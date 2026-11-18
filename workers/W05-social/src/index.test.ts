@@ -2355,11 +2355,14 @@ describe('W05 social poll transport', () => {
     expect(missingKey.status).toBe(428)
   })
 
-  it('registers Expo push endpoints only in scoped D1-03 using the W01-derived principal', async () => {
+  it('registers Expo push endpoints through the W09-owned Neon D1-03 executor using the W01 principal', async () => {
     const token = 'ExponentPushToken[abcdefghijklmnop_1234567890]'
-    const d1_02 = dbFor()
-    const d1_03 = dbFor([{ endpoint_id: 'endpoint-1', permission_status: 'granted' }])
-    const response = await worker.fetch(
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({
+      rows: [{ endpoint_id: 'endpoint-1', permission_status: 'granted' }],
+    }))
+    const pushWorker = createW05SocialWorker({ pushEndpointDatabase: { query } as never })
+    const socialDb = dbFor()
+    const response = await pushWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
         method: 'PUT',
         headers: { ...transportHeaders, 'content-type': 'application/json' },
@@ -2370,24 +2373,25 @@ describe('W05 social poll transport', () => {
           appVersion: '1.0.0',
         }),
       }),
-      { DB: d1_02, D1_03: d1_03 },
+      { DB: socialDb },
     )
 
     expect(response.status).toBe(200)
     const responseText = await response.text()
-    expect(JSON.parse(responseText)).toMatchObject({
-      data: { endpointId: 'endpoint-1', status: 'ACTIVE' },
-    })
+    expect(JSON.parse(responseText)).toMatchObject({ data: { endpointId: 'endpoint-1', status: 'ACTIVE' } })
     expect(responseText).not.toContain(token)
-    expect((d1_02 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
-    expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).toHaveBeenCalledTimes(1)
-    expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare.mock.calls[0]?.[0])
-      .toContain('notification_push_endpoints')
+    expect(query).toHaveBeenCalledOnce()
+    expect(query.mock.calls[0]?.[0]).toContain('INSERT INTO notification_push_endpoints')
+    expect(query.mock.calls[0]?.[0]).toContain('WHERE notification_push_endpoints.owner_user_id = EXCLUDED.owner_user_id')
+    expect(query.mock.calls[0]?.[1]).toContain('viewer-1')
+    expect(query.mock.calls[0]?.[1]).toContain(token)
+    expect((socialDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
-  it('rejects caller-supplied owner fields before touching D1-03', async () => {
-    const d1_03 = dbFor()
-    const response = await worker.fetch(
+  it('rejects caller-supplied owner fields before touching the Neon endpoint executor', async () => {
+    const query = vi.fn()
+    const pushWorker = createW05SocialWorker({ pushEndpointDatabase: { query } as never })
+    const response = await pushWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
         method: 'PUT',
         headers: { ...transportHeaders, 'content-type': 'application/json' },
@@ -2398,15 +2402,18 @@ describe('W05 social poll transport', () => {
           expoPushToken: 'ExponentPushToken[abcdefghijklmnop_1234567890]',
         }),
       }),
-      { DB: dbFor(), D1_03: d1_03 },
+      { DB: dbFor() },
     )
     expect(response.status).toBe(422)
-    expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect(query).not.toHaveBeenCalled()
   })
 
-  it('clears an endpoint token when permission is no longer granted', async () => {
-    const d1_03 = dbFor([{ endpoint_id: 'endpoint-1', permission_status: 'denied' }])
-    const response = await worker.fetch(
+  it('clears endpoint tokens when permission is no longer granted', async () => {
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({
+      rows: [{ endpoint_id: 'endpoint-1', permission_status: 'denied' }],
+    }))
+    const pushWorker = createW05SocialWorker({ pushEndpointDatabase: { query } as never })
+    const response = await pushWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
         method: 'PUT',
         headers: { ...transportHeaders, 'content-type': 'application/json' },
@@ -2416,29 +2423,32 @@ describe('W05 social poll transport', () => {
           expoPushToken: 'ExponentPushToken[abcdefghijklmnop_1234567890]',
         }),
       }),
-      { DB: dbFor(), D1_03: d1_03 },
+      { DB: dbFor() },
     )
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { endpointId: 'endpoint-1', status: 'DISABLED' },
-    })
+    await expect(response.json()).resolves.toMatchObject({ data: { endpointId: 'endpoint-1', status: 'DISABLED' } })
+    expect(query.mock.calls[0]?.[1]?.[4]).toBeNull()
+    expect(query.mock.calls[0]?.[1]?.[5]).toBe('denied')
   })
 
-  it("deletes only the current user's push endpoint from D1-03", async () => {
-    const d1_03 = dbFor()
-    const response = await worker.fetch(
+  it("deletes only the current user's push endpoint in W09's Neon D1-03 domain", async () => {
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({ rows: [] }))
+    const pushWorker = createW05SocialWorker({ pushEndpointDatabase: { query } as never })
+    const response = await pushWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
         method: 'DELETE',
         headers: transportHeaders,
       }),
-      { DB: dbFor(), D1_03: d1_03 },
+      { DB: dbFor() },
     )
     expect(response.status).toBe(204)
-    expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare.mock.calls[0]?.[0])
-      .toContain('WHERE owner_user_id = ? AND installation_id = ?')
+    expect(query.mock.calls[0]?.[0]).toBe(
+      'DELETE FROM notification_push_endpoints WHERE owner_user_id = $1 AND installation_id = $2',
+    )
+    expect(query.mock.calls[0]?.[1]).toEqual(['viewer-1', '6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c'])
   })
 
-  it('fails closed when the scoped W05 D1-03 binding is missing', async () => {
+  it('fails closed when the W09-owned Neon D1-03 endpoint executor is missing', async () => {
     const socialDb = dbFor()
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
@@ -2451,25 +2461,28 @@ describe('W05 social poll transport', () => {
     expect((socialDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
-  it('requires L2 before push endpoint registration touches D1-03', async () => {
-    const d1_03 = dbFor()
-    const response = await worker.fetch(
+  it('requires L2 before endpoint mutations reach the Neon executor', async () => {
+    const query = vi.fn()
+    const pushWorker = createW05SocialWorker({ pushEndpointDatabase: { query } as never })
+    const response = await pushWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
         method: 'DELETE',
         headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L1' },
       }),
-      { DB: dbFor(), D1_03: d1_03 },
+      { DB: dbFor() },
     )
     expect(response.status).toBe(403)
-    expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect(query).not.toHaveBeenCalled()
   })
-
 
   it('applies W05 origin and authenticated-actor write limits to push endpoint registration', async () => {
     const globalLimiter = { limit: vi.fn(async () => ({ success: true })) }
     const actorLimiter = { limit: vi.fn(async () => ({ success: true })) }
-    const d1_03 = dbFor([{ endpoint_id: 'endpoint-1', permission_status: 'granted' }])
-    const response = await worker.fetch(
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({
+      rows: [{ endpoint_id: 'endpoint-1', permission_status: 'granted' }],
+    }))
+    const pushWorker = createW05SocialWorker({ pushEndpointDatabase: { query } as never })
+    const response = await pushWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
         method: 'PUT',
         headers: { ...transportHeaders, 'content-type': 'application/json' },
@@ -2479,43 +2492,27 @@ describe('W05 social poll transport', () => {
           expoPushToken: 'ExponentPushToken[abcdefghijklmnop_1234567890]',
         }),
       }),
-      {
-        DB: dbFor(),
-        D1_03: d1_03,
-        SOCIAL_ORIGIN_GLOBAL_LIMITER: globalLimiter,
-        SOCIAL_WRITE_LIMITER: actorLimiter,
-      },
+      { DB: dbFor(), SOCIAL_ORIGIN_GLOBAL_LIMITER: globalLimiter, SOCIAL_WRITE_LIMITER: actorLimiter },
     )
-
     expect(response.status).toBe(200)
-    expect(globalLimiter.limit).toHaveBeenCalledWith({
-      key: 'origin:write:/internal/social/push-endpoints',
-    })
-    expect(actorLimiter.limit).toHaveBeenCalledWith({
-      key: 'write:/internal/social/push-endpoints:user:viewer-1',
-    })
+    expect(globalLimiter.limit).toHaveBeenCalledWith({ key: 'origin:write:/internal/social/push-endpoints' })
+    expect(actorLimiter.limit).toHaveBeenCalledWith({ key: 'write:/internal/social/push-endpoints:user:viewer-1' })
   })
 
   it('rejects a push endpoint write when the authenticated-actor limiter blocks it', async () => {
     const actorLimiter = { limit: vi.fn(async () => ({ success: false })) }
-    const d1_03 = dbFor()
-    const response = await worker.fetch(
+    const query = vi.fn()
+    const pushWorker = createW05SocialWorker({ pushEndpointDatabase: { query } as never })
+    const response = await pushWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
         method: 'DELETE',
         headers: transportHeaders,
       }),
-      {
-        DB: dbFor(),
-        D1_03: d1_03,
-        SOCIAL_WRITE_LIMITER: actorLimiter,
-      },
+      { DB: dbFor(), SOCIAL_WRITE_LIMITER: actorLimiter },
     )
-
     expect(response.status).toBe(429)
-    expect(actorLimiter.limit).toHaveBeenCalledWith({
-      key: 'write:/internal/social/push-endpoints:user:viewer-1',
-    })
-    expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect(actorLimiter.limit).toHaveBeenCalledWith({ key: 'write:/internal/social/push-endpoints:user:viewer-1' })
+    expect(query).not.toHaveBeenCalled()
   })
 
 })

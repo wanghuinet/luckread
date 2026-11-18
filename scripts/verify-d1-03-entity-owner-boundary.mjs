@@ -79,11 +79,12 @@ if (
 }
 const d1_03References = w05Source.match(/env\.D1_03/g) ?? []
 if (
-  d1_03References.length !== 2 ||
-  !w05Source.includes('upsertPushEndpoint(env.D1_03') ||
-  !w05Source.includes('deletePushEndpoint(env.D1_03')
+  d1_03References.length !== 0 ||
+  !w05Entry.includes('pushEndpointDatabase: getW05PushEndpointPostgresDatabase(env)') ||
+  !w05Source.includes('upsertPushEndpoint(dependencies.pushEndpointDatabase') ||
+  !w05Source.includes('deletePushEndpoint(dependencies.pushEndpointDatabase')
 ) {
-  throw new Error('W05 may reference D1_03 only for the two delegated NotificationPushEndpoint operations')
+  throw new Error('W05 must use the existing HYPERDRIVE_D1_03 Neon executor for the two delegated NotificationPushEndpoint operations, with no D1_03 binding fallback')
 }
 
 const w09MigrationConfig = JSON.parse(readFileSync(w09MigrationConfigPath, 'utf8'))

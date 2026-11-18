@@ -89,7 +89,6 @@ interface Env {
   HYPERDRIVE_D1_02?: { connectionString?: string }
   W05_PUSH_ENDPOINT_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_03?: { connectionString?: string }
-  D1_03?: D1Database
   W03_CONTENT?: W03ContentBinding
   SOCIAL_READ_LIMITER?: RateLimitBinding
   SOCIAL_WRITE_LIMITER?: RateLimitBinding
@@ -295,7 +294,7 @@ function requireSocialClosureReadStore(source: SocialClosureReadStore | undefine
 }
 
 export type W05SocialWorkerDependencies = Readonly<{
-  /** W09-owned D1-03 endpoint mutations use the separately scoped Neon connection when enabled. */
+  /** W09-owned D1-03 endpoint mutations require the separately scoped Neon PostgreSQL executor. */
   pushEndpointDatabase?: PushEndpointPostgresExecutor
   /** Required Neon PostgreSQL follower/following list reader; missing composition fails closed. */
   followListReadStore?: FollowListReadStore
@@ -762,11 +761,17 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           try { body = await request.json() } catch {
             throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
           }
-          const data = await upsertPushEndpoint(env.D1_03, actorUserId, installationId, body, dependencies.pushEndpointDatabase)
+          if (!dependencies.pushEndpointDatabase) {
+            throw new PushEndpointRuntimeError('SERVICE_UNAVAILABLE', 503)
+          }
+          const data = await upsertPushEndpoint(dependencies.pushEndpointDatabase, actorUserId, installationId, body)
           return json({ data, requestId: createRequestId() })
         }
         if (request.method === 'DELETE') {
-          await deletePushEndpoint(env.D1_03, actorUserId, installationId, dependencies.pushEndpointDatabase)
+          if (!dependencies.pushEndpointDatabase) {
+            throw new PushEndpointRuntimeError('SERVICE_UNAVAILABLE', 503)
+          }
+          await deletePushEndpoint(dependencies.pushEndpointDatabase, actorUserId, installationId)
           return new Response(null, { status: 204 })
         }
         return new Response(null, { status: 405, headers: { Allow: 'PUT, DELETE' } })

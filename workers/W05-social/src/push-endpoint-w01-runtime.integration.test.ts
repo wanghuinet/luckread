@@ -1,8 +1,6 @@
 // @vitest-environment node
 
-import { readFileSync } from 'node:fs'
-import { DatabaseSync } from 'node:sqlite'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const bridge = vi.hoisted(() => ({
   w05Fetch: vi.fn(),
@@ -52,7 +50,8 @@ vi.mock('../../W01-payload/src/auth/traffic-limit.js', () => ({
   rateLimitResponse: bridge.rateLimitResponse,
 }))
 
-import w05Worker from './index.js'
+import { createW05SocialWorker } from './index.js'
+import type { PushEndpointPostgresExecutor } from './push-endpoint-runtime.js'
 import { DELETE, PUT } from '../../W01-payload/src/app/api/v1/push/endpoints/[installationId]/route.js'
 
 const installationId = '6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c'
@@ -60,41 +59,54 @@ const token = 'ExponentPushToken[abcdefghijklmnop_1234567890]'
 const principal = { userId: 'w02-user-0001', layer: 'L2', verified: true }
 const context = { params: Promise.resolve({ installationId }) }
 
-function createD1Sqlite() {
-  const sqlite = new DatabaseSync(':memory:')
-  sqlite.exec(readFileSync(
-    new URL('../../W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql', import.meta.url),
-    'utf8',
-  ))
-
-  const db = {
-    prepare(sql: string) {
-      const statement = sqlite.prepare(sql)
-      let values: unknown[] = []
-      const bound = {
-        bind(...next: unknown[]) {
-          values = next
-          return bound
-        },
-        async first<T>() {
-          return (statement.get(...values as (string | number | null)[]) as T | undefined) ?? null
-        },
-        async run() {
-          const result = statement.run(...values as (string | number | null)[])
-          return { success: true, meta: { changes: Number(result.changes) } }
-        },
-        async all<T>() {
-          return { results: statement.all(...values as (string | number | null)[]) as T[] }
-        },
-      }
-      return bound
-    },
-  } as unknown as D1Database
-
-  return { db, sqlite, close: () => sqlite.close() }
+type PushEndpointRecord = {
+  endpoint_id: string
+  installation_id: string
+  owner_user_id: string
+  provider: 'expo'
+  platform: string
+  push_token: string | null
+  permission_status: string
 }
 
-let d1: ReturnType<typeof createD1Sqlite>
+function createPushEndpointDatabase() {
+  const endpoints = new Map<string, PushEndpointRecord>()
+  const query = vi.fn(async (sql: string, values: unknown[] = []) => {
+    if (sql.startsWith('INSERT INTO notification_push_endpoints')) {
+      const [endpointId, installationId, ownerUserId, platform, pushToken, permissionStatus] = values as [string, string, string, string, string | null, string]
+      const existing = endpoints.get(installationId)
+      if (existing && existing.owner_user_id !== ownerUserId) return { rows: [] }
+      if (pushToken !== null && [...endpoints.values()].some(row => row.installation_id !== installationId && row.push_token === pushToken)) {
+        throw Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505' })
+      }
+      const row: PushEndpointRecord = {
+        endpoint_id: existing?.endpoint_id ?? endpointId,
+        installation_id: installationId,
+        owner_user_id: ownerUserId,
+        provider: 'expo',
+        platform,
+        push_token: pushToken,
+        permission_status: permissionStatus,
+      }
+      endpoints.set(installationId, row)
+      return { rows: [{ endpoint_id: row.endpoint_id, permission_status: row.permission_status }] }
+    }
+    if (sql === 'DELETE FROM notification_push_endpoints WHERE owner_user_id = $1 AND installation_id = $2') {
+      const [ownerUserId, installationId] = values as [string, string]
+      if (endpoints.get(installationId)?.owner_user_id === ownerUserId) endpoints.delete(installationId)
+      return { rows: [] }
+    }
+    throw new Error('UNEXPECTED_PUSH_ENDPOINT_SQL')
+  })
+  return {
+    database: { query } as unknown as PushEndpointPostgresExecutor,
+    endpoints,
+    query,
+  }
+}
+
+let pushDb: ReturnType<typeof createPushEndpointDatabase>
+let w05Worker: ReturnType<typeof createW05SocialWorker>
 
 const requestFor = (method: 'PUT' | 'DELETE', body?: unknown, key = 'idem_w05_binding_0001') =>
   new Request('https://www.luckread.com/api/v1/push/endpoints/' + installationId, {
@@ -122,7 +134,8 @@ async function expectRouteStatus(response: Response, expected: number): Promise<
 
 describe('W01 to W05 push endpoint service-binding integration', () => {
   beforeEach(() => {
-    d1 = createD1Sqlite()
+    pushDb = createPushEndpointDatabase()
+    w05Worker = createW05SocialWorker({ pushEndpointDatabase: pushDb.database })
     vi.clearAllMocks()
     bridge.resolvePrincipal.mockResolvedValue(principal)
     bridge.authorize.mockImplementation(async (request: Request) => {
@@ -153,18 +166,12 @@ describe('W01 to W05 push endpoint service-binding integration', () => {
     )
     bridge.w05Fetch.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init)
-      const runtime = w05Worker as unknown as {
-        fetch(request: Request, env: unknown): Promise<Response>
-      }
-      return runtime.fetch(request, { DB: d1.db, D1_03: d1.db })
+      return w05Worker.fetch(request, {} as never)
     })
   })
 
-  afterEach(() => {
-    d1.close()
-  })
 
-  it('executes the real W01 route and W05 Worker, persisting an Expo endpoint in SQLite D1-03', async () => {
+  it('executes the real W01 route and W05 Worker, persisting an Expo endpoint through the injected Neon D1-03 executor', async () => {
     const response = await PUT(requestFor('PUT', {
       platform: 'android',
       permissionStatus: 'granted',
@@ -188,9 +195,7 @@ describe('W01 to W05 push endpoint service-binding integration', () => {
     expect(forwarded.headers.has('Authorization')).toBe(false)
     expect(forwarded.headers.has('Cookie')).toBe(false)
 
-    const stored = d1.sqlite.prepare(
-      'SELECT endpoint_id, installation_id, owner_user_id, provider, platform, push_token, permission_status FROM notification_push_endpoints WHERE installation_id = ?',
-    ).get(installationId) as Record<string, string>
+    const stored = pushDb.endpoints.get(installationId)
     expect(stored).toMatchObject({
       endpoint_id: responseBody.data.endpointId,
       installation_id: installationId,
@@ -202,7 +207,7 @@ describe('W01 to W05 push endpoint service-binding integration', () => {
     })
   })
 
-  it('uses the real W05 owner predicate and cannot let a second account claim an installation', async () => {
+  it('uses the PostgreSQL owner predicate and cannot let a second account claim an installation', async () => {
     const first = await PUT(requestFor('PUT', {
       platform: 'ios', permissionStatus: 'granted', expoPushToken: token,
     }, 'idem_owner_first_0001'), context)
@@ -218,13 +223,12 @@ describe('W01 to W05 push endpoint service-binding integration', () => {
     }, 'idem_owner_second_0002'), context)
 
     await expectRouteStatus(second, 409)
-    const stored = d1.sqlite.prepare(
-      'SELECT owner_user_id, push_token FROM notification_push_endpoints WHERE installation_id = ?',
-    ).get(installationId) as { owner_user_id: string; push_token: string }
+    const row = pushDb.endpoints.get(installationId)
+    const stored = row && { owner_user_id: row.owner_user_id, push_token: row.push_token }
     expect(stored).toEqual({ owner_user_id: principal.userId, push_token: token })
   })
 
-  it('clears the actual D1-03 token when the authenticated user denies notification permission', async () => {
+  it('clears the stored Expo token when the authenticated user denies notification permission', async () => {
     const first = await PUT(requestFor('PUT', {
       platform: 'android', permissionStatus: 'granted', expoPushToken: token,
     }, 'idem_enable_device_0001'), context)
@@ -236,9 +240,8 @@ describe('W01 to W05 push endpoint service-binding integration', () => {
     await expectRouteStatus(disabled, 200)
     expect(await disabled.json()).toMatchObject({ data: { status: 'DISABLED' } })
 
-    const stored = d1.sqlite.prepare(
-      'SELECT permission_status, push_token FROM notification_push_endpoints WHERE installation_id = ?',
-    ).get(installationId) as { permission_status: string; push_token: string | null }
+    const row = pushDb.endpoints.get(installationId)
+    const stored = row && { permission_status: row.permission_status, push_token: row.push_token }
     expect(stored).toEqual({ permission_status: 'denied', push_token: null })
   })
 
@@ -253,13 +256,11 @@ describe('W01 to W05 push endpoint service-binding integration', () => {
     })
     const otherOwnerDelete = await DELETE(requestFor('DELETE', undefined, 'idem_wrong_owner_delete_0002'), context)
     await expectRouteStatus(otherOwnerDelete, 204)
-    expect(d1.sqlite.prepare('SELECT endpoint_id FROM notification_push_endpoints WHERE installation_id = ?')
-      .get(installationId)).toBeTruthy()
+    expect(pushDb.endpoints.has(installationId)).toBe(true)
 
     const ownerDelete = await DELETE(requestFor('DELETE', undefined, 'idem_right_owner_delete_0003'), context)
     await expectRouteStatus(ownerDelete, 204)
-    expect(d1.sqlite.prepare('SELECT endpoint_id FROM notification_push_endpoints WHERE installation_id = ?')
-      .get(installationId)).toBeUndefined()
+    expect(pushDb.endpoints.has(installationId)).toBe(false)
   })
 
   it('records the authorization and audit order before touching the W05 service boundary', async () => {
