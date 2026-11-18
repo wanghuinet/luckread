@@ -40,14 +40,8 @@ import { createPostgresNotificationPushEndpointAccessStore } from '../notificati
 import type { NotificationPushEndpointAccessStore } from '../notification-push-endpoint-access-store.js'
 import type { PushEndpointPostgresExecutor } from '../push-endpoint-runtime.js'
 
-/**
- * @deprecated-next-version
- * Reason: Legacy D1 provider selection remains reachable from local/test callers.
- * Replacement: The Neon PostgreSQL stores composed by this module and src/entry.ts.
- * Removal: Next release.
- * Condition: Every W05 route and push workflow requires injected Neon stores; no D1-backed fallback remains.
- */
-export type W05SocialDatabaseDriver = 'd1' | 'neon'
+/** W05 D1-02 social routes run on Neon PostgreSQL only. */
+export type W05SocialDatabaseDriver = 'neon'
 
 export interface W05SocialRuntimeEnv {
   W05_DATABASE_DRIVER?: string
@@ -62,7 +56,6 @@ const compositions = new WeakMap<object, W05SocialWorkerDependencies>()
 const pushCompositions = new WeakMap<object, NotificationPushDeliveryRuntimeDependencies>()
 const pushEndpointAccessStores = new WeakMap<object, NotificationPushEndpointAccessStore>()
 const pushRuntimeCompositions = new WeakMap<object, WeakMap<object, NotificationPushDeliveryRuntimeDependencies>>()
-const EMPTY_DEPENDENCIES: W05SocialWorkerDependencies = Object.freeze({})
 
 function validateD103HyperdriveConnectionString(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 4096) {
@@ -111,8 +104,8 @@ export function getW05PushEndpointPostgresDatabase(
 export function resolveW05SocialDatabaseDriver(
   env: W05SocialRuntimeEnv,
 ): W05SocialDatabaseDriver {
-  const configured = env.W05_DATABASE_DRIVER?.trim().toLowerCase() || 'd1'
-  if (configured === 'd1' || configured === 'neon') return configured
+  const configured = env.W05_DATABASE_DRIVER?.trim().toLowerCase()
+  if (!configured || configured === 'neon') return 'neon'
   throw new Error('W05_DATABASE_DRIVER_UNSUPPORTED')
 }
 
@@ -165,17 +158,15 @@ function getPool(
 const asExecutor = <T>(pool: Pool): T => pool as unknown as T
 
 /**
- * Compose all W05 social-route PostgreSQL Stores with explicit injection ports,
- * including reply-audience policy and the full comment write/notification path.
- * W09-owned D1-03 push endpoint state remains on its separately scoped binding.
- * D1 remains the default; Neon is opt-in through the existing D1-02 Hyperdrive.
+ * Compose all W05 social-route PostgreSQL Stores with explicit injection ports.
+ * Neon is the only supported D1-02 runtime; missing Hyperdrive composition fails closed.
+ * W09-owned push endpoint state remains on its separately scoped D1-03 Hyperdrive binding.
  */
 export function getW05SocialWorkerDependencies(
   env: W05SocialRuntimeEnv,
   poolFactory: W05PoolFactory = (config) => new Pool(config),
 ): W05SocialWorkerDependencies {
-  if (resolveW05SocialDatabaseDriver(env) === 'd1') return EMPTY_DEPENDENCIES
-
+  resolveW05SocialDatabaseDriver(env)
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
     throw new Error('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
@@ -291,10 +282,7 @@ export function getW05NotificationPushDeliveryDependencies(
   env: W05SocialRuntimeEnv,
   poolFactory: W05PoolFactory = (config) => new Pool(config),
 ): NotificationPushDeliveryRuntimeDependencies {
-  if (resolveW05SocialDatabaseDriver(env) !== 'neon') {
-    throw new Error('W05_NOTIFICATION_PUSH_NEON_DATABASE_REQUIRED')
-  }
-
+  resolveW05SocialDatabaseDriver(env)
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
     throw new Error('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')

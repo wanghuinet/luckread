@@ -15,16 +15,19 @@ function fakePool(): Pool {
 }
 
 describe('W05 Neon runtime composition', () => {
-  it('keeps D1 as the safe default without creating a PostgreSQL pool', () => {
+  it('uses Neon as the only default runtime and requires its Hyperdrive binding', () => {
     const poolFactory = vi.fn(() => fakePool())
 
-    expect(resolveW05SocialDatabaseDriver({})).toBe('d1')
-    expect(getW05SocialWorkerDependencies({}, poolFactory)).toEqual({})
+    expect(resolveW05SocialDatabaseDriver({})).toBe('neon')
+    expect(() => getW05SocialWorkerDependencies({}, poolFactory))
+      .toThrow('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
     expect(poolFactory).not.toHaveBeenCalled()
   })
 
   it('rejects unsupported driver values and missing or invalid Hyperdrive connection strings', () => {
     expect(() => resolveW05SocialDatabaseDriver({ W05_DATABASE_DRIVER: 'mysql' }))
+      .toThrow('W05_DATABASE_DRIVER_UNSUPPORTED')
+    expect(() => resolveW05SocialDatabaseDriver({ W05_DATABASE_DRIVER: 'd1' }))
       .toThrow('W05_DATABASE_DRIVER_UNSUPPORTED')
     expect(() => getW05SocialWorkerDependencies({ W05_DATABASE_DRIVER: 'neon' }))
       .toThrow('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
@@ -165,7 +168,7 @@ describe('W05 Neon notification push composition', () => {
   it('fails closed instead of selecting D1 when the W05 social driver is not Neon', () => {
     const poolFactory = vi.fn(() => fakePool())
     expect(() => getW05NotificationPushDeliveryDependencies({ W05_DATABASE_DRIVER: 'd1' }, poolFactory))
-      .toThrow('W05_NOTIFICATION_PUSH_NEON_DATABASE_REQUIRED')
+      .toThrow('W05_DATABASE_DRIVER_UNSUPPORTED')
     expect(poolFactory).not.toHaveBeenCalled()
   })
 })

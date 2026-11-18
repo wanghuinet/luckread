@@ -132,3 +132,13 @@ Comment list reads now require the injected Neon PostgreSQL Store and fail close
 - Removed the unreferenced legacy `block-policy.ts` D1 query helper and its standalone test; repository-wide references showed no production caller.
 - Removed obsolete D1-only test files for Comment List Read and Comment Notification Context. Their production D1 adapters had already been removed; the PostgreSQL adapter tests remain the active storage verification.
 - No production route, Store contract, migration, database schema, Hyperdrive binding, Worker deployment, or traffic behavior changed. W05 Block/Mute enforcement remains in the active PostgreSQL Store queries.
+
+
+## W05 D1-02 runtime selection is Neon-only
+
+- Removed the legacy `d1` runtime mode from W05's D1-02 social database composition. Missing `W05_DATABASE_DRIVER` now resolves to Neon; explicit `d1` or any unsupported value is rejected.
+- `getW05SocialWorkerDependencies` no longer returns an empty dependency set for D1 mode. It requires the approved `HYPERDRIVE_D1_02` PostgreSQL binding and composes the existing Neon Stores.
+- Notification push delivery composition follows the same Neon-only rule. The unused driver property was removed from its runtime contract.
+- The production Wrangler config already selects Neon and pins the approved D1-02 and D1-03 Hyperdrive resources; this change does not deploy or alter either binding.
+- W09-owned push endpoint state remains separately scoped to the D1-03-named Hyperdrive PostgreSQL connection. This change removes the W05 D1-02 runtime mode only; it does not change W09 ownership or the test/local D1-03 compatibility adapter.
+- No schema, migration history, production database, Worker deployment, or traffic change.
