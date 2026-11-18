@@ -281,9 +281,6 @@ export async function readScheduledDowngradeTargetPlan(
   db: D1Database | W07WebhookPostgresPool,
   change: ScheduledSubscriptionPlanDowngrade,
 ): Promise<Readonly<{
-  if (isPostgresScheduledPlanStore(db)) {
-    return readScheduledDowngradeTargetPlanPostgres(db, change);
-  }
   planId: string;
   planVersion: number;
   name: string;
@@ -294,6 +291,9 @@ export async function readScheduledDowngradeTargetPlan(
   benefits: string[];
   creatorId: string;
 }> | null> {
+  if (isPostgresScheduledPlanStore(db)) {
+    return readScheduledDowngradeTargetPlanPostgres(db, change);
+  }
   let row: {
     plan_id: string; plan_version: number; owner_type: string; owner_id: string;
     name: string; tier: string; billing_interval: string; price_minor: number;
