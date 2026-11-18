@@ -9,9 +9,12 @@ import {
   parseHyperswitchRfc3339Timestamp,
 } from './hyperswitch-webhook-signature.js';
 import type { HyperswitchPayment } from './hyperswitch-client.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import { validateHyperswitchPaymentWebhook } from './hyperswitch-webhook-payment-validation.js';
 import { buildCompletePaymentMethodRevocationOnMandateWebhook } from './payment-method-persistence.js';
 import { persistHyperswitchRefundWebhook } from './refund-webhook-persistence.js';
+
+export type PaymentPersistenceDatabase = D1Database | W07WebhookPostgresPool;
 
 export type PaymentAttemptStatus =
   | 'INITIATING'
@@ -316,11 +319,59 @@ function toDto(row: PaymentRow): PaymentAttemptDto {
   };
 }
 
+const PAYMENT_ROW_COLUMNS =
+  'payment_id, order_id, customer_id, provider, merchant_id, amount_minor::double precision AS amount_minor, ' +
+  'currency, status, version::double precision AS version, idempotency_key, request_hash, ' +
+  `CASE WHEN provider_updated_at IS NULL THEN NULL ELSE to_char(provider_updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS provider_updated_at, ` +
+  'failure_code, ' +
+  `to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
+  `to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at`;
+
+function isPostgresPaymentPersistenceDatabase(
+  db: PaymentPersistenceDatabase,
+): db is W07WebhookPostgresPool {
+  return typeof (db as W07WebhookPostgresPool).query === 'function';
+}
+
+async function readPaymentByIdAndCustomer(
+  db: PaymentPersistenceDatabase,
+  paymentId: string,
+  customerId: string,
+): Promise<PaymentRow | null> {
+  if (isPostgresPaymentPersistenceDatabase(db)) {
+    try {
+      const result = await db.query<PaymentRow & Record<string, unknown>>(
+        `SELECT ${PAYMENT_ROW_COLUMNS} FROM payments WHERE payment_id = $1 AND customer_id = $2 LIMIT 1`,
+        [paymentId, customerId],
+      );
+      return result.rows[0] ?? null;
+    } catch {
+      throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+    }
+  }
+  return db.prepare(
+    'SELECT payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, status, version, ' +
+    'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at ' +
+    'FROM payments WHERE payment_id = ? AND customer_id = ? LIMIT 1',
+  ).bind(paymentId, customerId).first<PaymentRow>();
+}
+
 async function readPaymentByCustomerAndKey(
-  db: D1Database,
+  db: PaymentPersistenceDatabase,
   customerId: string,
   idempotencyKey: string,
 ): Promise<PaymentRow | null> {
+  if (isPostgresPaymentPersistenceDatabase(db)) {
+    try {
+      const result = await db.query<PaymentRow & Record<string, unknown>>(
+        `SELECT ${PAYMENT_ROW_COLUMNS} FROM payments WHERE customer_id = $1 AND idempotency_key = $2 LIMIT 1`,
+        [customerId, idempotencyKey],
+      );
+      return result.rows[0] ?? null;
+    } catch {
+      throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+    }
+  }
   return db.prepare(
     'SELECT payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, status, version, ' +
     'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at ' +
@@ -329,10 +380,21 @@ async function readPaymentByCustomerAndKey(
 }
 
 async function readPaymentByOrder(
-  db: D1Database,
+  db: PaymentPersistenceDatabase,
   customerId: string,
   orderId: string,
 ): Promise<PaymentRow | null> {
+  if (isPostgresPaymentPersistenceDatabase(db)) {
+    try {
+      const result = await db.query<PaymentRow & Record<string, unknown>>(
+        `SELECT ${PAYMENT_ROW_COLUMNS} FROM payments WHERE customer_id = $1 AND order_id = $2 AND status NOT IN ('failed','cancelled','cancelled_post_capture','expired') LIMIT 1`,
+        [customerId, orderId],
+      );
+      return result.rows[0] ?? null;
+    } catch {
+      throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+    }
+  }
   return db.prepare(
     'SELECT payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, status, version, ' +
     'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at ' +
