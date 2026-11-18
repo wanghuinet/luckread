@@ -17,7 +17,7 @@ describe('content liker list adapter and UI', () => {
     expect(route).not.toContain('env.DB')
   })
 
-  it('uses an authoritative, bounded W05 query with stable pagination and block filters', () => {
+  it('uses the authoritative bounded PostgreSQL W05 query with stable pagination and block filters', () => {
     const runtime = read('../W05-social/src/like-list-runtime.ts')
     const providerNeutralStore = read('../W05-social/src/like-list-read-store.ts')
     const postgresStore = read('../W05-social/src/like-list-read-store-postgres.ts')
@@ -41,56 +41,6 @@ describe('content liker list adapter and UI', () => {
     expect(postgresStore).toContain("liker_block.relation_type = 'block'")
     expect(postgresStore).toContain('ORDER BY il.created_at DESC, il.relationship_id DESC')
     expect(postgresStore).toContain('LIMIT')
-
-  it('opens a responsive liked-by dialog from the count without replacing like/unlike', () => {
-    const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    const modal = read('src/app/(frontend)/content/[contentId]/ContentLikesModal.tsx')
-    expect(detail).toContain('onClick={() => setLikesOpen(true)}')
-    expect(detail).toContain('onClick={() => void toggleLike()}')
-    expect(detail).toContain('<ContentLikesModal')
-    expect(modal).toContain('aria-modal="true"')
-    expect(modal).toContain('aria-labelledby="content-likes-title"')
-    expect(modal).toContain("limit: '20'")
-    expect(modal).toContain('cursor: nextCursor')
-    expect(modal).toContain('TwitterCloneFollowRow')
-    expect(modal).toContain('requestControllerRef.current?.abort()')
-  })
-})
-)
-  })
-
-  it('opens a responsive liked-by dialog from the count without replacing like/unlike', () => {
-    const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    const modal = read('src/app/(frontend)/content/[contentId]/ContentLikesModal.tsx')
-    expect(detail).toContain('onClick={() => setLikesOpen(true)}')
-    expect(detail).toContain('onClick={() => void toggleLike()}')
-    expect(detail).toContain('<ContentLikesModal')
-    expect(modal).toContain('aria-modal="true"')
-    expect(modal).toContain('aria-labelledby="content-likes-title"')
-    expect(modal).toContain("limit: '20'")
-    expect(modal).toContain('cursor: nextCursor')
-    expect(modal).toContain('TwitterCloneFollowRow')
-    expect(modal).toContain('requestControllerRef.current?.abort()')
-  })
-})
-)
-  })
-
-  it('opens a responsive liked-by dialog from the count without replacing like/unlike', () => {
-    const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    const modal = read('src/app/(frontend)/content/[contentId]/ContentLikesModal.tsx')
-    expect(detail).toContain('onClick={() => setLikesOpen(true)}')
-    expect(detail).toContain('onClick={() => void toggleLike()}')
-    expect(detail).toContain('<ContentLikesModal')
-    expect(modal).toContain('aria-modal="true"')
-    expect(modal).toContain('aria-labelledby="content-likes-title"')
-    expect(modal).toContain("limit: '20'")
-    expect(modal).toContain('cursor: nextCursor')
-    expect(modal).toContain('TwitterCloneFollowRow')
-    expect(modal).toContain('requestControllerRef.current?.abort()')
-  })
-})
-)
   })
 
   it('opens a responsive liked-by dialog from the count without replacing like/unlike', () => {
