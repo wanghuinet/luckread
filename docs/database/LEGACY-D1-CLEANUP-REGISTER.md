@@ -184,3 +184,12 @@
 - Preserved W03 ownership/publication authority, Block checks, bounded option/duration validation, lazy publication-relative expiry, vote idempotency and immutable choice, closed-poll rejection, and no-delete/no-reconfigure-after-vote rules.
 - Updated poll runtime tests to use provider-neutral Store fixtures and updated PostgreSQL rehearsal scripts to call Store-only runtime APIs.
 - Scope: Poll lifecycle only. No production database/schema, Hyperdrive binding, Worker deployment, or traffic change.
+
+
+## W05 Profile Channel replies / likes
+
+- Removed `ProfileChannelD1QueryExecutor` and `createD1ProfileChannelReadStore`.
+- Profile Channel runtime functions now accept only `ProfileChannelReadStore`; both replies and likes routes require the injected Neon PostgreSQL Store and fail closed with 503 when missing. No Profile Channel `env.DB` fallback remains.
+- Existing PostgreSQL implementation `createPostgresProfileChannelReadStore` remains composed by `workers/W05-social/src/neon/runtime.ts`.
+- Preserved W03 published-content batch authority, profile-level Block/Mute checks, owner Block checks, profile/viewer Block and viewer Mute filters for liked content, bounded cursor pagination and microsecond timestamp precision.
+- Runtime tests now use Store fixtures; route tests verify missing-store fail-closed behavior. No production DB/schema, Hyperdrive binding, Worker deployment, or traffic change.

@@ -341,7 +341,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   blockMuteListReadStore?: BlockMuteListReadStore
   /** Optional PostgreSQL Block/Mute relation store; missing composition fails closed. */
   blockMuteRelationStore?: BlockMuteRelationStore
-  /** Optional PostgreSQL-capable profile replies/likes reader; D1 remains the deployed default. */
+  /** Neon PostgreSQL Profile Channel reader; routes fail closed when missing. */
   profileChannelReadStore?: ProfileChannelReadStore
   /** Optional PostgreSQL-capable content-liker page reader; D1 remains the deployed default. */
   contentLikerReadStore?: ContentLikerReadStore
@@ -1291,10 +1291,10 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new ProfileChannelRuntimeError('INVALID_CURSOR', 400)
         const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
-        const profileChannelSource = dependencies.profileChannelReadStore ?? env.DB
+        if (!dependencies.profileChannelReadStore) throw new ProfileChannelRuntimeError('SERVICE_UNAVAILABLE', 503)
         const data = profileChannel.kind === 'replies'
-          ? await listProfileReplies(profileChannelSource, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
-          : await listProfileLikedContents(profileChannelSource, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
+          ? await listProfileReplies(dependencies.profileChannelReadStore, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
+          : await listProfileLikedContents(dependencies.profileChannelReadStore, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
         return json({ data, requestId: createRequestId() })
       }
 

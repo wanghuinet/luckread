@@ -88,3 +88,12 @@ Comment list reads now require the injected Neon PostgreSQL Store and fail close
 - Preserved W03 published/owned-post validation, owner-only draft preview and configuration, bidirectional Block filtering, option and duration validation, publication-based lazy expiry, vote aggregation and viewer choice, one-vote idempotency, closed-poll enforcement, and protection against deleting/reconfiguring polls after votes exist.
 - Existing PostgreSQL adapters, SQL tests and local PostgreSQL 18 rehearsal scripts remain the storage verification path.
 - This closes the Poll business slice only. Other W05 routes may still have separate legacy D1 adapters/fallbacks.
+
+
+## W05 Profile Channel replies / likes
+
+- Removed the D1 Profile Channel query executor and `createD1ProfileChannelReadStore` adapter.
+- `listProfileReplies` and `listProfileLikedContents` now accept only the explicit `ProfileChannelReadStore` port; the runtime no longer detects a D1 database or constructs a fallback adapter.
+- Both profile channel HTTP routes require the Neon PostgreSQL Store and return 503 when it is not composed; neither route falls back to `env.DB`.
+- Preserved W03 published-content batch validation, profile-level Block/Mute visibility, reply-owner Block filtering, liked-content Block filtering for profile and viewer, viewer Mute filtering, bounded pagination, profile/viewer-scoped opaque cursors, and PostgreSQL microsecond timestamp precision.
+- Existing PostgreSQL adapter and Neon runtime composition remain unchanged. This closes Profile Channel reads only; other W05 D1-compatible routes remain separate work.

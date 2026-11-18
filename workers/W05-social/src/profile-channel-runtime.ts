@@ -1,25 +1,10 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { fetchPublishedContentSocialContexts, type W03ContentBinding } from './w03-content-context-client.js'
-import {
-  createD1ProfileChannelReadStore,
-  ProfileChannelReadStoreError,
-  type ProfileChannelReadStore,
-} from './profile-channel-read-store.js'
+import { ProfileChannelReadStoreError, type ProfileChannelReadStore } from './profile-channel-read-store.js'
 
 export class ProfileChannelRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
-}
-
-type ProfileChannelDataSource = D1Database | ProfileChannelReadStore
-
-function resolveProfileChannelReadStore(source: ProfileChannelDataSource): ProfileChannelReadStore {
-  if (
-    typeof (source as ProfileChannelReadStore).profileVisibility === 'function' &&
-    typeof (source as ProfileChannelReadStore).listReplies === 'function' &&
-    typeof (source as ProfileChannelReadStore).listLikedContents === 'function'
-  ) return source as ProfileChannelReadStore
-  return createD1ProfileChannelReadStore(source as D1Database)
 }
 
 function mapProfileChannelReadError(error: unknown): never {
@@ -110,7 +95,7 @@ export type ProfileReplyPage = {
 }
 
 export async function listProfileReplies(
-  source: ProfileChannelDataSource,
+  store: ProfileChannelReadStore,
   w03Content: W03ContentBinding | undefined,
   profileUserIdValue: string,
   cursorValue: string | null,
@@ -121,7 +106,6 @@ export async function listProfileReplies(
   const profileUserId = validateId(profileUserIdValue)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue) : null
   const cursor = decodeCursor(cursorValue, 'replies', profileUserId, viewerUserId)
-  const store = resolveProfileChannelReadStore(source)
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
     throw new ProfileChannelRuntimeError('VALIDATION_FAILED', 400)
   }
@@ -199,7 +183,7 @@ export type ProfileLikedContentPage = {
 }
 
 export async function listProfileLikedContents(
-  source: ProfileChannelDataSource,
+  store: ProfileChannelReadStore,
   w03Content: W03ContentBinding | undefined,
   profileUserIdValue: string,
   cursorValue: string | null,
@@ -210,7 +194,6 @@ export async function listProfileLikedContents(
   const profileUserId = validateId(profileUserIdValue)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue) : null
   const cursor = decodeCursor(cursorValue, 'likes', profileUserId, viewerUserId)
-  const store = resolveProfileChannelReadStore(source)
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
     throw new ProfileChannelRuntimeError('VALIDATION_FAILED', 400)
   }
