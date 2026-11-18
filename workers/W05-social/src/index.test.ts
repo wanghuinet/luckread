@@ -897,7 +897,10 @@ describe('W05 social query transport', () => {
   })
 
   it('rejects replies outside the configured audience on the W05 comment route', async () => {
-    const response = await worker.fetch(
+    const store = makeCommentCreateStore({ reply_audience_allowed: false })
+    const injectedWorker = createW05SocialWorker({ commentCreateStore: store })
+    const d1Prepare = vi.fn(() => { throw new Error('D1 must not be used by Comment Create') })
+    const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/contents/content-1/comments', {
         method: 'POST',
         headers: {
@@ -908,22 +911,13 @@ describe('W05 social query transport', () => {
         },
         body: JSON.stringify({ body: 'Restricted reply', parentId: null }),
       }),
-      { DB: dbFor([{
-        content_state: 'PUBLISHED',
-        content_owner_user_id: 'owner-1',
-        parent_content_id: null,
-        parent_author_user_id: null,
-        parent_state: null,
-        parent_depth: null,
-        recent_count: 0,
-        blocked: 0,
-        reply_audience_allowed: 0,
-      }]) },
+      { DB: { prepare: d1Prepare } } as never,
+      {} as never,
     )
     expect(response.status).toBe(403)
-    await expect(response.json()).resolves.toMatchObject({
-      error: { code: 'PERMISSION_DENIED' },
-    })
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'PERMISSION_DENIED' } })
+    expect(store.insert).not.toHaveBeenCalled()
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('requires internal transport and rejects writes to profile channel routes', async () => {
