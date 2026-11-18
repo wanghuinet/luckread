@@ -227,113 +227,152 @@ describe('like runtime', () => {
     expect(statusStore.read).not.toHaveBeenCalled()
   })
 
-  it('binds the final content like write to published visibility and Block policy', async () => {
-    const d = db([{ blocked: 0 }, null])
-    await expect(like(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId)).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-      status: 404,
-    })
-    const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[1]?.[0])
-    expect(sql).toContain("c.state = 'PUBLISHED'")
-    expect(sql).toContain("block.relation_type = 'block'")
-    expect(sql).toContain('NOT EXISTS')
+  it('fails closed when the final injected Like Store rejects its published and Block guard', async () => {
+    const mutationStore = makeLikeMutationStore(null)
+    const targetContextStore = makeLikeTargetContextStore()
+    await expect(like(
+      publishedContextBinding('user-2'),
+      'user-1',
+      { targetType: 'content', targetId: 'content-1' },
+      correlationId,
+      undefined,
+      mutationStore,
+      targetContextStore,
+    )).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith('user-1', ['user-2'])
+    expect(mutationStore.create).toHaveBeenCalledWith(expect.objectContaining({
+      actorUserId: 'user-1',
+      targetType: 'content',
+      targetId: 'content-1',
+    }))
   })
 
-  it('creates a content like after verifying published visibility', async () => {
-    const d = db([
-      { blocked: 0 },
-      {
-        relationship_id: 'like-1',
-        actor_user_id: 'user-1',
-        target_type: 'content',
-        target_id: 'content-1',
-        created_at: '2026-10-02T00:00:00.000Z',
-      },
-    ])
-    await expect(like(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId)).resolves.toEqual({
+  it('creates a content like through the injected mutation Store after W03 and Block validation', async () => {
+    const row = {
+      relationship_id: 'like-1',
+      actor_user_id: 'user-1',
+      target_type: 'content' as const,
+      target_id: 'content-1',
+      created_at: '2026-10-02T00:00:00.000Z',
+    }
+    const mutationStore = makeLikeMutationStore(row)
+    const targetContextStore = makeLikeTargetContextStore()
+    const binding = publishedContextBinding('user-2')
+    await expect(like(binding, 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId, undefined, mutationStore, targetContextStore)).resolves.toEqual({
       relationshipId: 'like-1',
       actorUserId: 'user-1',
       targetType: 'content',
       targetId: 'content-1',
       createdAt: '2026-10-02T00:00:00.000Z',
     })
-    expect(d.prepare).toHaveBeenCalledTimes(2)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith('user-1', ['user-2'])
+    expect(mutationStore.create).toHaveBeenCalledWith(expect.objectContaining({
+      actorUserId: 'user-1',
+      targetType: 'content',
+      targetId: 'content-1',
+    }))
   })
 
-  it('rejects likes when the content owner has blocked the actor or is blocked by the actor', async () => {
-    const d = db([{ blocked: 1 }])
-    await expect(like(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId)).rejects.toMatchObject({
-      code: 'CONFLICT',
-      status: 409,
-    })
-    expect(d.prepare).toHaveBeenCalledTimes(1)
+  it('rejects likes when either direction of the content-owner Block exists', async () => {
+    const mutationStore = makeLikeMutationStore()
+    const targetContextStore = makeLikeTargetContextStore(true)
+    await expect(like(
+      publishedContextBinding('user-2'),
+      'user-1',
+      { targetType: 'content', targetId: 'content-1' },
+      correlationId,
+      undefined,
+      mutationStore,
+      targetContextStore,
+    )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith('user-1', ['user-2'])
+    expect(mutationStore.create).not.toHaveBeenCalled()
   })
 
-  it('is idempotent for an already-liked content item', async () => {
+  it('is idempotent for an already-liked content item through the injected Store', async () => {
     const existing = {
       relationship_id: 'like-existing',
       actor_user_id: 'user-1',
-      target_type: 'content',
+      target_type: 'content' as const,
       target_id: 'content-1',
       created_at: '2026-10-02T00:00:00.000Z',
     }
-    const d = db([{ blocked: 0 }, existing])
-    await expect(like(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId)).resolves.toMatchObject({
-      relationshipId: 'like-existing',
-      targetId: 'content-1',
-    })
+    const mutationStore = makeLikeMutationStore(existing)
+    await expect(like(
+      publishedContextBinding('user-2'),
+      'user-1',
+      { targetType: 'content', targetId: 'content-1' },
+      correlationId,
+      undefined,
+      mutationStore,
+      makeLikeTargetContextStore(),
+    )).resolves.toMatchObject({ relationshipId: 'like-existing', targetId: 'content-1' })
   })
 
-  it('rejects unpublished content without creating a like', async () => {
-    const d = db([])
-    await expect(like(d, publishedContextBinding('user-2', 404), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId)).rejects.toMatchObject({
+  it('rejects unpublished content before calling the injected Like Store', async () => {
+    const mutationStore = makeLikeMutationStore()
+    await expect(like(
+      publishedContextBinding('user-2', 404),
+      'user-1',
+      { targetType: 'content', targetId: 'content-1' },
+      correlationId,
+      undefined,
+      mutationStore,
+      makeLikeTargetContextStore(),
+    )).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(mutationStore.create).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when the final comment Like Store guard rejects the target', async () => {
+    const mutationStore = makeLikeMutationStore(null)
+    const targetContextStore = makeLikeTargetContextStore(false, {
+      id: 'comment-1',
+      state: 'PUBLISHED',
+      author_user_id: 'user-2',
+      content_id: 'content-1',
+    })
+    const binding = publishedContextBinding('user-3')
+    await expect(like(binding, 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId, undefined, mutationStore, targetContextStore)).rejects.toMatchObject({
       code: 'NOT_FOUND',
       status: 404,
     })
-    expect(d.prepare).not.toHaveBeenCalled()
+    expect(targetContextStore.readCommentTarget).toHaveBeenCalledWith('comment-1')
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith('user-1', ['user-2', 'user-3'])
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    expect(mutationStore.create).toHaveBeenCalledWith(expect.objectContaining({
+      targetType: 'comment',
+      parentOwnerUserId: 'user-3',
+    }))
   })
 
-  it('binds the final comment like write to published visibility and Block policy', async () => {
-    const d = db([
-      { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'user-2', content_id: 'content-1' },
-      { blocked: 0 },
-      null,
-    ])
-    await expect(like(d, publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId)).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-      status: 404,
+  it('creates a like on a published comment through the injected PostgreSQL Stores', async () => {
+    const row = {
+      relationship_id: 'comment-like-1',
+      actor_user_id: 'user-1',
+      target_type: 'comment' as const,
+      target_id: 'comment-1',
+      created_at: '2026-10-02T00:00:00.000Z',
+    }
+    const mutationStore = makeLikeMutationStore(row)
+    const targetContextStore = makeLikeTargetContextStore(false, {
+      id: 'comment-1',
+      state: 'PUBLISHED',
+      author_user_id: 'user-2',
+      content_id: 'content-1',
     })
-    const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[2]?.[0])
-    expect(sql).toContain("c.state = 'PUBLISHED'")
-    expect(sql).toContain("block.relation_type = 'block'")
-    expect(sql).toContain('NOT EXISTS')
-    expect(sql).not.toMatch(/(?:FROM|JOIN)\s+contents/i)
-  })
-
-  it('creates a like on a published comment after validating its parent content', async () => {
-    const d = db([
-      { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'user-2', content_id: 'content-1' },
-      { blocked: 0 },
-      {
-        relationship_id: 'comment-like-1',
-        actor_user_id: 'user-1',
-        target_type: 'comment',
-        target_id: 'comment-1',
-        created_at: '2026-10-02T00:00:00.000Z',
-      },
-    ])
-    await expect(like(d, publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId)).resolves.toEqual({
+    const binding = publishedContextBinding('user-3')
+    await expect(like(binding, 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId, undefined, mutationStore, targetContextStore)).resolves.toEqual({
       relationshipId: 'comment-like-1',
       actorUserId: 'user-1',
       targetType: 'comment',
       targetId: 'comment-1',
       createdAt: '2026-10-02T00:00:00.000Z',
     })
-    expect(d.prepare).toHaveBeenCalledTimes(3)
-    const sql = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([query]) => String(query))
-    expect(sql.every(query => !/(?:FROM|JOIN)\s+contents/i.test(query))).toBe(true)
-    expect(sql[2]).toContain('FROM social_comments c')
-    expect(sql[2]).toContain('block.target_user_id = ?')
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    expect(targetContextStore.readCommentTarget).toHaveBeenCalledWith('comment-1')
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith('user-1', ['user-2', 'user-3'])
+    expect(mutationStore.create).toHaveBeenCalledWith(expect.objectContaining({ parentOwnerUserId: 'user-3' }))
   })
 
   it('reads like status for a published comment through the injected PostgreSQL stores', async () => {
