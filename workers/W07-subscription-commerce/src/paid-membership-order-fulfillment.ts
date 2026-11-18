@@ -386,10 +386,21 @@ function matchesExistingSubscription(
 }
 
 async function readExistingSubscription(
-  db: D1Database,
+  db: FulfillmentDatabase,
   subscriptionId: string,
 ): Promise<ExistingSubscriptionRow | null> {
   try {
+    if (isPostgresFulfillmentDatabase(db)) {
+      const result = await db.query<ExistingSubscriptionRow & Record<string, unknown>>(
+        'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, ' +
+        'to_char(started_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS started_at, ' +
+        'to_char(current_period_start AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS current_period_start, ' +
+        'to_char(current_period_end AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS current_period_end, ' +
+        'entitlement_snapshot_ref FROM membership_subscriptions WHERE subscription_id = $1 LIMIT 1',
+        [subscriptionId],
+      )
+      return result.rows[0] ?? null
+    }
     return await db.prepare(
       'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, ' +
       'current_period_start, current_period_end, entitlement_snapshot_ref ' +
@@ -399,9 +410,8 @@ async function readExistingSubscription(
     return failClosed();
   }
 }
-
 async function createOrReplayPaidSubscription(
-  db: D1Database,
+  db: FulfillmentDatabase,
   input: {
     subscriptionId: string;
     subscriberId: string;
@@ -422,20 +432,39 @@ async function createOrReplayPaidSubscription(
 
   const entitlementSnapshotRef = 'commerce-order:' + input.orderId + ':line:' + input.lineId;
   try {
-    await db.prepare(
-      'INSERT INTO membership_subscriptions ' +
-      '(subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, ' +
-      'current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at, version) ' +
-      "VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?, NULL, ?, ?, ?, 1)",
-    ).bind(
-      input.subscriptionId, input.subscriberId, input.snapshot.planId, input.snapshot.planVersion,
-      input.snapshot.creatorId, input.periodStart, input.periodStart, input.periodEnd,
-      entitlementSnapshotRef, input.periodStart, input.periodStart,
-    ).run();
-  } catch (error) {
+    if (isPostgresFulfillmentDatabase(db)) {
+      const result = await db.query<{ subscription_id: string } & Record<string, unknown>>(
+        'INSERT INTO membership_subscriptions ' +
+        '(subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, ' +
+        'current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at, version) ' +
+        "VALUES ($1, $2, $3, $4, $5, 'ACTIVE', $6::timestamptz, $7::timestamptz, $8::timestamptz, NULL, $9, $10::timestamptz, $11::timestamptz, 1) " +
+        'ON CONFLICT (subscription_id) DO NOTHING RETURNING subscription_id',
+        [
+          input.subscriptionId, input.subscriberId, input.snapshot.planId, input.snapshot.planVersion,
+          input.snapshot.creatorId, input.periodStart, input.periodStart, input.periodEnd,
+          entitlementSnapshotRef, input.periodStart, input.periodStart,
+        ],
+      )
+      if (result.rows.length === 0) {
+        const raced = await readExistingSubscription(db, input.subscriptionId)
+        if (raced && matchesExistingSubscription(raced, input)) return 'ALREADY_APPLIED'
+        return failClosed()
+      }
+    } else {
+      await db.prepare(
+        'INSERT INTO membership_subscriptions ' +
+        '(subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, ' +
+        'current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at, version) ' +
+        "VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?, NULL, ?, ?, ?, 1)",
+      ).bind(
+        input.subscriptionId, input.subscriberId, input.snapshot.planId, input.snapshot.planVersion,
+        input.snapshot.creatorId, input.periodStart, input.periodStart, input.periodEnd,
+        entitlementSnapshotRef, input.periodStart, input.periodStart,
+      ).run();
+    }
+  } catch {
     const raced = await readExistingSubscription(db, input.subscriptionId).catch(() => null);
     if (raced && matchesExistingSubscription(raced, input)) return 'ALREADY_APPLIED';
-    // Do not leak database diagnostics, and do not acknowledge successful fulfillment.
     throw new PaidMembershipPurchaseFulfillmentError('SERVICE_UNAVAILABLE', 503);
   }
 
