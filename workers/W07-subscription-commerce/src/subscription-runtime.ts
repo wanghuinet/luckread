@@ -1061,7 +1061,7 @@ const planVersionFromEtag = (etag: string): number => {
  * does not create a subscription, order, payment, or entitlement.
  */
 export async function publishMembershipPlan(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   verifiedCreatorId: string,
   planIdInput: string,
   ifMatchInput: string | null,
@@ -1071,15 +1071,18 @@ export async function publishMembershipPlan(
   const ifMatch = validateIfMatch(ifMatchInput)
   const expectedVersion = planVersionFromEtag(ifMatch)
 
-  const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> =>
-    db.prepare(
+  const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> => {
+    if (isPostgresSubscriptionStore(db)) {
+      return readOwnedMembershipPlanPostgres(db, planId, creatorId)
+    }
+    return db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
       'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? LIMIT 1",
     ).bind(planId, creatorId).first<MembershipPlanStoredRow>()
-
+  }
   const current = await readOwnedPlan()
   if (!current) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
 
@@ -1102,20 +1105,34 @@ export async function publishMembershipPlan(
   }
 
   const updatedAt = nextUpdatedAt(current.updated_at)
-  let updated: { meta?: { changes?: number } }
+  let updated = false
   try {
-    updated = await db.prepare(
-      "UPDATE membership_plans SET status = 'ACTIVE', visibility = 'PUBLIC', updated_at = ?, version = version + 1 " +
-      "WHERE plan_id = ? AND owner_type = 'CREATOR' AND owner_id = ? " +
-      "AND status = 'DRAFT' AND visibility = 'PRIVATE' AND version = ? " +
-      'AND EXISTS (SELECT 1 FROM membership_plan_versions AS v ' +
-      'WHERE v.plan_id = membership_plans.plan_id AND v.plan_version = membership_plans.current_version)',
-    ).bind(updatedAt, planId, creatorId, expectedVersion).run()
+    if (isPostgresSubscriptionStore(db)) {
+      const result = await db.query<{ plan_id: string } & Record<string, unknown>>(
+        "UPDATE membership_plans SET status = 'ACTIVE', visibility = 'PUBLIC', updated_at = $1::timestamptz, version = version + 1 " +
+        "WHERE plan_id = $2 AND owner_type = 'CREATOR' AND owner_id = $3 " +
+        "AND status = 'DRAFT' AND visibility = 'PRIVATE' AND version = $4 " +
+        'AND EXISTS (SELECT 1 FROM membership_plan_versions AS v ' +
+        'WHERE v.plan_id = membership_plans.plan_id AND v.plan_version = membership_plans.current_version) ' +
+        'RETURNING plan_id',
+        [updatedAt, planId, creatorId, expectedVersion],
+      )
+      updated = result.rows.length === 1
+    } else {
+      const result = await db.prepare(
+        "UPDATE membership_plans SET status = 'ACTIVE', visibility = 'PUBLIC', updated_at = ?, version = version + 1 " +
+        "WHERE plan_id = ? AND owner_type = 'CREATOR' AND owner_id = ? " +
+        "AND status = 'DRAFT' AND visibility = 'PRIVATE' AND version = ? " +
+        'AND EXISTS (SELECT 1 FROM membership_plan_versions AS v ' +
+        'WHERE v.plan_id = membership_plans.plan_id AND v.plan_version = membership_plans.current_version)',
+      ).bind(updatedAt, planId, creatorId, expectedVersion).run()
+      updated = Number(result.meta?.changes ?? 0) === 1
+    }
   } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
 
-  if (Number(updated.meta?.changes ?? 0) !== 1) {
+  if (!updated) {
     const raced = await readOwnedPlan()
     if (!raced) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
     if (
@@ -1153,7 +1170,7 @@ export async function publishMembershipPlan(
  * returns the current version; changed terms or a newer lifecycle version fail.
  */
 export async function reviseMembershipPlan(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   verifiedCreatorId: string,
   planIdInput: string,
   ifMatchInput: string | null,
@@ -1163,15 +1180,18 @@ export async function reviseMembershipPlan(
   const planId = ensureId(planIdInput)
   const expectedVersion = planVersionFromEtag(validateIfMatch(ifMatchInput))
 
-  const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> =>
-    db.prepare(
+  const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> => {
+    if (isPostgresSubscriptionStore(db)) {
+      return readOwnedMembershipPlanPostgres(db, planId, creatorId)
+    }
+    return db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
       'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? LIMIT 1",
     ).bind(planId, creatorId).first<MembershipPlanStoredRow>()
-
+  }
   const current = await readOwnedPlan()
   if (!current) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
   if (current.status === 'RETIRED') throw new SubscriptionRuntimeError('INVALID_STATE', 409)
@@ -1202,38 +1222,53 @@ export async function reviseMembershipPlan(
   }
   const updatedAt = nextUpdatedAt(current.updated_at)
 
-  let results: D1Result[]
-  try {
-    results = await db.batch([
-      db.prepare(
-        'INSERT OR IGNORE INTO membership_plan_versions ' +
-        '(plan_id, plan_version, name, tier, billing_interval, price_minor, currency, benefits_json, trial_period_days, created_at) ' +
-        'SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (' +
-        "SELECT 1 FROM membership_plans p WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? " +
-        "AND p.status IN ('DRAFT','ACTIVE','PAUSED') AND p.current_version = ? AND p.version = ?)",
-      ).bind(
-        planId, nextPlanVersion, revision.name, revision.tier, revision.billingInterval,
-        revision.priceMinor, revision.currency, benefitsJson, revision.trialPeriodDays, updatedAt,
-        planId, creatorId, current.current_version, expectedVersion,
-      ),
-      db.prepare(
-        'UPDATE membership_plans SET current_version = ?, updated_at = ?, version = version + 1 ' +
-        "WHERE plan_id = ? AND owner_type = 'CREATOR' AND owner_id = ? AND status IN ('DRAFT','ACTIVE','PAUSED') " +
-        'AND current_version = ? AND version = ? AND EXISTS (' +
-        'SELECT 1 FROM membership_plan_versions v WHERE v.plan_id = membership_plans.plan_id ' +
-        'AND v.plan_version = ? AND v.name = ? AND v.tier = ? AND v.billing_interval = ? ' +
-        'AND v.price_minor = ? AND v.currency = ? AND v.benefits_json = ? AND v.trial_period_days = ?)',
-      ).bind(
-        nextPlanVersion, updatedAt, planId, creatorId, current.current_version, expectedVersion,
-        nextPlanVersion, revision.name, revision.tier, revision.billingInterval,
-        revision.priceMinor, revision.currency, benefitsJson, revision.trialPeriodDays,
-      ),
-    ])
-  } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  let revisedPlan = false
+  if (isPostgresSubscriptionStore(db)) {
+    revisedPlan = await reviseMembershipPlanPostgres(db, {
+      planId,
+      creatorId,
+      currentPlanVersion: current.current_version,
+      expectedVersion,
+      nextPlanVersion,
+      revision,
+      benefitsJson,
+      updatedAt,
+    })
+  } else {
+    let results: D1Result[]
+    try {
+      results = await db.batch([
+        db.prepare(
+          'INSERT OR IGNORE INTO membership_plan_versions ' +
+          '(plan_id, plan_version, name, tier, billing_interval, price_minor, currency, benefits_json, trial_period_days, created_at) ' +
+          'SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (' +
+          "SELECT 1 FROM membership_plans p WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? " +
+          "AND p.status IN ('DRAFT','ACTIVE','PAUSED') AND p.current_version = ? AND p.version = ?)",
+        ).bind(
+          planId, nextPlanVersion, revision.name, revision.tier, revision.billingInterval,
+          revision.priceMinor, revision.currency, benefitsJson, revision.trialPeriodDays, updatedAt,
+          planId, creatorId, current.current_version, expectedVersion,
+        ),
+        db.prepare(
+          'UPDATE membership_plans SET current_version = ?, updated_at = ?, version = version + 1 ' +
+          "WHERE plan_id = ? AND owner_type = 'CREATOR' AND owner_id = ? AND status IN ('DRAFT','ACTIVE','PAUSED') " +
+          'AND current_version = ? AND version = ? AND EXISTS (' +
+          'SELECT 1 FROM membership_plan_versions v WHERE v.plan_id = membership_plans.plan_id ' +
+          'AND v.plan_version = ? AND v.name = ? AND v.tier = ? AND v.billing_interval = ? ' +
+          'AND v.price_minor = ? AND v.currency = ? AND v.benefits_json = ? AND v.trial_period_days = ?)',
+        ).bind(
+          nextPlanVersion, updatedAt, planId, creatorId, current.current_version, expectedVersion,
+          nextPlanVersion, revision.name, revision.tier, revision.billingInterval,
+          revision.priceMinor, revision.currency, benefitsJson, revision.trialPeriodDays,
+        ),
+      ])
+    } catch {
+      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+    }
+    revisedPlan = Number(results[1]?.meta?.changes ?? 0) === 1
   }
 
-  if (Number(results[1]?.meta?.changes ?? 0) !== 1) {
+  if (!revisedPlan) {
     const raced = await readOwnedPlan()
     if (!raced) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
     if (raced.version === expectedVersion + 1 && raced.current_version === nextPlanVersion && matchesRevision(raced)) {
@@ -1266,7 +1301,7 @@ export async function reviseMembershipPlan(
 
 /** Pause/resume new sales or permanently retire a paused plan with lifecycle CAS; existing subscribers keep their accepted plan_version. */
 export async function transitionMembershipPlanLifecycle(
-  db: D1Database, verifiedCreatorId: string, planIdInput: string, ifMatchInput: string | null,
+  db: D1Database | W07WebhookPostgresPool, verifiedCreatorId: string, planIdInput: string, ifMatchInput: string | null,
   action: 'pause' | 'resume' | 'retire',
 ): Promise<ReturnType<typeof mapMembershipPlan>> {
   const creatorId = validatePrincipal(verifiedCreatorId)
@@ -1278,14 +1313,18 @@ export async function transitionMembershipPlanLifecycle(
     : action === 'resume'
       ? { status: 'ACTIVE' as const, visibility: 'PUBLIC' as const, fromStatus: 'PAUSED' as const, fromVisibility: 'PRIVATE' as const }
       : { status: 'RETIRED' as const, visibility: 'PRIVATE' as const, fromStatus: 'PAUSED' as const, fromVisibility: 'PRIVATE' as const }
-  const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> =>
-    db.prepare(
+  const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> => {
+    if (isPostgresSubscriptionStore(db)) {
+      return readOwnedMembershipPlanPostgres(db, planId, creatorId)
+    }
+    return db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
       'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? LIMIT 1",
     ).bind(planId, creatorId).first<MembershipPlanStoredRow>()
+  }
   const current = await readOwnedPlan()
   if (!current) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
   // Exact retries of a completed retirement converge without reopening the plan.
@@ -1304,19 +1343,32 @@ export async function transitionMembershipPlanLifecycle(
     throw new SubscriptionRuntimeError('INVALID_STATE', 409)
   }
   const updatedAt = nextUpdatedAt(current.updated_at)
-  let updated: { meta?: { changes?: number } }
+  let updated = false
   try {
-    updated = await db.prepare(
-      'UPDATE membership_plans SET status = ?, visibility = ?, updated_at = ?, version = version + 1 ' +
-      "WHERE plan_id = ? AND owner_type = 'CREATOR' AND owner_id = ? AND version = ? " +
-      'AND status = ? AND visibility = ? AND EXISTS (' +
-      'SELECT 1 FROM membership_plan_versions v WHERE v.plan_id = membership_plans.plan_id ' +
-      'AND v.plan_version = membership_plans.current_version)',
-    ).bind(target.status, target.visibility, updatedAt, planId, creatorId, expectedVersion, target.fromStatus, target.fromVisibility).run()
+    if (isPostgresSubscriptionStore(db)) {
+      const result = await db.query<{ plan_id: string } & Record<string, unknown>>(
+        'UPDATE membership_plans SET status = $1, visibility = $2, updated_at = $3::timestamptz, version = version + 1 ' +
+        "WHERE plan_id = $4 AND owner_type = 'CREATOR' AND owner_id = $5 AND version = $6 " +
+        'AND status = $7 AND visibility = $8 AND EXISTS (' +
+        'SELECT 1 FROM membership_plan_versions v WHERE v.plan_id = membership_plans.plan_id ' +
+        'AND v.plan_version = membership_plans.current_version) RETURNING plan_id',
+        [target.status, target.visibility, updatedAt, planId, creatorId, expectedVersion, target.fromStatus, target.fromVisibility],
+      )
+      updated = result.rows.length === 1
+    } else {
+      const result = await db.prepare(
+        'UPDATE membership_plans SET status = ?, visibility = ?, updated_at = ?, version = version + 1 ' +
+        "WHERE plan_id = ? AND owner_type = 'CREATOR' AND owner_id = ? AND version = ? " +
+        'AND status = ? AND visibility = ? AND EXISTS (' +
+        'SELECT 1 FROM membership_plan_versions v WHERE v.plan_id = membership_plans.plan_id ' +
+        'AND v.plan_version = membership_plans.current_version)',
+      ).bind(target.status, target.visibility, updatedAt, planId, creatorId, expectedVersion, target.fromStatus, target.fromVisibility).run()
+      updated = Number(result.meta?.changes ?? 0) === 1
+    }
   } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
-  if (Number(updated.meta?.changes ?? 0) !== 1) {
+  if (!updated) {
     const raced = await readOwnedPlan()
     if (!raced) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
     if (raced.version === expectedVersion + 1 && raced.status === target.status && raced.visibility === target.visibility) {
