@@ -34,7 +34,20 @@ const marker = 'w05-social-closure-read-' + randomUUID()
 const reportPath = process.env.W05_SOCIAL_CLOSURE_READ_POSTGRES_REPORT ||
   '../../artifacts/neon/w05-social-closure-read-postgres-runtime-postflight.json'
 const pool = new Pool({ connectionString, max: 5, connectionTimeoutMillis: 5_000 })
-const store = createPostgresSocialClosureReadStore(pool)
+const diagnosticDb = {
+  async query(...args) {
+    try {
+      return await pool.query(...args)
+    } catch (error) {
+      console.error('W05 disposable PostgreSQL query diagnostic', {
+        message: error instanceof Error ? error.message : String(error),
+        query: String(args[0]).slice(0, 500),
+      })
+      throw error
+    }
+  },
+}
+const store = createPostgresSocialClosureReadStore(diagnosticDb)
 const now = new Date()
 const nowIso = now.toISOString()
 const timestamp = (offsetSeconds) => new Date(now.getTime() + offsetSeconds * 1000).toISOString()
