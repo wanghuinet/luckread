@@ -133,3 +133,11 @@
 - Replaced D1 fallback assertions and D1 runtime fixtures with Store-port fixtures.
 - Preserved public-read transport policy, bidirectional Block exclusion, deterministic cursor ordering, limit-plus-one pagination, separate filtered count, and cached aggregate count.
 - Follow/Unfollow writes and the separate Follow status helper are not part of this slice.
+
+
+## W05 Follow / Unfollow Write
+
+- Removed `createD1FollowStore` and the runtime D1/Store resolver; Follow and Unfollow now accept only the `FollowStore` port.
+- Both mutation routes require the injected Neon PostgreSQL writer and fail closed with 503 before touching `env.DB` when it is missing.
+- Preserved the PostgreSQL adapter's atomic bidirectional Block guard, existing relationship identity/timestamp, idempotent Unfollow, relationship-graph cache invalidation, and best-effort notification enqueue.
+- The separate Follow status reader remains out of scope and is tracked independently.

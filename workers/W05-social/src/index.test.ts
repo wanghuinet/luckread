@@ -126,7 +126,7 @@ describe('W05 follow-list PostgreSQL runtime injection', () => {
 
 
 describe('W05 Follow/Unfollow PostgreSQL runtime injection', () => {
-  it('routes Follow and Unfollow writes through the injected store while keeping notification persistence on D1', async () => {
+  it('routes Follow and Unfollow writes through the injected Store without D1 fallback', async () => {
     const row: FollowRow = {
       relationship_id: 'pg-follow-1',
       follower_user_id: 'viewer-1',
@@ -171,8 +171,7 @@ describe('W05 Follow/Unfollow PostgreSQL runtime injection', () => {
       followerUserId: 'viewer-1',
       targetUserId: 'target-1',
     }))
-    expect(d1Sql.some((sql) => sql.includes('social_follow_relationships'))).toBe(false)
-    expect(d1Sql.some((sql) => sql.includes('social_notifications'))).toBe(true)
+    expect(d1Prepare).not.toHaveBeenCalled()
 
     const callsBeforeUnfollow = d1Prepare.mock.calls.length
     const del = await injectedWorker.fetch(
@@ -189,28 +188,24 @@ describe('W05 Follow/Unfollow PostgreSQL runtime injection', () => {
     expect(d1Prepare).toHaveBeenCalledTimes(callsBeforeUnfollow)
   })
 
-  it('keeps the D1 FollowStore as the default when no provider store is injected', async () => {
-    const statements: string[] = []
-    const prepare = vi.fn((sql: string) => {
-      statements.push(sql)
-      return {
-        bind: vi.fn(() => ({
-          run: vi.fn(async () => ({ meta: { changes: 1 } })),
-        })),
-      }
-    })
-    const response = await worker.fetch(
-      requestWithMethod('/internal/social/follows/target-1', 'DELETE', {
-        ...transportHeaders,
-        'X-LuckRead-Principal-Layer': 'L2',
-        'Idempotency-Key': 'd1-unfollow-1',
-      }),
-      { DB: { prepare } as unknown as D1Database },
-      {} as never,
+  it('fails closed for Follow and Unfollow when the Neon Store is missing', async () => {
+    const prepare = vi.fn(() => { throw new Error('D1 must not be used') })
+    const env = { DB: { prepare } as unknown as D1Database }
+    const post = await worker.fetch(
+      requestWithMethod('/internal/social/follows/target-1', 'POST', {
+        ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'Idempotency-Key': 'missing-store-follow',
+      }), env, {} as never,
     )
-    expect(response.status).toBe(204)
-    expect(statements).toHaveLength(1)
-    expect(statements[0]).toContain('DELETE FROM social_follow_relationships')
+    expect(post.status).toBe(503)
+    await expect(post.json()).resolves.toMatchObject({ error: { code: 'SERVICE_UNAVAILABLE' } })
+    const del = await worker.fetch(
+      requestWithMethod('/internal/social/follows/target-1', 'DELETE', {
+        ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'Idempotency-Key': 'missing-store-unfollow',
+      }), env, {} as never,
+    )
+    expect(del.status).toBe(503)
+    await expect(del.json()).resolves.toMatchObject({ error: { code: 'SERVICE_UNAVAILABLE' } })
+    expect(prepare).not.toHaveBeenCalled()
   })
 })
 
