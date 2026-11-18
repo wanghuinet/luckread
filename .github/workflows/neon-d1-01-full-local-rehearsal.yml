@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/neon-d1-01-full-local-rehearsal.yml'
       - 'contracts/database/neon-d1-01-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-01-remote-runner-review.v1.json'
       - 'contracts/database/neon-schema-migration-ledger.v1.json'
       - 'scripts/neon/d1-01/**'
       - 'scripts/neon/d1-01-migration-manifest.mjs'
