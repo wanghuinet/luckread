@@ -13,7 +13,7 @@ import { handleRevenueCatWebhookRequest } from './revenuecat-webhook-http-runtim
 import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-subscriber-reconciliation-runtime.js'
 import { previewSubscriptionPlanChange } from './subscription-plan-change-preview.js'
 import { createSubscriptionPlanUpgradeCheckout } from './subscription-plan-change-checkout.js'
-import { scheduleSubscriptionPlanDowngrade, scheduleSubscriptionBillingIntervalChange } from './subscription-plan-change-schedule.js'
+import { getScheduledPlanChangeStore, scheduleSubscriptionPlanDowngrade, scheduleSubscriptionBillingIntervalChange } from './subscription-plan-change-schedule.js'
 import { startSubscriptionTrial } from './subscription-trial-runtime.js'
 import { startSubscriptionTrialPostgres } from './subscription-trial-postgres.js'
 import { listOwnedSavedPaymentMethods, revokeOwnedSavedPaymentMethod, PaymentMethodRuntimeError } from './payment-method-runtime.js'
@@ -348,7 +348,7 @@ export default {
         const targetPlanId = new URL(request.url).searchParams.get('targetPlanId')
         if (!targetPlanId) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         const result = await previewSubscriptionPlanChange(
-          getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01, principal, operation.subscriptionId, targetPlanId,
+          getScheduledPlanChangeStore(runtimeEnv), principal, operation.subscriptionId, targetPlanId,
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
