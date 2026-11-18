@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearFavoriteStatusCacheForTests, favorite, getFavoriteStatus, listFavorites, unfavorite } from './favorite-runtime.js'
 import type { W03ContentBinding } from './w03-content-context-client.js'
 import { FavoriteStatusReadStoreError } from './favorite-status-read-store.js'
+import { FavoriteListReadStoreError } from './favorite-list-read-store.js'
 import { FavoriteMutationStoreError } from './favorite-mutation-store.js'
 
 const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
@@ -164,29 +165,31 @@ describe('favorite runtime', () => {
     await expect(unfavorite(db(), 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toBeUndefined()
   })
 
-  it('paginates the actor-scoped favorite list with an opaque cursor', async () => {
-    const d = db([], [
-      { relationship_id: 'favorite_3', target_id: 'content_3', created_at: '2026-10-03T00:00:00.000Z' },
-      { relationship_id: 'favorite_2', target_id: 'content_2', created_at: '2026-10-02T00:00:00.000Z' },
-    ])
-    const first = await listFavorites(d, 'user_1', null, 1)
+  it('paginates the actor-scoped favorite list through the injected Store with an opaque cursor', async () => {
+    const store = {
+      list: vi.fn(async () => [
+        { relationship_id: 'favorite_3', target_id: 'content_3', created_at: '2026-10-03T00:00:00.000Z' },
+        { relationship_id: 'favorite_2', target_id: 'content_2', created_at: '2026-10-02T00:00:00.000Z' },
+      ]),
+    }
+    const first = await listFavorites(store, 'user_1', null, 1)
     expect(first).toMatchObject({
       items: [{ targetId: 'content_3', createdAt: '2026-10-03T00:00:00.000Z' }],
       hasMore: true,
       nextCursor: expect.any(String),
     })
-    const statement = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.results[0]?.value
-    expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).toContain('ORDER BY created_at DESC, relationship_id DESC')
-    expect(statement.bind).toHaveBeenCalledWith('user_1', 2)
-    await expect(listFavorites(db(), 'user_2', first.nextCursor, 1)).rejects.toMatchObject({
+    expect(store.list).toHaveBeenCalledWith({ actorUserId: 'user_1', cursor: null, limit: 2 })
+    await expect(listFavorites(store, 'user_2', first.nextCursor, 1)).rejects.toMatchObject({
       code: 'INVALID_CURSOR',
       status: 400,
     })
   })
 
-  it('rejects unbounded favorite-list pages and malformed cursors', async () => {
-    await expect(listFavorites(db(), 'user_1', null, 51)).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
-    await expect(listFavorites(db(), 'user_1', 'not a cursor', 20)).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
+  it('rejects unbounded favorite-list pages and malformed cursors before Store access', async () => {
+    const store = { list: vi.fn(async () => []) }
+    await expect(listFavorites(store, 'user_1', null, 51)).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    await expect(listFavorites(store, 'user_1', 'not a cursor', 20)).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
+    expect(store.list).not.toHaveBeenCalled()
   })
 
   it('rejects unsupported targets and invalid actors before database access', async () => {
@@ -261,16 +264,12 @@ describe('favorite runtime', () => {
     })
   })
 
-  it('maps D1 favorite list read failures to a sanitized 503', async () => {
-    const failingDb = {
-      prepare: vi.fn(() => ({
-        bind: vi.fn(() => ({
-          all: vi.fn(async () => { throw new Error('secret-d1-connection-detail') }),
-        })),
-      })),
-    } as unknown as D1Database
+  it('maps injected favorite list Store failures to a sanitized 503', async () => {
+    const store = {
+      list: vi.fn(async () => { throw new FavoriteListReadStoreError() }),
+    }
 
-    await expect(listFavorites(failingDb, 'actor-1', null, 20)).rejects.toMatchObject({
+    await expect(listFavorites(store, 'actor-1', null, 20)).rejects.toMatchObject({
       code: 'SERVICE_UNAVAILABLE',
       status: 503,
       message: 'FAVORITE_LIST_READ_UNAVAILABLE',
