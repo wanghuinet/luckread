@@ -47,7 +47,7 @@ export function buildCommentListReadQuery(
   const values: unknown[] = []
   const parameter = (value: unknown): string => {
     values.push(value)
-    return `${values.length}`
+    return '$' + values.length
   }
   const timestampParameter = (value: string): string => {
     const placeholder = parameter(value)
@@ -152,26 +152,9 @@ export function buildCommentListReadQuery(
             LIMIT 100
          ) mention
        ), '[]'::json)::text AS mentions_json`
-    : `COALESCE((
-         SELECT json_group_array(json_object(
-           'userId', mention.mentioned_user_id,
-           'handle', mention.handle
-         ))
-         FROM (
-           SELECT mentioned_user_id, handle
-             FROM social_mentions
-            WHERE target_type = 'comment'
-              AND target_id = c.id
-            ORDER BY created_at ASC
-            LIMIT 100
-         ) mention
-       ), '[]') AS mentions_json`
   const createdAtSql = 'to_char(c.created_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\')'
-    : 'c.created_at'
   const updatedAtSql = 'to_char(c.updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\')'
-    : 'c.updated_at'
   const threadCreatedAtSql = 'to_char(c.thread_created_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\')'
-    : 'c.thread_created_at'
   const limitParameter = parameter(input.limit + 1)
 
   const viewerSelect = `${viewerParameter}::text`
