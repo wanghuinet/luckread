@@ -46,3 +46,9 @@ Comment list reads now require the injected Neon PostgreSQL Store and fail close
 - Removed `createD1FollowStore`; the PostgreSQL adapter is the only production database implementation for these mutations.
 - Preserved atomic bidirectional Block guard, existing-relationship identity/timestamp, idempotent Unfollow, relationship-graph cache invalidation, and best-effort notification enqueue.
 - Follow status read remains a separately tracked D1 cleanup item; this slice does not make all W05 follow functionality Neon-only.
+
+## W05 Follow Status Read
+
+- The internal Follow Status helper now accepts only the injected Neon PostgreSQL `FollowStatusReadStore`; the D1 adapter and runtime fallback are removed.
+- The helper is currently used by the Neon PostgreSQL rehearsal and focused runtime tests, not by a public production route; this change does not claim a user-facing endpoint migration.
+- Preserved missing-relationship false status, either-direction Block suppression, and sanitized storage failure mapping.
