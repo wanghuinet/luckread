@@ -255,12 +255,13 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
         }
 
         hydratedIdsRef.current.add(item.id);
-        if (hydrated?.contentId) {
+        const hydratedContentId = hydrated?.contentId;
+        if (hydrated && hydratedContentId) {
           setHydratedState((current) => ({
             scope: hydrationScope,
             byId: {
               ...(current.scope === hydrationScope ? current.byId : {}),
-              [hydrated.contentId!]: hydrated,
+              [hydratedContentId]: hydrated,
             },
           }));
         }
