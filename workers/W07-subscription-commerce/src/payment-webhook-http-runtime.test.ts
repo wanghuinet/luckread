@@ -39,6 +39,7 @@ function fixture(options: {
   webhookDatabase?: D1Database;
   nativeRefundResult?: WebhookReceiptResult;
   nativePaymentResult?: WebhookReceiptResult;
+  nativeMandateResult?: WebhookReceiptResult;
 } = {}) {
   const calls: Array<{ db: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const syncCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
@@ -47,6 +48,7 @@ function fixture(options: {
   const receiptCalls: Array<{ db: unknown; paymentId: string; merchantId: string }> = [];
   const postgresCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const postgresPaymentCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
+  const postgresMandateCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const postgresPool = {} as W07WebhookPostgresPool;
   const receive: Receiver = async (db, input) => {
     calls.push({ db, input });
@@ -110,6 +112,13 @@ function fixture(options: {
       ) => {
         postgresPaymentCalls.push({ pool, input });
         return options.nativePaymentResult ?? null;
+      },
+      receiveMandateWebhookPostgres: async (
+        pool: W07WebhookPostgresPool,
+        input: ReceiveHyperswitchWebhookInput,
+      ) => {
+        postgresMandateCalls.push({ pool, input });
+        return options.nativeMandateResult ?? null;
       },
       syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder, issueReceipt,
       expirePendingPlanUpgrade: async () => {},
@@ -507,6 +516,33 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     expect(f.receiptCalls[0]?.db).toBe(neonDatabase);
     expect(f.syncCalls[0]?.env).toMatchObject({ D1_01: f.env.D1_01, D1_04: neonDatabase });
     expect(f.purchaseFulfillmentCalls[0]?.env).toMatchObject({ D1_01: f.env.D1_01, D1_04: neonDatabase });
+  });
+
+  it('routes mandate lifecycle events through the native PostgreSQL store without invoking the D1 facade', async () => {
+    const f = fixture({ nativeMandateResult: receipt('APPLIED') });
+    f.env.W07_DATABASE_DRIVER = 'neon';
+    const body = JSON.stringify({
+      event_id: 'evt_mandate_native_001',
+      event_type: 'mandate_active',
+      merchant_id: MERCHANT,
+      content: {
+        type: 'mandate_details',
+        object: { mandate_id: 'provider_mandate_001', payment_method_id: 'pm_test_001', status: 'active' },
+      },
+    });
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body, signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+    expect(response?.status).toBe(200);
+    expect(f.postgresMandateCalls).toHaveLength(1);
+    expect(new TextDecoder().decode(f.postgresMandateCalls[0]!.input.rawBody)).toBe(body);
+    expect(f.postgresCalls).toHaveLength(1);
+    expect(f.postgresPaymentCalls).toHaveLength(0);
+    expect(f.calls).toHaveLength(0);
+    expect(f.syncCalls).toHaveLength(0);
+    expect(await response?.json()).toMatchObject({ data: { outcome: 'APPLIED', state: 'APPLIED' } });
   });
 
   it('uses the native PostgreSQL Store for nested Neon payment_details events and continues the post-commit purchase saga', async () => {
