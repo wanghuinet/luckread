@@ -47,3 +47,11 @@ Comment list reads now require the injected Neon PostgreSQL Store and fail close
 - Removed the D1 FollowStore adapter and runtime D1 resolver. The PostgreSQL adapter is the only production database implementation for Follow/Unfollow writes.
 - Preserved atomic bidirectional Block guarding, immutable existing relationship identity/timestamp on duplicate Follow, idempotent Unfollow, sanitized storage errors, best-effort notification enqueue, and relationship/list cache invalidation.
 - Runtime tests use Store fixtures; PostgreSQL adapter tests continue to verify SQL-level Block and idempotency behavior. The separate Follow Status reader remains a distinct cleanup item.
+
+
+## W05 Follow Status Read
+
+- Follow Status point reads now require the explicitly injected Neon PostgreSQL `FollowStatusReadStore`; the D1 adapter and automatic fallback are removed.
+- The existing PostgreSQL query retains both directions of Block filtering and the actor/target-scoped relationship lookup.
+- Status responses continue to hide the relationship when either actor blocks the other.
+- This read slice is separate from the Follow/Unfollow writer removal in PR #1913.
