@@ -15,7 +15,6 @@ import {
   type FollowingAuthorIdsReadStore,
 } from './following-author-ids-read-store.js'
 import {
-  createD1FollowStatusReadStore,
   type FollowStatusReadRow,
   type FollowStatusReadStore,
 } from './follow-status-read-store.js'
@@ -329,14 +328,7 @@ export async function unfollow(
   await invalidateFollowListCountCache(follower, target)
 }
 
-type FollowStatusDataSource = D1Database | FollowStatusReadStore
-
-function resolveFollowStatusReadStore(source: FollowStatusDataSource): FollowStatusReadStore {
-  if (typeof (source as FollowStatusReadStore).getStatus === 'function') {
-    return source as FollowStatusReadStore
-  }
-  return createD1FollowStatusReadStore(source as D1Database)
-}
+type FollowStatusDataSource = FollowStatusReadStore
 
 export async function getFollowStatus(
   source: FollowStatusDataSource,
@@ -347,7 +339,7 @@ export async function getFollowStatus(
   const target = userId(targetUserId)
   let row: FollowStatusReadRow | null
   try {
-    row = await resolveFollowStatusReadStore(source).getStatus({
+    row = await source.getStatus({
       followerUserId: follower,
       targetUserId: target,
     })
