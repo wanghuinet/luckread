@@ -918,7 +918,7 @@ async function applyPaidSubscriptionPlanUpgrade(
           'AND s.plan_id = ? AND s.plan_version = ? AND s.version = ? AND s.entitlement_snapshot_ref = ?)',
         ).bind(
           order.confirmed_at!, change.expectedSubscriptionVersion + 1, updatedAt,
-          attempt.attemptId, change.subscriberId, change.subscriptionId, order.order_id,
+          attempt.attempt_id, change.subscriberId, change.subscriptionId, order.order_id,
           change.expectedSubscriptionVersion, change.expectedPlanId, change.expectedPlanVersion,
           change.targetPlanId, change.targetPlanVersion, change.currentPeriodStart, change.currentPeriodEnd, order.confirmed_at!,
           change.subscriptionId, change.subscriberId, change.targetPlanId, change.targetPlanVersion,
