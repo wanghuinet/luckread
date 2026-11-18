@@ -172,10 +172,6 @@ describe('native PostgreSQL subscription trial runtime', () => {
   })
 
   it('maps unique trial conflicts to HTTP 409 without leaking PostgreSQL details', async () => {
-    const f = poolWith([
-      { rows: [], rowCount: 0 },
-      { rows: [planRow()], rowCount: 1 },
-    ])
     const brokenPool = {
       query: vi.fn()
         .mockResolvedValueOnce({ rows: [], rowCount: 0 })
@@ -187,9 +183,7 @@ describe('native PostgreSQL subscription trial runtime', () => {
 
     await expect(startSubscriptionTrialPostgres(
       env, brokenPool, subscriberId, { planId }, idempotencyKey, { now: () => now },
-    )).rejects.toBeInstanceOf(SubscriptionRuntimeError)
-    await expect(startSubscriptionTrialPostgres(
-      env, f.pool, subscriberId, { planId }, idempotencyKey, { now: () => now },
-    )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+    )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+    expect((brokenPool.query as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(3)
   })
 })
