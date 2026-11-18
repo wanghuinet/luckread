@@ -38,6 +38,19 @@ import {
 } from './neon/payment-method-read-runtime.js';
 import type { OrderCreatePersistenceStore } from './order-persistence.js';
 import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
+import {
+  readDueRenewalMembershipsPostgres,
+  readRenewalChargeSubscriptionPostgres,
+  type RenewalMembershipCandidateRow,
+  type RenewalChargeSubscriptionRow,
+} from './renewal-membership-postgres.js';
+
+type RenewalMembershipStore = D1Database | W07WebhookPostgresPool;
+
+function isPostgresRenewalMembershipStore(store: RenewalMembershipStore): store is W07WebhookPostgresPool {
+  return typeof (store as W07WebhookPostgresPool).query === 'function';
+}
 
 export type RenewalCycleState =
   | 'AWAITING_PRICING'
@@ -65,25 +78,7 @@ export type RenewalRuntimeEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDa
   HYPERSWITCH_MERCHANT_ID?: string | null;
 }>;
 
-type RenewalSubscriptionRow = Readonly<{
-  subscription_id: string;
-  subscriber_id: string;
-  plan_id: string;
-  plan_version: number;
-  creator_id: string | null;
-  status: string;
-  current_period_start: string;
-  current_period_end: string;
-  trial_started_at: string | null;
-  trial_ends_at: string | null;
-  cancel_at: string | null;
-  billing_interval: string;
-  price_minor: number;
-  currency: string;
-  name: string;
-  tier: string;
-  benefits_json: string;
-}>;
+type RenewalSubscriptionRow = RenewalMembershipCandidateRow;
 
 type RenewalOfferSnapshot = Readonly<{
   subscriptionId: string;
@@ -636,48 +631,58 @@ export async function scanDueSubscriptionRenewals(
   const config = resolveHyperswitchConfig(env);
   const limit = Number.isSafeInteger(options.limit) ? Math.min(Math.max(options.limit!, 1), MAX_PAGE_SIZE) : 20;
   const cursor = await readSchedulerCursor(env.D1_04);
+  const membershipStore = getScheduledPlanChangeStore(env);
   let rows: RenewalSubscriptionRow[];
-  try {
-    rows = (await env.D1_01.prepare(
-      'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, s.status, ' +
-      's.current_period_start, s.current_period_end, s.trial_started_at, s.trial_ends_at, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
-      'pv.currency, pv.name, pv.tier, pv.benefits_json ' +
-      'FROM membership_subscriptions s ' +
-      'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
-      "WHERE s.status IN ('TRIALING','ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
-      'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
-      'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +
-      'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?',
-    ).bind(
-      now, cursor.cursor_period_end, cursor.cursor_period_end, cursor.cursor_period_end,
-      cursor.cursor_subscription_id, limit,
-    ).all<RenewalSubscriptionRow>()).results ?? [];
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/no such column:\s*(?:s\.)?trial_(?:started|ends)_at/i.test(message)) {
+  if (isPostgresRenewalMembershipStore(membershipStore)) {
+    try {
+      rows = await readDueRenewalMembershipsPostgres(
+        membershipStore, now, cursor.cursor_period_end, cursor.cursor_subscription_id, limit,
+      );
+    } catch {
       throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
     }
-    // Before migration 0008, only ACTIVE/PAST_DUE subscriptions exist. Keep
-    // the pre-trial renewal scanner fully functional and treat legacy rows as
-    // having no trial metadata; trial creation itself still fails closed.
+  } else {
     try {
-      const legacy = (await env.D1_01.prepare(
+      rows = (await membershipStore.prepare(
         'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, s.status, ' +
-        's.current_period_start, s.current_period_end, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
+        's.current_period_start, s.current_period_end, s.trial_started_at, s.trial_ends_at, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
         'pv.currency, pv.name, pv.tier, pv.benefits_json ' +
         'FROM membership_subscriptions s ' +
         'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
-        "WHERE s.status IN ('ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
+        "WHERE s.status IN ('TRIALING','ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
         'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
         'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +
         'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?',
       ).bind(
         now, cursor.cursor_period_end, cursor.cursor_period_end, cursor.cursor_period_end,
         cursor.cursor_subscription_id, limit,
-      ).all<Omit<RenewalSubscriptionRow, 'trial_started_at' | 'trial_ends_at'>>()).results ?? [];
-      rows = legacy.map((row) => ({ ...row, trial_started_at: null, trial_ends_at: null }));
-    } catch {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+      ).all<RenewalSubscriptionRow>()).results ?? [];
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/no such column:\s*(?:s\.)?trial_(?:started|ends)_at/i.test(message)) {
+        throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+      }
+      // Before migration 0008, only ACTIVE/PAST_DUE subscriptions exist. Keep
+      // the pre-trial renewal scanner functional for isolated D1 test profiles.
+      try {
+        const legacy = (await membershipStore.prepare(
+          'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, s.status, ' +
+          's.current_period_start, s.current_period_end, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
+          'pv.currency, pv.name, pv.tier, pv.benefits_json ' +
+          'FROM membership_subscriptions s ' +
+          'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
+          "WHERE s.status IN ('ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
+          'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
+          'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +
+          'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?',
+        ).bind(
+          now, cursor.cursor_period_end, cursor.cursor_period_end, cursor.cursor_period_end,
+          cursor.cursor_subscription_id, limit,
+        ).all<Omit<RenewalSubscriptionRow, 'trial_started_at' | 'trial_ends_at'>>()).results ?? [];
+        rows = legacy.map((row) => ({ ...row, trial_started_at: null, trial_ends_at: null }));
+      } catch {
+        throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+      }
     }
   }
 
@@ -729,26 +734,24 @@ export async function scanDueSubscriptionRenewals(
   return { scanned: rows.length, cycleIds: [...new Set(cycleIds)], cursorAdvanced, cursorReset: false };
 }
 
-type ChargeSubscriptionRow = Readonly<{
-  subscription_id: string;
-  subscriber_id: string;
-  plan_id: string;
-  plan_version: number;
-  creator_id: string | null;
-  status: string;
-  current_period_end: string;
-  trial_started_at: string | null;
-  trial_ends_at: string | null;
-  cancel_at: string | null;
-}>;
+type ChargeSubscriptionRow = RenewalChargeSubscriptionRow;
 
-async function isSubscriptionChargeableForCycle(
+async function readChargeSubscriptionForRenewal(
   env: RenewalRuntimeEnv,
   cycle: RenewalCycleRow,
-): Promise<boolean> {
-  let subscription: ChargeSubscriptionRow | null;
+): Promise<ChargeSubscriptionRow | null> {
+  const membershipStore = getScheduledPlanChangeStore(env);
+  if (isPostgresRenewalMembershipStore(membershipStore)) {
+    try {
+      return await readRenewalChargeSubscriptionPostgres(
+        membershipStore, cycle.subscription_id, cycle.subscriber_id,
+      );
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+  }
   try {
-    subscription = await env.D1_01.prepare(
+    return await membershipStore.prepare(
       'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, trial_started_at, trial_ends_at, cancel_at ' +
       'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
     ).bind(cycle.subscription_id, cycle.subscriber_id).first<ChargeSubscriptionRow>();
@@ -758,15 +761,23 @@ async function isSubscriptionChargeableForCycle(
       throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
     }
     try {
-      const legacy = await env.D1_01.prepare(
+      const legacy = await membershipStore.prepare(
         'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, cancel_at ' +
         'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
-      ).bind(cycle.subscription_id, cycle.subscriber_id).first<Omit<ChargeSubscriptionRow, 'trial_started_at' | 'trial_ends_at'>>();
-      subscription = legacy ? { ...legacy, trial_started_at: null, trial_ends_at: null } : null;
+      ).bind(cycle.subscription_id, cycle.subscriber_id)
+        .first<Omit<ChargeSubscriptionRow, 'trial_started_at' | 'trial_ends_at'>>();
+      return legacy ? { ...legacy, trial_started_at: null, trial_ends_at: null } : null;
     } catch {
       throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
     }
   }
+}
+
+async function isSubscriptionChargeableForCycle(
+  env: RenewalRuntimeEnv,
+  cycle: RenewalCycleRow,
+): Promise<boolean> {
+  const subscription = await readChargeSubscriptionForRenewal(env, cycle);
   const retryingPastDue = cycle.outcome_code === 'RETRY_PREPARED' || cycle.attempt_number > 1;
   if (!subscription ||
       subscription.subscription_id !== cycle.subscription_id ||
@@ -928,43 +939,7 @@ async function prepareFailedCycleRetry(
       cycle.attempt_number >= MAX_ATTEMPTS) return 'TERMINAL';
   if (!renewalRetryDue(cycle, now)) return 'AWAITING_RETRY';
 
-  let subscription: {
-    subscription_id: string; subscriber_id: string; plan_id: string; plan_version: number;
-    creator_id: string | null; status: string; current_period_end: string;
-    trial_started_at: string | null; trial_ends_at: string | null; cancel_at: string | null;
-  } | null;
-  const retrySubscriptionShape = {
-    subscription_id: '' as string,
-    subscriber_id: '' as string,
-    plan_id: '' as string,
-    plan_version: 0 as number,
-    creator_id: null as string | null,
-    status: '' as string,
-    current_period_end: '' as string,
-    trial_started_at: null as string | null,
-    trial_ends_at: null as string | null,
-    cancel_at: null as string | null,
-  };
-  try {
-    subscription = await env.D1_01.prepare(
-      'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, trial_started_at, trial_ends_at, cancel_at ' +
-      'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
-    ).bind(cycle.subscription_id, cycle.subscriber_id).first<typeof retrySubscriptionShape>();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/no such column:\s*(?:trial_started_at|trial_ends_at)/i.test(message)) {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
-    try {
-      const legacy = await env.D1_01.prepare(
-        'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, cancel_at ' +
-        'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
-      ).bind(cycle.subscription_id, cycle.subscriber_id).first<Omit<typeof retrySubscriptionShape, 'trial_started_at' | 'trial_ends_at'>>();
-      subscription = legacy ? { ...legacy, trial_started_at: null, trial_ends_at: null } : null;
-    } catch {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
-  }
+  const subscription = await readChargeSubscriptionForRenewal(env, cycle);
   if (!subscription ||
       subscription.subscription_id !== cycle.subscription_id ||
       subscription.subscriber_id !== cycle.subscriber_id ||
