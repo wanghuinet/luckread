@@ -125,3 +125,11 @@
 - Updated tests to remove the D1 fallback expectation and verify that missing composition does not touch `env.DB`.
 - Preserved the 500-author bounded candidate window, bidirectional Block filtering, viewer-directed Mute filtering, deterministic ordering, and W03 content authority.
 - This slice does not clean up the separate Follow/Unfollow writer, follower/following list reader, or Follow status reader; those remain separate work items.
+
+## W05 Follower / Following List Read
+
+- Removed the D1 executor interface and `createD1FollowListReadStore`.
+- `listFollowers` and `listFollowing` now accept only the Store port; both routes require the Neon PostgreSQL reader and fail closed with 503 when it is missing.
+- Replaced D1 fallback assertions and D1 runtime fixtures with Store-port fixtures.
+- Preserved public-read transport policy, bidirectional Block exclusion, deterministic cursor ordering, limit-plus-one pagination, separate filtered count, and cached aggregate count.
+- Follow/Unfollow writes and the separate Follow status helper are not part of this slice.
