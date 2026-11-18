@@ -236,8 +236,8 @@ async function selectMandate(
     'SELECT mandate_record_id, customer_id, payment_method_id, provider_mandate_id, source_payment_id, ' +
     'status, version::text AS version, ' +
     'CASE WHEN provider_updated_at IS NULL THEN NULL ELSE ' +
-    'to_char(provider_updated_at AT TIME ZONE \\'UTC\\', \\'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\\') END AS provider_updated_at, ' +
-    'to_char(updated_at AT TIME ZONE \\'UTC\\', \\'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\\') AS updated_at ' +
+    'to_char(provider_updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\') END AS provider_updated_at, ' +
+    'to_char(updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\') AS updated_at ' +
     'FROM payment_mandates WHERE provider = $1 AND merchant_id = $2 AND payment_method_id = $3 ' +
     'AND (provider_mandate_id = $4 OR (provider_mandate_id IS NULL AND source_payment_id = $5)) ' +
     'LIMIT 1 FOR UPDATE',
