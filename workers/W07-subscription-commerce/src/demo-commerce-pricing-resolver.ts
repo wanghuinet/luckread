@@ -5,6 +5,10 @@ import type { AuthoritativelyPricedOrder } from './order-persistence.js';
 import { applyDemoTaxPricing, isDemoPricingEnabled } from './demo-tax-pricing.js';
 import { applyTaxJarSandboxPricing, type TaxJarSandboxAddress } from './taxjar-sandbox-pricing.js';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
+import {
+  getW07MembershipPostgresPool,
+  type W07MembershipDatabaseRuntimeEnv,
+} from './neon/membership-database-runtime.js';
 
 export type DemoCommercePricingEnv = Readonly<{
   D1_01: D1Database;
@@ -20,7 +24,7 @@ export type DemoCommercePricingEnv = Readonly<{
   TAXJAR_DEMO_TO_CITY?: string | null;
   TAXJAR_DEMO_TO_STATE?: string | null;
   TAXJAR_DEMO_TO_ZIP?: string | null;
-}>;
+}> & W07MembershipDatabaseRuntimeEnv;
 
 type DemoCommercePricingDependencies = Readonly<{
   resolveItems?: typeof resolveCommerceOrderItems;
@@ -59,7 +63,8 @@ export async function resolveDemoCommercePricing(
   }
 
   const resolveItems = dependencies.resolveItems ?? resolveCommerceOrderItems;
-  const resolved = await resolveItems(env.D1_01, input);
+  const membershipStore = getW07MembershipPostgresPool(env) ?? env.D1_01;
+  const resolved = await resolveItems(membershipStore, input);
 
   if (env.COMMERCE_DEMO_TAX_PROVIDER === 'synthetic') {
     return applyDemoTaxPricing(resolved);
