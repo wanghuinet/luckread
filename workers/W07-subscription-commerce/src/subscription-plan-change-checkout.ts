@@ -31,8 +31,23 @@ import {
   hasPendingScheduledPlanDowngrade,
 } from './subscription-plan-change-schedule.js';
 import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
+import {
+  attachPlanUpgradeOrderPostgres,
+  expirePlanUpgradeAttemptPostgres,
+  expireStalePlanUpgradeAttemptsPostgres,
+  insertPlanUpgradeAttemptPostgres,
+  readPlanUpgradeAttemptByIdPostgres,
+  readPlanUpgradeAttemptByIdempotencyPostgres,
+} from './subscription-plan-upgrade-checkout-postgres.js';
 
-type PlanChangeAttemptRow = Readonly<{
+type PlanUpgradeAttemptStore = D1Database | W07WebhookPostgresPool;
+
+function isPostgresPlanUpgradeStore(db: PlanUpgradeAttemptStore): db is W07WebhookPostgresPool {
+  return typeof (db as W07WebhookPostgresPool).query === 'function';
+}
+
+export type PlanChangeAttemptRow = Readonly<{
   attempt_id: string;
   subscriber_id: string;
   subscription_id: string;
@@ -169,10 +184,13 @@ function toAttempt(row: PlanChangeAttemptRow): SubscriptionPlanUpgradeAttempt {
 }
 
 async function readAttemptByIdempotency(
-  db: D1Database,
+  db: PlanUpgradeAttemptStore,
   subscriberId: string,
   keyHash: string,
 ): Promise<PlanChangeAttemptRow | null> {
+  if (isPostgresPlanUpgradeStore(db)) {
+    return readPlanUpgradeAttemptByIdempotencyPostgres(db, subscriberId, keyHash);
+  }
   try {
     return await db.prepare(
       'SELECT attempt_id, subscriber_id, subscription_id, expected_subscription_version, ' +
@@ -187,7 +205,10 @@ async function readAttemptByIdempotency(
   }
 }
 
-async function readAttemptById(db: D1Database, attemptId: string): Promise<PlanChangeAttemptRow | null> {
+async function readAttemptById(db: PlanUpgradeAttemptStore, attemptId: string): Promise<PlanChangeAttemptRow | null> {
+  if (isPostgresPlanUpgradeStore(db)) {
+    return readPlanUpgradeAttemptByIdPostgres(db, attemptId);
+  }
   try {
     return await db.prepare(
       'SELECT attempt_id, subscriber_id, subscription_id, expected_subscription_version, ' +
@@ -201,7 +222,10 @@ async function readAttemptById(db: D1Database, attemptId: string): Promise<PlanC
   }
 }
 
-async function expireAttempt(db: D1Database, row: PlanChangeAttemptRow, now: string): Promise<void> {
+async function expireAttempt(db: PlanUpgradeAttemptStore, row: PlanChangeAttemptRow, now: string): Promise<void> {
+  if (isPostgresPlanUpgradeStore(db)) {
+    return expirePlanUpgradeAttemptPostgres(db, row, now);
+  }
   try {
     await db.prepare(
       "UPDATE membership_subscription_plan_change_attempts SET status = 'EXPIRED', updated_at = ?, " +
@@ -213,10 +237,13 @@ async function expireAttempt(db: D1Database, row: PlanChangeAttemptRow, now: str
 }
 
 async function expireStalePendingAttempts(
-  db: D1Database,
+  db: PlanUpgradeAttemptStore,
   subscriptionId: string,
   now: string,
 ): Promise<void> {
+  if (isPostgresPlanUpgradeStore(db)) {
+    return expireStalePlanUpgradeAttemptsPostgres(db, subscriptionId, now);
+  }
   try {
     await db.prepare(
       "UPDATE membership_subscription_plan_change_attempts SET status = 'EXPIRED', updated_at = ?, " +
@@ -285,6 +312,7 @@ function toCheckoutResult(
 
 async function createOrReadOrder(
   env: SubscriptionPlanUpgradeCheckoutEnv,
+  membershipStore: PlanUpgradeAttemptStore,
   subscriberId: string,
   row: PlanChangeAttemptRow,
   preview: SubscriptionPlanChangePreview,
@@ -310,22 +338,20 @@ async function createOrReadOrder(
       order = created.data;
       const updatedAt = new Date().toISOString();
       try {
-        const saved = await env.D1_01.prepare(
-          'UPDATE membership_subscription_plan_change_attempts SET order_id = ?, updated_at = ?, ' +
-          'version = version + 1 WHERE attempt_id = ? AND status = ? AND ' +
-          '(order_id IS NULL OR order_id = ?)',
-        ).bind(order.orderId, updatedAt, row.attempt_id, 'PENDING_PAYMENT', order.orderId).run();
-        if (Number(saved.meta?.changes ?? 0) !== 1) {
-          const latest = await readAttemptById(env.D1_01, row.attempt_id);
-          if (!latest || latest.order_id !== order.orderId) {
-            throw new SubscriptionRuntimeError('CONFLICT', 409);
-          }
-          row = latest;
+        if (isPostgresPlanUpgradeStore(membershipStore)) {
+          await attachPlanUpgradeOrderPostgres(membershipStore, row.attempt_id, order.orderId, updatedAt);
         } else {
-          const latest = await readAttemptById(env.D1_01, row.attempt_id);
-          if (!latest) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-          row = latest;
+          await membershipStore.prepare(
+            'UPDATE membership_subscription_plan_change_attempts SET order_id = ?, updated_at = ?, ' +
+            'version = version + 1 WHERE attempt_id = ? AND status = ? AND ' +
+            '(order_id IS NULL OR order_id = ?)',
+          ).bind(order.orderId, updatedAt, row.attempt_id, 'PENDING_PAYMENT', order.orderId).run();
         }
+        const latest = await readAttemptById(membershipStore, row.attempt_id);
+        if (!latest || latest.order_id !== order.orderId) {
+          throw new SubscriptionRuntimeError('CONFLICT', 409);
+        }
+        row = latest;
       } catch (error) {
         if (error instanceof SubscriptionRuntimeError) throw error;
         throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
@@ -345,7 +371,7 @@ async function createOrReadOrder(
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
 
-  const latest = row.order_id ? row : await readAttemptById(env.D1_01, row.attempt_id);
+  const latest = row.order_id ? row : await readAttemptById(membershipStore, row.attempt_id);
   if (!latest || latest.order_id !== order.orderId) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   return toCheckoutResult(latest, order, replayed);
 }
@@ -366,6 +392,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
   dependencies: SubscriptionPlanUpgradeCheckoutDependencies,
 ): Promise<SubscriptionPlanUpgradeCheckoutResult> {
   env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
+  const membershipStore = getScheduledPlanChangeStore(env);
   const subscriberId = validatePrincipal(subscriberIdInput);
   const subscriptionId = subscriptionIdInput.trim();
   if (!isBoundedText(subscriptionId)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
@@ -386,7 +413,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
   // Existing idempotency attempts must replay the original order even if a
   // later period-end downgrade has since been scheduled. New attempts are
   // mutually exclusive through the guarded INSERT below.
-  let attemptRow = await readAttemptByIdempotency(env.D1_01, subscriberId, keyDigest);
+  let attemptRow = await readAttemptByIdempotency(membershipStore, subscriberId, keyDigest);
   const replayedAttempt = attemptRow !== null
   if (attemptRow) {
     assertAttemptMatches(attemptRow, subscriberId, subscriptionId, targetPlanId);
@@ -397,7 +424,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
       throw new SubscriptionRuntimeError('CONFLICT', 409);
     }
     if (attemptRow.status === 'PENDING_PAYMENT' && attemptRow.expires_at <= now) {
-      await expireAttempt(env.D1_01, attemptRow, now);
+      await expireAttempt(membershipStore, attemptRow, now);
       throw new SubscriptionRuntimeError('CONFLICT', 409);
     }
     if (attemptRow.order_id) {
@@ -405,7 +432,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
         const order = await (dependencies.getOrder ?? getCommerceOrder)(env.D1_04, subscriberId, attemptRow.order_id)
           .catch(() => { throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503); });
         if (order.status === 'FAILED' || order.status === 'CANCELLED') {
-          await expireAttempt(env.D1_01, attemptRow, now);
+          await expireAttempt(membershipStore, attemptRow, now);
           throw new SubscriptionRuntimeError('CONFLICT', 409);
         }
         const invoice = dependencies.issueInvoice ?? issueInvoiceForOrder;
@@ -421,7 +448,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
   }
 
   const preview = await previewSubscriptionPlanChange(
-    getScheduledPlanChangeStore(env), subscriberId, subscriptionId, targetPlanId, { now: () => nowDate },
+    membershipStore, subscriberId, subscriptionId, targetPlanId, { now: () => nowDate },
   );
   if (preview.changeType !== 'UPGRADE' || !preview.paymentRequired || preview.prorationBaseMinor <= 0) {
     throw new SubscriptionRuntimeError('INVALID_STATE', 409);
@@ -461,62 +488,83 @@ export async function createSubscriptionPlanUpgradeCheckout(
   });
 
   if (!attemptRow) {
-    await expireStalePendingAttempts(env.D1_01, subscriptionId, now);
+    await expireStalePendingAttempts(membershipStore, subscriptionId, now);
     try {
-      const insertValues = [
-        candidate.attempt_id, candidate.subscriber_id, candidate.subscription_id,
-        candidate.expected_subscription_version, candidate.expected_plan_id, candidate.expected_plan_version,
-        candidate.target_plan_id, candidate.target_plan_version, candidate.current_period_start,
-        candidate.current_period_end, candidate.idempotency_key_hash, candidate.expires_at,
-        candidate.created_at, candidate.updated_at,
-        candidate.subscription_id, candidate.subscriber_id, candidate.expected_subscription_version,
-        candidate.expected_plan_id, candidate.expected_plan_version, candidate.current_period_start,
-        candidate.current_period_end, candidate.target_plan_id, candidate.subscription_id, candidate.subscriber_id,
-        candidate.target_plan_version,
-      ];
-      const insertSql =
-        'INSERT INTO membership_subscription_plan_change_attempts ' +
-        '(attempt_id, subscriber_id, subscription_id, expected_subscription_version, expected_plan_id, ' +
-        'expected_plan_version, target_plan_id, target_plan_version, current_period_start, current_period_end, ' +
-        'idempotency_key_hash, order_id, status, expires_at, applied_at, applied_subscription_version, ' +
-        'created_at, updated_at, version) ' +
-        "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'PENDING_PAYMENT', ?, NULL, NULL, ?, ?, 1 " +
-        'WHERE EXISTS (SELECT 1 FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? ' +
-        "AND status = 'ACTIVE' AND cancel_at IS NULL AND version = ? AND plan_id = ? AND plan_version = ? " +
-        'AND current_period_start = ? AND current_period_end = ?) ' +
-        'AND EXISTS (SELECT 1 FROM membership_plans WHERE plan_id = ? AND owner_type = \'CREATOR\' ' +
-        'AND owner_id = (SELECT creator_id FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ?) ' +
-        "AND current_version = ? AND status = 'ACTIVE' AND visibility = 'PUBLIC')";
-      const guardedInsertSql = insertSql +
-        " AND NOT EXISTS (SELECT 1 FROM membership_subscription_scheduled_plan_changes " +
-        "WHERE subscription_id = ? AND status IN ('SCHEDULED', 'RECONCILIATION_REQUIRED'))";
-      let inserted: D1Result;
-      try {
-        inserted = await env.D1_01.prepare(guardedInsertSql).bind(...insertValues, candidate.subscription_id).run();
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        // Before migration 0006 no downgrade record can exist; preserve the #1446 upgrade path.
-        if (!/no such table:\s*membership_subscription_scheduled_plan_changes/i.test(message)) throw error;
-        inserted = await env.D1_01.prepare(insertSql).bind(...insertValues).run();
+      let inserted = false;
+      if (isPostgresPlanUpgradeStore(membershipStore)) {
+        inserted = await insertPlanUpgradeAttemptPostgres(membershipStore, {
+          attemptId: candidate.attempt_id,
+          subscriberId: candidate.subscriber_id,
+          subscriptionId: candidate.subscription_id,
+          expectedSubscriptionVersion: candidate.expected_subscription_version,
+          expectedPlanId: candidate.expected_plan_id,
+          expectedPlanVersion: candidate.expected_plan_version,
+          targetPlanId: candidate.target_plan_id,
+          targetPlanVersion: candidate.target_plan_version,
+          currentPeriodStart: candidate.current_period_start,
+          currentPeriodEnd: candidate.current_period_end,
+          idempotencyKeyHash: candidate.idempotency_key_hash,
+          expiresAt: candidate.expires_at,
+          createdAt: candidate.created_at,
+          updatedAt: candidate.updated_at,
+        });
+      } else {
+        const insertValues = [
+          candidate.attempt_id, candidate.subscriber_id, candidate.subscription_id,
+          candidate.expected_subscription_version, candidate.expected_plan_id, candidate.expected_plan_version,
+          candidate.target_plan_id, candidate.target_plan_version, candidate.current_period_start,
+          candidate.current_period_end, candidate.idempotency_key_hash, candidate.expires_at,
+          candidate.created_at, candidate.updated_at,
+          candidate.subscription_id, candidate.subscriber_id, candidate.expected_subscription_version,
+          candidate.expected_plan_id, candidate.expected_plan_version, candidate.current_period_start,
+          candidate.current_period_end, candidate.target_plan_id, candidate.subscription_id, candidate.subscriber_id,
+          candidate.target_plan_version,
+        ];
+        const insertSql =
+          'INSERT INTO membership_subscription_plan_change_attempts ' +
+          '(attempt_id, subscriber_id, subscription_id, expected_subscription_version, expected_plan_id, ' +
+          'expected_plan_version, target_plan_id, target_plan_version, current_period_start, current_period_end, ' +
+          'idempotency_key_hash, order_id, status, expires_at, applied_at, applied_subscription_version, ' +
+          'created_at, updated_at, version) ' +
+          "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'PENDING_PAYMENT', ?, NULL, NULL, ?, ?, 1 " +
+          'WHERE EXISTS (SELECT 1 FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? ' +
+          "AND status = 'ACTIVE' AND cancel_at IS NULL AND version = ? AND plan_id = ? AND plan_version = ? " +
+          'AND current_period_start = ? AND current_period_end = ?) ' +
+          'AND EXISTS (SELECT 1 FROM membership_plans WHERE plan_id = ? AND owner_type = \'CREATOR\' ' +
+          'AND owner_id = (SELECT creator_id FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ?) ' +
+          "AND current_version = ? AND status = 'ACTIVE' AND visibility = 'PUBLIC')";
+        const guardedInsertSql = insertSql +
+          " AND NOT EXISTS (SELECT 1 FROM membership_subscription_scheduled_plan_changes " +
+          "WHERE subscription_id = ? AND status IN ('SCHEDULED', 'RECONCILIATION_REQUIRED'))";
+        let result: D1Result;
+        try {
+          result = await membershipStore.prepare(guardedInsertSql).bind(...insertValues, candidate.subscription_id).run();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          // Before migration 0006 no downgrade record can exist; preserve the #1446 upgrade path.
+          if (!/no such table:\s*membership_subscription_scheduled_plan_changes/i.test(message)) throw error;
+          result = await membershipStore.prepare(insertSql).bind(...insertValues).run();
+        }
+        inserted = Number(result.meta?.changes ?? 0) === 1;
       }
-      if (Number(inserted.meta?.changes ?? 0) !== 1) {
-        const raced = await readAttemptByIdempotency(env.D1_01, subscriberId, keyDigest);
+      if (!inserted) {
+        const raced = await readAttemptByIdempotency(membershipStore, subscriberId, keyDigest);
         if (raced) {
           assertAttemptMatches(raced, subscriberId, subscriptionId, targetPlanId);
           throw new SubscriptionRuntimeError('CONFLICT', 409);
         }
-        if (await hasPendingScheduledPlanDowngrade(getScheduledPlanChangeStore(env), subscriptionId)) {
+        if (await hasPendingScheduledPlanDowngrade(membershipStore, subscriptionId)) {
           throw new SubscriptionRuntimeError('CONFLICT', 409);
         }
         throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
       }
-      attemptRow = await readAttemptById(env.D1_01, attemptId);
+      attemptRow = await readAttemptById(membershipStore, attemptId);
       if (!attemptRow) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
     } catch (error) {
       if (error instanceof SubscriptionRuntimeError) throw error;
       const message = error instanceof Error ? error.message : String(error);
       if (/unique/i.test(message)) {
-        const sameKey = await readAttemptByIdempotency(env.D1_01, subscriberId, keyDigest);
+        const sameKey = await readAttemptByIdempotency(membershipStore, subscriberId, keyDigest);
         if (sameKey) assertAttemptMatches(sameKey, subscriberId, subscriptionId, targetPlanId);
         throw new SubscriptionRuntimeError('CONFLICT', 409);
       }
@@ -524,7 +572,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
     }
   }
 
-  return createOrReadOrder(env, subscriberId, attemptRow, preview, {
+  return createOrReadOrder(env, membershipStore, subscriberId, attemptRow, preview, {
     ...dependencies,
     resolvePricing: async () => pricing,
   }, replayedAttempt || Boolean(attemptRow.order_id));
