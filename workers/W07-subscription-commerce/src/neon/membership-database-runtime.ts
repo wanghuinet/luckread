@@ -56,7 +56,7 @@ function validateD101HyperdriveConnectionString(value: unknown): string {
   return value
 }
 
-function getW07MembershipPostgresPool(
+function getOrCreateW07MembershipPostgresPool(
   env: W07MembershipDatabaseRuntimeEnv,
   poolFactory: W07MembershipPoolFactory,
 ): Pool {
@@ -85,6 +85,15 @@ function getW07MembershipPostgresPool(
   return pool
 }
 
+/** Return the shared native D1-01 pool for PostgreSQL membership stores. */
+export function getW07MembershipPostgresPool(
+  env: W07MembershipDatabaseRuntimeEnv,
+  poolFactory: W07MembershipPoolFactory = (config) => new Pool(config),
+): W07WebhookPostgresPool | undefined {
+  if (resolveW07MembershipDatabaseDriver(env) === 'd1') return undefined;
+  return getOrCreateW07MembershipPostgresPool(env, poolFactory) as unknown as W07WebhookPostgresPool;
+}
+
 /**
  * Selects the W07 membership store provider. Production uses the Neon D1-01
  * Hyperdrive bridge; the historical D1 adapter is available only to explicit
@@ -106,7 +115,7 @@ export function getW07SelectedD101Database(
   const cached = databases.get(binding)
   if (cached) return cached
 
-  const pool = getW07MembershipPostgresPool(env, poolFactory)
+  const pool = getOrCreateW07MembershipPostgresPool(env, poolFactory)
   const database = createPostgresD1Database(pool as unknown as W07WebhookPostgresPool)
   databases.set(binding, database)
   return database
