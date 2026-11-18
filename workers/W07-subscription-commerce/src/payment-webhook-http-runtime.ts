@@ -18,6 +18,9 @@ import {
 import { issueReceiptForPaidPayment } from './billing-persistence.js';
 import { expirePendingSubscriptionPlanUpgradeForPayment } from './subscription-plan-change-checkout.js';
 import {
+  getW07MembershipPostgresPool,
+} from './neon/membership-database-runtime.js';
+import {
   getW07PaymentWebhookDatabase,
   getW07PaymentWebhookPostgresPool,
   type W07PaymentMethodReadRuntimeEnv,
@@ -27,8 +30,9 @@ import { receiveHyperswitchRefundWebhookPostgres } from './refund-webhook-postgr
 import { receiveHyperswitchPaymentWebhookPostgres } from './payment-webhook-payment-postgres.js';
 import { receiveHyperswitchMandateWebhookPostgres } from './mandate-webhook-postgres-persistence.js';
 import { issueReceiptForPaidPaymentPostgres } from './billing-document-postgres-persistence.js';
+import { expirePendingSubscriptionPlanUpgradeForPaymentPostgres } from './subscription-plan-upgrade-expiry-postgres.js';
 
-type HyperswitchWebhookRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
+type HyperswitchWebhookRuntimeEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{
   D1_01: D1Database;
   D1_04: D1Database;
   W06_GOVERNANCE?: Fetcher;
@@ -47,6 +51,7 @@ type HyperswitchWebhookRuntimeDependencies = Readonly<{
   receive?: typeof receiveHyperswitchWebhook;
   getWebhookDatabase?: (env: HyperswitchWebhookRuntimeEnv) => D1Database | undefined;
   getWebhookPostgresPool?: (env: HyperswitchWebhookRuntimeEnv) => W07WebhookPostgresPool | undefined;
+  getMembershipPostgresPool?: (env: HyperswitchWebhookRuntimeEnv) => W07WebhookPostgresPool | undefined;
   receiveRefundWebhookPostgres?: typeof receiveHyperswitchRefundWebhookPostgres;
   receivePaymentWebhookPostgres?: typeof receiveHyperswitchPaymentWebhookPostgres;
   receiveMandateWebhookPostgres?: typeof receiveHyperswitchMandateWebhookPostgres;
@@ -63,6 +68,7 @@ type HyperswitchWebhookRuntimeDependencies = Readonly<{
   fulfillPaidOrder?: typeof fulfillPaidMembershipOrder;
   issueReceipt?: typeof issueReceiptForPaidPayment;
   expirePendingPlanUpgrade?: typeof expirePendingSubscriptionPlanUpgradeForPayment;
+  expirePendingPlanUpgradePostgres?: typeof expirePendingSubscriptionPlanUpgradeForPaymentPostgres;
 }>;
 
 const WEBHOOK_PATH = '/internal/webhooks/hyperswitch';
@@ -281,9 +287,17 @@ export async function handleHyperswitchWebhookRequest(
 
       // Signed provider outcomes are already durable in D1-04. Expire only a
       // matching unpaid plan-upgrade reservation when the stored Payment is terminally failed.
-      const expireUpgrade = dependencies.expirePendingPlanUpgrade ??
-        expirePendingSubscriptionPlanUpgradeForPayment;
-      await expireUpgrade(renewalEnv, paymentId, env.HYPERSWITCH_MERCHANT_ID);
+      if (postgresPool) {
+        const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
+        if (!membershipPool) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+        const expireUpgrade = dependencies.expirePendingPlanUpgradePostgres ??
+          expirePendingSubscriptionPlanUpgradeForPaymentPostgres;
+        await expireUpgrade(postgresPool, membershipPool, paymentId, env.HYPERSWITCH_MERCHANT_ID);
+      } else {
+        const expireUpgrade = dependencies.expirePendingPlanUpgrade ??
+          expirePendingSubscriptionPlanUpgradeForPayment;
+        await expireUpgrade(renewalEnv, paymentId, env.HYPERSWITCH_MERCHANT_ID);
+      }
 
       // Initial creator-membership purchases have no renewal-cycle row. Only a
       // verified payment_succeeded event may fulfill one, and fulfillment reads
