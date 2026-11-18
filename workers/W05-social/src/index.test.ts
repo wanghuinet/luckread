@@ -2146,10 +2146,11 @@ describe('W05 social poll transport', () => {
   it('reads public poll results through W03 and does not query canonical contents in W05', async () => {
     const binding = publishedContextBinding()
     const db = dbFor()
-    const response = await worker.fetch(
+    const injectedWorker = createW05SocialWorker({ pollReadStore: emptyPollReadStore() })
+    const response = await injectedWorker.fetch(
       request('/internal/social/contents/content-1/poll', transportHeaders),
-      { DB: db, W03_CONTENT: binding },
-      { pollReadStore: emptyPollReadStore() },
+      { DB: db, W03_CONTENT: binding } as never,
+      {} as never,
     )
     expect(response.status).toBe(200)
     expect(binding.fetch).toHaveBeenCalledTimes(1)
@@ -2175,9 +2176,11 @@ describe('W05 social poll transport', () => {
       }),
     }
     const db = dbFor()
-    const response = await worker.fetch(
+    const injectedWorker = createW05SocialWorker({ pollReadStore: emptyPollReadStore() })
+    const response = await injectedWorker.fetch(
       request('/internal/social/contents/content-1/poll', transportHeaders),
-      { DB: db, W03_CONTENT: binding },
+      { DB: db, W03_CONTENT: binding } as never,
+      {} as never,
     )
     expect(response.status).toBe(200)
     expect(binding.fetch).toHaveBeenCalledTimes(2)
@@ -2304,14 +2307,15 @@ describe('W05 social poll transport', () => {
 
   it('validates poll options before issuing database reads', async () => {
     const d1 = dbFor()
-    const response = await worker.fetch(
+    const injectedWorker = createW05SocialWorker({ pollConfigurationStore: emptyPollConfigurationStore, pollReadStore: emptyPollReadStore() })
+    const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll', {
         method: 'POST',
         headers: { ...transportHeaders, 'content-type': 'application/json', 'Idempotency-Key': 'poll-invalid-1' },
         body: JSON.stringify({ options: ['Same', ' same '], durationHours: 24 }),
       }),
-      { DB: d1, W03_CONTENT: publishedContextBinding() },
-      { pollConfigurationStore: emptyPollConfigurationStore, pollReadStore: emptyPollReadStore() },
+      { DB: d1, W03_CONTENT: publishedContextBinding() } as never,
+      {} as never,
     )
     expect(response.status).toBe(422)
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_FAILED' } })
@@ -2321,14 +2325,15 @@ describe('W05 social poll transport', () => {
   it('rejects mixed minute and legacy hour durations before resolving W03 or touching D1', async () => {
     const binding = { fetch: vi.fn(async () => Response.json({ error: { code: 'SHOULD_NOT_BE_CALLED' } }, { status: 500 })) }
     const db = dbFor()
-    const response = await worker.fetch(
+    const injectedWorker = createW05SocialWorker({ pollConfigurationStore: emptyPollConfigurationStore, pollReadStore: emptyPollReadStore() })
+    const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll', {
         method: 'POST',
         headers: { ...transportHeaders, 'content-type': 'application/json', 'Idempotency-Key': 'poll-mixed-duration' },
         body: JSON.stringify({ options: ['Yes', 'No'], durationMinutes: 5, durationHours: 24 }),
       }),
-      { DB: db, W03_CONTENT: binding },
-      { pollConfigurationStore: emptyPollConfigurationStore, pollReadStore: emptyPollReadStore() },
+      { DB: db, W03_CONTENT: binding } as never,
+      {} as never,
     )
     expect(response.status).toBe(422)
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_FAILED' } })
