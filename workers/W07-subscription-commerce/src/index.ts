@@ -284,7 +284,8 @@ export default {
           throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         }
         const creatorId = validatePrincipal((input as { creatorId: string }).creatorId)
-        const allowed = await hasActiveCreatorMembership(runtimeEnv.D1_01, subscriberId, creatorId)
+        const membershipStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+        const allowed = await hasActiveCreatorMembership(membershipStore, subscriberId, creatorId)
         return json({
           data: { allowed, reason: allowed ? 'ACTIVE_CREATOR_MEMBERSHIP' : 'MEMBERSHIP_REQUIRED' },
           requestId: crypto.randomUUID(),
