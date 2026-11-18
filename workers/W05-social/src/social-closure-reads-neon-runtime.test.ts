@@ -138,13 +138,15 @@ describe('W05 Neon social-closure read route composition', () => {
 
   it('reads a visible social-summary batch through one W03 context request and viewer-scoped Neon batch reads', async () => {
     const h = createHarness()
+    const readLimiter = { limit: vi.fn(async () => ({ success: true })) }
+    const writeLimiter = { limit: vi.fn(async () => ({ success: true })) }
     const response = await h.worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/contents/summary-batch', {
         method: 'POST',
         headers: { ...transportHeaders, 'content-type': 'application/json' },
         body: JSON.stringify({ contentIds: [contentId, 'social-summary-second'] }),
       }),
-      h.env as never,
+      { ...h.env, SOCIAL_READ_LIMITER: readLimiter, SOCIAL_WRITE_LIMITER: writeLimiter } as never,
       {} as never,
     )
     expect(response.status).toBe(200)
@@ -155,6 +157,10 @@ describe('W05 Neon social-closure read route composition', () => {
       ] },
     })
     expect(h.w03Content.fetch).toHaveBeenCalledTimes(1)
+    expect(readLimiter.limit).toHaveBeenCalledWith({
+      key: 'read:internal/social/contents/summary-batch:user:' + viewerUserId,
+    })
+    expect(writeLimiter.limit).not.toHaveBeenCalled()
     expect(h.socialClosureReadStore.getContentSocialBatchRows).toHaveBeenCalledWith(
       [contentId, 'social-summary-second'],
       ['social-summary-owner', 'social-summary-owner'],
