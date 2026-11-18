@@ -15,9 +15,14 @@ import { previewSubscriptionPlanChange } from './subscription-plan-change-previe
 import { createSubscriptionPlanUpgradeCheckout } from './subscription-plan-change-checkout.js'
 import { scheduleSubscriptionPlanDowngrade, scheduleSubscriptionBillingIntervalChange } from './subscription-plan-change-schedule.js'
 import { startSubscriptionTrial } from './subscription-trial-runtime.js'
+import { startSubscriptionTrialPostgres } from './subscription-trial-postgres.js'
 import { listOwnedSavedPaymentMethods, revokeOwnedSavedPaymentMethod, PaymentMethodRuntimeError } from './payment-method-runtime.js'
 import { getW07PaymentMethodReadStore, getW07SelectedD104Database } from './neon/payment-method-read-runtime.js'
-import { getW07SelectedD101Database } from './neon/membership-database-runtime.js'
+import {
+  getW07MembershipPostgresPool,
+  getW07SelectedD101Database,
+  resolveW07MembershipDatabaseDriver,
+} from './neon/membership-database-runtime.js'
 import { resolveDemoCommercePricing, resolveDemoRenewalPricing } from './demo-commerce-pricing-resolver.js'
 import { runRenewalScheduledBatch } from './renewal-scheduler.js'
 
@@ -325,12 +330,18 @@ export default {
       const operation = toOperation(request.method, parseSegments(pathname))
       if (operation?.operation === 'trialStart') {
         requireLayer(request)
-        const result = await startSubscriptionTrial(
-          runtimeEnv,
-          principal,
-          await readJsonBody(request),
-          request.headers.get('Idempotency-Key'),
-        )
+        const input = await readJsonBody(request)
+        const idempotencyKey = request.headers.get('Idempotency-Key')
+        let result
+        if (resolveW07MembershipDatabaseDriver(runtimeEnv) === 'neon') {
+          const membershipPool = getW07MembershipPostgresPool(runtimeEnv)
+          if (!membershipPool) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+          result = await startSubscriptionTrialPostgres(
+            runtimeEnv, membershipPool, principal, input, idempotencyKey,
+          )
+        } else {
+          result = await startSubscriptionTrial(runtimeEnv, principal, input, idempotencyKey)
+        }
         return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 201, result.etag)
       }
       if (operation?.operation === 'planChangePreview') {
