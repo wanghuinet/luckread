@@ -47,7 +47,7 @@ export function buildCommentListReadQuery(
   const values: unknown[] = []
   const parameter = (value: unknown): string => {
     values.push(value)
-return `$${values.length}`
+    return `${values.length}`
   }
   const timestampParameter = (value: string): string => {
     const placeholder = parameter(value)
