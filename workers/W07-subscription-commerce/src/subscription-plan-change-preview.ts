@@ -249,7 +249,8 @@ export async function previewSubscriptionPlanChange(
         'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
         'WHERE p.plan_id = ? LIMIT 1',
       ).bind(targetPlanId).first<TargetPlanRow>()
-    }  } catch {
+    }
+  } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
   if (!target || target.owner_type !== 'CREATOR' || target.owner_id !== subscription.creator_id ||
