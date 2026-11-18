@@ -9,6 +9,7 @@ import {
   receiveHyperswitchWebhook,
 } from '../../src/payment-persistence.ts'
 import { createPostgresWebhookD1Database } from '../../src/payment-webhook-database-postgres.ts'
+import { receiveHyperswitchPaymentWebhookPostgres } from '../../src/payment-webhook-payment-postgres.ts'
 
 if (!globalThis.crypto) {
   Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true })
@@ -42,6 +43,9 @@ const checks = {
   samePayloadReplayReturnsDuplicate: false,
   payloadConflictPreservesFirstReceipt: false,
   midBatchFailureRollsBackPaymentOrderAndReceipt: false,
+  nativePaymentAndOrderCommittedTogether: false,
+  nativeSamePayloadReplayReturnsDuplicate: false,
+  nativePayloadConflictPreservesFirstReceipt: false,
   fixtureRowsCleaned: false,
 }
 
@@ -142,6 +146,14 @@ async function receive(input, eventRowId, conflictId) {
     createEventRowId: () => eventRowId,
     createConflictId: () => conflictId,
     databaseDialect: 'postgres',
+  })
+}
+
+async function receiveNative(input, eventRowId, conflictId) {
+  return receiveHyperswitchPaymentWebhookPostgres(pool, input, {
+    now: () => new Date(now),
+    createEventRowId: () => eventRowId,
+    createConflictId: () => conflictId,
   })
 }
 
@@ -256,6 +268,91 @@ try {
   assert.equal(conflicts.rows[0]?.existing_payload_sha256, first.payloadSha256)
   assert.equal(conflicts.rows[0]?.incoming_payload_sha256, conflict.payloadSha256)
   checks.payloadConflictPreservesFirstReceipt = true
+
+  // The production Neon runtime uses this native Store rather than the
+  // D1-shaped compatibility facade for payment_details events.
+  const native = await createPaymentFixture('native')
+  const nativeEventId = marker + '-native-event-success'
+  const nativeReceiptId = marker + '-native-receipt-success'
+  const nativeInput = signedWebhook({
+    eventId: nativeEventId,
+    paymentId: native.paymentId,
+  })
+  const nativeFirst = await receiveNative(
+    nativeInput,
+    nativeReceiptId,
+    marker + '-native-conflict-unused',
+  )
+  assert.equal(nativeFirst?.outcome, 'APPLIED')
+  assert.equal(nativeFirst?.state, 'APPLIED')
+
+  const nativePayment = await pool.query(
+    'SELECT status, version::int AS version, provider_updated_at FROM payments WHERE payment_id = $1',
+    [native.paymentId],
+  )
+  assert.deepEqual(nativePayment.rows, [{
+    status: 'succeeded',
+    version: 2,
+    provider_updated_at: new Date(providerUpdatedAt),
+  }])
+  const nativeOrder = await pool.query(
+    'SELECT status, version::int AS version, confirmed_at FROM orders WHERE order_id = $1',
+    [native.orderId],
+  )
+  assert.equal(nativeOrder.rows[0]?.status, 'CONFIRMED')
+  assert.equal(nativeOrder.rows[0]?.version, 2)
+  assert.ok(nativeOrder.rows[0]?.confirmed_at instanceof Date)
+  const nativeEvent = await pool.query(
+    'SELECT event_row_id, payload_sha256, state, outcome_code FROM payment_provider_events ' +
+    'WHERE provider = $1 AND merchant_id = $2 AND event_id = $3',
+    ['hyperswitch', merchantId, nativeEventId],
+  )
+  assert.deepEqual(nativeEvent.rows, [{
+    event_row_id: nativeReceiptId,
+    payload_sha256: nativeFirst?.payloadSha256,
+    state: 'APPLIED',
+    outcome_code: 'PAYMENT_STATUS_APPLIED_AND_ORDER_CONFIRMED',
+  }])
+  checks.nativePaymentAndOrderCommittedTogether = true
+
+  const nativeReplay = await receiveNative(
+    nativeInput,
+    marker + '-native-receipt-replay-unused',
+    marker + '-native-conflict-replay-unused',
+  )
+  assert.equal(nativeReplay?.outcome, 'DUPLICATE')
+  assert.equal(await count('payment_provider_events', 'event_id', nativeEventId), 1)
+  const nativePaymentAfterReplay = await pool.query(
+    'SELECT status, version::int AS version FROM payments WHERE payment_id = $1',
+    [native.paymentId],
+  )
+  assert.deepEqual(nativePaymentAfterReplay.rows, [{ status: 'succeeded', version: 2 }])
+  checks.nativeSamePayloadReplayReturnsDuplicate = true
+
+  const nativeConflicting = signedWebhook({
+    eventId: nativeEventId,
+    paymentId: native.paymentId,
+    amount: 2_499,
+  })
+  const nativeConflict = await receiveNative(
+    nativeConflicting,
+    marker + '-native-receipt-conflict-unused',
+    marker + '-native-conflict-success',
+  )
+  assert.equal(nativeConflict?.outcome, 'PAYLOAD_CONFLICT')
+  assert.equal(nativeConflict?.conflictId, marker + '-native-conflict-success')
+  const nativeConflictRow = await pool.query(
+    'SELECT existing_payload_sha256, incoming_payload_sha256, state, occurrence_count::int AS occurrence_count ' +
+    'FROM payment_provider_event_conflicts WHERE conflict_id = $1',
+    [marker + '-native-conflict-success'],
+  )
+  assert.deepEqual(nativeConflictRow.rows, [{
+    existing_payload_sha256: nativeFirst?.payloadSha256,
+    incoming_payload_sha256: nativeConflict?.payloadSha256,
+    state: 'OPEN',
+    occurrence_count: 1,
+  }])
+  checks.nativePayloadConflictPreservesFirstReceipt = true
 
   // Force an Order-confirmation constraint failure after the Payment update
   // is attempted. The adapter's PostgreSQL batch transaction must roll back
