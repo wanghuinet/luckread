@@ -53,3 +53,11 @@ No Worker deployment is implied by source changes. Remote D1 mutation and contro
 - The session-list handler now resolves the existing Neon PostgreSQL runtime Store by default; production routing continues to inject the same Store explicitly.
 - Handler and PostgreSQL Store tests preserve authenticated-subject scoping, effective base-user role rechecks, bounded keyset pagination, look-ahead behavior, and PostgreSQL timestamp precision.
 - Historical D1/SQLite migrations and session revoke/logout/username-change adapters remain separate and are not changed by this slice.
+
+
+## W02 CreatorRoleGrant Store Cleanup
+
+- Removed the legacy D1 creator-role grant adapter and the D1-only fake database fixture; the provider-neutral Store contract remains.
+- Production W02 already composes `createPostgresCreatorRoleGrantStore` through `getW02PostgresRuntime` and passes it to the creator-role grant command.
+- PostgreSQL adapter tests cover delegation and typed error mapping; the disposable PostgreSQL 18 runtime rehearsal remains the source of truth for ACTIVE/email-verified target checks, effective L2 verified-user admission, transaction rollback, deterministic replay and conflicting assignments.
+- No role policy, authorization contract, Neon schema or historical D1 migration is changed.
