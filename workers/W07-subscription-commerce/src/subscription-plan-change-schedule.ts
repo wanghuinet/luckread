@@ -80,7 +80,12 @@ export type ScheduledSubscriptionPlanDowngradeResult = Readonly<{
 export type ScheduledPlanDowngradeEnv = Readonly<{ D1_01: D1Database }> & W07MembershipDatabaseRuntimeEnv;
 export type ScheduledPlanDowngradeDependencies = Readonly<{ now?: () => Date }>;
 
-function selectedScheduledPlanStore(env: ScheduledPlanDowngradeEnv): D1Database | W07WebhookPostgresPool {
+export function getScheduledPlanChangeStore(
+  env: ScheduledPlanDowngradeEnv,
+): D1Database | W07WebhookPostgresPool {
+  // Explicit Neon production configuration must fail closed when its existing
+  // Hyperdrive binding is missing. Only unconfigured isolated tests retain D1.
+  if (!env.W07_MEMBERSHIP_DATABASE_DRIVER?.trim() && !env.HYPERDRIVE_D1_01) return env.D1_01;
   if (resolveW07MembershipDatabaseDriver(env) === 'd1') return env.D1_01;
   const pool = getW07MembershipPostgresPool(env);
   if (!pool) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
@@ -378,7 +383,7 @@ async function scheduleSubscriptionPlanChange(
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
   const now = nowDate.toISOString();
-  const membershipStore = selectedScheduledPlanStore(env);
+  const membershipStore = getScheduledPlanChangeStore(env);
   const existing = await readScheduledChangeByIdempotency(membershipStore, subscriberId, keyDigest);
   if (existing) {
     const change = toScheduledChange(existing);
