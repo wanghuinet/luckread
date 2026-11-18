@@ -96,15 +96,16 @@ describe('like runtime', () => {
     expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).not.toContain('COUNT(*)')
   })
 
-  it('reads effective like status from W05 relation tables after W03 visibility validation', async () => {
-    const d = db([{ blocked: 0 }, { liked: 1, like_count: 3 }])
-    await expect(getLikeStatus(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId))
+  it('reads effective like status from the injected Store after W03 visibility validation', async () => {
+    const d = db([{ blocked: 0 }])
+    const statusStore: LikeStatusReadStore = {
+      read: vi.fn(async () => ({ liked: true, likeCount: 3 })),
+    }
+    await expect(getLikeStatus(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId, undefined, statusStore))
       .resolves.toEqual({ liked: true, likeCount: 3 })
-    expect(d.prepare).toHaveBeenCalledTimes(2)
-    const sql = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([query]) => String(query))
-    expect(sql[0]).toContain('social_user_interactions')
-    expect(sql[1]).toContain('interaction_likes')
-    expect(sql.every(query => !query.toLowerCase().includes('from contents') && !query.toLowerCase().includes('join contents'))).toBe(true)
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+    expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).toContain('social_user_interactions')
+    expect(statusStore.read).toHaveBeenCalledWith({ actorUserId: 'user-1', targetType: 'content', targetId: 'content-1', includeCount: true })
 
     const unpublished = db([])
     await expect(getLikeStatus(unpublished, publishedContextBinding('user-2', 404), 'user-1', { targetType: 'content', targetId: 'content-3' }, correlationId))
