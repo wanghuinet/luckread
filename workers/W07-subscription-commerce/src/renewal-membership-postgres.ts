@@ -37,8 +37,6 @@ function failUnavailable(): never {
   throw new Error('W07_RENEWAL_MEMBERSHIP_POSTGRES_UNAVAILABLE')
 }
 
-const TIMESTAMP = `to_char(%s AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS %s`
-
 export async function readDueRenewalMembershipsPostgres(
   pool: W07WebhookPostgresPool,
   now: string,
