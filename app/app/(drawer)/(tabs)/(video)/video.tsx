@@ -366,6 +366,7 @@ export default function VideoFeed() {
   const hydrationControllerRef = useRef<AbortController | null>(null);
   const hydrationGenerationRef = useRef(0);
   const recordsByIdRef = useRef<Map<string, ApiContentRecord>>(new Map());
+  const hydratedIdsRef = useRef<Set<string>>(new Set());
   const [hydrationRetryVersion, setHydrationRetryVersion] = useState(0);
 
   useEffect(() => {
@@ -392,6 +393,7 @@ export default function VideoFeed() {
       hydrationControllerRef.current?.abort();
       hydrationGenerationRef.current += 1;
       recordsByIdRef.current.clear();
+      hydratedIdsRef.current.clear();
       setCurrentId(null);
       setHydrationRetryVersion((value) => value + 1);
       setLoading(true);
@@ -466,7 +468,7 @@ export default function VideoFeed() {
       return;
     }
     const record = recordsByIdRef.current.get(currentId);
-    if (!record) return;
+    if (!record || hydratedIdsRef.current.has(currentId)) return;
 
     hydrationControllerRef.current?.abort();
     const controller = new AbortController();
@@ -498,9 +500,11 @@ export default function VideoFeed() {
         mediaLoading: false,
         mediaSourceVersion: generation,
       };
+      hydratedIdsRef.current.add(currentId);
       setItems((current) => current.map((item) => item.contentId === currentId ? hydrated : item));
     })().catch((cause) => {
       if (controller.signal.aborted || generation !== hydrationGenerationRef.current) return;
+      hydratedIdsRef.current.add(currentId);
       setItems((current) => current.map((item) => item.contentId === currentId
         ? { ...item, mediaLoading: false, mediaError: cause instanceof Error ? cause.message : 'Unable to load video details.' }
         : item));
