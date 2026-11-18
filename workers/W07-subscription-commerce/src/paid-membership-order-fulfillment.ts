@@ -722,8 +722,78 @@ async function markUpgradeApplied(
  * Payment remain in D1-04; only plan identity, opaque order reference and CAS
  * version are changed in authoritative D1-01.
  */
+async function applyPaidSubscriptionPlanUpgradePostgres(
+  pool: W07WebhookPostgresPool,
+  attempt: UpgradeAttemptRow,
+  change: SubscriptionPlanUpgradeSnapshot,
+  order: PaidOrderRow,
+  line: PaidOrderLineRow,
+  creatorId: string,
+  entitlementRef: string,
+  updatedAt: string,
+): Promise<boolean> {
+  let client: W07WebhookPostgresClient | undefined;
+  let settled = false;
+  try {
+    client = await pool.connect();
+    await client.query('BEGIN');
+    const subscription = await client.query<{ subscription_id: string } & Record<string, unknown>>(
+      'UPDATE membership_subscriptions SET plan_id = $1, plan_version = $2, entitlement_snapshot_ref = $3, ' +
+      'updated_at = $4::timestamptz, version = version + 1 WHERE subscription_id = $5 AND subscriber_id = $6 AND creator_id = $7 ' +
+      "AND plan_id = $8 AND plan_version = $9 AND status = 'ACTIVE' AND cancel_at IS NULL AND version = $10 " +
+      'AND current_period_start = $11::timestamptz AND current_period_end = $12::timestamptz RETURNING subscription_id',
+      [
+        change.targetPlanId, change.targetPlanVersion, entitlementRef, updatedAt,
+        change.subscriptionId, change.subscriberId, creatorId,
+        change.expectedPlanId, change.expectedPlanVersion, change.expectedSubscriptionVersion,
+        change.currentPeriodStart, change.currentPeriodEnd,
+      ],
+    );
+    if (subscription.rows.length !== 1) {
+      await client.query('ROLLBACK');
+      settled = true;
+      return false;
+    }
+    const attemptResult = await client.query<{ attempt_id: string } & Record<string, unknown>>(
+      "UPDATE membership_subscription_plan_change_attempts SET status = 'APPLIED', applied_at = $1::timestamptz, " +
+      'applied_subscription_version = $2, updated_at = $3::timestamptz, version = version + 1 ' +
+      "WHERE attempt_id = $4 AND subscriber_id = $5 AND subscription_id = $6 AND order_id = $7 AND status = 'PENDING_PAYMENT' " +
+      'AND expected_subscription_version = $8 AND expected_plan_id = $9 AND expected_plan_version = $10 ' +
+      'AND target_plan_id = $11 AND target_plan_version = $12 AND current_period_start = $13::timestamptz ' +
+      'AND current_period_end = $14::timestamptz AND expires_at >= $15::timestamptz ' +
+      'AND EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = $16 AND s.subscriber_id = $17 ' +
+      'AND s.plan_id = $18 AND s.plan_version = $19 AND s.version = $20 AND s.entitlement_snapshot_ref = $21) ' +
+      'RETURNING attempt_id',
+      [
+        order.confirmed_at!, change.expectedSubscriptionVersion + 1, updatedAt,
+        attempt.attempt_id, change.subscriberId, change.subscriptionId, order.order_id,
+        change.expectedSubscriptionVersion, change.expectedPlanId, change.expectedPlanVersion,
+        change.targetPlanId, change.targetPlanVersion, change.currentPeriodStart, change.currentPeriodEnd, order.confirmed_at!,
+        change.subscriptionId, change.subscriberId, change.targetPlanId, change.targetPlanVersion,
+        change.expectedSubscriptionVersion + 1, entitlementRef,
+      ],
+    );
+    if (attemptResult.rows.length !== 1) {
+      await client.query('ROLLBACK');
+      settled = true;
+      return false;
+    }
+    await client.query('COMMIT');
+    settled = true;
+    return true;
+  } catch {
+    if (client && !settled) {
+      try { await client.query('ROLLBACK'); } catch { /* preserve the sanitized failure */ }
+    }
+    return failClosed();
+  } finally {
+    client?.release();
+  }
+}
+
 async function applyPaidSubscriptionPlanUpgrade(
   env: FulfillmentEnv,
+  membershipDb: FulfillmentDatabase,
   order: PaidOrderRow,
   line: PaidOrderLineRow,
   snapshot: MembershipOfferSnapshot,
@@ -734,7 +804,7 @@ async function applyPaidSubscriptionPlanUpgrade(
     return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_SNAPSHOT_INVALID' };
   }
 
-  const attempt = await readUpgradeAttempt(env.D1_01, change.attemptId);
+  const attempt = await readUpgradeAttempt(membershipDb, change.attemptId);
   if (!attempt) return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_ATTEMPT_NOT_FOUND' };
   if (attempt.status === 'APPLIED') {
     if (attempt.order_id !== order.order_id) {
@@ -759,24 +829,24 @@ async function applyPaidSubscriptionPlanUpgrade(
     attempt.expires_at !== change.expiresAt ||
     attempt.order_id !== order.order_id;
   if (mismatch || attempt.status !== 'PENDING_PAYMENT') {
-    await markUpgradeReconciliation(env.D1_01, attempt, order.confirmed_at!);
+    await markUpgradeReconciliation(membershipDb, attempt, order.confirmed_at!);
     return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_ATTEMPT_MISMATCH' };
   }
   if (order.confirmed_at! > attempt.expires_at || order.confirmed_at! < attempt.updated_at) {
-    await markUpgradeReconciliation(env.D1_01, attempt, order.confirmed_at!);
+    await markUpgradeReconciliation(membershipDb, attempt, order.confirmed_at!);
     return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_PAYMENT_AFTER_EXPIRY' };
   }
 
-  const subscription = await readUpgradeSubscription(env.D1_01, change.subscriptionId, change.subscriberId);
+  const subscription = await readUpgradeSubscription(membershipDb, change.subscriptionId, change.subscriberId);
   if (!subscription) {
-    await markUpgradeReconciliation(env.D1_01, attempt, order.confirmed_at!);
+    await markUpgradeReconciliation(membershipDb, attempt, order.confirmed_at!);
     return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_SUBSCRIPTION_NOT_FOUND' };
   }
 
   const entitlementRef = 'commerce-plan-upgrade:' + order.order_id + ':line:' + line.order_line_id;
   if (isAppliedUpgradeSubscription(subscription, change, order.order_id, line.order_line_id)) {
     const recovered = await markUpgradeApplied(
-      env.D1_01, attempt, change, order.order_id, line.order_line_id, order.confirmed_at!,
+      membershipDb, attempt, change, order.order_id, line.order_line_id, order.confirmed_at!,
       new Date(Math.max(Date.parse(subscription.updated_at) + 1, Date.parse(attempt.updated_at) + 1, Date.parse(order.confirmed_at!))).toISOString(),
     );
     if (recovered) {
@@ -784,7 +854,7 @@ async function applyPaidSubscriptionPlanUpgrade(
         ? { outcome: 'APPLIED' }
         : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
     }
-    const latest = await readUpgradeAttempt(env.D1_01, change.attemptId);
+    const latest = await readUpgradeAttempt(membershipDb, change.attemptId);
     if (latest?.status === 'APPLIED' && latest.order_id === order.order_id) {
       return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
         ? { outcome: 'ALREADY_APPLIED' }
@@ -806,7 +876,7 @@ async function applyPaidSubscriptionPlanUpgrade(
     subscription.current_period_end === change.currentPeriodEnd &&
     canonicalIso(subscription.updated_at);
   if (!currentStateMatches) {
-    await markUpgradeReconciliation(env.D1_01, attempt, order.confirmed_at!);
+    await markUpgradeReconciliation(membershipDb, attempt, order.confirmed_at!);
     return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_SUBSCRIPTION_CAS_PRECONDITION_FAILED' };
   }
 
@@ -816,42 +886,50 @@ async function applyPaidSubscriptionPlanUpgrade(
     Date.parse(attempt.updated_at) + 1,
   )).toISOString();
   try {
-    const results = await env.D1_01.batch([
-      env.D1_01.prepare(
-        'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, entitlement_snapshot_ref = ?, ' +
-        'updated_at = ?, version = version + 1 WHERE subscription_id = ? AND subscriber_id = ? AND creator_id = ? ' +
-        "AND plan_id = ? AND plan_version = ? AND status = 'ACTIVE' AND cancel_at IS NULL AND version = ? " +
-        'AND current_period_start = ? AND current_period_end = ?',
-      ).bind(
-        change.targetPlanId, change.targetPlanVersion, entitlementRef, updatedAt,
-        change.subscriptionId, change.subscriberId, snapshot.creatorId,
-        change.expectedPlanId, change.expectedPlanVersion, change.expectedSubscriptionVersion,
-        change.currentPeriodStart, change.currentPeriodEnd,
-      ),
-      env.D1_01.prepare(
-        "UPDATE membership_subscription_plan_change_attempts SET status = 'APPLIED', applied_at = ?, " +
-        'applied_subscription_version = ?, updated_at = ?, version = version + 1 ' +
-        "WHERE attempt_id = ? AND subscriber_id = ? AND subscription_id = ? AND order_id = ? AND status = 'PENDING_PAYMENT' " +
-        'AND expected_subscription_version = ? AND expected_plan_id = ? AND expected_plan_version = ? ' +
-        'AND target_plan_id = ? AND target_plan_version = ? AND current_period_start = ? AND current_period_end = ? AND expires_at >= ? ' +
-        'AND EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = ? AND s.subscriber_id = ? ' +
-        'AND s.plan_id = ? AND s.plan_version = ? AND s.version = ? AND s.entitlement_snapshot_ref = ?)',
-      ).bind(
-        order.confirmed_at!, change.expectedSubscriptionVersion + 1, updatedAt,
-        attempt.attempt_id, change.subscriberId, change.subscriptionId, order.order_id,
-        change.expectedSubscriptionVersion, change.expectedPlanId, change.expectedPlanVersion,
-        change.targetPlanId, change.targetPlanVersion, change.currentPeriodStart, change.currentPeriodEnd, order.confirmed_at!,
-        change.subscriptionId, change.subscriberId, change.targetPlanId, change.targetPlanVersion,
-        change.expectedSubscriptionVersion + 1, entitlementRef,
-      ),
-    ]);
-    if (Number(results[0]?.meta?.changes ?? 0) === 1 && Number(results[1]?.meta?.changes ?? 0) === 1) {
+    let applied = false;
+    if (isPostgresFulfillmentDatabase(membershipDb)) {
+      applied = await applyPaidSubscriptionPlanUpgradePostgres(
+        membershipDb, attempt, change, order, line, snapshot.creatorId, entitlementRef, updatedAt,
+      );
+    } else {
+      const results = await membershipDb.batch([
+        membershipDb.prepare(
+          'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, entitlement_snapshot_ref = ?, ' +
+          'updated_at = ?, version = version + 1 WHERE subscription_id = ? AND subscriber_id = ? AND creator_id = ? ' +
+          "AND plan_id = ? AND plan_version = ? AND status = 'ACTIVE' AND cancel_at IS NULL AND version = ? " +
+          'AND current_period_start = ? AND current_period_end = ?',
+        ).bind(
+          change.targetPlanId, change.targetPlanVersion, entitlementRef, updatedAt,
+          change.subscriptionId, change.subscriberId, snapshot.creatorId,
+          change.expectedPlanId, change.expectedPlanVersion, change.expectedSubscriptionVersion,
+          change.currentPeriodStart, change.currentPeriodEnd,
+        ),
+        membershipDb.prepare(
+          "UPDATE membership_subscription_plan_change_attempts SET status = 'APPLIED', applied_at = ?, " +
+          'applied_subscription_version = ?, updated_at = ?, version = version + 1 ' +
+          "WHERE attempt_id = ? AND subscriber_id = ? AND subscription_id = ? AND order_id = ? AND status = 'PENDING_PAYMENT' " +
+          'AND expected_subscription_version = ? AND expected_plan_id = ? AND expected_plan_version = ? ' +
+          'AND target_plan_id = ? AND target_plan_version = ? AND current_period_start = ? AND current_period_end = ? AND expires_at >= ? ' +
+          'AND EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = ? AND s.subscriber_id = ? ' +
+          'AND s.plan_id = ? AND s.plan_version = ? AND s.version = ? AND s.entitlement_snapshot_ref = ?)',
+        ).bind(
+          order.confirmed_at!, change.expectedSubscriptionVersion + 1, updatedAt,
+          attempt.attemptId, change.subscriberId, change.subscriptionId, order.order_id,
+          change.expectedSubscriptionVersion, change.expectedPlanId, change.expectedPlanVersion,
+          change.targetPlanId, change.targetPlanVersion, change.currentPeriodStart, change.currentPeriodEnd, order.confirmed_at!,
+          change.subscriptionId, change.subscriberId, change.targetPlanId, change.targetPlanVersion,
+          change.expectedSubscriptionVersion + 1, entitlementRef,
+        ),
+      ]);
+      applied = Number(results[0]?.meta?.changes ?? 0) === 1 && Number(results[1]?.meta?.changes ?? 0) === 1;
+    }
+    if (applied) {
       return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
         ? { outcome: 'APPLIED' }
         : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
     }
   } catch {
-    const latestAttempt = await readUpgradeAttempt(env.D1_01, change.attemptId);
+    const latestAttempt = await readUpgradeAttempt(membershipDb, change.attemptId);
     if (latestAttempt?.status === 'APPLIED' && latestAttempt.order_id === order.order_id) {
       return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
         ? { outcome: 'ALREADY_APPLIED' }
@@ -860,24 +938,24 @@ async function applyPaidSubscriptionPlanUpgrade(
     return failClosed() as never;
   }
 
-  const latestAttempt = await readUpgradeAttempt(env.D1_01, change.attemptId);
+  const latestAttempt = await readUpgradeAttempt(membershipDb, change.attemptId);
   if (latestAttempt?.status === 'APPLIED' && latestAttempt.order_id === order.order_id) {
     return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
       ? { outcome: 'ALREADY_APPLIED' }
       : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
   }
-  const latestSubscription = await readUpgradeSubscription(env.D1_01, change.subscriptionId, change.subscriberId);
+  const latestSubscription = await readUpgradeSubscription(membershipDb, change.subscriptionId, change.subscriberId);
   if (latestAttempt && latestSubscription &&
       isAppliedUpgradeSubscription(latestSubscription, change, order.order_id, line.order_line_id)) {
     const recovered = await markUpgradeApplied(
-      env.D1_01, latestAttempt, change, order.order_id, line.order_line_id, order.confirmed_at!, updatedAt,
+      membershipDb, latestAttempt, change, order.order_id, line.order_line_id, order.confirmed_at!, updatedAt,
     );
     if (recovered) {
       return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
         ? { outcome: 'APPLIED' }
         : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
     }
-    const afterRecovery = await readUpgradeAttempt(env.D1_01, change.attemptId);
+    const afterRecovery = await readUpgradeAttempt(membershipDb, change.attemptId);
     if (afterRecovery?.status === 'APPLIED' && afterRecovery.order_id === order.order_id) {
       return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
         ? { outcome: 'ALREADY_APPLIED' }
@@ -885,7 +963,7 @@ async function applyPaidSubscriptionPlanUpgrade(
     }
   }
 
-  if (latestAttempt) await markUpgradeReconciliation(env.D1_01, latestAttempt, order.confirmed_at!);
+  if (latestAttempt) await markUpgradeReconciliation(membershipDb, latestAttempt, order.confirmed_at!);
   return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_SUBSCRIPTION_CAS_LOST' };
 }
 
