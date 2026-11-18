@@ -74,8 +74,8 @@ function mapQueryError(error: unknown): PaymentMethodPersistenceError {
 }
 
 /**
- * PostgreSQL 18 counterpart for the D1 read boundary. It preserves the exact
- * status precedence, merchant/customer scoping, ordering and 100-row bound.
+ * Native PostgreSQL persistence for saved-method ownership, mandate reads,
+ * idempotent revocation and version-checked finalization.
  */
 
 type RevocationRequestRow = {

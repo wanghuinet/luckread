@@ -13,12 +13,10 @@ import {
   type SavedPaymentMethodRecord,
 } from './payment-method-persistence.js';
 import {
-  createD1PaymentMethodReadStore,
   type PaymentMethodReadStore,
 } from './payment-method-read-store.js';
 
 export type PaymentMethodRuntimeEnv = Readonly<{
-  D1_04: D1Database;
   HYPERSWITCH_ENVIRONMENT?: string | null;
   HYPERSWITCH_API_KEY?: string | null;
   HYPERSWITCH_MERCHANT_ID?: string | null;
@@ -103,11 +101,11 @@ function toSavedPaymentMethodDto(
   };
 }
 
-/** Read saved methods only after intersecting provider output with webhook-verified D1-04 ownership records. */
+/** Read saved methods only after intersecting provider output with webhook-verified W07 ownership records. */
 export async function listOwnedSavedPaymentMethods(
   env: PaymentMethodRuntimeEnv,
   customerId: string,
-  readStore: PaymentMethodReadStore = createD1PaymentMethodReadStore(env.D1_04),
+  readStore: PaymentMethodReadStore,
 ): Promise<readonly SavedPaymentMethodDto[]> {
   const config = resolveHyperswitchConfig(env);
   let local: readonly SavedPaymentMethodRecord[];
@@ -149,7 +147,7 @@ async function confirmProviderMandateRevoked(
     return true;
   } catch (revokeError) {
     // A timeout/409 may mean the provider already processed the original revoke.
-    // Read the provider's authoritative mandate status; never mutate local D1 from it.
+    // Read the provider's authoritative mandate status; never mutate local persistence from this read.
     try {
       const current = await retrieveHyperswitchMandate(config, mandateId);
       return current.status === 'revoked';
@@ -166,8 +164,8 @@ async function confirmProviderMandateRevoked(
 
 /**
  * Start provider revocation for every mandate attached to this saved method,
- * then delete the provider vault reference. D1-04's request row blocks new MIT
- * charges immediately. Local mandate states are finalized only by signed
+ * then delete the provider vault reference. The durable revocation request blocks
+ * new MIT charges immediately. Local mandate states are finalized only by signed
  * mandate_revoked webhooks.
  */
 export async function revokeOwnedSavedPaymentMethod(
@@ -175,7 +173,7 @@ export async function revokeOwnedSavedPaymentMethod(
   customerId: string,
   savedPaymentMethodId: string,
   idempotencyKey: string | null,
-  readStore: PaymentMethodReadStore = createD1PaymentMethodReadStore(env.D1_04),
+  readStore: PaymentMethodReadStore,
 ): Promise<Readonly<{ savedPaymentMethodId: string; status: 'REVOCATION_PENDING' | 'REMOVED'; replayed: boolean }>> {
   const config = resolveHyperswitchConfig(env);
   const key = idempotencyKey?.trim() ?? '';
@@ -201,9 +199,9 @@ export async function revokeOwnedSavedPaymentMethod(
     return { savedPaymentMethodId, status: 'REMOVED', replayed: true };
   }
 
-  // First DELETE invocation spends its single D1-04 write on the durable MIT
-  // block. The client repeats the same idempotent DELETE to dispatch provider
-  // revocation and use that second request's one D1-04 write for final state.
+  // The first DELETE persists the durable MIT block. Replaying the same
+  // idempotency key is the explicit second phase: dispatch provider revocation,
+  // then persist the provider result through the same PostgreSQL Store.
   if (!started.dispatchProvider) {
     return { savedPaymentMethodId, status: 'REVOCATION_PENDING', replayed: started.replayed };
   }
@@ -248,7 +246,7 @@ export async function revokeOwnedSavedPaymentMethod(
     }
   }
 
-  // The selected store derives finality in its D1-04 CAS/transactional update.
+  // The PostgreSQL Store derives finality with a version-checked transaction.
   // This avoids racing a just-arrived signed mandate_revoked webhook.
   try {
     const updated = await readStore.markPaymentMethodProviderDeleted(request, nowIso());
