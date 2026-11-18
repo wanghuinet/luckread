@@ -587,6 +587,106 @@ export type MembershipPlanDraftInput = {
   trialPeriodDays: number
 }
 
+async function readOwnedMembershipPlanPostgres(
+  pool: W07WebhookPostgresPool,
+  planId: string,
+  creatorId: string,
+): Promise<MembershipPlanStoredRow | null> {
+  try {
+    const result = await pool.query<MembershipPlanStoredRow & Record<string, unknown>>(
+      'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, ' +
+      `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
+      `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+      'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
+      'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
+      "WHERE p.plan_id = $1 AND p.owner_type = 'CREATOR' AND p.owner_id = $2 LIMIT 1",
+      [planId, creatorId],
+    )
+    return result.rows[0] ?? null
+  } catch {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+}
+
+type MembershipPlanRevisionWriteInput = Readonly<{
+  planId: string
+  creatorId: string
+  currentPlanVersion: number
+  expectedVersion: number
+  nextPlanVersion: number
+  revision: MembershipPlanDraftInput
+  benefitsJson: string
+  updatedAt: string
+}>
+
+async function reviseMembershipPlanPostgres(
+  pool: W07WebhookPostgresPool,
+  input: MembershipPlanRevisionWriteInput,
+): Promise<boolean> {
+  let client: W07WebhookPostgresClient | undefined
+  let inTransaction = false
+  try {
+    client = await pool.connect()
+    await client.query('BEGIN')
+    inTransaction = true
+    const inserted = await client.query<{ plan_id: string } & Record<string, unknown>>(
+      'INSERT INTO membership_plan_versions ' +
+      '(plan_id, plan_version, name, tier, billing_interval, price_minor, currency, benefits_json, trial_period_days, created_at) ' +
+      'SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::timestamptz WHERE EXISTS (' +
+      "SELECT 1 FROM membership_plans p WHERE p.plan_id = $11 AND p.owner_type = 'CREATOR' AND p.owner_id = $12 " +
+      "AND p.status IN ('DRAFT','ACTIVE','PAUSED') AND p.current_version = $13 AND p.version = $14) " +
+      'ON CONFLICT (plan_id, plan_version) DO NOTHING RETURNING plan_id',
+      [
+        input.planId, input.nextPlanVersion, input.revision.name, input.revision.tier,
+        input.revision.billingInterval, input.revision.priceMinor, input.revision.currency,
+        input.benefitsJson, input.revision.trialPeriodDays, input.updatedAt,
+        input.planId, input.creatorId, input.currentPlanVersion, input.expectedVersion,
+      ],
+    )
+    if (inserted.rows.length !== 1) {
+      await client.query('ROLLBACK')
+      inTransaction = false
+      return false
+    }
+    const updated = await client.query<{ plan_id: string } & Record<string, unknown>>(
+      'UPDATE membership_plans SET current_version = $1, updated_at = $2::timestamptz, version = version + 1 ' +
+      "WHERE plan_id = $3 AND owner_type = 'CREATOR' AND owner_id = $4 " +
+      "AND status IN ('DRAFT','ACTIVE','PAUSED') AND current_version = $5 AND version = $6 " +
+      'AND EXISTS (SELECT 1 FROM membership_plan_versions v WHERE v.plan_id = membership_plans.plan_id ' +
+      'AND v.plan_version = $7 AND v.name = $8 AND v.tier = $9 AND v.billing_interval = $10 ' +
+      'AND v.price_minor = $11 AND v.currency = $12 AND v.benefits_json = $13 AND v.trial_period_days = $14) ' +
+      'RETURNING plan_id',
+      [
+        input.nextPlanVersion, input.updatedAt, input.planId, input.creatorId,
+        input.currentPlanVersion, input.expectedVersion, input.nextPlanVersion,
+        input.revision.name, input.revision.tier, input.revision.billingInterval,
+        input.revision.priceMinor, input.revision.currency, input.benefitsJson,
+        input.revision.trialPeriodDays,
+      ],
+    )
+    if (updated.rows.length !== 1) {
+      await client.query('ROLLBACK')
+      inTransaction = false
+      return false
+    }
+    await client.query('COMMIT')
+    inTransaction = false
+    return true
+  } catch {
+    if (client && inTransaction) {
+      try {
+        await client.query('ROLLBACK')
+      } catch {
+        // Do not expose database diagnostics.
+      }
+    }
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  } finally {
+    client?.release()
+  }
+}
+
 type MembershipPlanStoredRow = {
   plan_id: string
   owner_id: string
