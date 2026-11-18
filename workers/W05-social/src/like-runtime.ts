@@ -10,7 +10,7 @@ import {
   LikeStatusReadStoreError,
   type LikeStatusReadStore,
 } from './like-status-read-store.js'
-import { LikeTargetContextReadStoreError, type LikeTargetContextReadStore } from './like-target-context-read-store.js'
+import type { LikeTargetContextReadStore } from './like-target-context-read-store.js'
 import { fetchPublishedContentSocialContext, type PublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
 
 export class LikeRuntimeError extends Error {
