@@ -1753,7 +1753,7 @@ describe('W05 social comment transport', () => {
   it('updates an owned comment with a conditional version', async () => {
     const binding = publishedContextBinding()
     const store = makeCommentMutationStore()
-    const injectedWorker = createW05SocialWorker({ commentMutationStore: store })
+    const injectedWorker = createW05SocialWorker({ commentMutationStore: store, socialClosureReadStore: emptySocialClosureReadStore() })
     const d1Prepare = vi.fn(() => { throw new Error('D1 must not be used by Comment Mutation') })
     const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
@@ -1854,56 +1854,27 @@ describe('W05 social comment transport', () => {
 
   it('resolves root comment notification recipients through W03', async () => {
     const contextBinding = {
-      fetch: vi.fn(async (_input: RequestInfo | URL) => Response.json({
+      fetch: vi.fn(async () => Response.json({
         data: {
-          contentId: 'content-1',
-          ownerUserId: 'owner-1',
-          contentType: 'post',
-          state: 'PUBLISHED',
-          updatedAt: '2026-10-17T04:00:00.000Z',
+          contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'post',
+          state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z',
         },
         requestId: 'req_comment_owner',
       })),
     }
-    const d = dbFor([
-      {
-        existing_id: null,
-        existing_content_id: null,
-        existing_parent_id: null,
-        existing_body: null,
-        existing_author_user_id: null,
-        existing_state: null,
-        existing_depth: null,
-        existing_created_at: null,
-        existing_updated_at: null,
-        content_state: 'PUBLISHED',
-        content_owner_user_id: 'owner-1',
-        parent_content_id: null,
-        parent_author_user_id: null,
-        parent_state: null,
-        parent_depth: null,
-        recent_count: 0,
-        blocked: 0,
-        reply_audience_allowed: 1,
-      },
-      {
-        id: 'comment-1',
-        content_id: 'content-1',
-        author_user_id: 'viewer-1',
-        parent_id: null,
-        body: 'hello',
-        state: 'PUBLISHED',
-        updatedAt: '2026-10-17T04:00:00.000Z',
-        depth: 0,
-        created_at: '2026-10-20T00:00:00.000Z',
-        updated_at: '2026-10-20T00:00:00.000Z',
-      },
-      null,
-      null,
-      null,
-    ])
+    const created: StoredCommentCreate = {
+      id: 'comment-1', content_id: 'content-1', author_user_id: 'viewer-1', parent_id: null,
+      body: 'hello', state: 'PUBLISHED', depth: 0,
+      created_at: '2026-10-20T00:00:00.000Z', updated_at: '2026-10-20T00:00:00.000Z',
+    }
+    const createStore = makeCommentCreateStore({}, created)
+    const injectedWorker = createW05SocialWorker({
+      commentCreateStore: createStore,
+      socialClosureReadStore: emptySocialClosureReadStore(),
+    })
+    const d1Prepare = vi.fn(() => { throw new Error('D1 must not be used by Comment Create') })
     const context = { waitUntil: vi.fn() }
-    const response = await worker.fetch(
+    const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/contents/content-1/comments', {
         method: 'POST',
         headers: {
@@ -1914,16 +1885,17 @@ describe('W05 social comment transport', () => {
         },
         body: JSON.stringify({ body: 'hello' }),
       }),
-      { DB: d, W03_CONTENT: contextBinding },
+      { DB: { prepare: d1Prepare }, W03_CONTENT: contextBinding } as never,
       context as never,
     )
     expect(response.status).toBe(201)
+    expect(createStore.validate).toHaveBeenCalledTimes(1)
+    expect(createStore.insert).toHaveBeenCalledTimes(1)
     expect(contextBinding.fetch).toHaveBeenCalledTimes(1)
     const forwarded = contextBinding.fetch.mock.calls[0]?.[0] as Request
     expect(forwarded.url).toContain('/internal/content/contents/content-1/published-social-context')
     expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(prepare.mock.calls.some(([sql]) => String(sql) === "SELECT owner_user_id FROM contents WHERE id = ? AND state = 'PUBLISHED' LIMIT 1")).toBe(false)
+    expect(d1Prepare).not.toHaveBeenCalled()
     await expect(response.json()).resolves.toMatchObject({
       data: { id: 'comment-1', contentId: 'content-1', authorUserId: 'viewer-1' },
     })
