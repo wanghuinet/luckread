@@ -66,7 +66,7 @@ describe('reply audience backend closure', () => {
   it('stores reply policies outside canonical W03 content and defaults legacy posts to everyone', () => {
     const migration = read('../../workers/W05-social/migrations/20261019_015_social_reply_audience_v1.sql')
     const policy = read('../../workers/W05-social/src/reply-audience-runtime.ts')
-    const store = read('../../workers/W05-social/src/reply-audience-store.ts')
+    const store = read('../../workers/W05-social/src/reply-audience-store-postgres.ts')
     const ownerPolicyRead = policy.split('export async function getContentReplyAudience(')[1]?.split('/**')[0] ?? ''
     expect(migration).toContain('social_content_reply_policies')
     expect(migration).toContain("CHECK (audience IN ('everyone','verified','following','mentioned','followingNetwork'))")
@@ -75,7 +75,7 @@ describe('reply audience backend closure', () => {
     expect(ownerPolicyRead).not.toContain('FROM social_content_reply_policies')
     expect(ownerPolicyRead).not.toContain('FROM contents')
     expect(store).toContain('FROM social_content_reply_policies')
-    expect(store).toContain('WHERE content_id = ? AND owner_user_id = ?')
+    expect(store).toContain('WHERE content_id = $1 AND owner_user_id = $2')
     expect(policy).not.toContain('UPDATE contents')
     expect(policy).not.toContain('INSERT INTO contents')
   })
