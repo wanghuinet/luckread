@@ -326,11 +326,16 @@ export async function readRenewalCycleByPaymentPostgres(
       [merchantId, paymentId],
     )
     return result.rows[0] ?? null
-  } catch {
+  } catch (error) {
+    // Migration 0004 may not yet be applied in a deliberately isolated
+    // non-renewal profile; preserve the regular-payment NO_RENEWAL_CYCLE path.
+    const code = typeof error === 'object' && error !== null && 'code' in error
+      ? String((error as { code?: unknown }).code ?? '')
+      : ''
+    if (code === '42P01') return null
     return failUnavailable()
   }
 }
-
 export async function listPendingRenewalCycleIdsPostgres(
   pool: W07WebhookPostgresPool,
   limit: number,
