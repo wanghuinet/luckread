@@ -148,3 +148,11 @@
 - Removed `FollowStatusD1Database`, `createD1FollowStatusReadStore`, and the runtime D1/Store resolver. `getFollowStatus` now accepts only `FollowStatusReadStore`.
 - The helper is referenced by the Neon PostgreSQL rehearsal and focused runtime tests; it is not currently injected into a public production route.
 - Kept the PostgreSQL adapter and rehearsal coverage for active/missing relationships and both Block directions; runtime tests now use provider-neutral Store fixtures only.
+
+
+## W05 Like Status Read
+
+- Removed `LikeStatusD1QueryExecutor` and `createD1LikeStatusReadStore`; the Like Status runtime no longer has a D1 status-query fallback.
+- Like status reads use the already-composed Neon PostgreSQL `LikeStatusReadStore`; a missing Store fails closed with 503 when a cache miss requires storage.
+- Preserved W03 publication validation, W05 Block preflight, actor-scoped liked state, shared aggregate cache semantics, and PostgreSQL adapter/rehearsal coverage.
+- Like mutation and like-target-context D1 adapters remain explicitly out of scope for this slice.
