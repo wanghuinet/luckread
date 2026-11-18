@@ -176,14 +176,17 @@ describe('native PostgreSQL D1-04 renewal cycle persistence', () => {
 
   it('acquires a submission lease with a state/version CAS and expiry predicate', async () => {
     const row = cycleRow({ state: 'SUBMITTING', lease_token: 'lease_1', lease_expires_at: later, version: 4, updated_at: later })
-    const f = poolWith(async () => ({ rows: [{ cycle_id: cycleId }], rowCount: 1 }))
+    const f = poolWith(async (sql) => sql.startsWith('UPDATE')
+      ? { rows: [{ cycle_id: cycleId }], rowCount: 1 }
+      : { rows: [row as unknown as Record<string, unknown>], rowCount: 1 })
     const result = await acquireRenewalSubmissionLeasePostgres(
       f.pool, cycleRow({ state: 'PAYMENT_READY' }), 'lease_1', later, now, now,
     )
-    expect(result).toBeNull()
+    expect(result).toEqual(row)
     expect(f.calls[0]?.sql).toContain("SET state = 'SUBMITTING'")
     expect(f.calls[0]?.sql).toContain("state = 'PAYMENT_READY' OR (state = 'SUBMITTING' AND lease_expires_at <= $6::timestamptz)")
     expect(f.calls[0]?.values).toEqual(['lease_1', later, now, cycleId, 3, now])
+    expect(f.calls[1]?.values).toEqual([cycleId])
   })
 
   it('reopens a failed synchronized cycle only via retry backoff and attempt CAS', async () => {
@@ -233,7 +236,7 @@ describe('native PostgreSQL D1-04 renewal cycle persistence', () => {
 
     expect(f.calls[0]?.sql).toContain("subscription_sync_state = 'PENDING'")
     expect(f.calls[0]?.sql).toContain('WHERE cycle_id = $5 AND version = $6 AND state = $7')
-    expect(f.calls[0]?.values).toEqual(['APPLIED', later, null, later, cycleId, 3, 'PREPARED'])
+    expect(f.calls[0]?.values).toEqual(['APPLIED', later, null, later, cycleId, 3, 'SUCCEEDED'])
   })
 
   it('lists pending terminal outcomes with a bounded stable order and reads payment mapping', async () => {
