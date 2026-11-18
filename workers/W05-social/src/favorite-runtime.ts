@@ -2,17 +2,14 @@
 
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import {
-  createD1FavoriteListReadStore,
   FavoriteListReadStoreError,
   type FavoriteListReadStore,
 } from './favorite-list-read-store.js'
 import {
-  createD1FavoriteStatusReadStore,
   FavoriteStatusReadStoreError,
   type FavoriteStatusReadStore,
 } from './favorite-status-read-store.js'
 import {
-  createD1FavoriteMutationStore,
   FavoriteMutationStoreError,
   type FavoriteMutationRow,
   type FavoriteMutationStore,
@@ -93,18 +90,6 @@ const fetchPublishedTarget = async (
  * Cross-Worker publication changes cannot be locked in the same transaction,
  * so reads revalidate published visibility through W03 before using the cache.
  */
-type FavoriteMutationDataSource = D1Database | FavoriteMutationStore
-
-function resolveFavoriteMutationStore(source: FavoriteMutationDataSource): FavoriteMutationStore {
-  if (
-    typeof (source as FavoriteMutationStore).create === 'function' &&
-    typeof (source as FavoriteMutationStore).remove === 'function'
-  ) {
-    return source as FavoriteMutationStore
-  }
-  return createD1FavoriteMutationStore(source as D1Database)
-}
-
 function mapFavoriteMutationStoreError(error: unknown): never {
   if (error instanceof FavoriteMutationStoreError) {
     throw new FavoriteRuntimeError(error.code, error.status, error.message)
@@ -113,7 +98,7 @@ function mapFavoriteMutationStoreError(error: unknown): never {
 }
 
 export async function favorite(
-  source: FavoriteMutationDataSource,
+  source: FavoriteMutationStore,
   w03Content: W03ContentBinding | undefined,
   actorUserId: string,
   target: FavoriteTarget,
@@ -152,17 +137,8 @@ export async function favorite(
   }
 }
 
-type FavoriteStatusDataSource = D1Database | FavoriteStatusReadStore
-
-function resolveFavoriteStatusReadStore(source: FavoriteStatusDataSource): FavoriteStatusReadStore {
-  if (typeof (source as FavoriteStatusReadStore).isFavorited === 'function') {
-    return source as FavoriteStatusReadStore
-  }
-  return createD1FavoriteStatusReadStore(source as D1Database)
-}
-
 export async function getFavoriteStatus(
-  source: FavoriteStatusDataSource,
+  source: FavoriteStatusReadStore,
   w03Content: W03ContentBinding | undefined,
   actorUserId: string,
   target: FavoriteTarget,
@@ -209,7 +185,7 @@ export async function getFavoriteStatus(
 }
 
 export async function unfavorite(
-  source: FavoriteMutationDataSource,
+  source: FavoriteMutationStore,
   actorUserId: string,
   target: FavoriteTarget,
 ): Promise<void> {
@@ -265,17 +241,8 @@ const decodeFavoriteListCursor = (cursor: string, actorUserId: string): Favorite
   }
 }
 
-type FavoriteListDataSource = D1Database | FavoriteListReadStore
-
-function resolveFavoriteListReadStore(source: FavoriteListDataSource): FavoriteListReadStore {
-  if (typeof (source as FavoriteListReadStore).list === 'function') {
-    return source as FavoriteListReadStore
-  }
-  return createD1FavoriteListReadStore(source as D1Database)
-}
-
 export async function listFavorites(
-  source: FavoriteListDataSource,
+  source: FavoriteListReadStore,
   actorUserId: string,
   cursor: string | null,
   limit: number,
