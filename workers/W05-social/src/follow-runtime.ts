@@ -1,7 +1,4 @@
-/// <reference types="@cloudflare/workers-types" />
-
 import {
-  createD1FollowStore,
   FollowStoreError,
   type FollowStore,
 } from './follow-store.js'
@@ -16,7 +13,6 @@ import {
   type FollowingAuthorIdsReadStore,
 } from './following-author-ids-read-store.js'
 import {
-  createD1FollowStatusReadStore,
   type FollowStatusReadRow,
   type FollowStatusReadStore,
 } from './follow-status-read-store.js'
@@ -278,17 +274,7 @@ export async function listFollowingAuthorIds(
   }
 }
 
-type FollowDataSource = D1Database | FollowStore
-
-function resolveFollowStore(source: FollowDataSource): FollowStore {
-  if (
-    typeof (source as FollowStore).follow === 'function' &&
-    typeof (source as FollowStore).unfollow === 'function'
-  ) {
-    return source as FollowStore
-  }
-  return createD1FollowStore(source as D1Database)
-}
+type FollowDataSource = FollowStore
 
 function mapFollowStoreError(error: unknown): never {
   if (error instanceof FollowStoreError) {
@@ -308,7 +294,7 @@ export async function follow(
 
   let row: FollowRow | null
   try {
-    row = await resolveFollowStore(source).follow({
+    row = await source.follow({
       followerUserId: follower,
       targetUserId: target,
       relationshipId: crypto.randomUUID(),
@@ -333,21 +319,14 @@ export async function unfollow(
   if (follower === target) throw new FollowRuntimeError('CONFLICT', 409)
 
   try {
-    await resolveFollowStore(source).unfollow(follower, target)
+    await source.unfollow(follower, target)
   } catch (error) {
     mapFollowStoreError(error)
   }
   await invalidateFollowListCountCache(follower, target)
 }
 
-type FollowStatusDataSource = D1Database | FollowStatusReadStore
-
-function resolveFollowStatusReadStore(source: FollowStatusDataSource): FollowStatusReadStore {
-  if (typeof (source as FollowStatusReadStore).getStatus === 'function') {
-    return source as FollowStatusReadStore
-  }
-  return createD1FollowStatusReadStore(source as D1Database)
-}
+type FollowStatusDataSource = FollowStatusReadStore
 
 export async function getFollowStatus(
   source: FollowStatusDataSource,
@@ -358,7 +337,7 @@ export async function getFollowStatus(
   const target = userId(targetUserId)
   let row: FollowStatusReadRow | null
   try {
-    row = await resolveFollowStatusReadStore(source).getStatus({
+    row = await source.getStatus({
       followerUserId: follower,
       targetUserId: target,
     })
