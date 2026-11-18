@@ -580,7 +580,7 @@ export async function syncTerminalRenewalCycleToSubscription(
     );
     if (result === 'CAS_LOST') return reconcile(env, cycle, 'SUBSCRIPTION_CAS_LOST', now);
 
-    const appliedSubscription = await readSubscription(env.D1_01, cycle.subscription_id, cycle.subscriber_id);
+    const appliedSubscription = await readSubscription(membershipStore, cycle.subscription_id, cycle.subscriber_id);
     if (appliedSubscription?.trial_started_at && appliedSubscription.trial_ends_at === cycle.cycle_start &&
         appliedSubscription.trial_converted_at === cycle.cycle_start &&
         !(await auditAppliedSubscriptionTrialConversion(env, cycle, appliedSubscription))) {
