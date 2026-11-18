@@ -939,43 +939,7 @@ async function prepareFailedCycleRetry(
       cycle.attempt_number >= MAX_ATTEMPTS) return 'TERMINAL';
   if (!renewalRetryDue(cycle, now)) return 'AWAITING_RETRY';
 
-  let subscription: {
-    subscription_id: string; subscriber_id: string; plan_id: string; plan_version: number;
-    creator_id: string | null; status: string; current_period_end: string;
-    trial_started_at: string | null; trial_ends_at: string | null; cancel_at: string | null;
-  } | null;
-  const retrySubscriptionShape = {
-    subscription_id: '' as string,
-    subscriber_id: '' as string,
-    plan_id: '' as string,
-    plan_version: 0 as number,
-    creator_id: null as string | null,
-    status: '' as string,
-    current_period_end: '' as string,
-    trial_started_at: null as string | null,
-    trial_ends_at: null as string | null,
-    cancel_at: null as string | null,
-  };
-  try {
-    subscription = await env.D1_01.prepare(
-      'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, trial_started_at, trial_ends_at, cancel_at ' +
-      'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
-    ).bind(cycle.subscription_id, cycle.subscriber_id).first<typeof retrySubscriptionShape>();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/no such column:\s*(?:trial_started_at|trial_ends_at)/i.test(message)) {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
-    try {
-      const legacy = await env.D1_01.prepare(
-        'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, cancel_at ' +
-        'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
-      ).bind(cycle.subscription_id, cycle.subscriber_id).first<Omit<typeof retrySubscriptionShape, 'trial_started_at' | 'trial_ends_at'>>();
-      subscription = legacy ? { ...legacy, trial_started_at: null, trial_ends_at: null } : null;
-    } catch {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
-  }
+  const subscription = await readChargeSubscriptionForRenewal(env, cycle);
   if (!subscription ||
       subscription.subscription_id !== cycle.subscription_id ||
       subscription.subscriber_id !== cycle.subscriber_id ||
