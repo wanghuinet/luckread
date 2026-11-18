@@ -387,17 +387,10 @@ async function readCycleByPeriod(
 }
 
 async function readActiveMandate(
-  db: RenewalCycleStore,
+  db: D1Database,
   merchantId: string,
   customerId: string,
 ): Promise<ActiveMandateRow | null> {
-  if (isPostgresRenewalCycleStore(db)) {
-    try {
-      return await readActiveRenewalMandatePostgres(db, merchantId, customerId);
-    } catch {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
-  }
   return db.prepare(
     'SELECT m.mandate_record_id, m.payment_method_id FROM payment_mandates m ' +
     'JOIN saved_payment_methods s ON s.provider = m.provider AND s.merchant_id = m.merchant_id ' +
@@ -409,17 +402,8 @@ async function readActiveMandate(
   ).bind(merchantId, customerId).first<ActiveMandateRow>();
 }
 
-async function isExactMandateActive(db: RenewalCycleStore, cycle: RenewalCycleRow): Promise<boolean> {
+async function isExactMandateActive(db: D1Database, cycle: RenewalCycleRow): Promise<boolean> {
   if (!cycle.mandate_record_id || !cycle.payment_method_id) return false;
-  if (isPostgresRenewalCycleStore(db)) {
-    try {
-      return await isExactRenewalMandateActivePostgres(
-        db, cycle.mandate_record_id, cycle.merchant_id, cycle.subscriber_id, cycle.payment_method_id,
-      );
-    } catch {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
-  }
   const row = await db.prepare(
     'SELECT 1 AS active FROM payment_mandates m ' +
     'JOIN saved_payment_methods s ON s.provider = m.provider AND s.merchant_id = m.merchant_id ' +
@@ -431,6 +415,39 @@ async function isExactMandateActive(db: RenewalCycleStore, cycle: RenewalCycleRo
   ).bind(cycle.mandate_record_id, cycle.merchant_id, cycle.subscriber_id, cycle.payment_method_id).first<{ active: number }>();
   return row?.active === 1;
 }
+
+async function readActiveMandateFromStore(
+  db: RenewalCycleStore,
+  merchantId: string,
+  customerId: string,
+): Promise<ActiveMandateRow | null> {
+  if (isPostgresRenewalCycleStore(db)) {
+    try {
+      return await readActiveRenewalMandatePostgres(db, merchantId, customerId);
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+  }
+  return readActiveMandate(db, merchantId, customerId);
+}
+
+async function isExactMandateActiveFromStore(
+  db: RenewalCycleStore,
+  cycle: RenewalCycleRow,
+): Promise<boolean> {
+  if (!cycle.mandate_record_id || !cycle.payment_method_id) return false;
+  if (isPostgresRenewalCycleStore(db)) {
+    try {
+      return await isExactRenewalMandateActivePostgres(
+        db, cycle.mandate_record_id, cycle.merchant_id, cycle.subscriber_id, cycle.payment_method_id,
+      );
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+  }
+  return isExactMandateActive(db, cycle);
+}
+
 
 async function updateCycle(
   db: RenewalCycleStore,
@@ -762,7 +779,7 @@ export async function scanDueSubscriptionRenewals(
         cycle.subscription_sync_state === 'APPLIED' &&
         cycle.attempt_number < MAX_ATTEMPTS &&
         renewalRetryDue(cycle, now) &&
-        await isExactMandateActive(getW07RenewalCycleStore(env), cycle)) {
+        await isExactMandateActiveFromStore(getW07RenewalCycleStore(env), cycle)) {
         cycleIds.push(cycle.cycle_id);
       } else if (
         cycle.state === 'PREPARED' ||
@@ -883,7 +900,7 @@ async function persistPricingDecision(
     );
   }
   const config = resolveHyperswitchConfig(env);
-  const mandate = await readActiveMandate(getW07RenewalCycleStore(env), String(config.expectedMerchantId), cycle.subscriber_id);
+  const mandate = await readActiveMandateFromStore(getW07RenewalCycleStore(env), String(config.expectedMerchantId), cycle.subscriber_id);
   return updateCycle(
     getW07RenewalCycleStore(env),
     cycle,
@@ -906,7 +923,7 @@ async function advanceAwaitingMandate(
   now: string,
 ): Promise<RenewalCycleRow> {
   const config = resolveHyperswitchConfig(env);
-  const mandate = await readActiveMandate(getW07RenewalCycleStore(env), String(config.expectedMerchantId), cycle.subscriber_id);
+  const mandate = await readActiveMandateFromStore(getW07RenewalCycleStore(env), String(config.expectedMerchantId), cycle.subscriber_id);
   if (!mandate) return cycle;
   return updateCycle(getW07RenewalCycleStore(env), cycle, now,
     "payment_method_id = ?, mandate_record_id = ?, state = 'PREPARED', outcome_code = NULL",
@@ -1040,7 +1057,7 @@ async function prepareFailedCycleRetry(
   // A retry may reuse only the exact same still-active saved method/mandate.
   // A revoked mandate requires a new customer-present consent flow and is never
   // silently replaced with another token during off-session recovery.
-  if (!(await isExactMandateActive(getW07RenewalCycleStore(env), cycle))) return 'TERMINAL';
+  if (!(await isExactMandateActiveFromStore(getW07RenewalCycleStore(env), cycle))) return 'TERMINAL';
 
   const retryCutoff = new Date(Date.parse(now) - renewalRetryDelayMs(cycle.attempt_number)).toISOString();
   const updatedAt = strictlyAfter(now, cycle.updated_at);
@@ -1177,7 +1194,7 @@ export async function processSubscriptionRenewalCycle(
       cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'SUBSCRIPTION_NOT_CHARGEABLE_BEFORE_ORDER', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }
-    if (!(await isExactMandateActive(getW07RenewalCycleStore(env), cycle))) {
+    if (!(await isExactMandateActiveFromStore(getW07RenewalCycleStore(env), cycle))) {
       cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'MANDATE_NOT_ACTIVE', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }
@@ -1231,7 +1248,7 @@ export async function processSubscriptionRenewalCycle(
   }
 
   if (cycle.state === 'PAYMENT_READY' || cycle.state === 'SUBMITTING') {
-    if (!(await isExactMandateActive(getW07RenewalCycleStore(env), cycle))) {
+    if (!(await isExactMandateActiveFromStore(getW07RenewalCycleStore(env), cycle))) {
       cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'MANDATE_NOT_ACTIVE_AT_SUBMISSION', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }
