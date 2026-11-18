@@ -20,7 +20,6 @@ const reportPath = process.env.W05_COMMENT_CREATE_POSTGRES_REPORT ||
 const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 5_000 })
 const client = await pool.connect()
 const store = createPostgresCommentCreateStore(client)
-const unusedD1 = { prepare() { throw new Error('Unexpected D1 access during PostgreSQL comment-create rehearsal') } }
 const marker = 'w05-comment-create-' + randomUUID()
 const owner = marker + '-owner'
 const actor = marker + '-actor'
@@ -47,7 +46,7 @@ let cleanupPassed = false
 let postgresMajor = null
 
 const create = (actorUserId, id, body, key, parentId = null, actorVerified = false, injectedStore = store) =>
-  createComment(unusedD1, actorUserId, id, { body, parentId, idempotencyKey: key }, actorVerified, injectedStore)
+  createComment(injectedStore, actorUserId, id, { body, parentId, idempotencyKey: key }, actorVerified)
 
 try {
   const version = await client.query("SELECT current_setting('server_version_num')::integer / 10000 AS major")
