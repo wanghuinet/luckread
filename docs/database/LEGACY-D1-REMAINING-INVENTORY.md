@@ -59,7 +59,6 @@ Search-index results can lag behind `main`; file-level decisions are based on re
 | #1948 | W02 RegistrationRollbackStore D1 adapter/test fixture removal | Merged |
 | #1950 | W02 AUTH-010 session-list D1 adapter and handler fallback removal | Merged |
 | #1951 | W02 CreatorRoleGrant D1 adapter and D1-only test fixture removal | Pending CI/review |
-| #1951 | W02 CreatorRoleGrant D1 adapter and D1-only test fixture removal | Pending CI/review |
 
 ## Cross-cutting D-class references to retain
 
