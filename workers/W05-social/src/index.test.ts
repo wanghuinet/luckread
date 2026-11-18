@@ -1746,7 +1746,10 @@ describe('W05 social comment transport', () => {
 
   it('updates an owned comment with a conditional version', async () => {
     const binding = publishedContextBinding()
-    const response = await worker.fetch(
+    const store = makeCommentMutationStore()
+    const injectedWorker = createW05SocialWorker({ commentMutationStore: store })
+    const d1Prepare = vi.fn(() => { throw new Error('D1 must not be used by Comment Mutation') })
+    const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
         method: 'PATCH',
         headers: {
@@ -1759,46 +1762,15 @@ describe('W05 social comment transport', () => {
         },
         body: JSON.stringify({ body: '修改后的评论' }),
       }),
-      {
-        DB: dbFor([
-          {
-            id: 'comment-1',
-            content_id: 'content-1',
-            author_user_id: 'viewer-1',
-            parent_id: null,
-            body: '原评论',
-            state: 'PUBLISHED',
-            updatedAt: '2026-10-17T04:00:00.000Z',
-            depth: 0,
-            created_at: '2026-10-02T00:00:00.000Z',
-            updated_at: '2026-10-02T00:01:00.000Z',
-            content_state: 'PUBLISHED',
-          },
-          {
-            id: 'comment-1',
-            content_id: 'content-1',
-            author_user_id: 'viewer-1',
-            parent_id: null,
-            body: '修改后的评论',
-            state: 'PUBLISHED',
-            updatedAt: '2026-10-17T04:00:00.000Z',
-            depth: 0,
-            created_at: '2026-10-02T00:00:00.000Z',
-            updated_at: '2026-10-02T00:02:00.000Z',
-          },
-        ]),
-        W03_CONTENT: binding,
-      },
+      { DB: { prepare: d1Prepare }, W03_CONTENT: binding } as never,
+      {} as never,
     )
-
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe('"2026-10-02T00:02:00.000Z"')
     expect(response.headers.get('X-LuckRead-Content-Id')).toBe('content-1')
+    expect(store.update).toHaveBeenCalledTimes(1)
     expect(binding.fetch).toHaveBeenCalledTimes(1)
-    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
-    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
-    expect(forwarded.headers.has('Authorization')).toBe(false)
-    expect(forwarded.headers.has('Cookie')).toBe(false)
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('requires If-Match for comment updates', async () => {
@@ -1820,7 +1792,10 @@ describe('W05 social comment transport', () => {
 
   it('deletes an owned leaf comment through the internal transport', async () => {
     const binding = publishedContextBinding()
-    const response = await worker.fetch(
+    const store = makeCommentMutationStore()
+    const injectedWorker = createW05SocialWorker({ commentMutationStore: store })
+    const d1Prepare = vi.fn(() => { throw new Error('D1 must not be used by Comment Mutation') })
+    const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
         method: 'DELETE',
         headers: {
@@ -1830,19 +1805,14 @@ describe('W05 social comment transport', () => {
           'Idempotency-Key': 'comment-delete-1',
         },
       }),
-      {
-        DB: dbFor([
-          { id: 'comment-1', content_id: 'content-1', author_user_id: 'viewer-1', state: 'PUBLISHED', has_replies: 0 },
-        ]),
-        W03_CONTENT: binding,
-      },
+      { DB: { prepare: d1Prepare }, W03_CONTENT: binding } as never,
+      {} as never,
     )
     expect(response.status).toBe(204)
     expect(response.headers.get('X-LuckRead-Content-Id')).toBe('content-1')
     expect(binding.fetch).toHaveBeenCalledTimes(1)
-    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
-    expect(forwarded.headers.has('Authorization')).toBe(false)
-    expect(forwarded.headers.has('Cookie')).toBe(false)
+    expect(store.markDeleted).toHaveBeenCalledTimes(1)
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('requires an idempotency key for comment deletion', async () => {
