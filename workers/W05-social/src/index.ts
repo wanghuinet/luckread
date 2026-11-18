@@ -297,7 +297,7 @@ function requireSocialClosureReadStore(source: SocialClosureReadStore | undefine
 export type W05SocialWorkerDependencies = Readonly<{
   /** W09-owned D1-03 endpoint mutations use the separately scoped Neon connection when enabled. */
   pushEndpointDatabase?: PushEndpointPostgresExecutor
-  /** Optional internal adapter injection; D1 remains the deployed default. */
+  /** Required Neon PostgreSQL follower/following list reader; missing composition fails closed. */
   followListReadStore?: FollowListReadStore
   /** Optional PostgreSQL-capable Follow/Unfollow writer; D1 remains the deployed default. */
   followStore?: FollowStore
@@ -1366,10 +1366,10 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         throw new FollowRuntimeError('INVALID_CURSOR', 400)
       }
 
-      const followListSource = dependencies.followListReadStore ?? env.DB
+      if (!dependencies.followListReadStore) throw new FollowRuntimeError('SERVICE_UNAVAILABLE', 503)
       const page = path.kind === 'followers'
-        ? await listFollowers(followListSource, path.userId, cursor, limit)
-        : await listFollowing(followListSource, path.userId, cursor, limit)
+        ? await listFollowers(dependencies.followListReadStore, path.userId, cursor, limit)
+        : await listFollowing(dependencies.followListReadStore, path.userId, cursor, limit)
 
       return json({
         data: page,
