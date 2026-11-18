@@ -5,6 +5,7 @@ import {
   SubscriptionRuntimeError,
   validatePrincipal,
 } from './subscription-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 type SubscriptionPlanChangeRow = Readonly<{
   subscription_id: string;
@@ -138,7 +139,7 @@ function validPlanSnapshot(value: {
  * boundary so a customer never receives extra value before a payment.
  */
 export async function previewSubscriptionPlanChange(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   subscriberIdInput: string,
   subscriptionIdInput: string,
   targetPlanIdInput: string,
@@ -168,16 +169,33 @@ export async function previewSubscriptionPlanChange(
 
   let subscription: SubscriptionPlanChangeRow | null;
   try {
-    subscription = await db.prepare(
-      'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, ' +
-      's.status, s.current_period_start, s.current_period_end, s.cancel_at, s.version, ' +
-      'v.name AS current_name, v.tier AS current_tier, ' +
-      'v.billing_interval AS current_billing_interval, v.price_minor AS current_price_minor, ' +
-      'v.currency AS current_currency ' +
-      'FROM membership_subscriptions AS s ' +
-      'INNER JOIN membership_plan_versions AS v ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
-      'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
-    ).bind(subscriptionId, subscriberId).first<SubscriptionPlanChangeRow>();
+    if (typeof (db as W07WebhookPostgresPool).query === 'function') {
+      const result = await (db as W07WebhookPostgresPool).query<SubscriptionPlanChangeRow & Record<string, unknown>>(
+        'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, ' +
+        's.status, to_char(s.current_period_start AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS current_period_start, ' +
+        'to_char(s.current_period_end AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS current_period_end, ' +
+        'CASE WHEN s.cancel_at IS NULL THEN NULL ELSE to_char(s.cancel_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') END AS cancel_at, ' +
+        's.version, v.name AS current_name, v.tier AS current_tier, ' +
+        'v.billing_interval AS current_billing_interval, v.price_minor AS current_price_minor, ' +
+        'v.currency AS current_currency ' +
+        'FROM membership_subscriptions AS s ' +
+        'INNER JOIN membership_plan_versions AS v ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
+        'WHERE s.subscription_id = $1 AND s.subscriber_id = $2 LIMIT 1',
+        [subscriptionId, subscriberId],
+      )
+      subscription = result.rows[0] ?? null
+    } else {
+      subscription = await (db as D1Database).prepare(
+        'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, ' +
+        's.status, s.current_period_start, s.current_period_end, s.cancel_at, s.version, ' +
+        'v.name AS current_name, v.tier AS current_tier, ' +
+        'v.billing_interval AS current_billing_interval, v.price_minor AS current_price_minor, ' +
+        'v.currency AS current_currency ' +
+        'FROM membership_subscriptions AS s ' +
+        'INNER JOIN membership_plan_versions AS v ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
+        'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
+      ).bind(subscriptionId, subscriberId).first<SubscriptionPlanChangeRow>()
+    }
   } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
@@ -213,13 +231,25 @@ export async function previewSubscriptionPlanChange(
 
   let target: TargetPlanRow | null;
   try {
-    target = await db.prepare(
-      'SELECT p.plan_id, p.owner_type, p.owner_id, p.current_version, p.status, p.visibility, ' +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency ' +
-      'FROM membership_plans AS p ' +
-      'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
-      'WHERE p.plan_id = ? LIMIT 1',
-    ).bind(targetPlanId).first<TargetPlanRow>();
+    if (typeof (db as W07WebhookPostgresPool).query === 'function') {
+      const result = await (db as W07WebhookPostgresPool).query<TargetPlanRow & Record<string, unknown>>(
+        'SELECT p.plan_id, p.owner_type, p.owner_id, p.current_version, p.status, p.visibility, ' +
+        'v.name, v.tier, v.billing_interval, v.price_minor, v.currency ' +
+        'FROM membership_plans AS p ' +
+        'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
+        'WHERE p.plan_id = $1 LIMIT 1',
+        [targetPlanId],
+      )
+      target = result.rows[0] ?? null
+    } else {
+      target = await (db as D1Database).prepare(
+        'SELECT p.plan_id, p.owner_type, p.owner_id, p.current_version, p.status, p.visibility, ' +
+        'v.name, v.tier, v.billing_interval, v.price_minor, v.currency ' +
+        'FROM membership_plans AS p ' +
+        'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
+        'WHERE p.plan_id = ? LIMIT 1',
+      ).bind(targetPlanId).first<TargetPlanRow>()
+    }
   } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }

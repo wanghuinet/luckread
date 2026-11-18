@@ -2,7 +2,9 @@
 
 import { strictlyAfterCanonicalUtcTimestamp } from './canonical-utc-timestamp.js';
 import { getW07SelectedD104Database, type W07PaymentMethodReadRuntimeEnv } from './neon/payment-method-read-runtime.js';
+import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
 import {
+  getScheduledPlanChangeStore,
   readScheduledSubscriptionPlanDowngradeForPeriod,
   readScheduledDowngradeTargetPlan,
   type ScheduledSubscriptionPlanDowngrade,
@@ -55,7 +57,7 @@ export type RenewalOutcomeSyncDependencies = Readonly<{
   now?: () => Date;
   getDatabase?: (env: OutcomeSyncEnv) => D1Database;
 }>;
-type OutcomeSyncEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{ D1_01: D1Database; D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>; 
+type OutcomeSyncEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{ D1_01: D1Database; D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>; 
 
 const PROVIDER = 'hyperswitch';
 const MAX_PAGE_SIZE = 50;
@@ -450,7 +452,7 @@ export async function syncTerminalRenewalCycleToSubscription(
   }
 
   const scheduledChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
-    env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
+    getScheduledPlanChangeStore(env), cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
   );
   const currentPlanMatchesCycle =
     subscription.plan_id === cycle.plan_id && subscription.plan_version === cycle.plan_version;
@@ -468,7 +470,7 @@ export async function syncTerminalRenewalCycleToSubscription(
         scheduledChange.subscriptionId !== cycle.subscription_id) {
       return reconcile(env, cycle, 'SCHEDULED_PLAN_CHANGE_IDENTITY_MISMATCH', now);
     }
-    const target = await readScheduledDowngradeTargetPlan(env.D1_01, scheduledChange);
+    const target = await readScheduledDowngradeTargetPlan(getScheduledPlanChangeStore(env), scheduledChange);
     const validScheduledChange = scheduledChange.status === 'APPLIED'
       ? target?.billingInterval === subscription.billing_interval &&
         target.tier === subscription.tier && target.currency === subscription.currency
@@ -542,7 +544,7 @@ export async function syncTerminalRenewalCycleToSubscription(
     }
     if (scheduledChange?.status === 'SCHEDULED') {
       const appliedChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
-        env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
+        getScheduledPlanChangeStore(env), cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
       );
       if (!appliedChange || appliedChange.status !== 'APPLIED' ||
           !(await auditAppliedSubscriptionPlanChange(env, cycle, appliedChange))) {

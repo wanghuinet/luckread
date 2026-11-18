@@ -12,11 +12,24 @@ import {
   previewSubscriptionPlanChange,
   type SubscriptionPlanChangePreview,
 } from './subscription-plan-change-preview.js';
+import {
+  getW07MembershipPostgresPool,
+  resolveW07MembershipDatabaseDriver,
+  type W07MembershipDatabaseRuntimeEnv,
+} from './neon/membership-database-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
+import {
+  hasPendingScheduledPlanDowngradePostgres,
+  insertScheduledPlanChangePostgres,
+  readScheduledChangeByIdempotencyPostgres,
+  readScheduledDowngradeTargetPlanPostgres,
+  readScheduledSubscriptionPlanDowngradeForPeriodPostgres,
+} from './subscription-plan-change-schedule-postgres.js';
 
 const PLAN_ID_PATTERN = /^plan_[a-f0-9]{64}$/;
 const CHANGE_ID_PATTERN = /^sudc_[a-f0-9]{64}$/;
 
-type ScheduledPlanChangeRow = Readonly<{
+export type ScheduledPlanChangeRow = Readonly<{
   change_id: string;
   subscriber_id: string;
   subscription_id: string;
@@ -64,8 +77,26 @@ export type ScheduledSubscriptionPlanDowngradeResult = Readonly<{
   replayed: boolean;
 }>;
 
-export type ScheduledPlanDowngradeEnv = Readonly<{ D1_01: D1Database }>;
+export type ScheduledPlanDowngradeEnv = Readonly<{ D1_01: D1Database }> & W07MembershipDatabaseRuntimeEnv;
 export type ScheduledPlanDowngradeDependencies = Readonly<{ now?: () => Date }>;
+
+export function getScheduledPlanChangeStore(
+  env: ScheduledPlanDowngradeEnv,
+): D1Database | W07WebhookPostgresPool {
+  // Explicit Neon production configuration must fail closed when its existing
+  // Hyperdrive binding is missing. Only unconfigured isolated tests retain D1.
+  if (!env.W07_MEMBERSHIP_DATABASE_DRIVER?.trim() && !env.HYPERDRIVE_D1_01) return env.D1_01;
+  if (resolveW07MembershipDatabaseDriver(env) === 'd1') return env.D1_01;
+  const pool = getW07MembershipPostgresPool(env);
+  if (!pool) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+  return pool;
+}
+
+function isPostgresScheduledPlanStore(
+  value: D1Database | W07WebhookPostgresPool,
+): value is W07WebhookPostgresPool {
+  return typeof (value as W07WebhookPostgresPool).query === 'function';
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value) &&
@@ -126,10 +157,13 @@ function toScheduledChange(row: ScheduledPlanChangeRow): ScheduledSubscriptionPl
 }
 
 async function readScheduledChangeByIdempotency(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   subscriberId: string,
   keyHash: string,
 ): Promise<ScheduledPlanChangeRow | null> {
+  if (isPostgresScheduledPlanStore(db)) {
+    return readScheduledChangeByIdempotencyPostgres(db, subscriberId, keyHash);
+  }
   try {
     return await db.prepare(
       'SELECT change_id, subscriber_id, subscription_id, change_type, expected_subscription_version, expected_plan_id, ' +
@@ -160,12 +194,23 @@ async function readScheduledChangeByIdempotency(
 }
 
 export async function readScheduledSubscriptionPlanDowngradeForPeriod(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   subscriptionId: string,
   subscriberId: string,
   effectiveAt: string,
   includeApplied = true,
 ): Promise<ScheduledSubscriptionPlanDowngrade | null> {
+  if (isPostgresScheduledPlanStore(db)) {
+    const postgresRow = await readScheduledSubscriptionPlanDowngradeForPeriodPostgres(
+      db, subscriptionId, subscriberId, effectiveAt, includeApplied,
+    );
+    if (!postgresRow) return null;
+    const change = toScheduledChange(postgresRow);
+    if (change.subscriberId !== subscriberId || change.subscriptionId !== subscriptionId) {
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+    }
+    return change;
+  }
   let row: ScheduledPlanChangeRow | null;
   try {
     row = await db.prepare(
@@ -218,9 +263,12 @@ export async function readScheduledSubscriptionPlanDowngradeForPeriod(
 
 /** Returns true while a period-end downgrade is scheduled and not yet applied. */
 export async function hasPendingScheduledPlanDowngrade(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   subscriptionId: string,
 ): Promise<boolean> {
+  if (isPostgresScheduledPlanStore(db)) {
+    return hasPendingScheduledPlanDowngradePostgres(db, subscriptionId);
+  }
   try {
     const row = await db.prepare(
       "SELECT change_id FROM membership_subscription_scheduled_plan_changes WHERE subscription_id = ? " +
@@ -235,7 +283,7 @@ export async function hasPendingScheduledPlanDowngrade(
   }
 }
 export async function readScheduledDowngradeTargetPlan(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   change: ScheduledSubscriptionPlanDowngrade,
 ): Promise<Readonly<{
   planId: string;
@@ -248,6 +296,9 @@ export async function readScheduledDowngradeTargetPlan(
   benefits: string[];
   creatorId: string;
 }> | null> {
+  if (isPostgresScheduledPlanStore(db)) {
+    return readScheduledDowngradeTargetPlanPostgres(db, change);
+  }
   let row: {
     plan_id: string; plan_version: number; owner_type: string; owner_id: string;
     name: string; tier: string; billing_interval: string; price_minor: number;
@@ -332,7 +383,8 @@ async function scheduleSubscriptionPlanChange(
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
   const now = nowDate.toISOString();
-  const existing = await readScheduledChangeByIdempotency(env.D1_01, subscriberId, keyDigest);
+  const membershipStore = getScheduledPlanChangeStore(env);
+  const existing = await readScheduledChangeByIdempotency(membershipStore, subscriberId, keyDigest);
   if (existing) {
     const change = toScheduledChange(existing);
     if (change.subscriptionId !== subscriptionId || change.targetPlanId !== targetPlanId ||
@@ -359,7 +411,7 @@ async function scheduleSubscriptionPlanChange(
   }
 
   const preview = await previewSubscriptionPlanChange(
-    env.D1_01, subscriberId, subscriptionId, targetPlanId, { now: () => nowDate },
+    membershipStore, subscriberId, subscriptionId, targetPlanId, { now: () => nowDate },
   );
   const previewMatches = preview.changeType === expectedChangeType &&
     !preview.paymentRequired && preview.prorationBaseMinor === 0 &&
@@ -381,32 +433,53 @@ async function scheduleSubscriptionPlanChange(
   }
 
   try {
-    const inserted = await env.D1_01.prepare(
-      'INSERT INTO membership_subscription_scheduled_plan_changes ' +
-      '(change_id, subscriber_id, subscription_id, change_type, expected_subscription_version, expected_plan_id, ' +
-      'expected_plan_version, target_plan_id, target_plan_version, effective_at, idempotency_key_hash, ' +
-      'status, applied_at, applied_subscription_version, created_at, updated_at, version) ' +
-      "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED', NULL, NULL, ?, ?, 1 " +
-      'WHERE EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = ? AND s.subscriber_id = ? ' +
-      "AND s.status = 'ACTIVE' AND s.cancel_at IS NULL AND s.version = ? AND s.plan_id = ? AND s.plan_version = ? " +
-      'AND s.current_period_start = ? AND s.current_period_end = ?) ' +
-      'AND EXISTS (SELECT 1 FROM membership_plans p WHERE p.plan_id = ? AND p.owner_type = \'CREATOR\' ' +
-      'AND p.owner_id = (SELECT creator_id FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ?) ' +
-      "AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC') " +
-      "AND NOT EXISTS (SELECT 1 FROM membership_subscription_plan_change_attempts a " +
-       "WHERE a.subscription_id = ? AND a.status IN ('PENDING_PAYMENT', 'RECONCILIATION_REQUIRED')) " +
-       "AND NOT EXISTS (SELECT 1 FROM membership_subscription_scheduled_plan_changes c " +
-       "WHERE c.subscription_id = ? AND c.status IN ('SCHEDULED', 'RECONCILIATION_REQUIRED'))",
-    ).bind(
-      changeId, subscriberId, subscriptionId, expectedChangeType, expectedVersion, preview.currentPlan.planId,
-      preview.currentPlan.planVersion, preview.targetPlan.planId, preview.targetPlan.planVersion,
-      preview.currentPeriodEnd, keyDigest, now, now,
-      subscriptionId, subscriberId, expectedVersion, preview.currentPlan.planId,
-      preview.currentPlan.planVersion, preview.currentPeriodStart, preview.currentPeriodEnd,
-      preview.targetPlan.planId, subscriptionId, subscriberId, subscriptionId, subscriptionId,
-    ).run();
-    if (Number(inserted.meta?.changes ?? 0) !== 1) {
-      const raced = await readScheduledChangeByIdempotency(env.D1_01, subscriberId, keyDigest);
+    let inserted: boolean;
+    if (isPostgresScheduledPlanStore(membershipStore)) {
+      inserted = await insertScheduledPlanChangePostgres(membershipStore, {
+        changeId,
+        subscriberId,
+        subscriptionId,
+        changeType: expectedChangeType,
+        expectedVersion,
+        currentPlanId: preview.currentPlan.planId,
+        currentPlanVersion: preview.currentPlan.planVersion,
+        targetPlanId: preview.targetPlan.planId,
+        targetPlanVersion: preview.targetPlan.planVersion,
+        effectiveAt: preview.currentPeriodEnd,
+        idempotencyKeyHash: keyDigest,
+        now,
+        currentPeriodStart: preview.currentPeriodStart,
+        currentPeriodEnd: preview.currentPeriodEnd,
+      });
+    } else {
+      const result = await membershipStore.prepare(
+        'INSERT INTO membership_subscription_scheduled_plan_changes ' +
+        '(change_id, subscriber_id, subscription_id, change_type, expected_subscription_version, expected_plan_id, ' +
+        'expected_plan_version, target_plan_id, target_plan_version, effective_at, idempotency_key_hash, ' +
+        'status, applied_at, applied_subscription_version, created_at, updated_at, version) ' +
+        "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED', NULL, NULL, ?, ?, 1 " +
+        'WHERE EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = ? AND s.subscriber_id = ? ' +
+        "AND s.status = 'ACTIVE' AND s.cancel_at IS NULL AND s.version = ? AND s.plan_id = ? AND s.plan_version = ? " +
+        'AND s.current_period_start = ? AND s.current_period_end = ?) ' +
+        'AND EXISTS (SELECT 1 FROM membership_plans p WHERE p.plan_id = ? AND p.owner_type = \'CREATOR\' ' +
+        'AND p.owner_id = (SELECT creator_id FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ?) ' +
+        "AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC') " +
+        "AND NOT EXISTS (SELECT 1 FROM membership_subscription_plan_change_attempts a " +
+        "WHERE a.subscription_id = ? AND a.status IN ('PENDING_PAYMENT', 'RECONCILIATION_REQUIRED')) " +
+        "AND NOT EXISTS (SELECT 1 FROM membership_subscription_scheduled_plan_changes c " +
+        "WHERE c.subscription_id = ? AND c.status IN ('SCHEDULED', 'RECONCILIATION_REQUIRED'))",
+      ).bind(
+        changeId, subscriberId, subscriptionId, expectedChangeType, expectedVersion, preview.currentPlan.planId,
+        preview.currentPlan.planVersion, preview.targetPlan.planId, preview.targetPlan.planVersion,
+        preview.currentPeriodEnd, keyDigest, now, now,
+        subscriptionId, subscriberId, expectedVersion, preview.currentPlan.planId,
+        preview.currentPlan.planVersion, preview.currentPeriodStart, preview.currentPeriodEnd,
+        preview.targetPlan.planId, subscriptionId, subscriberId, subscriptionId, subscriptionId,
+      ).run();
+      inserted = Number(result.meta?.changes ?? 0) === 1;
+    }
+    if (!inserted) {
+      const raced = await readScheduledChangeByIdempotency(membershipStore, subscriberId, keyDigest);
       if (raced) {
         const same = toScheduledChange(raced);
         if (same.subscriptionId === subscriptionId && same.targetPlanId === targetPlanId &&
