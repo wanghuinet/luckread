@@ -94,7 +94,7 @@ function fixture(options: {
     W07_DATABASE_DRIVER: undefined as string | undefined,
   };
   return {
-    env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, postgresCalls, postgresPaymentCalls,
+    env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, postgresCalls, postgresPaymentCalls, postgresMandateCalls,
     dependencies: {
       receive,
       getWebhookDatabase: vi.fn(() => options.webhookDatabase),
