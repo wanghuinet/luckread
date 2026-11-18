@@ -204,7 +204,7 @@ async function readOrderSnapshot(
     const lineTotalMinor = safeInteger(line.line_total_minor)
     if (
       !validId(line.item_type, 64) || !validId(line.item_ref, 255) ||
-      !validId(line.item_version, 128) || quantity === null || quantity < 1 ||
+      !validId(line.item_version, 255) || quantity === null || quantity < 1 ||
       unitAmountMinor === null || unitAmountMinor < 0 ||
       lineSubtotalMinor === null || lineSubtotalMinor < 0 ||
       lineDiscountMinor === null || lineDiscountMinor < 0 ||
