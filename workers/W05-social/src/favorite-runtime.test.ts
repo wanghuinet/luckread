@@ -6,18 +6,6 @@ import { FavoriteStatusReadStoreError } from './favorite-status-read-store.js'
 import { FavoriteListReadStoreError } from './favorite-list-read-store.js'
 import { FavoriteMutationStoreError } from './favorite-mutation-store.js'
 
-const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
-  let firstIndex = 0
-  const prepare = vi.fn((sql: string) => ({
-    bind: vi.fn((...args: unknown[]) => ({
-      first: vi.fn(async () => firstResults[firstIndex++] ?? null),
-      all: vi.fn(async () => ({ results: allResults })),
-      run: vi.fn(async () => ({ sql, args })),
-    })),
-  }))
-  return { prepare } as unknown as D1Database
-}
-
 const publishedBinding = (status = 200) => ({
   fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init)
@@ -39,10 +27,13 @@ const favoriteRow = {
 describe('favorite runtime', () => {
   beforeEach(() => clearFavoriteStatusCacheForTests())
 
-  it('creates a favorite through W03 and writes only the W05 relationship row', async () => {
-    const d = db([favoriteRow])
+  it('creates a favorite through W03 and the injected Favorite Store', async () => {
+    const store = {
+      create: vi.fn(async () => favoriteRow),
+      remove: vi.fn(async () => undefined),
+    }
     const binding = publishedBinding()
-    await expect(favorite(d, binding, 'user-1', { targetType: 'content', targetId: 'content-1' }, 'corr-1'))
+    await expect(favorite(store, binding, 'user-1', { targetType: 'content', targetId: 'content-1' }, 'corr-1'))
       .resolves.toEqual({
         relationshipId: 'favorite-1',
         actorUserId: 'user-1',
@@ -51,34 +42,37 @@ describe('favorite runtime', () => {
         createdAt: favoriteRow.created_at,
       })
 
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(prepare).toHaveBeenCalledTimes(1)
-    expect(String(prepare.mock.calls[0]?.[0])).toContain('INSERT INTO interaction_favorites')
-    expect(String(prepare.mock.calls[0]?.[0])).not.toMatch(/\b(?:FROM|JOIN)\s+contents\b/i)
-    expect(String(prepare.mock.calls[0]?.[0])).toContain('ON CONFLICT')
     const sent = binding.fetch.mock.calls[0]?.[0] as Request
     expect(sent.url).toContain('/internal/content/contents/content-1/published-social-context')
     expect(sent.headers.get('X-LuckRead-Caller')).toBe('W05')
     expect(sent.headers.has('Authorization')).toBe(false)
     expect(sent.headers.has('Cookie')).toBe(false)
+    expect(store.create).toHaveBeenCalledWith(expect.objectContaining({
+      actorUserId: 'user-1',
+      targetType: 'content',
+      targetId: 'content-1',
+      createdAt: expect.any(String),
+      relationshipId: expect.any(String),
+    }))
   })
 
-  it('fails closed before any W05 D1 access when W03 says content is not published', async () => {
-    const d = db()
-    await expect(favorite(d, publishedBinding(404), 'user-1', { targetType: 'content', targetId: 'content-1' }, 'corr-1'))
+  it('does not call the Favorite Store when W03 says content is not published', async () => {
+    const store = { create: vi.fn(async () => favoriteRow), remove: vi.fn(async () => undefined) }
+    await expect(favorite(store, publishedBinding(404), 'user-1', { targetType: 'content', targetId: 'content-1' }, 'corr-1'))
       .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect(store.create).not.toHaveBeenCalled()
   })
 
-  it('fails closed when the W03 binding is unavailable', async () => {
-    const d = db()
-    await expect(favorite(d, undefined, 'user-1', { targetType: 'content', targetId: 'content-1' }, 'corr-1'))
+  it('does not call the Favorite Store when the W03 binding is unavailable', async () => {
+    const store = { create: vi.fn(async () => favoriteRow), remove: vi.fn(async () => undefined) }
+    await expect(favorite(store, undefined, 'user-1', { targetType: 'content', targetId: 'content-1' }, 'corr-1'))
       .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect(store.create).not.toHaveBeenCalled()
   })
 
-  it('is idempotent for an already-favorited content item', async () => {
-    await expect(favorite(db([favoriteRow]), publishedBinding(), 'user-1', { targetType: 'content', targetId: 'content-1' }, 'corr-1'))
+  it('is idempotent for an already-favorited content item through the Store', async () => {
+    const store = { create: vi.fn(async () => favoriteRow), remove: vi.fn(async () => undefined) }
+    await expect(favorite(store, publishedBinding(), 'user-1', { targetType: 'content', targetId: 'content-1' }, 'corr-1'))
       .resolves.toMatchObject({ relationshipId: 'favorite-1', targetId: 'content-1' })
   })
 
@@ -161,8 +155,10 @@ describe('favorite runtime', () => {
       .resolves.toEqual({ favorited: false })
   })
 
-  it('unfavorites idempotently without a preliminary read', async () => {
-    await expect(unfavorite(db(), 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toBeUndefined()
+  it('unfavorites idempotently through the injected Store without a preliminary read', async () => {
+    const store = { create: vi.fn(async () => favoriteRow), remove: vi.fn(async () => undefined) }
+    await expect(unfavorite(store, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toBeUndefined()
+    expect(store.remove).toHaveBeenCalledWith({ actorUserId: 'user-1', targetType: 'content', targetId: 'content-1' })
   })
 
   it('paginates the actor-scoped favorite list through the injected Store with an opaque cursor', async () => {
@@ -192,15 +188,15 @@ describe('favorite runtime', () => {
     expect(store.list).not.toHaveBeenCalled()
   })
 
-  it('rejects unsupported targets and invalid actors before database access', async () => {
-    const d = db()
-    await expect(favorite(d, publishedBinding(), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, 'corr-1'))
+  it('rejects unsupported targets and invalid actors before calling the Favorite Store', async () => {
+    const store = { create: vi.fn(async () => favoriteRow), remove: vi.fn(async () => undefined) }
+    await expect(favorite(store, publishedBinding(), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, 'corr-1'))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
-    await expect(favorite(d, publishedBinding(), '', { targetType: 'content', targetId: 'content-1' }, 'corr-1'))
+    await expect(favorite(store, publishedBinding(), '', { targetType: 'content', targetId: 'content-1' }, 'corr-1'))
       .rejects.toMatchObject({ code: 'UNAUTHENTICATED', status: 401 })
-    await expect(favorite(d, publishedBinding(), 'user-1', { targetType: 'content', targetId: 'content/1' }, 'corr-1'))
+    await expect(favorite(store, publishedBinding(), 'user-1', { targetType: 'content', targetId: 'content/1' }, 'corr-1'))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect(store.create).not.toHaveBeenCalled()
   })
 
   it('accepts an injected favorite list read store and preserves the exact keyset cursor', async () => {
