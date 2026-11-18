@@ -631,48 +631,58 @@ export async function scanDueSubscriptionRenewals(
   const config = resolveHyperswitchConfig(env);
   const limit = Number.isSafeInteger(options.limit) ? Math.min(Math.max(options.limit!, 1), MAX_PAGE_SIZE) : 20;
   const cursor = await readSchedulerCursor(env.D1_04);
+  const membershipStore = getScheduledPlanChangeStore(env);
   let rows: RenewalSubscriptionRow[];
-  try {
-    rows = (await env.D1_01.prepare(
-      'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, s.status, ' +
-      's.current_period_start, s.current_period_end, s.trial_started_at, s.trial_ends_at, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
-      'pv.currency, pv.name, pv.tier, pv.benefits_json ' +
-      'FROM membership_subscriptions s ' +
-      'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
-      "WHERE s.status IN ('TRIALING','ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
-      'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
-      'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +
-      'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?',
-    ).bind(
-      now, cursor.cursor_period_end, cursor.cursor_period_end, cursor.cursor_period_end,
-      cursor.cursor_subscription_id, limit,
-    ).all<RenewalSubscriptionRow>()).results ?? [];
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/no such column:\s*(?:s\.)?trial_(?:started|ends)_at/i.test(message)) {
+  if (isPostgresRenewalMembershipStore(membershipStore)) {
+    try {
+      rows = await readDueRenewalMembershipsPostgres(
+        membershipStore, now, cursor.cursor_period_end, cursor.cursor_subscription_id, limit,
+      );
+    } catch {
       throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
     }
-    // Before migration 0008, only ACTIVE/PAST_DUE subscriptions exist. Keep
-    // the pre-trial renewal scanner fully functional and treat legacy rows as
-    // having no trial metadata; trial creation itself still fails closed.
+  } else {
     try {
-      const legacy = (await env.D1_01.prepare(
+      rows = (await membershipStore.prepare(
         'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, s.status, ' +
-        's.current_period_start, s.current_period_end, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
+        's.current_period_start, s.current_period_end, s.trial_started_at, s.trial_ends_at, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
         'pv.currency, pv.name, pv.tier, pv.benefits_json ' +
         'FROM membership_subscriptions s ' +
         'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
-        "WHERE s.status IN ('ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
+        "WHERE s.status IN ('TRIALING','ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
         'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
         'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +
         'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?',
       ).bind(
         now, cursor.cursor_period_end, cursor.cursor_period_end, cursor.cursor_period_end,
         cursor.cursor_subscription_id, limit,
-      ).all<Omit<RenewalSubscriptionRow, 'trial_started_at' | 'trial_ends_at'>>()).results ?? [];
-      rows = legacy.map((row) => ({ ...row, trial_started_at: null, trial_ends_at: null }));
-    } catch {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+      ).all<RenewalSubscriptionRow>()).results ?? [];
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/no such column:\\s*(?:s\\.)?trial_(?:started|ends)_at/i.test(message)) {
+        throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+      }
+      // Before migration 0008, only ACTIVE/PAST_DUE subscriptions exist. Keep
+      // the pre-trial renewal scanner functional for isolated D1 test profiles.
+      try {
+        const legacy = (await membershipStore.prepare(
+          'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, s.status, ' +
+          's.current_period_start, s.current_period_end, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
+          'pv.currency, pv.name, pv.tier, pv.benefits_json ' +
+          'FROM membership_subscriptions s ' +
+          'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
+          "WHERE s.status IN ('ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
+          'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
+          'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +
+          'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?',
+        ).bind(
+          now, cursor.cursor_period_end, cursor.cursor_period_end, cursor.cursor_period_end,
+          cursor.cursor_subscription_id, limit,
+        ).all<Omit<RenewalSubscriptionRow, 'trial_started_at' | 'trial_ends_at'>>()).results ?? [];
+        rows = legacy.map((row) => ({ ...row, trial_started_at: null, trial_ends_at: null }));
+      } catch {
+        throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+      }
     }
   }
 
