@@ -104,4 +104,14 @@ Comment list reads now require the injected Neon PostgreSQL Store and fail close
 - Removed the D1 Reply Audience Store adapter and the runtime's D1 database parameter/default Store construction.
 - Reply Audience GET and PUT routes now require the injected Neon PostgreSQL `ReplyAudienceStore`; missing composition returns 503 instead of falling back to `env.DB`.
 - Preserved W03 owner-context validation, owner-only policy changes, audience validation, bounded/deduplicated mention allowlists, default `everyone` behavior, owner-scoped reads, and sanitized persistence failures.
-- Existing PostgreSQL Store and PostgreSQL 18 rehearsal remain. The legacy `replyAudienceAllowedSql` predicate is intentionally retained for the separate legacy D1 Comment Create adapter; this PR does not claim Comment Create is D1-free.
+- Existing PostgreSQL Store and PostgreSQL 18 rehearsal remain. The separate Comment Create write path was completed in the subsequent W05 Comment Create / Update / Delete cleanup.
+
+
+## W05 Comment Create / Update / Delete
+
+- Removed the D1 Comment Create and Comment Mutation adapters and all runtime default construction for these write paths.
+- Comment POST requires the injected Neon PostgreSQL `CommentCreateStore`; PATCH and DELETE require the injected Neon PostgreSQL `CommentMutationStore`. Missing Store composition returns sanitized 503 before comment writes.
+- Removed the legacy D1 Reply Audience SQL predicate from the Reply Audience runtime. Comment creation now uses the PostgreSQL-native reply-audience predicate in its validation, final INSERT, and post-race recheck.
+- Preserved W03 published-content authority, idempotent comment creation, rate limiting, parent ownership/state/depth constraints, bidirectional Block checks in the final PostgreSQL INSERT, reply-audience checks in the final INSERT, author-only deletion of published leaf comments, tombstone replay, and ETag compare-and-swap edits.
+- Existing PostgreSQL adapters, SQL tests, and Neon runtime composition remain the production storage path. This closes Comment Create/Update/Delete writes only; comment list and other W05 modules are tracked separately.
+- No production database/schema, Hyperdrive binding, Worker deployment, or traffic change.

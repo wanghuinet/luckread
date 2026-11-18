@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import worker, { createW05SocialWorker } from './index.js'
 import type { CommentListReadInput, CommentListReadRow, CommentListReadStore } from './comment-list-read-store.js'
+import type { CommentCreateStore, CommentCreateValidation, StoredCommentCreate } from './comment-create-store.js'
+import type { CommentMutationStore, CommentDeleteRow, CommentUpdateRow, CommentMutationState } from './comment-mutation-store.js'
 import type { FollowListReadInput, FollowListReadRow, FollowListCountInput, FollowListReadStore } from './follow-list-read-store.js'
 import type { FollowMutation, FollowRow, FollowStore } from './follow-store.js'
 import type { RelationshipGraphReadRow, RelationshipGraphReadStore } from './relationship-graph-store.js'
@@ -20,6 +22,7 @@ import type { RepostStore } from './repost-store.js'
 import type { ShareStore } from './share-store.js'
 import type { ProfilePinStore } from './profile-pin-store.js'
 import type { SocialTokenSyncStore } from './social-token-sync-store.js'
+import type { SocialClosureReadStore } from './social-closure-read-store.js'
 import type { PollReadStore } from './poll-read-store.js'
 import type { PollConfigurationStore } from './poll-configuration-store.js'
 import type { ReplyAudienceStore, StoredReplyAudiencePolicy } from './reply-audience-store.js'
@@ -36,6 +39,53 @@ const dbFor = (results: unknown[] = []) => {
   }))
   return { prepare } as unknown as D1Database
 }
+
+
+const makeCommentCreateStore = (overrides: Partial<CommentCreateValidation> = {}, inserted?: StoredCommentCreate): CommentCreateStore => ({
+  validate: vi.fn(async () => ({
+    existing_id: null, existing_content_id: null, existing_parent_id: null, existing_body: null,
+    existing_author_user_id: null, existing_state: null, existing_depth: null,
+    existing_created_at: null, existing_updated_at: null,
+    content_state: 'PUBLISHED', content_owner_user_id: 'owner-1',
+    parent_content_id: null, parent_author_user_id: null, parent_state: null, parent_depth: null,
+    recent_count: 0, blocked: false, reply_audience_allowed: true,
+    ...overrides,
+  })),
+  insert: vi.fn(async (input): Promise<StoredCommentCreate> => inserted ?? ({
+    id: 'comment-created', content_id: input.contentId, author_user_id: input.actorUserId,
+    parent_id: input.parentId, body: input.body, state: 'PUBLISHED', depth: input.depth,
+    created_at: input.now, updated_at: input.now,
+  })),
+  getFinalState: vi.fn(async () => ({ content_state: 'PUBLISHED', reply_audience_allowed: true })),
+})
+const makeCommentMutationStore = (options: {
+  deleteRow?: CommentDeleteRow | null
+  markedDeleted?: boolean
+  deleteState?: CommentMutationState | null
+  updateRow?: CommentUpdateRow | null
+  updatedRow?: CommentUpdateRow | null
+} = {}): CommentMutationStore => ({
+  getForDelete: vi.fn(async () => options.deleteRow === undefined ? {
+    id: 'comment-1', content_id: 'content-1', author_user_id: 'viewer-1', state: 'PUBLISHED', has_replies: false,
+  } : options.deleteRow),
+  markDeleted: vi.fn(async () => options.markedDeleted ?? true),
+  getDeleteState: vi.fn(async () => options.deleteState ?? null),
+  getForUpdate: vi.fn(async () => options.updateRow === undefined ? {
+    id: 'comment-1', content_id: 'content-1', author_user_id: 'viewer-1', parent_id: null,
+    body: '原评论', state: 'PUBLISHED', depth: 0,
+    created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:01:00.000Z',
+  } : options.updateRow),
+  update: vi.fn(async (input) => options.updatedRow ?? {
+    id: 'comment-1', content_id: 'content-1', author_user_id: 'viewer-1', parent_id: null,
+    body: input.body, state: 'PUBLISHED', depth: 0,
+    created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:02:00.000Z',
+  }),
+})
+
+
+const emptySocialClosureReadStore = (): SocialClosureReadStore => ({
+  getTargets: vi.fn(async () => ({ topics: [], mentions: [] })),
+} as unknown as SocialClosureReadStore)
 
 const emptyPollReadStore = (): PollReadStore => ({
   isBlocked: vi.fn(async () => false),
@@ -853,7 +903,10 @@ describe('W05 social query transport', () => {
   })
 
   it('rejects replies outside the configured audience on the W05 comment route', async () => {
-    const response = await worker.fetch(
+    const store = makeCommentCreateStore({ reply_audience_allowed: false })
+    const injectedWorker = createW05SocialWorker({ commentCreateStore: store })
+    const d1Prepare = vi.fn(() => { throw new Error('D1 must not be used by Comment Create') })
+    const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/contents/content-1/comments', {
         method: 'POST',
         headers: {
@@ -864,22 +917,13 @@ describe('W05 social query transport', () => {
         },
         body: JSON.stringify({ body: 'Restricted reply', parentId: null }),
       }),
-      { DB: dbFor([{
-        content_state: 'PUBLISHED',
-        content_owner_user_id: 'owner-1',
-        parent_content_id: null,
-        parent_author_user_id: null,
-        parent_state: null,
-        parent_depth: null,
-        recent_count: 0,
-        blocked: 0,
-        reply_audience_allowed: 0,
-      }]) },
+      { DB: { prepare: d1Prepare } } as never,
+      {} as never,
     )
     expect(response.status).toBe(403)
-    await expect(response.json()).resolves.toMatchObject({
-      error: { code: 'PERMISSION_DENIED' },
-    })
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'PERMISSION_DENIED' } })
+    expect(store.insert).not.toHaveBeenCalled()
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('requires internal transport and rejects writes to profile channel routes', async () => {
@@ -1708,7 +1752,10 @@ describe('W05 social comment transport', () => {
 
   it('updates an owned comment with a conditional version', async () => {
     const binding = publishedContextBinding()
-    const response = await worker.fetch(
+    const store = makeCommentMutationStore()
+    const injectedWorker = createW05SocialWorker({ commentMutationStore: store, socialClosureReadStore: emptySocialClosureReadStore() })
+    const d1Prepare = vi.fn(() => { throw new Error('D1 must not be used by Comment Mutation') })
+    const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
         method: 'PATCH',
         headers: {
@@ -1721,46 +1768,15 @@ describe('W05 social comment transport', () => {
         },
         body: JSON.stringify({ body: '修改后的评论' }),
       }),
-      {
-        DB: dbFor([
-          {
-            id: 'comment-1',
-            content_id: 'content-1',
-            author_user_id: 'viewer-1',
-            parent_id: null,
-            body: '原评论',
-            state: 'PUBLISHED',
-            updatedAt: '2026-10-17T04:00:00.000Z',
-            depth: 0,
-            created_at: '2026-10-02T00:00:00.000Z',
-            updated_at: '2026-10-02T00:01:00.000Z',
-            content_state: 'PUBLISHED',
-          },
-          {
-            id: 'comment-1',
-            content_id: 'content-1',
-            author_user_id: 'viewer-1',
-            parent_id: null,
-            body: '修改后的评论',
-            state: 'PUBLISHED',
-            updatedAt: '2026-10-17T04:00:00.000Z',
-            depth: 0,
-            created_at: '2026-10-02T00:00:00.000Z',
-            updated_at: '2026-10-02T00:02:00.000Z',
-          },
-        ]),
-        W03_CONTENT: binding,
-      },
+      { DB: { prepare: d1Prepare }, W03_CONTENT: binding } as never,
+      {} as never,
     )
-
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe('"2026-10-02T00:02:00.000Z"')
     expect(response.headers.get('X-LuckRead-Content-Id')).toBe('content-1')
+    expect(store.update).toHaveBeenCalledTimes(1)
     expect(binding.fetch).toHaveBeenCalledTimes(1)
-    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
-    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
-    expect(forwarded.headers.has('Authorization')).toBe(false)
-    expect(forwarded.headers.has('Cookie')).toBe(false)
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('requires If-Match for comment updates', async () => {
@@ -1782,7 +1798,10 @@ describe('W05 social comment transport', () => {
 
   it('deletes an owned leaf comment through the internal transport', async () => {
     const binding = publishedContextBinding()
-    const response = await worker.fetch(
+    const store = makeCommentMutationStore()
+    const injectedWorker = createW05SocialWorker({ commentMutationStore: store })
+    const d1Prepare = vi.fn(() => { throw new Error('D1 must not be used by Comment Mutation') })
+    const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
         method: 'DELETE',
         headers: {
@@ -1792,19 +1811,14 @@ describe('W05 social comment transport', () => {
           'Idempotency-Key': 'comment-delete-1',
         },
       }),
-      {
-        DB: dbFor([
-          { id: 'comment-1', content_id: 'content-1', author_user_id: 'viewer-1', state: 'PUBLISHED', has_replies: 0 },
-        ]),
-        W03_CONTENT: binding,
-      },
+      { DB: { prepare: d1Prepare }, W03_CONTENT: binding } as never,
+      {} as never,
     )
     expect(response.status).toBe(204)
     expect(response.headers.get('X-LuckRead-Content-Id')).toBe('content-1')
     expect(binding.fetch).toHaveBeenCalledTimes(1)
-    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
-    expect(forwarded.headers.has('Authorization')).toBe(false)
-    expect(forwarded.headers.has('Cookie')).toBe(false)
+    expect(store.markDeleted).toHaveBeenCalledTimes(1)
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('requires an idempotency key for comment deletion', async () => {
@@ -1840,56 +1854,27 @@ describe('W05 social comment transport', () => {
 
   it('resolves root comment notification recipients through W03', async () => {
     const contextBinding = {
-      fetch: vi.fn(async (_input: RequestInfo | URL) => Response.json({
+      fetch: vi.fn(async () => Response.json({
         data: {
-          contentId: 'content-1',
-          ownerUserId: 'owner-1',
-          contentType: 'post',
-          state: 'PUBLISHED',
-          updatedAt: '2026-10-17T04:00:00.000Z',
+          contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'post',
+          state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z',
         },
         requestId: 'req_comment_owner',
       })),
     }
-    const d = dbFor([
-      {
-        existing_id: null,
-        existing_content_id: null,
-        existing_parent_id: null,
-        existing_body: null,
-        existing_author_user_id: null,
-        existing_state: null,
-        existing_depth: null,
-        existing_created_at: null,
-        existing_updated_at: null,
-        content_state: 'PUBLISHED',
-        content_owner_user_id: 'owner-1',
-        parent_content_id: null,
-        parent_author_user_id: null,
-        parent_state: null,
-        parent_depth: null,
-        recent_count: 0,
-        blocked: 0,
-        reply_audience_allowed: 1,
-      },
-      {
-        id: 'comment-1',
-        content_id: 'content-1',
-        author_user_id: 'viewer-1',
-        parent_id: null,
-        body: 'hello',
-        state: 'PUBLISHED',
-        updatedAt: '2026-10-17T04:00:00.000Z',
-        depth: 0,
-        created_at: '2026-10-20T00:00:00.000Z',
-        updated_at: '2026-10-20T00:00:00.000Z',
-      },
-      null,
-      null,
-      null,
-    ])
+    const created: StoredCommentCreate = {
+      id: 'comment-1', content_id: 'content-1', author_user_id: 'viewer-1', parent_id: null,
+      body: 'hello', state: 'PUBLISHED', depth: 0,
+      created_at: '2026-10-20T00:00:00.000Z', updated_at: '2026-10-20T00:00:00.000Z',
+    }
+    const createStore = makeCommentCreateStore({}, created)
+    const injectedWorker = createW05SocialWorker({
+      commentCreateStore: createStore,
+      socialClosureReadStore: emptySocialClosureReadStore(),
+    })
+    const d1Prepare = vi.fn(() => { throw new Error('D1 must not be used by Comment Create') })
     const context = { waitUntil: vi.fn() }
-    const response = await worker.fetch(
+    const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/contents/content-1/comments', {
         method: 'POST',
         headers: {
@@ -1900,16 +1885,17 @@ describe('W05 social comment transport', () => {
         },
         body: JSON.stringify({ body: 'hello' }),
       }),
-      { DB: d, W03_CONTENT: contextBinding },
+      { DB: { prepare: d1Prepare }, W03_CONTENT: contextBinding } as never,
       context as never,
     )
     expect(response.status).toBe(201)
+    expect(createStore.validate).toHaveBeenCalledTimes(1)
+    expect(createStore.insert).toHaveBeenCalledTimes(1)
     expect(contextBinding.fetch).toHaveBeenCalledTimes(1)
     const forwarded = contextBinding.fetch.mock.calls[0]?.[0] as Request
     expect(forwarded.url).toContain('/internal/content/contents/content-1/published-social-context')
     expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(prepare.mock.calls.some(([sql]) => String(sql) === "SELECT owner_user_id FROM contents WHERE id = ? AND state = 'PUBLISHED' LIMIT 1")).toBe(false)
+    expect(d1Prepare).not.toHaveBeenCalled()
     await expect(response.json()).resolves.toMatchObject({
       data: { id: 'comment-1', contentId: 'content-1', authorUserId: 'viewer-1' },
     })

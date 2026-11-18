@@ -1,628 +1,282 @@
-/// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import { createComment, deleteComment, listComments, parseCommentLimit, parseCommentSort, updateComment } from './comment-runtime.js'
-import { replyAudienceAllowedSql } from './reply-audience-runtime.js'
-import { buildCommentListReadQuery } from './comment-list-read-store.js'
+import { buildCommentListReadQuery, type CommentListReadStore } from './comment-list-read-store.js'
+import type { CommentCreateStore, CommentCreateValidation, StoredCommentCreate } from './comment-create-store.js'
+import type { CommentMutationStore, CommentDeleteRow, CommentUpdateRow, CommentMutationState } from './comment-mutation-store.js'
 import type { PublishedContentSocialContext, W03ContentBinding } from './w03-content-context-client.js'
 
-const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
-  let firstIndex = 0
-  const prepare = vi.fn(() => ({
-    bind: vi.fn(() => ({
-      first: vi.fn(async () => firstResults[firstIndex++] ?? null),
-      all: vi.fn(async () => ({ results: allResults })),
-      run: vi.fn(async () => ({ success: true, meta: { changes: 1 } })),
-    })),
-  }))
-  const fixture = {
-    prepare,
-    async list(input: Parameters<import('./comment-list-read-store.js').CommentListReadStore['list']>[0]) {
-      const { sql, values } = buildCommentListReadQuery(input)
-      await prepare(sql).bind(...values).all()
-      const first = allResults[0] as { results?: unknown[] } | undefined
-      return first && Array.isArray(first.results) ? first.results : allResults
-    },
-  }
-  return fixture as unknown as D1Database & import('./comment-list-read-store.js').CommentListReadStore
-}
-
 const publishedContext = (contentId = 'content-1'): PublishedContentSocialContext => ({
-  contentId,
-  ownerUserId: 'owner-1',
-  contentType: 'post',
-  state: 'PUBLISHED',
-  updatedAt: '2026-10-17T04:00:00.000Z',
+  contentId, ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z',
 })
-
-const publishedBinding = (): W03ContentBinding => ({
+const publishedBinding = (): W03ContentBinding & { fetch: ReturnType<typeof vi.fn> } => ({
   fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init)
     const contentId = decodeURIComponent(new URL(request.url).pathname.split('/').filter(Boolean).at(-2) ?? '')
     return Response.json({ data: publishedContext(contentId) })
   }),
 })
+const defaultValidation: CommentCreateValidation = {
+  existing_id: null, existing_content_id: null, existing_parent_id: null, existing_body: null,
+  existing_author_user_id: null, existing_state: null, existing_depth: null,
+  existing_created_at: null, existing_updated_at: null,
+  content_state: 'PUBLISHED', content_owner_user_id: 'owner-1',
+  parent_content_id: null, parent_author_user_id: null, parent_state: null, parent_depth: null,
+  recent_count: 0, blocked: false, reply_audience_allowed: true,
+}
+const createdRow = (input: Parameters<CommentCreateStore['insert']>[0]): StoredCommentCreate => ({
+  id: input.id, content_id: input.contentId, author_user_id: input.actorUserId, parent_id: input.parentId,
+  body: input.body, state: 'PUBLISHED', depth: input.depth, created_at: input.now, updated_at: input.now,
+})
+const createStoreFor = (options: {
+  validation?: CommentCreateValidation | null
+  inserted?: StoredCommentCreate | null
+  finalState?: { content_state: string; reply_audience_allowed: number | boolean } | null
+} = {}): CommentCreateStore => ({
+  validate: vi.fn(async () => options.validation === undefined ? defaultValidation : options.validation),
+  insert: vi.fn(async (input) => options.inserted === undefined ? createdRow(input) : options.inserted),
+  getFinalState: vi.fn(async () => options.finalState === undefined
+    ? { content_state: 'PUBLISHED', reply_audience_allowed: true }
+    : options.finalState),
+})
+const deleteRow = (overrides: Partial<CommentDeleteRow> = {}): CommentDeleteRow => ({
+  id: 'comment-1', content_id: 'content-1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: false, ...overrides,
+})
+const updateRow = (overrides: Partial<CommentUpdateRow> = {}): CommentUpdateRow => ({
+  id: 'comment-1', content_id: 'content-1', author_user_id: 'user-1', parent_id: null,
+  body: 'before', state: 'PUBLISHED', depth: 0,
+  created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:01:00.000Z', ...overrides,
+})
+const mutationStoreFor = (options: {
+  deleteRow?: CommentDeleteRow | null
+  markedDeleted?: boolean
+  deleteState?: CommentMutationState | null
+  updateRow?: CommentUpdateRow | null
+  updatedRow?: CommentUpdateRow | null
+} = {}): CommentMutationStore => ({
+  getForDelete: vi.fn(async () => options.deleteRow === undefined ? deleteRow() : options.deleteRow),
+  markDeleted: vi.fn(async () => options.markedDeleted ?? true),
+  getDeleteState: vi.fn(async () => options.deleteState ?? null),
+  getForUpdate: vi.fn(async () => options.updateRow === undefined ? updateRow() : options.updateRow),
+  update: vi.fn(async (input) => options.updatedRow === undefined
+    ? updateRow({ body: input.body, updated_at: input.now })
+    : options.updatedRow),
+})
+// Query-builder fixture for CommentListReadStore. It captures generated PostgreSQL SQL
+// for pagination assertions; the runtime itself only sees the Store.list contract.
+const db = (_firstResults: unknown[] = [], allResults: unknown[] = []) => {
+  const prepare = vi.fn((sql: string) => ({
+    bind: vi.fn((...args: unknown[]) => ({
+      first: vi.fn(async () => null),
+      all: vi.fn(async () => ({ results: allResults, sql, args })),
+    })),
+  }))
+  const fixture: CommentListReadStore & { prepare: ReturnType<typeof vi.fn> } = {
+    prepare,
+    async list(input) {
+      const { sql, values } = buildCommentListReadQuery(input)
+      const result = await prepare(sql).bind(...values).all()
+      const first = result.results[0] as { results?: unknown[] } | undefined
+      return (first && Array.isArray(first.results) ? first.results : allResults) as never
+    },
+  }
+  return fixture
+}
 
-describe('comment runtime', () => {
+describe('W05 comment create runtime — Store port only', () => {
   it('creates a published root comment after one validation read', async () => {
-    const d = db([
-      {
-        content_state: 'PUBLISHED',
-        parent_content_id: null,
-        parent_state: null,
-        parent_depth: null,
-      },
-      {
-        id: 'c1',
-        content_id: 'content-1',
-        author_user_id: 'user-1',
-        parent_id: null,
-        body: '你好',
-        state: 'PUBLISHED',
-        depth: 0,
-        created_at: '2026-10-02T00:00:00.000Z',
-        updated_at: '2026-10-02T00:00:00.000Z',
-      },
-    ])
-    await expect(createComment(d, 'user-1', 'content-1', {
-      body: '你好',
-      idempotencyKey: 'idem-1',
-    })).resolves.toMatchObject({
-      id: 'c1',
-      contentId: 'content-1',
-      authorUserId: 'user-1',
-      parentId: null,
-      state: 'PUBLISHED',
-      depth: 0,
-    })
-    expect(d.prepare).toHaveBeenCalledTimes(2)
+    const store = createStoreFor()
+    await expect(createComment(store, 'user-1', 'content-1', { body: '你好', idempotencyKey: 'idem-1' }))
+      .resolves.toMatchObject({ contentId: 'content-1', authorUserId: 'user-1', parentId: null, state: 'PUBLISHED', depth: 0 })
+    expect(store.validate).toHaveBeenCalledTimes(1)
+    expect(store.insert).toHaveBeenCalledWith(expect.objectContaining({ actorUserId: 'user-1', contentId: 'content-1', body: '你好', depth: 0 }))
   })
 
   it('returns the existing comment for an idempotent retry before rate-limit checks', async () => {
-    const d = db([{
-      existing_id: 'c-existing',
-      existing_content_id: 'content-1',
-      existing_parent_id: null,
-      existing_body: '已经发表',
-      existing_author_user_id: 'user-1',
-      existing_state: 'PUBLISHED',
-      existing_depth: 0,
-      existing_created_at: '2026-10-02T00:00:00.000Z',
-      existing_updated_at: '2026-10-02T00:00:00.000Z',
-      content_state: 'DRAFT',
-      recent_count: 99,
-      blocked: 1,
-    }])
-
-    await expect(createComment(d, 'user-1', 'content-1', {
-      body: '已经发表',
-      idempotencyKey: 'same-key',
-    })).resolves.toMatchObject({
-      id: 'c-existing',
-      contentId: 'content-1',
-      authorUserId: 'user-1',
-      state: 'PUBLISHED',
-      mentions: [],
-    })
-    expect(d.prepare).toHaveBeenCalledTimes(1)
+    const store = createStoreFor({ validation: {
+      ...defaultValidation, existing_id: 'comment-existing', existing_content_id: 'content-1',
+      existing_parent_id: null, existing_body: 'same', existing_author_user_id: 'user-1',
+      existing_state: 'PUBLISHED', existing_depth: 0, existing_created_at: '2026-10-02T00:00:00.000Z',
+      existing_updated_at: '2026-10-02T00:01:00.000Z', recent_count: 99,
+    } })
+    await expect(createComment(store, 'user-1', 'content-1', { body: 'same', idempotencyKey: 'idem-retry' }))
+      .resolves.toMatchObject({ id: 'comment-existing', body: 'same' })
+    expect(store.insert).not.toHaveBeenCalled()
   })
 
   it('rejects an idempotency key reused with a different comment payload', async () => {
-    const d = db([{
-      existing_id: 'c-existing',
-      existing_content_id: 'content-1',
-      existing_parent_id: null,
-      existing_body: '原始评论',
-      existing_author_user_id: 'user-1',
-      existing_state: 'PUBLISHED',
-      existing_depth: 0,
-      existing_created_at: '2026-10-02T00:00:00.000Z',
-      existing_updated_at: '2026-10-02T00:00:00.000Z',
-      content_state: 'PUBLISHED',
-      recent_count: 0,
-      blocked: 0,
-    }])
-
-    await expect(createComment(d, 'user-1', 'content-1', {
-      body: '不同评论',
-      idempotencyKey: 'same-key',
-    })).rejects.toMatchObject({
-      code: 'CONFLICT',
-      status: 409,
-    })
-    expect(d.prepare).toHaveBeenCalledTimes(1)
+    const store = createStoreFor({ validation: {
+      ...defaultValidation, existing_id: 'comment-existing', existing_content_id: 'content-1',
+      existing_parent_id: null, existing_body: 'original', existing_author_user_id: 'user-1',
+      existing_state: 'PUBLISHED', existing_depth: 0,
+    } })
+    await expect(createComment(store, 'user-1', 'content-1', { body: 'different', idempotencyKey: 'idem-reuse' }))
+      .rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+    expect(store.insert).not.toHaveBeenCalled()
   })
 
-  it('replays a deleted comment idempotency key as the original published result', async () => {
-    const d = db([{
-      existing_id: 'c-deleted',
-      existing_content_id: 'content-1',
-      existing_parent_id: null,
-      existing_body: '已删除前的评论',
-      existing_author_user_id: 'user-1',
-      existing_state: 'AUTHOR_DELETED',
-      existing_depth: 0,
-      existing_created_at: '2026-10-02T00:00:00.000Z',
-      existing_updated_at: '2026-10-03T00:00:00.000Z',
-      content_state: 'DRAFT',
-      recent_count: 99,
-      blocked: 1,
-    }])
-
-    await expect(createComment(d, 'user-1', 'content-1', {
-      body: '已删除前的评论',
-      idempotencyKey: 'same-key',
-    })).resolves.toMatchObject({
-      id: 'c-deleted',
-      contentId: 'content-1',
-      authorUserId: 'user-1',
-      state: 'PUBLISHED',
-    })
-    expect(d.prepare).toHaveBeenCalledTimes(1)
+  it('replays an author-deleted idempotency tombstone as the original published result', async () => {
+    const store = createStoreFor({ validation: {
+      ...defaultValidation, existing_id: 'comment-deleted', existing_content_id: 'content-1',
+      existing_parent_id: null, existing_body: 'same', existing_author_user_id: 'user-1',
+      existing_state: 'AUTHOR_DELETED', existing_depth: 0,
+    } })
+    await expect(createComment(store, 'user-1', 'content-1', { body: 'same', idempotencyKey: 'idem-deleted' }))
+      .resolves.toMatchObject({ id: 'comment-deleted', state: 'PUBLISHED' })
+    expect(store.insert).not.toHaveBeenCalled()
   })
 
-  it('retries an author deletion tombstone after the parent content is unpublished', async () => {
-    const d = db([{
-      id: 'c-deleted',
-      content_id: 'content-1',
-      author_user_id: 'user-1',
-      state: 'AUTHOR_DELETED',
-      content_state: 'DRAFT',
-      has_replies: 0,
-    }])
-
-    await expect(deleteComment(d, undefined, 'user-1', 'c-deleted', 'comment-test')).resolves.toBe('content-1')
-    expect(d.prepare).toHaveBeenCalledTimes(1)
+  it('rejects unpublished, blocked, audience-denied and rate-limited comments before insert', async () => {
+    for (const validation of [
+      { ...defaultValidation, content_state: 'DRAFT' },
+      { ...defaultValidation, blocked: true },
+      { ...defaultValidation, reply_audience_allowed: false },
+      { ...defaultValidation, recent_count: 10 },
+    ]) {
+      const store = createStoreFor({ validation })
+      await expect(createComment(store, 'user-1', 'content-1', { body: 'not allowed', idempotencyKey: 'idem-denied' }))
+        .rejects.toBeInstanceOf(Error)
+      expect(store.insert).not.toHaveBeenCalled()
+    }
   })
 
-  it('rejects comments when the actor is blocked by the content relationship', async () => {
-    const d = db([{
-      content_state: 'PUBLISHED',
-      content_owner_user_id: 'user-2',
-      parent_content_id: null,
-      parent_author_user_id: null,
-      parent_state: null,
-      parent_depth: null,
-      blocked: 1,
-      recent_count: 0,
-    }])
-    await expect(createComment(d, 'user-1', 'content-1', {
-      body: '被屏蔽后不能评论',
-      idempotencyKey: 'blocked-1',
-    })).rejects.toMatchObject({
-      code: 'CONFLICT',
-      status: 409,
-    })
-  })
-
-  it('rejects a reply outside the content owner’s configured audience before inserting', async () => {
-    const d = db([{
-      content_state: 'PUBLISHED',
-      content_owner_user_id: 'owner-1',
-      parent_content_id: null,
-      parent_author_user_id: null,
-      parent_state: null,
-      parent_depth: null,
-      blocked: 0,
-      recent_count: 0,
-      reply_audience_allowed: 0,
-    }])
-    await expect(createComment(d, 'viewer-1', 'content-1', {
-      body: 'not allowed',
-      idempotencyKey: 'reply-audience-denied',
-    })).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
-    expect(d.prepare).toHaveBeenCalledTimes(1)
-  })
-
-  it('rechecks published parent state in the final comment insert', async () => {
-    const d = db([
-      {
-        content_state: 'PUBLISHED',
-        parent_content_id: 'content-1',
-        parent_state: 'PUBLISHED',
-        parent_depth: 1,
-      },
-      {
-        id: 'c-race-safe',
-        content_id: 'content-1',
-        author_user_id: 'user-2',
-        parent_id: 'c1',
-        body: '回复',
-        state: 'PUBLISHED',
-        depth: 2,
-        created_at: '2026-10-02T00:01:00.000Z',
-        updated_at: '2026-10-02T00:01:00.000Z',
-      },
-    ])
-
-    await expect(createComment(d, 'user-2', 'content-1', {
-      body: '回复',
-      parentId: 'c1',
-      idempotencyKey: 'idem-race-safe',
-    })).resolves.toMatchObject({ id: 'c-race-safe', parentId: 'c1' })
-
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(prepare.mock.calls[1]?.[0]).toContain("content.state = 'PUBLISHED'")
-    expect(prepare.mock.calls[1]?.[0]).toContain("parent.state = 'PUBLISHED'")
-    expect(prepare.mock.calls[1]?.[0]).toContain('parent.depth < 3')
-  })
-
-  it('rechecks reply audience eligibility if the policy changes before the final insert', async () => {
-    const d = db([
-      {
-        content_state: 'PUBLISHED',
-        content_owner_user_id: 'user-2',
-        parent_content_id: null,
-        parent_author_user_id: null,
-        parent_state: null,
-        parent_depth: null,
-        blocked: 0,
-        recent_count: 0,
-        reply_audience_allowed: 1,
-      },
-      null,
-      { content_state: 'PUBLISHED', reply_audience_allowed: 0 },
-    ])
-
-    await expect(createComment(d, 'user-1', 'content-1', {
-      body: '权限在提交过程中收紧',
-      idempotencyKey: 'reply-audience-race-1',
-    })).rejects.toMatchObject({
-      code: 'PERMISSION_DENIED',
-      status: 403,
-    })
-
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(String(prepare.mock.calls[1]?.[0])).toContain(replyAudienceAllowedSql)
-    expect(prepare).toHaveBeenCalledTimes(3)
-  })
-
-  it('rechecks the Block policy in the final comment insert', async () => {
-    const d = db([
-      {
-        content_state: 'PUBLISHED',
-        content_owner_user_id: 'user-2',
-        parent_content_id: null,
-        parent_author_user_id: null,
-        parent_state: null,
-        parent_depth: null,
-        blocked: 0,
-        recent_count: 0,
-      },
-    ])
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    prepare.mockImplementationOnce(() => ({
-      bind: vi.fn(() => ({
-        first: vi.fn(async () => ({
-          content_state: 'PUBLISHED',
-          content_owner_user_id: 'user-2',
-          parent_content_id: null,
-          parent_author_user_id: null,
-          parent_state: null,
-          parent_depth: null,
-          blocked: 0,
-          recent_count: 0,
-        })),
-      })),
-    })).mockImplementationOnce(() => ({
-      bind: vi.fn(() => ({
-        first: vi.fn(async () => null),
-      })),
-    })).mockImplementationOnce(() => ({
-      bind: vi.fn(() => ({
-        first: vi.fn(async () => ({ content_state: 'PUBLISHED', reply_audience_allowed: 1 })),
-      })),
-    }))
-
-    await expect(createComment(d, 'user-1', 'content-1', {
-      body: '并发屏蔽期间的评论',
-      idempotencyKey: 'block-race-1',
-    })).rejects.toMatchObject({
-      code: 'CONFLICT',
-      status: 409,
-    })
-
-    expect(prepare.mock.calls[1]?.[0]).toContain("block.relation_type = 'block'")
-    expect(prepare.mock.calls[1]?.[0]).toContain('block.actor_user_id = ? AND block.target_user_id = content.owner_user_id')
-    expect(prepare.mock.calls[1]?.[0]).toContain('block.actor_user_id = content.owner_user_id AND block.target_user_id = ?')
-  })
-
-  it('creates a nested comment only while the parent depth is below three', async () => {
-    const d = db([
-      {
-        content_state: 'PUBLISHED',
-        parent_content_id: 'content-1',
-        parent_state: 'PUBLISHED',
-        parent_depth: 2,
-      },
-      {
-        id: 'c2',
-        content_id: 'content-1',
-        author_user_id: 'user-2',
-        parent_id: 'c1',
-        body: '回复',
-        state: 'PUBLISHED',
-        depth: 3,
-        created_at: '2026-10-02T00:01:00.000Z',
-        updated_at: '2026-10-02T00:01:00.000Z',
-      },
-    ])
-    await expect(createComment(d, 'user-2', 'content-1', {
-      body: '回复',
-      parentId: 'c1',
-      idempotencyKey: 'idem-2',
-    })).resolves.toMatchObject({ parentId: 'c1', depth: 3 })
-  })
-
-  it('rejects a parent from another content item', async () => {
-    const d = db([{
-      content_state: 'PUBLISHED',
-      parent_content_id: 'content-2',
-      parent_state: 'PUBLISHED',
-      parent_depth: 0,
-    }])
-    await expect(createComment(d, 'user-1', 'content-1', {
-      body: '错误回复',
-      parentId: 'other',
-      idempotencyKey: 'idem-3',
+  it('creates a nested reply only while the parent depth is below three and belongs to the same content', async () => {
+    const store = createStoreFor({ validation: {
+      ...defaultValidation, parent_content_id: 'content-1', parent_state: 'PUBLISHED', parent_depth: 2,
+    } })
+    await expect(createComment(store, 'user-1', 'content-1', {
+      body: 'nested', parentId: 'parent-1', idempotencyKey: 'nested-1',
+    })).resolves.toMatchObject({ parentId: 'parent-1', depth: 3 })
+    expect(store.insert).toHaveBeenCalledWith(expect.objectContaining({ parentId: 'parent-1', depth: 3 }))
+    const wrongParent = createStoreFor({ validation: {
+      ...defaultValidation, parent_content_id: 'another-content', parent_state: 'PUBLISHED', parent_depth: 1,
+    } })
+    await expect(createComment(wrongParent, 'user-1', 'content-1', {
+      body: 'wrong parent', parentId: 'parent-2', idempotencyKey: 'nested-2',
     })).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    expect(wrongParent.insert).not.toHaveBeenCalled()
   })
 
-  it('rejects non-published content', async () => {
-    const d = db([{
-      content_state: 'DRAFT',
-      parent_content_id: null,
-      parent_state: null,
-      parent_depth: null,
-    }])
-    await expect(createComment(d, 'user-1', 'content-1', {
-      body: '不可见',
-      idempotencyKey: 'idem-4',
-    })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+  it('rechecks publication and reply audience after a final insert loses a race', async () => {
+    const unpublished = createStoreFor({ inserted: null, finalState: null })
+    await expect(createComment(unpublished, 'user-1', 'content-1', { body: 'race', idempotencyKey: 'race-1' }))
+      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    const denied = createStoreFor({ inserted: null, finalState: { content_state: 'PUBLISHED', reply_audience_allowed: false } })
+    await expect(createComment(denied, 'user-1', 'content-1', { body: 'race', idempotencyKey: 'race-2' }))
+      .rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    const blocked = createStoreFor({ inserted: null, finalState: { content_state: 'PUBLISHED', reply_audience_allowed: true } })
+    await expect(createComment(blocked, 'user-1', 'content-1', { body: 'race', idempotencyKey: 'race-3' }))
+      .rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
   })
 
-  it('treats a concurrent deletion that already reached the tombstone as idempotent success', async () => {
-    const d = db([
-      { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
-      { state: 'AUTHOR_DELETED' },
-    ])
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    prepare.mockImplementationOnce(() => ({
-      bind: vi.fn(() => ({
-        first: vi.fn(async () => ({
-          id: 'c1',
-          content_id: 'content-1',
-          author_user_id: 'user-1',
-          state: 'PUBLISHED',
-          content_state: 'PUBLISHED',
-          has_replies: 0,
-        })),
-      })),
-    })).mockImplementationOnce(() => ({
-      bind: vi.fn(() => ({
-        run: vi.fn(async () => ({ success: true, meta: { changes: 0 } })),
-      })),
-    })).mockImplementationOnce(() => ({
-      bind: vi.fn(() => ({
-        first: vi.fn(async () => ({ state: 'AUTHOR_DELETED' })),
-      })),
-    }))
-
-    await expect(deleteComment(d, publishedBinding(), 'user-1', 'c1', 'comment-test')).resolves.toBe('content-1')
-    expect(prepare).toHaveBeenCalledTimes(3)
+  it('maps Store failures to sanitized runtime errors', async () => {
+    const store: CommentCreateStore = {
+      validate: vi.fn(async () => { throw new Error('private connection details') }),
+      insert: vi.fn(async () => null),
+      getFinalState: vi.fn(async () => null),
+    }
+    await expect(createComment(store, 'user-1', 'content-1', { body: 'x', idempotencyKey: 'store-error' }))
+      .rejects.toMatchObject({ code: 'INTERNAL_ERROR', status: 500 })
   })
+})
 
-  it('keeps comment deletion atomic against a concurrent reply', async () => {
-    const d = db([
-      { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
-    ])
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    prepare.mockImplementationOnce(() => ({
-      bind: vi.fn(() => ({
-        first: vi.fn(async () => ({
-          id: 'c1',
-          content_id: 'content-1',
-          author_user_id: 'user-1',
-          state: 'PUBLISHED',
-          content_state: 'PUBLISHED',
-          has_replies: 0,
-        })),
-      })),
-    })).mockImplementationOnce(() => ({
-      bind: vi.fn(() => ({
-        run: vi.fn(async () => ({ success: true, meta: { changes: 0 } })),
-      })),
-    }))
-
-    await expect(deleteComment(d, publishedBinding(), 'user-1', 'c1', 'comment-test')).rejects.toMatchObject({
-      code: 'CONFLICT',
-      status: 409,
-    })
-  })
-
-  it('deletes an owned leaf comment', async () => {
+describe('W05 comment mutation runtime — Store port only', () => {
+  it('deletes an owned leaf comment after W03 publication validation', async () => {
+    const store = mutationStoreFor()
     const binding = publishedBinding()
-    const d = db([
-      { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
-    ])
-    await expect(deleteComment(d, binding, 'user-1', 'c1', 'comment-test')).resolves.toBe('content-1')
-    expect(d.prepare).toHaveBeenCalledTimes(2)
+    await expect(deleteComment(store, binding, 'user-1', 'comment-1', 'comment-delete'))
+      .resolves.toBe('content-1')
+    expect(store.getForDelete).toHaveBeenCalledWith('comment-1')
+    expect(store.markDeleted).toHaveBeenCalledWith(expect.objectContaining({ commentId: 'comment-1', actorUserId: 'user-1' }))
     expect(binding.fetch).toHaveBeenCalledTimes(1)
-    const queries = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([sql]) => String(sql))
-    expect(queries.every(sql => !sql.toLowerCase().includes('contents'))).toBe(true)
   })
 
-  it('fails closed before deleting when W03 publication context is unavailable', async () => {
-    const d = db([{ id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 }])
-    await expect(deleteComment(d, undefined, 'user-1', 'c1', 'comment-test')).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
-    const queries = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([sql]) => String(sql))
-    expect(queries).toHaveLength(1)
-    expect(queries[0].toLowerCase()).not.toContain('contents')
+  it('keeps author tombstone deletion idempotent without requiring W03 after the original delete', async () => {
+    const store = mutationStoreFor({ deleteRow: deleteRow({ state: 'AUTHOR_DELETED' }) })
+    await expect(deleteComment(store, undefined, 'user-1', 'comment-1', 'comment-delete'))
+      .resolves.toBe('content-1')
+    expect(store.markDeleted).not.toHaveBeenCalled()
   })
 
-  it('keeps author deletion idempotent for an existing tombstone', async () => {
-    const d = db([
-      { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'AUTHOR_DELETED', has_replies: 0 },
-    ])
-
-    await expect(deleteComment(d, publishedBinding(), 'user-1', 'c1', 'comment-test')).resolves.toBe('content-1')
-    expect(d.prepare).toHaveBeenCalledTimes(1)
+  it('rejects deleting another author comment, non-published comments and comments with replies', async () => {
+    await expect(deleteComment(mutationStoreFor({ deleteRow: deleteRow({ author_user_id: 'other-user' }) }), publishedBinding(), 'user-1', 'comment-1', 'corr'))
+      .rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    await expect(deleteComment(mutationStoreFor({ deleteRow: deleteRow({ state: 'PENDING' }) }), publishedBinding(), 'user-1', 'comment-1', 'corr'))
+      .rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
+    await expect(deleteComment(mutationStoreFor({ deleteRow: deleteRow({ has_replies: true }) }), publishedBinding(), 'user-1', 'comment-1', 'corr'))
+      .rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
   })
 
-  it('rejects deleting another user comment', async () => {
-    const d = db([
-      { id: 'c1', author_user_id: 'user-2', state: 'PUBLISHED', has_replies: 0 },
-    ])
-    await expect(deleteComment(d, publishedBinding(), 'user-1', 'c1', 'comment-test')).rejects.toMatchObject({
-      code: 'PERMISSION_DENIED',
-      status: 403,
-    })
+  it('fails closed before marking a comment deleted when W03 publication context is unavailable', async () => {
+    const store = mutationStoreFor()
+    await expect(deleteComment(store, undefined, 'user-1', 'comment-1', 'corr'))
+      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+    expect(store.markDeleted).not.toHaveBeenCalled()
   })
 
-  it('rejects deleting comments that have replies', async () => {
-    const d = db([
-      { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 1 },
-    ])
-    await expect(deleteComment(d, publishedBinding(), 'user-1', 'c1', 'comment-test')).rejects.toMatchObject({
-      code: 'CONFLICT',
-      status: 409,
-    })
+  it('treats a concurrent author tombstone as idempotent and rejects other lost delete races', async () => {
+    const replay = mutationStoreFor({ markedDeleted: false, deleteState: 'AUTHOR_DELETED' })
+    await expect(deleteComment(replay, publishedBinding(), 'user-1', 'comment-1', 'corr')).resolves.toBe('content-1')
+    const conflict = mutationStoreFor({ markedDeleted: false, deleteState: null })
+    await expect(deleteComment(conflict, publishedBinding(), 'user-1', 'comment-1', 'corr'))
+      .rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
   })
 
-  it('updates an owned published comment with the matching version', async () => {
+  it('updates an owned published comment with the matching ETag and Store compare-and-swap', async () => {
+    const store = mutationStoreFor({ updatedRow: updateRow({ body: 'after', updated_at: '2026-10-02T00:02:00.000Z' }) })
     const binding = publishedBinding()
-    const d = db([
-      {
-        id: 'c1',
-        content_id: 'content-1',
-        author_user_id: 'user-1',
-        parent_id: null,
-        body: '修改前',
-        state: 'PUBLISHED',
-        depth: 0,
-        created_at: '2026-10-02T00:00:00.000Z',
-        updated_at: '2026-10-02T00:01:00.000Z',
-        content_state: 'PUBLISHED',
-      },
-      {
-        id: 'c1',
-        content_id: 'content-1',
-        author_user_id: 'user-1',
-        parent_id: null,
-        body: '修改后',
-        state: 'PUBLISHED',
-        depth: 0,
-        created_at: '2026-10-02T00:00:00.000Z',
-        updated_at: '2026-10-02T00:02:00.000Z',
-      },
-    ])
-
-    await expect(updateComment(d, binding, 'user-1', 'c1', {
-      body: '修改后',
-      ifMatch: '"2026-10-02T00:01:00.000Z"',
-    }, 'comment-test')).resolves.toMatchObject({
-      item: { id: 'c1', body: '修改后' },
-      etag: '"2026-10-02T00:02:00.000Z"',
+    await expect(updateComment(store, binding, 'user-1', 'comment-1', {
+      body: 'after', ifMatch: '"2026-10-02T00:01:00.000Z"',
+    }, 'comment-update')).resolves.toMatchObject({
+      item: { id: 'comment-1', body: 'after' }, etag: '"2026-10-02T00:02:00.000Z"',
     })
-    expect(d.prepare).toHaveBeenCalledTimes(2)
+    expect(store.update).toHaveBeenCalledWith(expect.objectContaining({
+      commentId: 'comment-1', actorUserId: 'user-1', body: 'after', expectedUpdatedAt: '2026-10-02T00:01:00.000Z',
+    }))
     expect(binding.fetch).toHaveBeenCalledTimes(1)
-    const queries = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([sql]) => String(sql))
-    expect(queries.every(sql => !sql.toLowerCase().includes('contents'))).toBe(true)
   })
 
-  it('fails closed before updating when W03 publication context is unavailable', async () => {
-    const d = db([{
-      id: 'c1', content_id: 'content-1', author_user_id: 'user-1', parent_id: null,
-      body: '原文', state: 'PUBLISHED', depth: 0,
-      created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:01:00.000Z',
-    }])
-    await expect(updateComment(d, undefined, 'user-1', 'c1', {
-      body: '修改', ifMatch: '"2026-10-02T00:01:00.000Z"',
-    }, 'comment-test')).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
-    expect(d.prepare).toHaveBeenCalledTimes(1)
+  it('fails closed when W03 cannot validate the content before comment update', async () => {
+    const store = mutationStoreFor()
+    await expect(updateComment(store, undefined, 'user-1', 'comment-1', {
+      body: 'after', ifMatch: '"2026-10-02T00:01:00.000Z"',
+    }, 'comment-update')).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+    expect(store.update).not.toHaveBeenCalled()
   })
 
-  it('rejects an update from another author', async () => {
-    const d = db([{
-      id: 'c1',
-      content_id: 'content-1',
-      author_user_id: 'user-2',
-      body: '原文',
-      state: 'PUBLISHED',
-      depth: 0,
-      parent_id: null,
-      created_at: '2026-10-02T00:00:00.000Z',
-      updated_at: '2026-10-02T00:01:00.000Z',
-      content_state: 'PUBLISHED',
-    }])
-
-    await expect(updateComment(d, publishedBinding(), 'user-1', 'c1', {
-      body: '越权修改',
-      ifMatch: '"2026-10-02T00:01:00.000Z"',
-    }, 'comment-test')).rejects.toMatchObject({
-      code: 'PERMISSION_DENIED',
-      status: 403,
-    })
+  it('rejects updates from another author, stale versions, and invalid If-Match values', async () => {
+    await expect(updateComment(mutationStoreFor({ updateRow: updateRow({ author_user_id: 'other-user' }) }), publishedBinding(), 'user-1', 'comment-1', {
+      body: 'after', ifMatch: '"2026-10-02T00:01:00.000Z"',
+    }, 'corr')).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    await expect(updateComment(mutationStoreFor({ updateRow: updateRow({ updated_at: '2026-10-02T00:02:00.000Z' }) }), publishedBinding(), 'user-1', 'comment-1', {
+      body: 'different', ifMatch: '"2026-10-02T00:01:00.000Z"',
+    }, 'corr')).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
+    await expect(updateComment(mutationStoreFor(), publishedBinding(), 'user-1', 'comment-1', {
+      body: 'after', ifMatch: '',
+    }, 'corr')).rejects.toMatchObject({ code: 'PRECONDITION_REQUIRED', status: 428 })
   })
 
-  it('rejects stale comment versions', async () => {
-    const d = db([{
-      id: 'c1',
-      content_id: 'content-1',
-      author_user_id: 'user-1',
-      body: '原文',
-      state: 'PUBLISHED',
-      depth: 0,
-      parent_id: null,
-      created_at: '2026-10-02T00:00:00.000Z',
-      updated_at: '2026-10-02T00:02:00.000Z',
-      content_state: 'PUBLISHED',
-    }])
-
-    await expect(updateComment(d, publishedBinding(), 'user-1', 'c1', {
-      body: '旧版本修改',
-      ifMatch: '"2026-10-02T00:01:00.000Z"',
-    }, 'comment-test')).rejects.toMatchObject({
-      code: 'PRECONDITION_FAILED',
-      status: 412,
-    })
+  it('replays a comment edit after the response was lost without issuing a second update', async () => {
+    const store = mutationStoreFor({ updateRow: updateRow({ body: 'already saved', updated_at: '2026-10-02T00:02:00.000Z' }) })
+    await expect(updateComment(store, publishedBinding(), 'user-1', 'comment-1', {
+      body: 'already saved', ifMatch: '"2026-10-02T00:01:00.000Z"',
+    }, 'corr')).resolves.toMatchObject({ item: { body: 'already saved' }, etag: '"2026-10-02T00:02:00.000Z"' })
+    expect(store.update).not.toHaveBeenCalled()
   })
 
-  it('replays a comment edit after the server committed but its response was lost', async () => {
-    const d = db([{
-      id: 'c1',
-      content_id: 'content-1',
-      author_user_id: 'user-1',
-      body: 'already saved',
-      state: 'PUBLISHED',
-      depth: 0,
-      parent_id: null,
-      created_at: '2026-10-02T00:00:00.000Z',
-      updated_at: '2026-10-02T00:02:00.000Z',
-      content_state: 'PUBLISHED',
-    }])
-
-    await expect(updateComment(d, publishedBinding(), 'user-1', 'c1', {
-      body: 'already saved',
-      ifMatch: '"2026-10-02T00:01:00.000Z"',
-    }, 'comment-retry')).resolves.toMatchObject({
-      item: { id: 'c1', body: 'already saved', updatedAt: '2026-10-02T00:02:00.000Z' },
-      etag: '"2026-10-02T00:02:00.000Z"',
-    })
-    // Replay reads the canonical record but does not issue a second UPDATE.
-    expect(d.prepare).toHaveBeenCalledTimes(1)
+  it('maps mutation Store failures to sanitized 500 responses', async () => {
+    const store: CommentMutationStore = {
+      getForDelete: vi.fn(async () => { throw new Error('private database host') }),
+      markDeleted: vi.fn(async () => false),
+      getDeleteState: vi.fn(async () => null),
+      getForUpdate: vi.fn(async () => null),
+      update: vi.fn(async () => null),
+    }
+    await expect(deleteComment(store, publishedBinding(), 'user-1', 'comment-1', 'corr'))
+      .rejects.toMatchObject({ code: 'INTERNAL_ERROR', status: 500 })
   })
+})
 
-  it('requires a valid If-Match header value', async () => {
-    const d = db()
-    await expect(updateComment(d, publishedBinding(), 'user-1', 'c1', {
-      body: '修改',
-      ifMatch: '',
-    }, 'comment-test')).rejects.toMatchObject({
-      code: 'PRECONDITION_REQUIRED',
-      status: 428,
-    })
-  })
-
+describe('W05 comment list runtime', () => {
   it('lists only bounded published comments with an opaque next cursor', async () => {
     const d = db([], [
       {

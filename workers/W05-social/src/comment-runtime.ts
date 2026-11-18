@@ -1,8 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 import { fetchPublishedContentSocialContext, type PublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
 
-import { createD1CommentCreateStore, type CommentCreateStore } from './comment-create-store.js'
-import { createD1CommentMutationStore, type CommentMutationStore } from './comment-mutation-store.js'
+import type { CommentCreateStore } from './comment-create-store.js'
+import type { CommentMutationStore } from './comment-mutation-store.js'
 import {
   CommentListReadStoreError,
   type CommentListReadStore,
@@ -245,12 +245,11 @@ const toCommentItem = (row: {
 })
 
 export async function createComment(
-  db: D1Database,
+  store: CommentCreateStore,
   actorUserId: string,
   contentIdValue: string,
   input: CommentCreateInput,
   actorVerified = false,
-  store: CommentCreateStore = createD1CommentCreateStore(db),
 ): Promise<CommentItem> {
   const actor = validateId(actorUserId, 'UNAUTHENTICATED')
   const contentId = validateId(contentIdValue)
@@ -382,12 +381,11 @@ export type CommentUpdateInput = {
 }
 
 export async function deleteComment(
-  db: D1Database,
+  store: CommentMutationStore,
   w03Content: W03ContentBinding | undefined,
   actorUserIdValue: string,
   commentIdValue: string,
   correlationId: string,
-  store: CommentMutationStore = createD1CommentMutationStore(db),
 ): Promise<string> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const commentId = validateId(commentIdValue)
@@ -440,13 +438,12 @@ export async function deleteComment(
 }
 
 export async function updateComment(
-  db: D1Database,
+  store: CommentMutationStore,
   w03Content: W03ContentBinding | undefined,
   actorUserIdValue: string,
   commentIdValue: string,
   input: CommentUpdateInput,
   correlationId: string,
-  store: CommentMutationStore = createD1CommentMutationStore(db),
 ): Promise<{ item: CommentItem; etag: string }> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const commentId = validateId(commentIdValue)

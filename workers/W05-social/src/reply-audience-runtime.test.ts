@@ -2,8 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ReplyAudienceStore, StoredReplyAudiencePolicy, WriteReplyAudiencePolicy } from './reply-audience-store.js'
 import {
   getContentReplyAudience,
-  replyAudienceAllowedParams,
-  replyAudienceAllowedSql,
   setContentReplyAudience,
 } from './reply-audience-runtime.js'
 
@@ -89,14 +87,6 @@ describe('W05 reply audience runtime — Neon Store port only', () => {
     expect(store.get).not.toHaveBeenCalled()
   })
 
-  it('uses W05 follow, mention, second-degree, and trusted verified facts in the legacy comment-create SQL predicate', () => {
-    expect(replyAudienceAllowedSql).toContain('social_follow_relationships')
-    expect(replyAudienceAllowedSql).toContain('json_each')
-    expect(replyAudienceAllowedSql).toContain('second_degree')
-    expect(replyAudienceAllowedSql).toContain("= 'verified'")
-    expect(replyAudienceAllowedSql).toContain('mentioned_override')
-    expect(replyAudienceAllowedParams('reply-1', true)).toEqual(['reply-1', 1, 'reply-1', 'reply-1', 'reply-1', 'reply-1', 'reply-1', 'reply-1', 'reply-1'])
-  })
 
   it('keeps owner conflicts and provider failures distinct at the runtime boundary', async () => {
     const conflictStore: ReplyAudienceStore = { set: vi.fn(async () => null), get: vi.fn(async () => null) }

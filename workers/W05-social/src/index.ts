@@ -589,14 +589,14 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             throw new CommentRuntimeError('VALIDATION_FAILED', 400)
           }
 
+          if (!dependencies.commentMutationStore) throw new CommentRuntimeError('SERVICE_UNAVAILABLE', 503)
           const result = await updateComment(
-            env.DB,
+            dependencies.commentMutationStore,
             env.W03_CONTENT,
             actorUserId,
             commentId,
             { body: bodyValue, ifMatch },
             request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
-            dependencies.commentMutationStore,
           )
           const mentionTargets = rawMentions === undefined ? [] : rawMentions as Array<{ userId: string; handle: string }>
           await syncSocialTokens(
@@ -630,13 +630,13 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         }
 
         if (request.method === 'DELETE') {
+          if (!dependencies.commentMutationStore) throw new CommentRuntimeError('SERVICE_UNAVAILABLE', 503)
           const contentId = await deleteComment(
-            env.DB,
+            dependencies.commentMutationStore,
             env.W03_CONTENT,
             actorUserId,
             commentId,
             request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
-            dependencies.commentMutationStore,
           )
           return new Response(null, {
             status: 204,
@@ -1055,11 +1055,12 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
 
         if (parentId) requireCommentNotificationContextStore(dependencies.commentNotificationContextStore)
         const actorVerified = request.headers.get('X-LuckRead-Principal-Verified') === 'true'
-        const comment = await createComment(env.DB, viewerUserId, commentContentId, {
+        if (!dependencies.commentCreateStore) throw new CommentRuntimeError('SERVICE_UNAVAILABLE', 503)
+        const comment = await createComment(dependencies.commentCreateStore, viewerUserId, commentContentId, {
           body: bodyValue,
           parentId: parentId ?? null,
           idempotencyKey,
-        }, actorVerified, dependencies.commentCreateStore)
+        }, actorVerified)
         const mentionTargets = rawMentions === undefined ? [] : rawMentions as Array<{ userId: string; handle: string }>
         await syncSocialTokens(
           dependencies.socialTokenSyncStore,
