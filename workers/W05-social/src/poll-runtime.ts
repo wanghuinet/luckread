@@ -1,4 +1,3 @@
-/// <reference types="@cloudflare/workers-types" />
 import type { OwnedPostContext } from './owned-post-context.js'
 import type { PublishedContentSocialContext } from './w03-content-context-client.js'
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
