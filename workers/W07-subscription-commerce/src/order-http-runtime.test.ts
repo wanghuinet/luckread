@@ -8,7 +8,8 @@ import {
   type AuthoritativelyPricedOrder,
 } from './order-persistence.js';
 import { handleCommerceOrderRequest } from './order-http-runtime.js';
-import { issueInvoiceForOrder } from './billing-persistence.js';
+import { issueInvoiceForOrderPostgres } from './billing-document-postgres-persistence.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 const env: Parameters<typeof handleCommerceOrderRequest>[2] = {
   W07_DATABASE_DRIVER: 'd1',
@@ -81,9 +82,9 @@ describe('private W07 commerce order HTTP handler', () => {
 
   it('creates an order using the authenticated principal, bounded request body, and forwarded idempotency key', async () => {
     let captured: Parameters<typeof createCommerceOrder> | undefined;
-    let invoiceCall: Parameters<typeof issueInvoiceForOrder> | undefined;
+    let invoiceCall: Parameters<typeof issueInvoiceForOrderPostgres> | undefined;
     let readDatabaseSelections = 0;
-    const neonDatabase = {} as D1Database;
+    const postgresPool = {} as W07WebhookPostgresPool;
     const postgresOrderStore = {
       readIdempotencyRow: async () => null,
       persistNewOrder: async () => ({ statementCount: 4, expireChanges: 0, claimChanges: 1, completionChanges: 1, orderChanges: 1, lineChanges: [1] }),
@@ -92,10 +93,10 @@ describe('private W07 commerce order HTTP handler', () => {
       captured = args;
       return createResult;
     }) as typeof createCommerceOrder;
-    const mockInvoice = (async (...args: Parameters<typeof issueInvoiceForOrder>) => {
+    const mockInvoice = (async (...args: Parameters<typeof issueInvoiceForOrderPostgres>) => {
       invoiceCall = args;
-      return {} as Awaited<ReturnType<typeof issueInvoiceForOrder>>;
-    }) as typeof issueInvoiceForOrder;
+      return {} as Awaited<ReturnType<typeof issueInvoiceForOrderPostgres>>;
+    }) as typeof issueInvoiceForOrderPostgres;
 
     const response = await handleCommerceOrderRequest(
       postRequest({ items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] }, {
@@ -104,10 +105,11 @@ describe('private W07 commerce order HTTP handler', () => {
       'user_42',
       { ...env, W07_DATABASE_DRIVER: 'neon' },
       {
-        getReadDatabase: () => { readDatabaseSelections += 1; return neonDatabase; },
+        getReadDatabase: () => { readDatabaseSelections += 1; return {} as D1Database; },
+        getPostgresPool: () => postgresPool,
         getOrderCreateStore: () => postgresOrderStore,
         createOrder: mockCreate,
-        issueInvoice: mockInvoice,
+        issueInvoicePostgres: mockInvoice,
         resolvePricing: async () => explicitTestPricing,
       },
     );
@@ -117,9 +119,9 @@ describe('private W07 commerce order HTTP handler', () => {
     expect(captured?.[1]).toBe('user_42');
     expect(captured?.[2]).toBe('purchase_attempt_01');
     expect(captured?.[3]).toEqual({ items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] })
-    expect(invoiceCall?.slice(0, 2)).toEqual([neonDatabase, 'user_42'])
+    expect(invoiceCall?.slice(0, 2)).toEqual([postgresPool, 'user_42'])
     expect(invoiceCall?.[2]).toBe(orderData.orderId);
-    expect(readDatabaseSelections).toBe(1);
+    expect(readDatabaseSelections).toBe(0);
     const envelope = await parseResponse(response!);
     expect(envelope.data).toEqual(orderData);
     expect(envelope.requestId).toMatch(/^req_/);

@@ -11,11 +11,15 @@ import {
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
 import { validateCreateCommerceOrderRequest, validateOrderCreateIdempotencyKey } from './order-request-validation.js';
 import { issueInvoiceForOrder } from './billing-persistence.js';
+import { issueInvoiceForOrderPostgres } from './billing-document-postgres-persistence.js';
 import {
   getW07OrderCreatePersistenceStore,
   getW07SelectedD104Database,
+  getW07PaymentWebhookPostgresPool,
+  resolveW07DatabaseDriver,
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 type OrderRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
   D1_01: D1Database;
@@ -26,6 +30,8 @@ type OrderRuntimeDependencies = Readonly<{
   createOrder?: typeof createCommerceOrder;
   getOrder?: typeof getCommerceOrder;
   issueInvoice?: typeof issueInvoiceForOrder;
+  issueInvoicePostgres?: typeof issueInvoiceForOrderPostgres;
+  getPostgresPool?: (env: OrderRuntimeEnv) => W07WebhookPostgresPool | undefined;
   getReadDatabase?: (env: OrderRuntimeEnv) => D1Database;
   getOrderCreateStore?: (env: OrderRuntimeEnv) => import('./order-persistence.js').OrderCreatePersistenceStore | undefined;
   /** Must be an admitted pricing authority that returns immutable offer versions, discounts, and tax decisions. */
@@ -177,21 +183,30 @@ export async function handleCommerceOrderRequest(
         return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Order creation is disabled until the authoritative pricing and tax decision is admitted');
       }
 
-      const database = (dependencies.getReadDatabase ?? getW07SelectedD104Database)(env);
       const orderCreateStore = (dependencies.getOrderCreateStore ?? getW07OrderCreatePersistenceStore)(env);
       const createOrder = dependencies.createOrder ?? createCommerceOrder;
+      const useNeon = resolveW07DatabaseDriver(env) === 'neon';
+      const database = useNeon
+        ? undefined
+        : (dependencies.getReadDatabase ?? getW07SelectedD104Database)(env);
       const result: CreateOrderResult = await createOrder(
-        orderCreateStore ?? database,
+        orderCreateStore ?? database!,
         customerId,
         request.headers.get('Idempotency-Key'),
         body,
         (validatedRequest) => dependencies.resolvePricing!(validatedRequest),
       );
-      // Invoice issuance is replay-safe on (INVOICE, order_id). Replays also
-      // repair the invoice if the previous request persisted its Order but
-      // the document write was interrupted.
-      const issueInvoice = dependencies.issueInvoice ?? issueInvoiceForOrder;
-      await issueInvoice(database, customerId, result.data.orderId);
+      // Invoice issuance is replay-safe on (INVOICE, order_id). Neon uses the
+      // native PostgreSQL Store; explicit D1 mode retains its compatibility path.
+      if (useNeon) {
+        const pool = (dependencies.getPostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+        if (!pool) throw new Error('W07 PostgreSQL invoice pool is unavailable');
+        const issueInvoice = dependencies.issueInvoicePostgres ?? issueInvoiceForOrderPostgres;
+        await issueInvoice(pool, customerId, result.data.orderId);
+      } else {
+        const issueInvoice = dependencies.issueInvoice ?? issueInvoiceForOrder;
+        await issueInvoice(database!, customerId, result.data.orderId);
+      }
       return Response.json(
         { data: result.data, requestId: 'req_' + crypto.randomUUID() },
         { status: result.status, headers: { 'cache-control': 'no-store' } },

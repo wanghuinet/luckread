@@ -5,7 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 import worker from '../../src/index.ts'
-import { issueReceiptForPaidPaymentPostgres } from '../../src/billing-document-postgres-persistence.ts'
+import { issueInvoiceForOrderPostgres, issueReceiptForPaidPaymentPostgres } from '../../src/billing-document-postgres-persistence.ts'
 import { createPostgresWebhookD1Database } from '../../src/payment-webhook-database-postgres.ts'
 import { receiveHyperswitchWebhook } from '../../src/payment-persistence.ts'
 import { closeW07PostgresRuntimeForTest } from '../../src/neon/payment-method-read-runtime.ts'
@@ -44,6 +44,7 @@ const idempotencyKey = marker + '-order-key'
 
 const checks = {
   signedPaymentWebhookAppliedToPostgres: false,
+  nativePostgresOrderInvoiceIssued: false,
   immutableInvoiceAndReceiptIssued: false,
   nativePostgresBillingStoreUsed: false,
   billingDocumentsReadThroughW07NeonEntry: false,
@@ -144,6 +145,32 @@ try {
   )
 
   await adminPool.query(
+    `INSERT INTO order_lines
+      (order_line_id, order_id, item_type, item_ref, item_version, quantity,
+       unit_amount_minor, line_subtotal_minor, line_discount_minor, line_tax_minor,
+       line_total_minor, item_snapshot_json, created_at)
+     VALUES ($1, $2, 'MEMBERSHIP_PLAN', 'plan_pg18_invoice', '1', 1,
+       2_500, 2_500, 0, 0, 2_500, $3, $4::timestamptz)`,
+    [
+      marker + '-line',
+      orderId,
+      JSON.stringify({ planId: 'plan_pg18_invoice', planVersion: 1 }),
+      priorIso,
+    ],
+  )
+
+  const issuedInvoice = await issueInvoiceForOrderPostgres(adminPool, customerId, orderId, {
+    now: () => new Date(now),
+    createDocumentId: () => marker + '-invoice',
+    createDocumentNumber: () => 'INV-' + marker,
+  })
+  assert.equal(issuedInvoice.documentType, 'INVOICE')
+  assert.equal(issuedInvoice.paymentId, null)
+  assert.equal(issuedInvoice.amountMinor, 2_500)
+  assert.equal(issuedInvoice.snapshot.items.length, 1)
+  checks.nativePostgresOrderInvoiceIssued = true
+
+  await adminPool.query(
     `INSERT INTO payments
       (payment_id, order_id, customer_id, provider, merchant_id,
        amount_minor, currency, status, version, idempotency_key, request_hash,
@@ -187,7 +214,7 @@ try {
   const issuedReceipt = await issueReceiptForPaidPaymentPostgres(adminPool, paymentId, merchantId, {
     now: () => new Date(now),
     createDocumentId: () => marker + '-document-' + (++issuedDocumentSequence),
-    createDocumentNumber: () => (issuedDocumentSequence === 1 ? 'INV-' : 'RCT-') + marker,
+    createDocumentNumber: (type) => (type === 'INVOICE' ? 'INV-' : 'RCT-') + marker,
   })
   assert.equal(issuedReceipt.documentType, 'RECEIPT')
   checks.nativePostgresBillingStoreUsed = true
