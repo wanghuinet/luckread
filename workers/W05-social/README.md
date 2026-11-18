@@ -60,3 +60,12 @@ Comment list reads now require the injected Neon PostgreSQL Store and fail close
 - Like status and aggregate reads now require the injected Neon PostgreSQL `LikeStatusReadStore` on cache misses; missing composition fails closed with 503.
 - Preserved W03 published-content validation, W05 Block preflight ordering, viewer-state and aggregate cache behavior, bounded safe counts, and the existing PostgreSQL adapter/rehearsal coverage.
 - This slice removes only the like-status query adapter; like mutation and like-target context D1 paths remain separate cleanup items.
+
+
+## W05 Like / Unlike and Like Target Context
+
+- Removed the D1 like-mutation adapter and D1 target-context/Block-preflight adapter.
+- Like, Unlike, and Like Status runtime paths now accept explicit Store ports only; Like/Unlike routes fail closed with 503 when required Neon Stores are not composed.
+- The Neon runtime composes the existing PostgreSQL mutation and target-context Stores. No route passes `env.DB` into the Like runtime.
+- Preserved W03 published-content authority, published-comment checks, bidirectional Block preflight, final PostgreSQL guarded Like insert (including W03 parent owner for comment likes), idempotent Like/Unlike behavior, sanitized storage errors, and viewer/aggregate cache invalidation.
+- This is one Like business slice; it does not mean all W05 routes or the W05 Worker are D1-free.
