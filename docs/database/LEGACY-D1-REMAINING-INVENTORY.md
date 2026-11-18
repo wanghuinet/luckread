@@ -59,6 +59,7 @@ Search-index results can lag behind `main`; file-level decisions are based on re
 | #1948 | W02 RegistrationRollbackStore D1 adapter/test fixture removal | Merged |
 | #1950 | W02 AUTH-010 session-list D1 adapter and handler fallback removal | Merged |
 | #1951 | W02 CreatorRoleGrant D1 adapter and D1-only test fixture removal | Pending CI/review |
+| #1951 | W02 CreatorRoleGrant D1 adapter and D1-only test fixture removal | Pending CI/review |
 
 ## Cross-cutting D-class references to retain
 
@@ -70,7 +71,7 @@ Search-index results can lag behind `main`; file-level decisions are based on re
 
 ## Immediate queue
 
-1. W02 remaining test-only D1 adapters (Better Auth schema profile, account-state, MFA, session revoke/logout, username-change, publisher and L8/bootstrap fixtures). Principal Authority (#1939), RoleLayer (#1940), registration rollback (#1944/#1948), session-list (#1950) and CreatorRoleGrant (current PR) are closed or in closeout; continue with non-overlapping adapter families and keep historical migration/config work separate.
+1. W02 remaining test-only D1 adapters (Better Auth schema profile, account-state, MFA, session revoke/logout, username-change, publisher and L8/bootstrap fixtures). Principal Authority (#1939), RoleLayer (#1940), registration rollback (#1944/#1948), session-list (#1950) and CreatorRoleGrant (#1951) is in closeout; continue with non-overlapping adapter families and keep historical migration/config work separate.
 2. W05: follower/following reads (#1912), Content Liker read (#1938), orphaned D1 residue (#1941) and push endpoint fallback (#1942) are closed. Reconcile the remaining Social routes and D1-compatible test/local contract against current runtime composition before selecting another slice; do not change W09 push-endpoint ownership.
 3. W06 PostgreSQL-native moderation store migration: replace translator/facade only after consumer ports and transactions are migrated.
 4. W07 membership/order/payment/refund/webhook runtime paths: finish PostgreSQL-native store composition before deleting compatibility SQL.
