@@ -237,21 +237,34 @@ function parseSnapshot(raw: string, line: PaidOrderLineRow, orderCurrency: strin
 }
 
 async function readPaidOrder(
-  db: D1Database,
+  db: FulfillmentDatabase,
   paymentId: string,
   merchantId: string,
 ): Promise<PaidOrderRow> {
   let row: PaidOrderRow | null;
   try {
-    row = await db.prepare(
-      'SELECT p.payment_id, p.order_id, p.customer_id, p.provider, p.merchant_id, ' +
-      'p.status AS payment_status, p.amount_minor, p.currency AS payment_currency, ' +
-      'o.status AS order_status, o.currency AS order_currency, o.total_minor, o.confirmed_at ' +
-      'FROM payments AS p INNER JOIN orders AS o ON o.order_id = p.order_id AND o.customer_id = p.customer_id ' +
-      "WHERE p.provider = 'hyperswitch' AND p.payment_id = ? AND p.merchant_id = ? LIMIT 1",
-    ).bind(paymentId, merchantId).first<PaidOrderRow>();
+    if (isPostgresFulfillmentDatabase(db)) {
+      const result = await db.query<PaidOrderRow & Record<string, unknown>>(
+        'SELECT p.payment_id, p.order_id, p.customer_id, p.provider, p.merchant_id, ' +
+        'p.status AS payment_status, p.amount_minor::double precision AS amount_minor, p.currency AS payment_currency, ' +
+        'o.status AS order_status, o.currency AS order_currency, o.total_minor::double precision AS total_minor, ' +
+        'to_char(o.confirmed_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS confirmed_at ' +
+        'FROM payments AS p INNER JOIN orders AS o ON o.order_id = p.order_id AND o.customer_id = p.customer_id ' +
+        "WHERE p.provider = 'hyperswitch' AND p.payment_id = $1 AND p.merchant_id = $2 LIMIT 1",
+        [paymentId, merchantId],
+      )
+      row = result.rows[0] ?? null
+    } else {
+      row = await db.prepare(
+        'SELECT p.payment_id, p.order_id, p.customer_id, p.provider, p.merchant_id, ' +
+        'p.status AS payment_status, p.amount_minor, p.currency AS payment_currency, ' +
+        'o.status AS order_status, o.currency AS order_currency, o.total_minor, o.confirmed_at ' +
+        'FROM payments AS p INNER JOIN orders AS o ON o.order_id = p.order_id AND o.customer_id = p.customer_id ' +
+        "WHERE p.provider = 'hyperswitch' AND p.payment_id = ? AND p.merchant_id = ? LIMIT 1",
+      ).bind(paymentId, merchantId).first<PaidOrderRow>()
+    }
   } catch {
-    return failClosed();
+    return failClosed()
   }
   if (!row) return failClosed();
   if (
@@ -267,8 +280,17 @@ async function readPaidOrder(
   return row;
 }
 
-async function readOrderLines(db: D1Database, orderId: string): Promise<PaidOrderLineRow[]> {
+async function readOrderLines(db: FulfillmentDatabase, orderId: string): Promise<PaidOrderLineRow[]> {
   try {
+    if (isPostgresFulfillmentDatabase(db)) {
+      const result = await db.query<PaidOrderLineRow & Record<string, unknown>>(
+        'SELECT order_line_id, item_type, item_ref, item_version, quantity::double precision AS quantity, ' +
+        'unit_amount_minor::double precision AS unit_amount_minor, line_total_minor::double precision AS line_total_minor, ' +
+        'item_snapshot_json FROM order_lines WHERE order_id = $1 ORDER BY order_line_id ASC',
+        [orderId],
+      )
+      return result.rows
+    }
     const rows = await db.prepare(
       'SELECT order_line_id, item_type, item_ref, item_version, quantity, unit_amount_minor, ' +
       'line_total_minor, item_snapshot_json FROM order_lines WHERE order_id = ? ORDER BY order_line_id ASC',
@@ -280,17 +302,28 @@ async function readOrderLines(db: D1Database, orderId: string): Promise<PaidOrde
 }
 
 async function readPlanVersion(
-  db: D1Database,
+  db: FulfillmentDatabase,
   snapshot: MembershipOfferSnapshot,
 ): Promise<MembershipPlanVersionRow> {
   let row: MembershipPlanVersionRow | null;
   try {
-    row = await db.prepare(
-      'SELECT p.plan_id, p.owner_type, p.owner_id, v.plan_version, v.name, v.tier, ' +
-      'v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
-      'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id ' +
-      'WHERE p.plan_id = ? AND v.plan_version = ? LIMIT 1',
-    ).bind(snapshot.planId, snapshot.planVersion).first<MembershipPlanVersionRow>();
+    if (isPostgresFulfillmentDatabase(db)) {
+      const result = await db.query<MembershipPlanVersionRow & Record<string, unknown>>(
+        'SELECT p.plan_id, p.owner_type, p.owner_id, v.plan_version, v.name, v.tier, ' +
+        'v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+        'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id ' +
+        'WHERE p.plan_id = $1 AND v.plan_version = $2 LIMIT 1',
+        [snapshot.planId, snapshot.planVersion],
+      )
+      row = result.rows[0] ?? null
+    } else {
+      row = await db.prepare(
+        'SELECT p.plan_id, p.owner_type, p.owner_id, v.plan_version, v.name, v.tier, ' +
+        'v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+        'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id ' +
+        'WHERE p.plan_id = ? AND v.plan_version = ? LIMIT 1',
+      ).bind(snapshot.planId, snapshot.planVersion).first<MembershipPlanVersionRow>();
+    }
   } catch {
     return failClosed();
   }
