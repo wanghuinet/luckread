@@ -22,10 +22,6 @@ const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 5_000
 const client = await pool.connect()
 const readStore = createPostgresPollReadStore(client)
 const voteStore = createPostgresPollVoteStore(client)
-const unusedD1 = {
-  prepare() { throw new Error('Unexpected D1 access during PostgreSQL poll-vote rehearsal') },
-  batch() { throw new Error('Unexpected D1 batch during PostgreSQL poll-vote rehearsal') },
-}
 const marker = 'w05-poll-vote-' + randomUUID()
 const owner = marker + '-owner'
 const now = new Date()
@@ -100,7 +96,7 @@ try {
   const binding = contentContextBinding(owner)
 
   const firstVote = await castContentPollVote(
-    unusedD1, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[0],
+    voteStore, readStore, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[0],
     marker + '-correlation-first', voteStore, readStore,
   )
   assert.equal(firstVote.viewerOptionId, pollFixture.options[0])
@@ -108,7 +104,7 @@ try {
   firstVoteSaved = true
 
   const repeatedVote = await castContentPollVote(
-    unusedD1, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[0],
+    voteStore, readStore, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[0],
     marker + '-correlation-repeat', voteStore, readStore,
   )
   assert.equal(repeatedVote.viewerOptionId, pollFixture.options[0])
@@ -117,7 +113,7 @@ try {
 
   await expectSocialError(
     castContentPollVote(
-      unusedD1, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[1],
+      voteStore, readStore, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[1],
       marker + '-correlation-different', voteStore, readStore,
     ),
     'ALREADY_VOTED',
@@ -141,7 +137,7 @@ try {
   )
   await expectSocialError(
     castContentPollVote(
-      unusedD1, binding, blockedVoter, pollFixture.contentId, pollFixture.options[0],
+      voteStore, readStore, binding, blockedVoter, pollFixture.contentId, pollFixture.options[0],
       marker + '-correlation-block-out', voteStore, readStore,
     ),
     'NOT_FOUND',
@@ -149,7 +145,7 @@ try {
   )
   await expectSocialError(
     castContentPollVote(
-      unusedD1, binding, reverseBlockedVoter, pollFixture.contentId, pollFixture.options[0],
+      voteStore, readStore, binding, reverseBlockedVoter, pollFixture.contentId, pollFixture.options[0],
       marker + '-correlation-block-in', voteStore, readStore,
     ),
     'NOT_FOUND',
@@ -160,7 +156,7 @@ try {
 
   await expectSocialError(
     castContentPollVote(
-      unusedD1, binding, marker + '-invalid-option-viewer', pollFixture.contentId,
+      voteStore, readStore, binding, marker + '-invalid-option-viewer', pollFixture.contentId,
       marker + '-not-a-real-option', marker + '-correlation-invalid-option', voteStore, readStore,
     ),
     'VALIDATION_FAILED',
@@ -171,7 +167,7 @@ try {
   const mismatchedOwnerBinding = contentContextBinding(marker + '-different-owner')
   await expectSocialError(
     castContentPollVote(
-      unusedD1, mismatchedOwnerBinding, marker + '-mismatch-viewer', pollFixture.contentId,
+      voteStore, readStore, mismatchedOwnerBinding, marker + '-mismatch-viewer', pollFixture.contentId,
       pollFixture.options[0], marker + '-correlation-owner-mismatch', voteStore, readStore,
     ),
     'SERVICE_UNAVAILABLE',
@@ -182,7 +178,7 @@ try {
   expiredFixture = await createPoll({ suffix: 'expired', endsAt: past })
   await expectSocialError(
     castContentPollVote(
-      unusedD1, binding, marker + '-expired-viewer', expiredFixture.contentId,
+      voteStore, readStore, binding, marker + '-expired-viewer', expiredFixture.contentId,
       expiredFixture.options[0], marker + '-correlation-expired', voteStore, readStore,
     ),
     'POLL_CLOSED',
