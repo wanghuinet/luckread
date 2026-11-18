@@ -351,9 +351,9 @@ export type W05SocialWorkerDependencies = Readonly<{
   favoriteMutationStore?: FavoriteMutationStore
   /** PostgreSQL favorite status reader; requests fail closed when it is not injected. */
   favoriteStatusReadStore?: FavoriteStatusReadStore
-  /** Optional PostgreSQL-capable like-status reader; D1 remains the deployed default. */
+  /** PostgreSQL like-status reader; GET requests fail closed when absent. */
   likeStatusReadStore?: LikeStatusReadStore
-  /** Optional PostgreSQL-capable like-target context and Block preflight reader; D1 remains the deployed default. */
+  /** PostgreSQL comment-context and bidirectional Block reader; GET requests fail closed when absent. */
   likeTargetContextReadStore?: LikeTargetContextReadStore
   /** Optional PostgreSQL-capable Like/Unlike mutation store; D1 remains the deployed default. */
   likeMutationStore?: LikeMutationStore
@@ -1191,15 +1191,16 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             }
           : await parseJsonTarget(request)
         if (request.method === 'GET') {
+          const statusReadStore = dependencies.likeStatusReadStore
+          const targetContextReadStore = dependencies.likeTargetContextReadStore
+          if (!statusReadStore || !targetContextReadStore) throw new LikeRuntimeError('SERVICE_UNAVAILABLE', 503)
           const result = await getLikeStatus(
-            env.DB,
             env.W03_CONTENT,
             viewerUserId,
             target,
             request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
-            undefined,
-            dependencies.likeStatusReadStore,
-            dependencies.likeTargetContextReadStore,
+            statusReadStore,
+            targetContextReadStore,
           )
           return json({ data: result, requestId: createRequestId() }, 200)
         }
