@@ -5,6 +5,7 @@ import {
   getW07OrderCreatePersistenceStore,
   getW07PaymentMethodReadStore,
   getW07PaymentWebhookDatabase,
+  getW07PaymentWebhookPostgresPool,
   getW07RevenueCatWebhookReceiptStore,
   getW07SelectedD104Database,
   resolveW07DatabaseDriver,
@@ -56,6 +57,7 @@ describe('W07 payment-method Neon read runtime', () => {
     const second = getW07PaymentMethodReadStore(env, poolFactory)
     const webhookDatabase = getW07PaymentWebhookDatabase(env, poolFactory)
     const secondWebhookDatabase = getW07PaymentWebhookDatabase(env, poolFactory)
+    const directWebhookPool = getW07PaymentWebhookPostgresPool(env, poolFactory)
     const revenueCatStore = getW07RevenueCatWebhookReceiptStore(env, poolFactory)
     const secondRevenueCatStore = getW07RevenueCatWebhookReceiptStore(env, poolFactory)
     const orderCreateStore = getW07OrderCreatePersistenceStore(env, poolFactory)
@@ -67,6 +69,7 @@ describe('W07 payment-method Neon read runtime', () => {
     expect(first).toBe(second)
     expect(webhookDatabase).toBeDefined()
     expect(webhookDatabase).toBe(secondWebhookDatabase)
+    expect(directWebhookPool).toBe(pool)
     expect(revenueCatStore).toBeDefined()
     expect(revenueCatStore).toBe(secondRevenueCatStore)
     expect(poolFactory).toHaveBeenCalledTimes(1)

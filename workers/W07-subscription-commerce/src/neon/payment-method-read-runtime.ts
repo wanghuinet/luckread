@@ -124,6 +124,15 @@ export function getW07PaymentMethodReadStore(
  * the existing webhook business logic through a D1-compatible PostgreSQL
  * adapter whose batch operation is one explicit PostgreSQL transaction.
  */
+/** Return the existing D1-04 Hyperdrive pool for native PostgreSQL webhook stores. */
+export function getW07PaymentWebhookPostgresPool(
+  env: W07PaymentMethodReadRuntimeEnv,
+  poolFactory: W07PoolFactory = (config) => new Pool(config),
+): W07WebhookPostgresPool | undefined {
+  const pool = getW07PostgresPool(env, poolFactory)
+  return pool ? pool as unknown as W07WebhookPostgresPool : undefined
+}
+
 export function getW07PaymentWebhookDatabase(
   env: W07PaymentMethodReadRuntimeEnv,
   poolFactory: W07PoolFactory = (config) => new Pool(config),
