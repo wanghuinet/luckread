@@ -349,7 +349,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   favoriteListReadStore?: FavoriteListReadStore
   /** Optional PostgreSQL-capable Favorite/Unfavorite writer; D1 remains the deployed default. */
   favoriteMutationStore?: FavoriteMutationStore
-  /** Optional PostgreSQL-capable favorite status reader; D1 remains the deployed default. */
+  /** PostgreSQL favorite status reader; requests fail closed when it is not injected. */
   favoriteStatusReadStore?: FavoriteStatusReadStore
   /** Optional PostgreSQL-capable like-status reader; D1 remains the deployed default. */
   likeStatusReadStore?: LikeStatusReadStore
@@ -1154,8 +1154,10 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         }
 
         if (request.method === 'GET') {
+          const statusReadStore = dependencies.favoriteStatusReadStore
+          if (!statusReadStore) throw new FavoriteRuntimeError('SERVICE_UNAVAILABLE', 503)
           return json({
-            data: await getFavoriteStatus(dependencies.favoriteStatusReadStore ?? env.DB, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
+            data: await getFavoriteStatus(statusReadStore, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
             requestId: createRequestId(),
           })
         }
