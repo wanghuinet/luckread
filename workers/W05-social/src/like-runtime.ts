@@ -2,7 +2,6 @@
 
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import {
-  createD1LikeMutationStore,
   LikeMutationStoreError,
   type LikeMutationRow,
   type LikeMutationStore,
@@ -11,10 +10,7 @@ import {
   LikeStatusReadStoreError,
   type LikeStatusReadStore,
 } from './like-status-read-store.js'
-import {
-  createD1LikeTargetContextReadStore,
-  type LikeTargetContextReadStore,
-} from './like-target-context-read-store.js'
+import { LikeTargetContextReadStoreError, type LikeTargetContextReadStore } from './like-target-context-read-store.js'
 import { fetchPublishedContentSocialContext, type PublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
 
 export class LikeRuntimeError extends Error {
@@ -247,14 +243,13 @@ const assertTargetNotBlocked = async (
 }
 
 export async function like(
-  db: D1Database,
   w03Content: W03ContentBinding | undefined,
   actorUserId: string,
   target: LikeTarget,
   correlationId: string,
-  prevalidatedContentContext?: PublishedContentSocialContext,
-  mutationStore: LikeMutationStore = createD1LikeMutationStore(db),
-  targetContextReadStore: LikeTargetContextReadStore = createD1LikeTargetContextReadStore(db),
+  prevalidatedContentContext: PublishedContentSocialContext | undefined,
+  mutationStore: LikeMutationStore,
+  targetContextReadStore: LikeTargetContextReadStore,
 ): Promise<LikeResult> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
@@ -370,10 +365,9 @@ export async function getLikeStatus(
 }
 
 export async function unlike(
-  db: D1Database,
   actorUserId: string,
   target: LikeTarget,
-  mutationStore: LikeMutationStore = createD1LikeMutationStore(db),
+  mutationStore: LikeMutationStore,
 ): Promise<void> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
