@@ -388,7 +388,8 @@ export default {
           request.headers.get('If-Match'),
           {
             resolvePricing: async ({ preview, attempt }) => {
-              const resolved = await resolveCommerceOrderItems(runtimeEnv.D1_01, {
+              const membershipReadStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+              const resolved = await resolveCommerceOrderItems(membershipReadStore, {
                 items: [{ itemRef: preview.targetPlan.planId, quantity: 1 }],
               })
               const item = resolved.items[0]
