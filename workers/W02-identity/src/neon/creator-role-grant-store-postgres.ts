@@ -15,8 +15,9 @@ import {
  * It delegates to the existing single-connection transaction, and maps only
  * its typed persistence errors to the shared W02 command error contract.
  *
- * This adapter is for disposable PostgreSQL rehearsal and future staged
- * runtime admission. It is not wired into the production Worker.
+ * This adapter is composed by getW02PostgresRuntime and used by the production
+ * W02 creator-role grant route. The underlying PostgreSQL command owns the
+ * transaction, eligibility checks, deterministic replay and database conflicts.
  */
 export function createPostgresCreatorRoleGrantStore(pool: Pool): CreatorRoleGrantStore {
   return {
