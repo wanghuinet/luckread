@@ -59,7 +59,7 @@ async function readPlanTrialDays(
       [planId, planVersion],
     )
     const days = result.rows[0]?.trial_period_days
-    if (!Number.isSafeInteger(days) || days < 1 || days > 30) failUnavailable()
+    if (typeof days !== 'number' || !Number.isSafeInteger(days) || days < 1 || days > 30) failUnavailable()
     return days
   } catch {
     return failUnavailable()
