@@ -13,6 +13,7 @@ import {
   type RevenueCatStore,
 } from './membership-store-product-binding.js';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 export type RevenueCatMembershipCurrentState = 'ACTIVE' | 'EXPIRED' | 'REFUNDED';
 
@@ -210,7 +211,7 @@ function validateSnapshot(snapshot: RevenueCatSubscriberSnapshot): void {
  * binding; otherwise the entire reconciliation candidate build fails closed.
  */
 export async function buildRevenueCatSubscriberReconciliationCandidates(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   input: Readonly<{
     snapshot: RevenueCatSubscriberSnapshot;
     expectedAppUserId: string;
