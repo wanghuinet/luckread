@@ -26,6 +26,7 @@ import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres
 import { receiveHyperswitchRefundWebhookPostgres } from './refund-webhook-postgres-persistence.js';
 import { receiveHyperswitchPaymentWebhookPostgres } from './payment-webhook-payment-postgres.js';
 import { receiveHyperswitchMandateWebhookPostgres } from './mandate-webhook-postgres-persistence.js';
+import { issueReceiptForPaidPaymentPostgres } from './billing-document-postgres-persistence.js';
 
 type HyperswitchWebhookRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
   D1_01: D1Database;
@@ -49,6 +50,7 @@ type HyperswitchWebhookRuntimeDependencies = Readonly<{
   receiveRefundWebhookPostgres?: typeof receiveHyperswitchRefundWebhookPostgres;
   receivePaymentWebhookPostgres?: typeof receiveHyperswitchPaymentWebhookPostgres;
   receiveMandateWebhookPostgres?: typeof receiveHyperswitchMandateWebhookPostgres;
+  issueReceiptPostgres?: typeof issueReceiptForPaidPaymentPostgres;
   syncRenewalOutcome?: (
     env: Readonly<{ D1_01: D1Database; D1_04: D1Database }>,
     paymentId: string,
@@ -261,8 +263,13 @@ export async function handleHyperswitchWebhookRequest(
         // A receipt is created only after the selected provider Store has verified
         // the raw HMAC signature and durably committed the successful Payment state.
         // Duplicate signed events safely retry a previously interrupted receipt.
-        const issueReceipt = dependencies.issueReceipt ?? issueReceiptForPaidPayment;
-        await issueReceipt(selectedWebhookDatabase, paymentId, env.HYPERSWITCH_MERCHANT_ID);
+        if (postgresPool) {
+          const issueReceipt = dependencies.issueReceiptPostgres ?? issueReceiptForPaidPaymentPostgres;
+          await issueReceipt(postgresPool, paymentId, env.HYPERSWITCH_MERCHANT_ID);
+        } else {
+          const issueReceipt = dependencies.issueReceipt ?? issueReceiptForPaidPayment;
+          await issueReceipt(selectedWebhookDatabase, paymentId, env.HYPERSWITCH_MERCHANT_ID);
+        }
       }
       const sync = dependencies.syncRenewalOutcome ?? syncRenewalCycleOutcomeForPayment;
       const renewalEnv = { D1_01: env.D1_01, D1_04: selectedWebhookDatabase, W06_GOVERNANCE: env.W06_GOVERNANCE };
