@@ -5,6 +5,7 @@ import {
   listBillingDocumentsForCustomer,
   listPaymentHistoryForCustomer,
   listRefundHistoryForCustomer,
+  type BillingList,
 } from './billing-persistence.js';
 import {
   listBillingDocumentsForCustomerPostgres,
@@ -94,7 +95,7 @@ export async function handleCommerceBillingReadRequest(
   }
 
   try {
-    let result;
+    let result: BillingList<unknown>;
     if (resolveW07DatabaseDriver(env) === 'neon') {
       // Neon customer history reads query the existing D1-04 Hyperdrive Pool
       // natively; they never pass through the D1-compatible webhook facade.
