@@ -60,7 +60,7 @@ const MAX_SNAPSHOT_BYTES = 65_536
 function safeInteger(value: unknown): number | null {
   const number = typeof value === 'number'
     ? value
-    : typeof value === 'string' && /^\\d+$/.test(value) ? Number(value) : Number.NaN
+    : typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : Number.NaN
   return Number.isSafeInteger(number) ? number : null
 }
 
