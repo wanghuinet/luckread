@@ -78,3 +78,13 @@ Comment list reads now require the injected Neon PostgreSQL Store and fail close
 - Favorite, Unfavorite, Favorite Status, and Favorite List routes require their injected Neon PostgreSQL Stores and fail closed with sanitized 503 when composition is missing.
 - Preserved W03 publication validation before writes and reads, unpublished-content cache invalidation/false status, actor-scoped idempotent favorite upsert, idempotent removal, bounded keyset pagination with exact microsecond cursor precision, and status-cache invalidation after mutations.
 - Existing PostgreSQL adapters, SQL tests, and rehearsal composition remain unchanged. This closes the Favorite business slice only, not all W05 D1-compatible routes.
+
+
+## W05 Poll lifecycle (configuration, read, vote and draft deletion)
+
+- Removed the D1 adapters from the Poll configuration, read, vote and draft-delete Store modules.
+- Poll runtime APIs now accept explicit Store ports only; no D1 default Store construction or D1 database parameter remains in the poll runtime.
+- Poll GET requires the Neon read Store; poll POST requires configuration + read Stores; vote POST requires vote + read Stores; draft DELETE requires the delete Store. Missing composition returns 503.
+- Preserved W03 published/owned-post validation, owner-only draft preview and configuration, bidirectional Block filtering, option and duration validation, publication-based lazy expiry, vote aggregation and viewer choice, one-vote idempotency, closed-poll enforcement, and protection against deleting/reconfiguring polls after votes exist.
+- Existing PostgreSQL adapters, SQL tests and local PostgreSQL 18 rehearsal scripts remain the storage verification path.
+- This closes the Poll business slice only. Other W05 routes may still have separate legacy D1 adapters/fallbacks.

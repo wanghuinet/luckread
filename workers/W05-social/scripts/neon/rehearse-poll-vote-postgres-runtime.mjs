@@ -22,10 +22,6 @@ const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 5_000
 const client = await pool.connect()
 const readStore = createPostgresPollReadStore(client)
 const voteStore = createPostgresPollVoteStore(client)
-const unusedD1 = {
-  prepare() { throw new Error('Unexpected D1 access during PostgreSQL poll-vote rehearsal') },
-  batch() { throw new Error('Unexpected D1 batch during PostgreSQL poll-vote rehearsal') },
-}
 const marker = 'w05-poll-vote-' + randomUUID()
 const owner = marker + '-owner'
 const now = new Date()
@@ -100,16 +96,16 @@ try {
   const binding = contentContextBinding(owner)
 
   const firstVote = await castContentPollVote(
-    unusedD1, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[0],
-    marker + '-correlation-first', voteStore, readStore,
+    voteStore, readStore, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[0],
+    marker + '-correlation-first',
   )
   assert.equal(firstVote.viewerOptionId, pollFixture.options[0])
   assert.equal(firstVote.totalVotes, 1)
   firstVoteSaved = true
 
   const repeatedVote = await castContentPollVote(
-    unusedD1, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[0],
-    marker + '-correlation-repeat', voteStore, readStore,
+    voteStore, readStore, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[0],
+    marker + '-correlation-repeat',
   )
   assert.equal(repeatedVote.viewerOptionId, pollFixture.options[0])
   assert.equal(repeatedVote.totalVotes, 1)
@@ -117,8 +113,8 @@ try {
 
   await expectSocialError(
     castContentPollVote(
-      unusedD1, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[1],
-      marker + '-correlation-different', voteStore, readStore,
+      voteStore, readStore, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[1],
+      marker + '-correlation-different',
     ),
     'ALREADY_VOTED',
     409,
@@ -141,16 +137,16 @@ try {
   )
   await expectSocialError(
     castContentPollVote(
-      unusedD1, binding, blockedVoter, pollFixture.contentId, pollFixture.options[0],
-      marker + '-correlation-block-out', voteStore, readStore,
+      voteStore, readStore, binding, blockedVoter, pollFixture.contentId, pollFixture.options[0],
+      marker + '-correlation-block-out',
     ),
     'NOT_FOUND',
     404,
   )
   await expectSocialError(
     castContentPollVote(
-      unusedD1, binding, reverseBlockedVoter, pollFixture.contentId, pollFixture.options[0],
-      marker + '-correlation-block-in', voteStore, readStore,
+      voteStore, readStore, binding, reverseBlockedVoter, pollFixture.contentId, pollFixture.options[0],
+      marker + '-correlation-block-in',
     ),
     'NOT_FOUND',
     404,
@@ -160,8 +156,8 @@ try {
 
   await expectSocialError(
     castContentPollVote(
-      unusedD1, binding, marker + '-invalid-option-viewer', pollFixture.contentId,
-      marker + '-not-a-real-option', marker + '-correlation-invalid-option', voteStore, readStore,
+      voteStore, readStore, binding, marker + '-invalid-option-viewer', pollFixture.contentId,
+      marker + '-not-a-real-option', marker + '-correlation-invalid-option',
     ),
     'VALIDATION_FAILED',
     400,
@@ -171,8 +167,8 @@ try {
   const mismatchedOwnerBinding = contentContextBinding(marker + '-different-owner')
   await expectSocialError(
     castContentPollVote(
-      unusedD1, mismatchedOwnerBinding, marker + '-mismatch-viewer', pollFixture.contentId,
-      pollFixture.options[0], marker + '-correlation-owner-mismatch', voteStore, readStore,
+      voteStore, readStore, mismatchedOwnerBinding, marker + '-mismatch-viewer', pollFixture.contentId,
+      pollFixture.options[0], marker + '-correlation-owner-mismatch',
     ),
     'SERVICE_UNAVAILABLE',
     503,
@@ -182,8 +178,8 @@ try {
   expiredFixture = await createPoll({ suffix: 'expired', endsAt: past })
   await expectSocialError(
     castContentPollVote(
-      unusedD1, binding, marker + '-expired-viewer', expiredFixture.contentId,
-      expiredFixture.options[0], marker + '-correlation-expired', voteStore, readStore,
+      voteStore, readStore, binding, marker + '-expired-viewer', expiredFixture.contentId,
+      expiredFixture.options[0], marker + '-correlation-expired',
     ),
     'POLL_CLOSED',
     409,

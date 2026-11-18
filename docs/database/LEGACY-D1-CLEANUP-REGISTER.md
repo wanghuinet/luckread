@@ -174,3 +174,13 @@
 - Existing PostgreSQL Stores remain the runtime composition: `createPostgresFavoriteMutationStore`, `createPostgresFavoriteStatusReadStore`, and `createPostgresFavoriteListReadStore`.
 - Preserved W03 published-content validation, actor-scoped idempotency, favorite-status cache revalidation/invalidation, bounded keyset pagination and microsecond cursor precision, and sanitized adapter failures.
 - Scope: W05 Favorite business slice only. No production database/schema, Hyperdrive binding, Worker deployment, or traffic change.
+
+
+## W05 Poll lifecycle (configuration, read, vote and draft deletion)
+
+- Removed `createD1PollConfigurationStore`, `createD1PollReadStore`, `createD1PollVoteStore`, and `createD1PollDeleteStore` implementations.
+- `poll-runtime.ts` now uses only explicit `PollConfigurationStore`, `PollReadStore`, `PollVoteStore`, and `PollDeleteStore` contracts. Poll HTTP routes require their respective Neon Store dependencies and fail closed with 503 when missing; no poll route falls back to `env.DB`.
+- Existing PostgreSQL implementations remain composed by `workers/W05-social/src/neon/runtime.ts`.
+- Preserved W03 ownership/publication authority, Block checks, bounded option/duration validation, lazy publication-relative expiry, vote idempotency and immutable choice, closed-poll rejection, and no-delete/no-reconfigure-after-vote rules.
+- Updated poll runtime tests to use provider-neutral Store fixtures and updated PostgreSQL rehearsal scripts to call Store-only runtime APIs.
+- Scope: Poll lifecycle only. No production database/schema, Hyperdrive binding, Worker deployment, or traffic change.

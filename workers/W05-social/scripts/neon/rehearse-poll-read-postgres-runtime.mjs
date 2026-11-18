@@ -20,7 +20,6 @@ const reportPath = process.env.W05_POLL_READ_POSTGRES_REPORT ||
 const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 5_000 })
 const client = await pool.connect()
 const store = createPostgresPollReadStore(client)
-const unusedD1 = { prepare() { throw new Error('Unexpected D1 access during PostgreSQL poll-read rehearsal') } }
 const marker = 'w05-poll-read-' + randomUUID()
 const pollId = marker + '-poll'
 const contentId = marker + '-content'
@@ -71,7 +70,7 @@ try {
     [voteOne, voteTwo, pollId, optionOne, viewer, now, optionTwo, owner],
   )
 
-  const result = await getContentPoll(unusedD1, contentId, viewer, publishedContext, store)
+  const result = await getContentPoll(store, contentId, viewer, publishedContext)
   assert.ok(result)
   assert.equal(result.durationMinutes, 5)
   assert.equal(result.totalVotes, 2)
@@ -99,7 +98,7 @@ try {
      VALUES ($1, $2, $3, 'block', $4::timestamptz, $4::timestamptz)`,
     [marker + '-block', owner, viewer, now],
   )
-  await expectNotFound(getContentPoll(unusedD1, contentId, viewer, publishedContext, store))
+  await expectNotFound(getContentPoll(store, contentId, viewer, publishedContext))
   blockFailsClosed = true
 
   // Owners retain access to their own poll without invoking the Block store.
@@ -107,7 +106,7 @@ try {
     ...store,
     async isBlocked() { throw new Error('Owner poll read must skip Block lookup') },
   }
-  const ownerRead = await getContentPoll(unusedD1, contentId, owner, publishedContext, ownerStore)
+  const ownerRead = await getContentPoll(ownerStore, contentId, owner, publishedContext)
   assert.equal(ownerRead?.pollId, pollId)
   ownerBlockLookupSkipped = true
 } finally {
