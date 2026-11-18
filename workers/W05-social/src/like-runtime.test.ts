@@ -2,7 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { getLikeStatus, like, unlike } from './like-runtime.js'
+import { getLikeStatus as getLikeStatusRuntime, like, unlike } from './like-runtime.js'
+import type { LikeStatusReadStore } from './like-status-read-store.js'
 import { LikeStatusReadStoreError } from './like-status-read-store.js'
 import { LikeMutationStoreError } from './like-mutation-store.js'
 import type { LikeTargetContextReadStore } from './like-target-context-read-store.js'
@@ -27,6 +28,17 @@ const publishedContextBinding = (
 })
 
 const correlationId = 'like-runtime-test'
+
+const defaultStatusStore: LikeStatusReadStore = {
+  read: vi.fn(async () => ({ liked: true, likeCount: 3 })),
+}
+
+const getLikeStatus = (...args: Parameters<typeof getLikeStatusRuntime>) => {
+  const normalized = [...args] as Parameters<typeof getLikeStatusRuntime>
+  if (!normalized[6]) normalized[6] = defaultStatusStore
+  return getLikeStatusRuntime(...normalized)
+}
+
 
 const db = (firstResults: unknown[] = []) => {
   let firstIndex = 0
@@ -152,6 +164,13 @@ describe('like runtime', () => {
       statusStore,
     )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
     expect(statusStore.read).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when the status Store is missing and caches are cold', async () => {
+    await expect(getLikeStatusRuntime(
+      db([{ blocked: 0 }]), publishedContextBinding(), 'user-1',
+      { targetType: 'content', targetId: 'content-1' }, correlationId,
+    )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
   })
 
   it('maps injected status store failures to a sanitized 503', async () => {
