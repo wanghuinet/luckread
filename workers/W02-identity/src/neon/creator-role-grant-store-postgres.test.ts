@@ -73,8 +73,8 @@ describe('W02 PostgreSQL creator-role grant Store', () => {
     )
 
     const operation = createPostgresCreatorRoleGrantStore(pool).grant(command, fixedNow)
-    await expect(operation).rejects.toBeInstanceOf(RoleAssignmentCommandError)
     await expect(operation).rejects.toMatchObject({
+      name: 'RoleAssignmentCommandError',
       code: 'VERIFIED_ROLE_REQUIRED',
       message: 'target must hold an effective L2 verified_user role',
     })
