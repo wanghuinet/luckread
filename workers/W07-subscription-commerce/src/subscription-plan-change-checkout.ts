@@ -31,6 +31,21 @@ import {
   hasPendingScheduledPlanDowngrade,
 } from './subscription-plan-change-schedule.js';
 import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
+import {
+  attachPlanUpgradeOrderPostgres,
+  expirePlanUpgradeAttemptPostgres,
+  expireStalePlanUpgradeAttemptsPostgres,
+  insertPlanUpgradeAttemptPostgres,
+  readPlanUpgradeAttemptByIdPostgres,
+  readPlanUpgradeAttemptByIdempotencyPostgres,
+} from './subscription-plan-upgrade-checkout-postgres.js';
+
+type PlanUpgradeAttemptStore = D1Database | W07WebhookPostgresPool;
+
+function isPostgresPlanUpgradeStore(db: PlanUpgradeAttemptStore): db is W07WebhookPostgresPool {
+  return typeof (db as W07WebhookPostgresPool).query === 'function';
+}
 
 export type PlanChangeAttemptRow = Readonly<{
   attempt_id: string;
@@ -169,10 +184,13 @@ function toAttempt(row: PlanChangeAttemptRow): SubscriptionPlanUpgradeAttempt {
 }
 
 async function readAttemptByIdempotency(
-  db: D1Database,
+  db: PlanUpgradeAttemptStore,
   subscriberId: string,
   keyHash: string,
 ): Promise<PlanChangeAttemptRow | null> {
+  if (isPostgresPlanUpgradeStore(db)) {
+    return readPlanUpgradeAttemptByIdempotencyPostgres(db, subscriberId, keyHash);
+  }
   try {
     return await db.prepare(
       'SELECT attempt_id, subscriber_id, subscription_id, expected_subscription_version, ' +
@@ -187,7 +205,10 @@ async function readAttemptByIdempotency(
   }
 }
 
-async function readAttemptById(db: D1Database, attemptId: string): Promise<PlanChangeAttemptRow | null> {
+async function readAttemptById(db: PlanUpgradeAttemptStore, attemptId: string): Promise<PlanChangeAttemptRow | null> {
+  if (isPostgresPlanUpgradeStore(db)) {
+    return readPlanUpgradeAttemptByIdPostgres(db, attemptId);
+  }
   try {
     return await db.prepare(
       'SELECT attempt_id, subscriber_id, subscription_id, expected_subscription_version, ' +
@@ -201,7 +222,10 @@ async function readAttemptById(db: D1Database, attemptId: string): Promise<PlanC
   }
 }
 
-async function expireAttempt(db: D1Database, row: PlanChangeAttemptRow, now: string): Promise<void> {
+async function expireAttempt(db: PlanUpgradeAttemptStore, row: PlanChangeAttemptRow, now: string): Promise<void> {
+  if (isPostgresPlanUpgradeStore(db)) {
+    return expirePlanUpgradeAttemptPostgres(db, row, now);
+  }
   try {
     await db.prepare(
       "UPDATE membership_subscription_plan_change_attempts SET status = 'EXPIRED', updated_at = ?, " +
@@ -213,10 +237,13 @@ async function expireAttempt(db: D1Database, row: PlanChangeAttemptRow, now: str
 }
 
 async function expireStalePendingAttempts(
-  db: D1Database,
+  db: PlanUpgradeAttemptStore,
   subscriptionId: string,
   now: string,
 ): Promise<void> {
+  if (isPostgresPlanUpgradeStore(db)) {
+    return expireStalePlanUpgradeAttemptsPostgres(db, subscriptionId, now);
+  }
   try {
     await db.prepare(
       "UPDATE membership_subscription_plan_change_attempts SET status = 'EXPIRED', updated_at = ?, " +
