@@ -41,9 +41,9 @@ const toIso = (value: Date | string): string =>
  * Resolve the authenticated Better Auth session and then reconcile the
  * authoritative W02 account lifecycle and effective authorization facts.
  *
- * Session lookup and principal authority both use the same W02 Hyperdrive-backed
- * PostgreSQL runtime. Legacy D1 stores are available only through the explicit
- * dependency injection port used by isolated tests.
+ * Session lookup and principal authority use the same W02 Hyperdrive-backed
+ * PostgreSQL runtime. The Store injection port supports isolated contract tests
+ * and controlled PostgreSQL rehearsals without introducing a provider fallback.
  */
 export async function resolveBetterAuthPrincipal(
   env: BetterAuthEnv,
