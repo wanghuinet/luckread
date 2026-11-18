@@ -65,7 +65,11 @@ function fakePool(options: FakePgOptions = {}) {
       if (sql.includes('FROM "user"') && sql.includes('OR email = $2')) {
         const rows = options.user && (
           options.user.id === values[0] || options.user.email === values[1]
-        ) ? [options.user] : []
+        ) ? [{
+          id: options.user.id,
+          email: options.user.email,
+          username: options.user.username,
+        }] : []
         return { rows, rowCount: rows.length } as unknown as T
       }
       if (sql.includes('FROM "user"')) {
