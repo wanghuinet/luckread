@@ -21,7 +21,6 @@ const reportPath = process.env.W05_LIKE_STATUS_POSTGRES_REPORT || '../../artifac
 const pool = new Pool({ connectionString, max: 4, connectionTimeoutMillis: 5_000 })
 const store = createPostgresLikeStatusReadStore(pool)
 const targetContextStore = createPostgresLikeTargetContextReadStore(pool)
-const noD1Database = Object.freeze({})
 let contentReadPassed = false
 let actorScopePassed = false
 let commentReadPassed = false
@@ -61,7 +60,6 @@ try {
   )
 
   const contentStatus = await getLikeStatus(
-    noD1Database,
     publishedBinding,
     actor,
     { targetType: 'content', targetId: contentId },
@@ -74,7 +72,6 @@ try {
   contentReadPassed = true
 
   const otherActorContentStatus = await getLikeStatus(
-    noD1Database,
     publishedBinding,
     marker + '-third-actor',
     { targetType: 'content', targetId: contentId },
@@ -87,7 +84,6 @@ try {
   actorScopePassed = true
 
   const commentStatus = await getLikeStatus(
-    noD1Database,
     publishedBinding,
     actor,
     { targetType: 'comment', targetId: commentId },
