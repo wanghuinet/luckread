@@ -452,7 +452,7 @@ const decodePlanListCursor = (value: string | null): PlanListCursor | null => {
  * no offset scan or private-plan metadata is exposed.
  */
 export async function listActiveMembershipPlans(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   limit = 20,
   cursorValue: string | null = null,
   creatorIdInput: string | null = null,
@@ -484,15 +484,45 @@ export async function listActiveMembershipPlans(
     'FROM membership_plans AS p ' +
     'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
     "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' "
-  const creatorFilterSql = creatorId ? 'AND p.owner_id = ? ' : ''
-  const creatorBindings = creatorId ? [creatorId] : []
-  const statement = cursor
-    ? db.prepare(baseSql + creatorFilterSql + 'AND (p.created_at < ? OR (p.created_at = ? AND p.plan_id < ?)) ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?')
-      .bind(...creatorBindings, cursor.createdAt, cursor.createdAt, cursor.planId, safeLimit + 1)
-    : db.prepare(baseSql + creatorFilterSql + 'ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?')
-      .bind(...creatorBindings, safeLimit + 1)
-  const rows = await statement.all<ActiveMembershipPlanRow>()
-  const candidates = rows.results ?? []
+  let candidates: ActiveMembershipPlanRow[]
+  if (isPostgresSubscriptionStore(db)) {
+    let sql =
+      'SELECT p.plan_id, p.owner_id, p.current_version, ' +
+      `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
+      `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+      'FROM membership_plans AS p ' +
+      'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
+      "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' "
+    const values: unknown[] = []
+    if (creatorId) {
+      values.push(creatorId)
+      sql += `AND p.owner_id = $${values.length} `
+    }
+    if (cursor) {
+      values.push(cursor.createdAt, cursor.createdAt, cursor.planId)
+      sql += `AND (p.created_at < $${values.length - 2}::timestamptz OR ` +
+        `(p.created_at = $${values.length - 1}::timestamptz AND p.plan_id < $${values.length})) `
+    }
+    values.push(safeLimit + 1)
+    sql += `ORDER BY p.created_at DESC, p.plan_id DESC LIMIT $${values.length}`
+    try {
+      const result = await db.query<ActiveMembershipPlanRow & Record<string, unknown>>(sql, values)
+      candidates = result.rows
+    } catch {
+      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+    }
+  } else {
+    const creatorFilterSql = creatorId ? 'AND p.owner_id = ? ' : ''
+    const creatorBindings = creatorId ? [creatorId] : []
+    const statement = cursor
+      ? db.prepare(baseSql + creatorFilterSql + 'AND (p.created_at < ? OR (p.created_at = ? AND p.plan_id < ?)) ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?')
+        .bind(...creatorBindings, cursor.createdAt, cursor.createdAt, cursor.planId, safeLimit + 1)
+      : db.prepare(baseSql + creatorFilterSql + 'ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?')
+        .bind(...creatorBindings, safeLimit + 1)
+    const rows = await statement.all<ActiveMembershipPlanRow>()
+    candidates = rows.results ?? []
+  }
   const hasMore = candidates.length > safeLimit
   const page = candidates.slice(0, safeLimit)
   const docs = page.map((row) => {
@@ -1048,7 +1078,7 @@ export async function transitionMembershipPlanLifecycle(
 
 /** Owner-scoped plan list for the authenticated creator, including private drafts. */
 export async function listCreatorMembershipPlans(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   verifiedCreatorId: string,
   limit = 20,
   cursorValue: string | null = null,
@@ -1067,12 +1097,38 @@ export async function listCreatorMembershipPlans(
     'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
     'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
     "WHERE p.owner_type = 'CREATOR' AND p.owner_id = ? "
-  const statement = cursor
-    ? db.prepare(baseSql + 'AND (p.created_at < ? OR (p.created_at = ? AND p.plan_id < ?)) ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?')
-      .bind(creatorId, cursor.createdAt, cursor.createdAt, cursor.planId, safeLimit + 1)
-    : db.prepare(baseSql + 'ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?').bind(creatorId, safeLimit + 1)
-  const rows = await statement.all<MembershipPlanStoredRow>()
-  const candidates = rows.results ?? []
+  let candidates: MembershipPlanStoredRow[]
+  if (isPostgresSubscriptionStore(db)) {
+    let sql =
+      'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, ' +
+      `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
+      `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+      'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
+      'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
+      "WHERE p.owner_type = 'CREATOR' AND p.owner_id = $1 "
+    const values: unknown[] = [creatorId]
+    if (cursor) {
+      values.push(cursor.createdAt, cursor.createdAt, cursor.planId)
+      sql += `AND (p.created_at < $${values.length - 2}::timestamptz OR ` +
+        `(p.created_at = $${values.length - 1}::timestamptz AND p.plan_id < $${values.length})) `
+    }
+    values.push(safeLimit + 1)
+    sql += `ORDER BY p.created_at DESC, p.plan_id DESC LIMIT $${values.length}`
+    try {
+      const result = await db.query<MembershipPlanStoredRow & Record<string, unknown>>(sql, values)
+      candidates = result.rows
+    } catch {
+      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+    }
+  } else {
+    const statement = cursor
+      ? db.prepare(baseSql + 'AND (p.created_at < ? OR (p.created_at = ? AND p.plan_id < ?)) ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?')
+        .bind(creatorId, cursor.createdAt, cursor.createdAt, cursor.planId, safeLimit + 1)
+      : db.prepare(baseSql + 'ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?').bind(creatorId, safeLimit + 1)
+    const rows = await statement.all<MembershipPlanStoredRow>()
+    candidates = rows.results ?? []
+  }
   const hasMore = candidates.length > safeLimit
   const page = candidates.slice(0, safeLimit)
   const last = page.at(-1)
