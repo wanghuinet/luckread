@@ -78,13 +78,13 @@ function postgresPool(
 ) {
   const transactionCalls: Array<{ sql: string; values: unknown[] }> = []
   const query = vi.fn(async (sql: string, values: unknown[] = []) => handler(sql, values))
-  const client: W07WebhookPostgresClient = {
+  const client = {
     query: vi.fn(async (sql: string, values: unknown[] = []) => {
       transactionCalls.push({ sql, values })
       return handler(sql, values)
     }),
     release: vi.fn(),
-  }
+  } as unknown as W07WebhookPostgresClient
   const pool: W07WebhookPostgresPool = {
     query,
     connect: vi.fn(async () => client),
