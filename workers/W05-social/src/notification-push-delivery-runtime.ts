@@ -14,7 +14,6 @@ type PushTicketLike = ExpoPushTicket
 type EndpointAccessSource = NotificationPushEndpointAccessStore
 
 export interface NotificationPushDeliveryEnv {
-  readonly W05_DATABASE_DRIVER?: string
   readonly HYPERDRIVE_D1_02?: { connectionString?: string }
   readonly HYPERDRIVE_D1_03?: { connectionString?: string }
   readonly PUSH_DELIVERY_ENABLED?: string
