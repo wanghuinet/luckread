@@ -39,3 +39,12 @@ Comment list reads now require the injected Neon PostgreSQL Store and fail close
 - Removed `FollowListD1Database` and `createD1FollowListReadStore`; the PostgreSQL adapter is the only production database implementation for this read path.
 - Preserved public-read transport policy, bidirectional Block filtering, deterministic timestamp/relationship cursor pagination, bounded page size, separate filtered aggregate count, and count-cache behavior.
 - Runtime and route tests use Store fixtures; PostgreSQL adapter tests continue to verify SQL behavior.
+
+
+## W05 Follow / Unfollow Writes
+
+- Follow and Unfollow HTTP routes now require the explicitly injected Neon PostgreSQL `FollowStore`; missing composition returns 503 before any relationship write or D1 access.
+- Removed the D1 Follow/Unfollow Store adapter and runtime fallback. Production composition continues to use the existing D1-02 Neon Hyperdrive pool and PostgreSQL Store.
+- Follow retains atomic block-aware creation, idempotent relationship identity/time, and conflict behavior; Unfollow remains idempotent.
+- Follow status reads also require the injected PostgreSQL Store; the D1 point-read adapter and fallback have been removed.
+- Follow notification enqueue remains a separate best-effort side effect and is not combined with the relationship transaction.
