@@ -245,9 +245,9 @@ export async function handleHyperswitchWebhookRequest(
       });
     }
 
-    // receiveHyperswitchWebhook verifies the provider signature and durably
-    // commits the selected D1-04 event/payment/cycle outcome before this point. Only then
-    // may the same signed payload identify a renewal cycle for D1-01 sync.
+    // The selected native PostgreSQL Store or D1-compatible bridge has verified
+    // the exact raw-body signature and committed its provider receipt before any
+    // payment-only post-commit saga is allowed to run.
     let subscriptionSync: RenewalOutcomeSyncResult | undefined;
     let pendingRecovery: RenewalPendingRecoveryResult | undefined;
     let purchaseFulfillment: PaidMembershipPurchaseFulfillmentResult | undefined;
