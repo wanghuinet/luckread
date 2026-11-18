@@ -114,12 +114,17 @@ function isPostgresFulfillmentDatabase(value: FulfillmentDatabase): value is W07
   return typeof (value as W07WebhookPostgresPool).query === 'function';
 }
 
-function selectedFulfillmentDatabases(env: FulfillmentEnv): Readonly<{
-  finance: FulfillmentDatabase;
-  membership: FulfillmentDatabase;
-}> {
-  const financePool = getW07PaymentWebhookPostgresPool(env);
-  const membershipPool = getW07MembershipPostgresPool(env);
+type FulfillmentDependencies = Readonly<{
+  getFinancePostgresPool?: (env: FulfillmentEnv) => W07WebhookPostgresPool | undefined;
+  getMembershipPostgresPool?: (env: FulfillmentEnv) => W07WebhookPostgresPool | undefined;
+}>;
+
+function selectedFulfillmentDatabases(
+  env: FulfillmentEnv,
+  dependencies: FulfillmentDependencies = {},
+): Readonly<{ finance: FulfillmentDatabase; membership: FulfillmentDatabase }> {
+  const financePool = (dependencies.getFinancePostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+  const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
   return {
     finance: financePool ?? getW07SelectedD104Database(env),
     membership: membershipPool ?? env.D1_01,
@@ -971,12 +976,13 @@ export async function fulfillPaidMembershipOrder(
   env: FulfillmentEnv,
   paymentId: string,
   merchantId: string,
+  dependencies: FulfillmentDependencies = {},
 ): Promise<PaidMembershipPurchaseFulfillmentResult> {
   if (!PAYMENT_ID_PATTERN.test(paymentId) || !boundedId(merchantId)) {
     throw new PaidMembershipPurchaseFulfillmentError('VALIDATION_FAILED', 400);
   }
 
-  const stores = selectedFulfillmentDatabases(env);
+  const stores = selectedFulfillmentDatabases(env, dependencies);
   const order = await readPaidOrder(stores.finance, paymentId, merchantId);
   const lines = await readOrderLines(stores.finance, order.order_id);
   if (lines.length === 0) return failClosed();
