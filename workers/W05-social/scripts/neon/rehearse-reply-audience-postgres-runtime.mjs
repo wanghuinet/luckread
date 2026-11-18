@@ -26,7 +26,6 @@ const reportPath = process.env.W05_REPLY_AUDIENCE_POSTGRES_REPORT ||
   '../../artifacts/neon/w05-reply-audience-postgres-runtime-postflight.json'
 const pool = new Pool({ connectionString, max: 2, connectionTimeoutMillis: 5_000 })
 const store = createPostgresReplyAudienceStore(pool)
-const unusedD1 = { prepare() { throw new Error('Unexpected D1 access during PostgreSQL reply-audience rehearsal') } }
 const marker = 'w05-reply-audience-' + randomUUID()
 const owner = marker + '-owner'
 const otherOwner = marker + '-other-owner'
@@ -175,25 +174,25 @@ try {
   assert.equal(postgresMajor, 18, 'runtime rehearsal must use PostgreSQL 18')
 
   const saved = await setContentReplyAudience(
-    unusedD1, owner, contentId, 'mentioned', [mentionedUser, mentionedUser], context(owner), store,
+    store, owner, contentId, 'mentioned', [mentionedUser, mentionedUser], context(owner),
   )
   assert.deepEqual(saved.mentionedUserIds, [mentionedUser])
   assert.equal(saved.replyAudience, 'mentioned')
   writeReadPassed = true
 
-  const loaded = await getContentReplyAudience(unusedD1, owner, contentId, context(owner), store)
+  const loaded = await getContentReplyAudience(store, owner, contentId, context(owner))
   assert.deepEqual(loaded, saved)
 
   await assert.rejects(
     setContentReplyAudience(
-      unusedD1, otherOwner, contentId, 'everyone', [], context(otherOwner), store,
+      store, otherOwner, contentId, 'everyone', [], context(otherOwner),
     ),
     error => error?.code === 'CONFLICT' && error?.status === 409,
   )
   ownerConflictPassed = true
 
   const otherOwnerView = await getContentReplyAudience(
-    unusedD1, otherOwner, contentId, context(otherOwner), store,
+    store, otherOwner, contentId, context(otherOwner),
   )
   assert.equal(otherOwnerView.replyAudience, 'everyone')
   assert.deepEqual(otherOwnerView.mentionedUserIds, [])
