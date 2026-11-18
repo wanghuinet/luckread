@@ -13,7 +13,6 @@ import type {
   FollowListReadStore,
 } from './follow-list-read-store.js'
 import {
-  createD1FollowingAuthorIdsReadStore,
   FollowingAuthorIdsReadStoreError,
   type FollowingAuthorIdsReadStore,
 } from './following-author-ids-read-store.js'
@@ -116,7 +115,7 @@ export const invalidateFollowListCountCache = async (...userIds: string[]): Prom
       try {
         await cache.delete(followCountCacheKey(direction, id))
       } catch {
-        // Best-effort invalidation; D1 remains authoritative.
+        // Best-effort invalidation; the Store remains authoritative.
       }
     })
   )))
@@ -257,22 +256,13 @@ export type FollowingAuthorCandidates = {
 
 const MAX_FOLLOWING_FEED_AUTHORS = 500
 
-type FollowingAuthorIdsDataSource = D1Database | FollowingAuthorIdsReadStore
-
-function resolveFollowingAuthorIdsReadStore(
-  source: FollowingAuthorIdsDataSource,
-): FollowingAuthorIdsReadStore {
-  if (typeof (source as FollowingAuthorIdsReadStore).list === 'function') {
-    return source as FollowingAuthorIdsReadStore
-  }
-  return createD1FollowingAuthorIdsReadStore(source as D1Database)
-}
+type FollowingAuthorIdsDataSource = FollowingAuthorIdsReadStore
 
 /**
  * W05 owns follow/block/mute relationships. It deliberately returns author IDs
  * only; W03 remains the authority that selects and projects published content.
  * The candidate window is bounded to keep the W04 fan-out request predictable.
- * D1 remains the default read path; PostgreSQL is injectable for rehearsal.
+ * Candidate selection uses the explicitly injected Neon PostgreSQL Store.
  */
 export async function listFollowingAuthorIds(
   source: FollowingAuthorIdsDataSource,
@@ -281,7 +271,7 @@ export async function listFollowingAuthorIds(
   const viewerId = userId(viewerUserId)
   let rows
   try {
-    rows = await resolveFollowingAuthorIdsReadStore(source).list(
+    rows = await source.list(
       viewerId,
       MAX_FOLLOWING_FEED_AUTHORS + 1,
     )

@@ -303,7 +303,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   followStore?: FollowStore
   /** Optional PostgreSQL relationship graph reader; missing composition fails closed. */
   relationshipGraphReadStore?: RelationshipGraphReadStore
-  /** Optional PostgreSQL-capable Following-feed author reader; D1 remains the deployed default. */
+  /** Required Neon PostgreSQL author candidate reader; the route fails closed when absent. */
   followingAuthorIdsReadStore?: FollowingAuthorIdsReadStore
   /** Required PostgreSQL comment page reader; missing composition fails closed. */
   commentListReadStore?: CommentListReadStore
@@ -1241,7 +1241,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           throw new FollowRuntimeError('VALIDATION_FAILED', 400)
         }
         const viewerUserId = requireFollowingFeedPrincipal(request)
-        const candidates = await listFollowingAuthorIds(dependencies.followingAuthorIdsReadStore ?? env.DB, viewerUserId)
+        if (!dependencies.followingAuthorIdsReadStore) throw new FollowRuntimeError('SERVICE_UNAVAILABLE', 503)
+        const candidates = await listFollowingAuthorIds(dependencies.followingAuthorIdsReadStore, viewerUserId)
         return json({ data: candidates, requestId: createRequestId() })
       }
 

@@ -117,3 +117,11 @@
 - Comment list routes now require the injected Neon PostgreSQL `CommentListReadStore`; missing composition returns 503 rather than falling back to `env.DB`.
 - Preserved published-comment visibility, bounded recursive replies, cursor scope, relevant/recent/liked ordering, viewer block/mute filtering, mention identity, and viewer like state.
 - Tests now exercise the Store port using a PostgreSQL query fixture; the production PostgreSQL adapter remains the only database adapter.
+
+## W05 Following-feed Author Read
+
+- Removed `FollowingAuthorIdsD1QueryExecutor` and `createD1FollowingAuthorIdsReadStore`.
+- `listFollowingAuthorIds` now accepts only `FollowingAuthorIdsReadStore`; the Following-feed route requires the injected Neon PostgreSQL Store and fails closed with 503 when missing.
+- Updated tests to remove the D1 fallback expectation and verify that missing composition does not touch `env.DB`.
+- Preserved the 500-author bounded candidate window, bidirectional Block filtering, viewer-directed Mute filtering, deterministic ordering, and W03 content authority.
+- This slice does not clean up the separate Follow/Unfollow writer, follower/following list reader, or Follow status reader; those remain separate work items.

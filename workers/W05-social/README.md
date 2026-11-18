@@ -25,3 +25,10 @@ Neon D1-02 runtime closure:
 
 
 Comment list reads now require the injected Neon PostgreSQL Store and fail closed when composition is absent. The D1 query dialect, adapter, and `env.DB` fallback have been removed; pagination, relevant/recent/liked ordering, viewer block/mute filtering, published-comment visibility, mention identity, and viewer like state remain covered by Store-port tests and PostgreSQL adapter tests.
+
+## W05 Following-feed Author Read
+
+- Following-feed author candidates now require the explicitly injected Neon PostgreSQL `FollowingAuthorIdsReadStore`; missing composition returns 503 and never falls back to `env.DB`.
+- Removed the D1 query executor and `createD1FollowingAuthorIdsReadStore` adapter.
+- Preserved the bounded 500-author candidate window, author-ID-only contract, bidirectional Block exclusion, viewer-directed Mute exclusion, deterministic ordering, and W03 authority over published content selection.
+- Runtime and route tests use Store fixtures; PostgreSQL adapter tests continue to verify the SQL semantics.
