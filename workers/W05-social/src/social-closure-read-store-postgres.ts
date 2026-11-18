@@ -182,7 +182,8 @@ export function createPostgresSocialClosureReadStore(
         const result = await db.query<ContentSocialBatchRow>(
           `WITH requested AS (
              SELECT content_id, pinned_owner_user_id
-               FROM unnest($1::text[], $2::text[]) AS item(content_id, pinned_owner_user_id)
+               FROM jsonb_to_recordset($1::jsonb)
+                 AS item(content_id text, pinned_owner_user_id text)
            )
            SELECT requested.content_id,
                   (SELECT COUNT(*)::int FROM interaction_likes l
@@ -198,17 +199,20 @@ export function createPostgresSocialClosureReadStore(
                   EXISTS (SELECT 1 FROM social_profile_pins p
                     WHERE p.content_id = requested.content_id
                       AND p.user_id = requested.pinned_owner_user_id) AS pinned,
-                  ($3::text IS NOT NULL AND EXISTS (SELECT 1 FROM interaction_likes l
-                    WHERE l.actor_user_id = $3 AND l.target_type = 'content'
+                  ($2::text IS NOT NULL AND EXISTS (SELECT 1 FROM interaction_likes l
+                    WHERE l.actor_user_id = $2 AND l.target_type = 'content'
                       AND l.target_id = requested.content_id)) AS liked,
-                  ($3::text IS NOT NULL AND EXISTS (SELECT 1 FROM interaction_favorites f
-                    WHERE f.actor_user_id = $3 AND f.target_type = 'content'
+                  ($2::text IS NOT NULL AND EXISTS (SELECT 1 FROM interaction_favorites f
+                    WHERE f.actor_user_id = $2 AND f.target_type = 'content'
                       AND f.target_id = requested.content_id)) AS favorited,
-                  ($3::text IS NOT NULL AND EXISTS (SELECT 1 FROM social_reposts r
-                    WHERE r.actor_user_id = $3 AND r.content_id = requested.content_id)) AS reposted
+                  ($2::text IS NOT NULL AND EXISTS (SELECT 1 FROM social_reposts r
+                    WHERE r.actor_user_id = $2 AND r.content_id = requested.content_id)) AS reposted
              FROM requested
             ORDER BY requested.content_id ASC`,
-          [[...contentIds], [...pinnedOwnerUserIds], viewerUserId],
+          [JSON.stringify(contentIds.map((contentId, index) => ({
+            content_id: contentId,
+            pinned_owner_user_id: pinnedOwnerUserIds[index],
+          }))), viewerUserId],
         )
         return result.rows
       } catch {
