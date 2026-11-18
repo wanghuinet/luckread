@@ -4,7 +4,9 @@ import { clearFavoriteStatusCacheForTests, favorite, getFavoriteStatus, listFavo
 import type { W03ContentBinding } from './w03-content-context-client.js'
 import { FavoriteStatusReadStoreError } from './favorite-status-read-store.js'
 import { FavoriteMutationStoreError } from './favorite-mutation-store.js'
-import { FavoriteListReadStoreError } from './favorite-list-read-store.js'
+import { FavoriteListReadStoreError, type FavoriteListReadRow, type FavoriteListReadStore } from './favorite-list-read-store.js'
+import type { FavoriteMutationStore } from './favorite-mutation-store.js'
+import type { FavoriteStatusReadStore } from './favorite-status-read-store.js'
 
 const publishedBinding = (status = 200): W03ContentBinding & { fetch: ReturnType<typeof vi.fn> } => ({
   fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -19,11 +21,11 @@ const favoriteRow = {
   relationship_id: 'favorite-1', actor_user_id: 'user-1', target_type: 'content' as const,
   target_id: 'content-1', created_at: '2026-10-02T00:00:00.000Z',
 }
-const mutationStore = (overrides: Record<string, unknown> = {}) => ({
+const mutationStore = (overrides: Partial<FavoriteMutationStore> = {}): FavoriteMutationStore => ({
   create: vi.fn(async () => favoriteRow), remove: vi.fn(async () => undefined), ...overrides,
 })
-const statusStore = (isFavorited = true) => ({ isFavorited: vi.fn(async () => isFavorited) })
-const listStore = (rows: readonly Record<string, unknown>[] = []) => ({ list: vi.fn(async () => rows) })
+const statusStore = (isFavorited = true): FavoriteStatusReadStore => ({ isFavorited: vi.fn(async () => isFavorited) })
+const listStore = (rows: readonly FavoriteListReadRow[] = []): FavoriteListReadStore => ({ list: vi.fn(async () => rows) })
 
 describe('favorite runtime — Neon Store ports only', () => {
   beforeEach(() => clearFavoriteStatusCacheForTests())
@@ -98,15 +100,13 @@ describe('favorite runtime — Neon Store ports only', () => {
   })
 
   it('paginates the actor-scoped favorite list with an opaque exact cursor', async () => {
-    const rows = [
-      { relationship_id: 'favorite-newer', target_id: 'content-newer', created_at: '2026-11-10T04:00:00.900Z', cursor_created_at: '2026-11-10T04:00:00.900456Z' },
-      { relationship_id: 'favorite-older', target_id: 'content-older', created_at: '2026-11-10T04:00:00.789Z', cursor_created_at: '2026-11-10T04:00:00.789123Z' },
-    ]
-    const reader = listStore(rows)
+    const newer = { relationship_id: 'favorite-newer', target_id: 'content-newer', created_at: '2026-11-10T04:00:00.900Z', cursor_created_at: '2026-11-10T04:00:00.900456Z' }
+    const older = { relationship_id: 'favorite-older', target_id: 'content-older', created_at: '2026-11-10T04:00:00.789Z', cursor_created_at: '2026-11-10T04:00:00.789123Z' }
+    const reader: FavoriteListReadStore = { list: vi.fn().mockResolvedValueOnce([newer, older]).mockResolvedValueOnce([older]) }
     const first = await listFavorites(reader, 'actor-1', null, 1)
     expect(first).toMatchObject({ items: [{ targetId: 'content-newer' }], hasMore: true, nextCursor: expect.any(String) })
     const second = await listFavorites(reader, 'actor-1', first.nextCursor, 1)
-    expect(second.items).toEqual([{ targetId: 'content-newer', createdAt: '2026-11-10T04:00:00.900Z' }])
+    expect(second.items).toEqual([{ targetId: 'content-older', createdAt: '2026-11-10T04:00:00.789Z' }])
     expect(reader.list).toHaveBeenNthCalledWith(1, { actorUserId: 'actor-1', cursor: null, limit: 2 })
     expect(reader.list).toHaveBeenNthCalledWith(2, { actorUserId: 'actor-1', cursor: { createdAt: '2026-11-10T04:00:00.900456Z', relationshipId: 'favorite-newer' }, limit: 2 })
   })
