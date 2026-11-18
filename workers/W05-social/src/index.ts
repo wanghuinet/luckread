@@ -345,7 +345,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   profileChannelReadStore?: ProfileChannelReadStore
   /** Optional PostgreSQL-capable content-liker page reader; D1 remains the deployed default. */
   contentLikerReadStore?: ContentLikerReadStore
-  /** Optional PostgreSQL-capable favorite list reader; D1 remains the deployed default. */
+  /** PostgreSQL favorite list reader; requests fail closed when it is not injected. */
   favoriteListReadStore?: FavoriteListReadStore
   /** Optional PostgreSQL-capable Favorite/Unfavorite writer; D1 remains the deployed default. */
   favoriteMutationStore?: FavoriteMutationStore
@@ -1127,8 +1127,10 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         }
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new FavoriteRuntimeError('INVALID_CURSOR', 400)
+        const listReadStore = dependencies.favoriteListReadStore
+        if (!listReadStore) throw new FavoriteRuntimeError('SERVICE_UNAVAILABLE', 503)
         return json({
-          data: await listFavorites(dependencies.favoriteListReadStore ?? env.DB, viewerUserId, cursor, limitText ? Number(limitText) : 20),
+          data: await listFavorites(listReadStore, viewerUserId, cursor, limitText ? Number(limitText) : 20),
           requestId: createRequestId(),
         })
       }
