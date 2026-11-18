@@ -2182,21 +2182,27 @@ describe('W05 social comment transport', () => {
 })
 
 describe('W05 social poll transport', () => {
-  it('reads public poll results through W03 and does not query canonical contents in W05', async () => {
+  it('reads public poll results through W03 and the injected PostgreSQL Store', async () => {
     const binding = publishedContextBinding()
-    const db = dbFor()
-    const response = await worker.fetch(
+    const pollReadStore = {
+      isBlocked: vi.fn(async () => false),
+      getPoll: vi.fn(async () => null),
+      setEndsAtIfUnset: vi.fn(async () => undefined),
+      listOptionsWithVoteCounts: vi.fn(async () => []),
+      getViewerOptionId: vi.fn(async () => null),
+    }
+    const injectedWorker = createW05SocialWorker({ pollReadStore })
+    const response = await injectedWorker.fetch(
       request('/internal/social/contents/content-1/poll', transportHeaders),
-      { DB: db, W03_CONTENT: binding },
+      { W03_CONTENT: binding },
     )
     expect(response.status).toBe(200)
     expect(binding.fetch).toHaveBeenCalledTimes(1)
-    const prepare = (db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(prepare.mock.calls.some(([sql]) => /(?:FROM|JOIN)\s+contents/i.test(String(sql)))).toBe(false)
+    expect(pollReadStore.getPoll).toHaveBeenCalledWith('content-1')
     await expect(response.json()).resolves.toMatchObject({ data: { poll: null } })
   })
 
-  it('preserves owner draft-poll preview through the W03 owner-scoped context', async () => {
+  it('preserves owner draft-poll preview through W03 and the injected Store', async () => {
     const binding = {
       fetch: vi.fn(async (input: RequestInfo | URL) => {
         const forwarded = input instanceof Request ? input : new Request(input)
@@ -2204,24 +2210,55 @@ describe('W05 social poll transport', () => {
           return Response.json({ error: { code: 'NOT_FOUND' } }, { status: 404 })
         }
         return Response.json({ data: {
-          contentId: 'content-1',
-          ownerUserId: 'viewer-1',
-          contentType: 'post',
-          state: 'DRAFT',
-          updatedAt: '2026-10-17T04:00:00.000Z',
+          contentId: 'content-1', ownerUserId: 'viewer-1', contentType: 'post',
+          state: 'DRAFT', updatedAt: '2026-10-17T04:00:00.000Z',
         } })
       }),
     }
-    const db = dbFor()
-    const response = await worker.fetch(
+    const pollReadStore = {
+      isBlocked: vi.fn(async () => false),
+      getPoll: vi.fn(async () => null),
+      setEndsAtIfUnset: vi.fn(async () => undefined),
+      listOptionsWithVoteCounts: vi.fn(async () => []),
+      getViewerOptionId: vi.fn(async () => null),
+    }
+    const injectedWorker = createW05SocialWorker({ pollReadStore })
+    const response = await injectedWorker.fetch(
       request('/internal/social/contents/content-1/poll', transportHeaders),
-      { DB: db, W03_CONTENT: binding },
+      { W03_CONTENT: binding },
     )
     expect(response.status).toBe(200)
     expect(binding.fetch).toHaveBeenCalledTimes(2)
-    const prepare = (db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(prepare.mock.calls.some(([sql]) => /(?:FROM|JOIN)\s+contents/i.test(String(sql)))).toBe(false)
+    expect(pollReadStore.getPoll).toHaveBeenCalledWith('content-1')
     await expect(response.json()).resolves.toMatchObject({ data: { poll: null } })
+  })
+
+  it('fails closed when Poll PostgreSQL Stores are not injected and never uses env.DB', async () => {
+    const prepare = vi.fn(() => { throw new Error('Poll routes must not use D1') })
+    const binding = {
+      fetch: vi.fn(async (input: RequestInfo | URL) => {
+        const forwarded = input instanceof Request ? input : new Request(input)
+        const path = new URL(forwarded.url).pathname
+        if (path.endsWith('/published-social-context')) {
+          return Response.json({ data: { contentId: 'content-1', ownerUserId: 'viewer-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' } })
+        }
+        return Response.json({ data: { contentId: 'content-1', ownerUserId: 'viewer-1', contentType: 'post', state: 'DRAFT', updatedAt: '2026-10-17T04:00:00.000Z' } })
+      }),
+    }
+    const env = { DB: { prepare }, W03_CONTENT: binding } as never
+    const get = await worker.fetch(request('/internal/social/contents/content-1/poll', transportHeaders), env, {} as never)
+    const headers = { ...transportHeaders, 'content-type': 'application/json', 'Idempotency-Key': 'poll-no-store' }
+    const configure = await worker.fetch(new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll', {
+      method: 'POST', headers, body: JSON.stringify({ options: ['Yes', 'No'], durationMinutes: 5 }),
+    }), env, {} as never)
+    const deletion = await worker.fetch(new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll', {
+      method: 'DELETE', headers: { ...transportHeaders, 'Idempotency-Key': 'poll-delete-no-store' },
+    }), env, {} as never)
+    const vote = await worker.fetch(new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll/votes', {
+      method: 'POST', headers, body: JSON.stringify({ optionId: 'option-1' }),
+    }), env, {} as never)
+    expect([get.status, configure.status, deletion.status, vote.status]).toEqual([503, 503, 503, 503])
+    expect(prepare).not.toHaveBeenCalled()
   })
 
   it('fails closed before W05 D1 when W03 published context is unavailable for poll reads', async () => {
