@@ -4,7 +4,6 @@ import { fetchPublishedContentSocialContext, type PublishedContentSocialContext,
 import { createD1CommentCreateStore, type CommentCreateStore } from './comment-create-store.js'
 import { createD1CommentMutationStore, type CommentMutationStore } from './comment-mutation-store.js'
 import {
-  createD1CommentListReadStore,
   CommentListReadStoreError,
   type CommentListReadStore,
   type CommentListReadRow,
@@ -506,7 +505,7 @@ export async function updateComment(
 }
 
 export async function listComments(
-  db: D1Database | CommentListReadStore,
+  store: CommentListReadStore,
   contentIdValue: string,
   cursorValue: string | null,
   limit: number,
@@ -522,9 +521,6 @@ export async function listComments(
   const sort = parseCommentSort(sortValue)
   const cursor = decodeCursor(cursorValue, contentId, viewerUserId, sort)
 
-  const store: CommentListReadStore = typeof (db as CommentListReadStore).list === 'function'
-    ? db as CommentListReadStore
-    : createD1CommentListReadStore(db as D1Database)
   let rows: CommentListReadRow[]
   try {
     rows = await store.list({
