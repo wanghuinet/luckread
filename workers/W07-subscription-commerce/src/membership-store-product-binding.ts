@@ -83,21 +83,18 @@ export async function resolveRevenueCatMembershipProduct(
       'FROM membership_revenuecat_product_bindings AS b ' +
       'INNER JOIN membership_plans AS p ON p.plan_id = b.plan_id ' +
       'INNER JOIN membership_plan_versions AS v ON v.plan_id = b.plan_id AND v.plan_version = b.plan_version ' +
-      "WHERE b.revenuecat_app_id = __APP_ID__ AND b.store = __STORE__ AND b.product_id = __PRODUCT_ID__ AND p.owner_type = 'CREATOR' " +
+      "WHERE b.revenuecat_app_id = $1 AND b.store = $2 AND b.product_id = $3 AND p.owner_type = 'CREATOR' " +
       sellableOnly +
       'LIMIT 1';
     if (typeof (db as W07WebhookPostgresPool).query === 'function') {
-      const postgresSql = sql
-        .replace('__APP_ID__', '$1')
-        .replace('__STORE__', '$2')
-        .replace('__PRODUCT_ID__', '$3');
+      const postgresSql = sql;
       const result = await (db as W07WebhookPostgresPool).query<
         RevenueCatMembershipProductBindingRow & Record<string, unknown>
       >(postgresSql, [appId, store, productId]);
       row = result.rows[0] ?? null;
     } else {
       row = await (db as D1Database).prepare(
-        sql.replace('__APP_ID__', '?').replace('__STORE__', '?').replace('__PRODUCT_ID__', '?'),
+        sql.replace(/\\$[1-3]/g, '?'),
       ).bind(appId, store, productId).first<RevenueCatMembershipProductBindingRow>();
     }
   } catch {
