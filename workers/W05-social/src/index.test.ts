@@ -22,6 +22,7 @@ import type { RepostStore } from './repost-store.js'
 import type { ShareStore } from './share-store.js'
 import type { ProfilePinStore } from './profile-pin-store.js'
 import type { SocialTokenSyncStore } from './social-token-sync-store.js'
+import type { SocialClosureReadStore } from './social-closure-read-store.js'
 import type { PollReadStore } from './poll-read-store.js'
 import type { PollConfigurationStore } from './poll-configuration-store.js'
 import type { ReplyAudienceStore, StoredReplyAudiencePolicy } from './reply-audience-store.js'
@@ -80,6 +81,11 @@ const makeCommentMutationStore = (options: {
     created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:02:00.000Z',
   }),
 })
+
+
+const emptySocialClosureReadStore = (): SocialClosureReadStore => ({
+  getTargets: vi.fn(async () => ({ topics: [], mentions: [] })),
+} as unknown as SocialClosureReadStore)
 
 const emptyPollReadStore = (): PollReadStore => ({
   isBlocked: vi.fn(async () => false),
