@@ -112,7 +112,10 @@ describe('favorite runtime — Neon Store ports only', () => {
   })
 
   it('rejects cross-actor cursors, malformed cursors and unbounded page sizes', async () => {
-    const reader = listStore()
+    const reader = listStore([
+      { relationship_id: 'favorite-cursor-1', target_id: 'content-1', created_at: '2026-11-10T00:00:00.000Z' },
+      { relationship_id: 'favorite-cursor-2', target_id: 'content-2', created_at: '2026-11-09T00:00:00.000Z' },
+    ])
     const first = await listFavorites(reader, 'actor-1', null, 1)
     await expect(listFavorites(reader, 'actor-2', first.nextCursor, 1)).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
     await expect(listFavorites(reader, 'actor-1', 'not a cursor', 20)).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
