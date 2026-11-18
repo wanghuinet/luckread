@@ -36,6 +36,10 @@ import {
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
 import type { OrderCreatePersistenceStore } from './order-persistence.js';
+import {
+  getW07MembershipPostgresPool,
+  type W07MembershipDatabaseRuntimeEnv,
+} from './neon/membership-database-runtime.js';
 
 export type RenewalCycleState =
   | 'AWAITING_PRICING'
@@ -55,7 +59,7 @@ export class RenewalRuntimeError extends Error {
   }
 }
 
-export type RenewalRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
+export type RenewalRuntimeEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{
   D1_01: D1Database;
   D1_04: D1Database;
   HYPERSWITCH_ENVIRONMENT?: string | null;
@@ -474,7 +478,7 @@ async function insertOrReadCycle(
   }
   const cycleStart = subscription.current_period_end;
   const scheduledChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
-    env.D1_01, subscription.subscription_id, subscription.subscriber_id, cycleStart, false,
+    getW07MembershipPostgresPool(env) ?? env.D1_01, subscription.subscription_id, subscription.subscriber_id, cycleStart, false,
   );
   let cyclePlan: {
     planId: string;
@@ -502,7 +506,7 @@ async function insertOrReadCycle(
         scheduledChange.effectiveAt !== cycleStart) {
       throw new RenewalRuntimeError('SCHEDULED_PLAN_CHANGE_MISMATCH', 503);
     }
-    const target = await readScheduledDowngradeTargetPlan(env.D1_01, scheduledChange);
+    const target = await readScheduledDowngradeTargetPlan(getW07MembershipPostgresPool(env) ?? env.D1_01, scheduledChange);
     const validChangeType = scheduledChange.changeType === 'DOWNGRADE'
       ? target?.billingInterval === subscription.billing_interval &&
         target.priceMinor < subscription.price_minor
