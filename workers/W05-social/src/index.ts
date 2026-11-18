@@ -1127,8 +1127,9 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         }
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new FavoriteRuntimeError('INVALID_CURSOR', 400)
+        if (!dependencies.favoriteListReadStore) throw new FavoriteRuntimeError('SERVICE_UNAVAILABLE', 503)
         return json({
-          data: await listFavorites(dependencies.favoriteListReadStore ?? env.DB, viewerUserId, cursor, limitText ? Number(limitText) : 20),
+          data: await listFavorites(dependencies.favoriteListReadStore, viewerUserId, cursor, limitText ? Number(limitText) : 20),
           requestId: createRequestId(),
         })
       }
@@ -1154,20 +1155,23 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         }
 
         if (request.method === 'GET') {
+          if (!dependencies.favoriteStatusReadStore) throw new FavoriteRuntimeError('SERVICE_UNAVAILABLE', 503)
           return json({
-            data: await getFavoriteStatus(dependencies.favoriteStatusReadStore ?? env.DB, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
+            data: await getFavoriteStatus(dependencies.favoriteStatusReadStore, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
             requestId: createRequestId(),
           })
         }
 
         if (request.method === 'POST') {
+          if (!dependencies.favoriteMutationStore) throw new FavoriteRuntimeError('SERVICE_UNAVAILABLE', 503)
           return json({
-            data: await favorite(dependencies.favoriteMutationStore ?? env.DB, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
+            data: await favorite(dependencies.favoriteMutationStore, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
             requestId: createRequestId(),
           })
         }
 
-        await unfavorite(dependencies.favoriteMutationStore ?? env.DB, viewerUserId, target)
+        if (!dependencies.favoriteMutationStore) throw new FavoriteRuntimeError('SERVICE_UNAVAILABLE', 503)
+        await unfavorite(dependencies.favoriteMutationStore, viewerUserId, target)
         return new Response(null, { status: 204 })
       }
 
