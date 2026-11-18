@@ -51,6 +51,9 @@ function fixture(options: {
   const postgresMandateCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const postgresReceiptCalls: Array<{ pool: unknown; paymentId: string; merchantId: string }> = [];
   const postgresPool = {} as W07WebhookPostgresPool;
+  const membershipPostgresPool = { marker: 'neon-d1-01-pool' } as unknown as W07WebhookPostgresPool;
+  const nativeUpgradeExpiryCalls: Array<{ financePool: unknown; membershipPool: unknown; paymentId: string; merchantId: string }> = [];
+  const legacyUpgradeExpiryCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
   const receive: Receiver = async (db, input) => {
     calls.push({ db, input });
     if (options.error) throw options.error;
@@ -95,11 +98,12 @@ function fixture(options: {
     W07_DATABASE_DRIVER: undefined as string | undefined,
   };
   return {
-    env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, postgresCalls, postgresPaymentCalls, postgresMandateCalls, postgresReceiptCalls,
+    env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, postgresCalls, postgresPaymentCalls, postgresMandateCalls, postgresReceiptCalls, nativeUpgradeExpiryCalls, legacyUpgradeExpiryCalls, membershipPostgresPool,
     dependencies: {
       receive,
       getWebhookDatabase: vi.fn(() => options.webhookDatabase),
       getWebhookPostgresPool: () => postgresPool,
+      getMembershipPostgresPool: () => membershipPostgresPool,
       receiveRefundWebhookPostgres: async (
         pool: W07WebhookPostgresPool,
         input: ReceiveHyperswitchWebhookInput,
@@ -130,7 +134,12 @@ function fixture(options: {
         return {} as BillingDocumentDto;
       },
       syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder, issueReceipt,
-      expirePendingPlanUpgrade: async () => {},
+      expirePendingPlanUpgradePostgres: async (financePool: W07WebhookPostgresPool, membershipPool: W07WebhookPostgresPool, paymentId: string, merchantId: string) => {
+        nativeUpgradeExpiryCalls.push({ financePool, membershipPool, paymentId, merchantId });
+      },
+      expirePendingPlanUpgrade: async (env: unknown, paymentId: string, merchantId: string) => {
+        legacyUpgradeExpiryCalls.push({ env, paymentId, merchantId });
+      },
     },
   };
 }
