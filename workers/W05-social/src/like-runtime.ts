@@ -8,7 +8,6 @@ import {
   type LikeMutationStore,
 } from './like-mutation-store.js'
 import {
-  createD1LikeStatusReadStore,
   LikeStatusReadStoreError,
   type LikeStatusReadStore,
 } from './like-status-read-store.js'
@@ -307,14 +306,12 @@ export async function like(
 }
 
 export async function getLikeStatus(
-  db: D1Database,
   w03Content: W03ContentBinding | undefined,
   actorUserId: string,
   target: LikeTarget,
   correlationId: string,
-  prevalidatedContentContext?: PublishedContentSocialContext,
-  statusReadStore: LikeStatusReadStore = createD1LikeStatusReadStore(db),
-  targetContextReadStore: LikeTargetContextReadStore = createD1LikeTargetContextReadStore(db),
+  statusReadStore: LikeStatusReadStore,
+  targetContextReadStore: LikeTargetContextReadStore,
 ): Promise<{ liked: boolean; likeCount: number }> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
@@ -326,7 +323,6 @@ export async function getLikeStatus(
     targetType,
     targetId,
     correlationId,
-    prevalidatedContentContext,
   )
   if (!targetContext) {
     await Promise.all([
