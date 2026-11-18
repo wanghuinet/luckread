@@ -11,22 +11,6 @@ import {
 import { FollowStoreError } from './follow-store.js'
 import type { FollowListReadStore } from './follow-list-read-store.js'
 
-const db = (
-  firstResults: unknown[] = [],
-  allResults: unknown[] = [],
-) => {
-  let firstIndex = 0
-  let allIndex = 0
-  const prepare = vi.fn((sql: string) => ({
-    bind: vi.fn((...args: unknown[]) => ({
-      first: vi.fn(async () => firstResults[firstIndex++] ?? null),
-      all: vi.fn(async () => allResults[allIndex++] ?? { results: [] }),
-      run: vi.fn(async () => ({ sql, args })),
-    })),
-  }))
-  return { prepare } as unknown as D1Database
-}
-
 const installCache = (store = new Map<string, Response>()) => {
   const cache = {
     match: vi.fn(async (request: Request) => store.get(request.url)?.clone()),
@@ -89,63 +73,31 @@ describe('follow runtime', () => {
     expect(store.unfollow).toHaveBeenCalledWith('u1', 'u2')
   })
 
-  it('reads status', async () => {
-    await expect(
-      getFollowStatus(
-        db([{ relationship_id: 'r1', created_at: '2026-10-02T00:00:00.000Z', blocked: 0 }]),
-        'u1',
-        'u2',
-      ),
-    ).resolves.toEqual({
-      following: true,
-      relationshipId: 'r1',
-      createdAt: '2026-10-02T00:00:00.000Z',
-    })
-  })
-
-  it('accepts an injected provider-neutral follow-status read store', async () => {
-    const store = {
-      getStatus: vi.fn(async () => ({
-        relationship_id: 'pg-r1',
-        created_at: '2026-11-10T00:00:00.000Z',
-        blocked: false,
-      })),
-    }
+  it('reads follow status through the injected Store', async () => {
+    const store = { getStatus: vi.fn(async () => ({
+      relationship_id: 'r1', created_at: '2026-10-02T00:00:00.000Z', blocked: false,
+    })) }
     await expect(getFollowStatus(store, 'u1', 'u2')).resolves.toEqual({
-      following: true,
-      relationshipId: 'pg-r1',
-      createdAt: '2026-11-10T00:00:00.000Z',
+      following: true, relationshipId: 'r1', createdAt: '2026-10-02T00:00:00.000Z',
     })
-    expect(store.getStatus).toHaveBeenCalledWith({
-      followerUserId: 'u1',
-      targetUserId: 'u2',
-    })
+    expect(store.getStatus).toHaveBeenCalledWith({ followerUserId: 'u1', targetUserId: 'u2' })
   })
 
-  it('maps injected follow-status storage failures to a sanitized service-unavailable error', async () => {
-    const store = {
-      getStatus: vi.fn(async () => { throw new FollowStoreError() }),
-    }
+  it('maps follow-status Store failures to a sanitized service-unavailable error', async () => {
+    const store = { getStatus: vi.fn(async () => { throw new FollowStoreError() }) }
     await expect(getFollowStatus(store, 'u1', 'u2')).rejects.toMatchObject({
-      code: 'SERVICE_UNAVAILABLE',
-      status: 503,
+      code: 'SERVICE_UNAVAILABLE', status: 503,
     })
   })
 
   it('hides follow status when either side is blocked', async () => {
-    const d = db([{
-      relationship_id: 'r-blocked',
-      created_at: '2026-10-02T00:00:00.000Z',
-      blocked: 1,
-    }])
-    await expect(getFollowStatus(d, 'u1', 'u2')).resolves.toEqual({
-      following: false,
-      relationshipId: null,
-      createdAt: null,
+    const store = { getStatus: vi.fn(async () => ({
+      relationship_id: 'r-blocked', created_at: '2026-10-02T00:00:00.000Z', blocked: true,
+    })) }
+    await expect(getFollowStatus(store, 'u1', 'u2')).resolves.toEqual({
+      following: false, relationshipId: null, createdAt: null,
     })
-    const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
-    expect(sql).toContain("block.relation_type = 'block'")
-    expect(sql).toContain('block.actor_user_id = ? AND block.target_user_id = ?')
+    expect(store.getStatus).toHaveBeenCalledWith({ followerUserId: 'u1', targetUserId: 'u2' })
   })
 
   it('lists followers through the injected Store with a bounded count and opaque next cursor', async () => {
