@@ -41,6 +41,39 @@ describe('content liker list adapter and UI', () => {
     expect(postgresStore).toContain("liker_block.relation_type = 'block'")
     expect(postgresStore).toContain('ORDER BY il.created_at DESC, il.relationship_id DESC')
     expect(postgresStore).toContain('LIMIT 
+
+  it('opens a responsive liked-by dialog from the count without replacing like/unlike', () => {
+    const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+    const modal = read('src/app/(frontend)/content/[contentId]/ContentLikesModal.tsx')
+    expect(detail).toContain('onClick={() => setLikesOpen(true)}')
+    expect(detail).toContain('onClick={() => void toggleLike()}')
+    expect(detail).toContain('<ContentLikesModal')
+    expect(modal).toContain('aria-modal="true"')
+    expect(modal).toContain('aria-labelledby="content-likes-title"')
+    expect(modal).toContain("limit: '20'")
+    expect(modal).toContain('cursor: nextCursor')
+    expect(modal).toContain('TwitterCloneFollowRow')
+    expect(modal).toContain('requestControllerRef.current?.abort()')
+  })
+})
+)
+  })
+
+  it('opens a responsive liked-by dialog from the count without replacing like/unlike', () => {
+    const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+    const modal = read('src/app/(frontend)/content/[contentId]/ContentLikesModal.tsx')
+    expect(detail).toContain('onClick={() => setLikesOpen(true)}')
+    expect(detail).toContain('onClick={() => void toggleLike()}')
+    expect(detail).toContain('<ContentLikesModal')
+    expect(modal).toContain('aria-modal="true"')
+    expect(modal).toContain('aria-labelledby="content-likes-title"')
+    expect(modal).toContain("limit: '20'")
+    expect(modal).toContain('cursor: nextCursor')
+    expect(modal).toContain('TwitterCloneFollowRow')
+    expect(modal).toContain('requestControllerRef.current?.abort()')
+  })
+})
+)
   })
 
   it('opens a responsive liked-by dialog from the count without replacing like/unlike', () => {
