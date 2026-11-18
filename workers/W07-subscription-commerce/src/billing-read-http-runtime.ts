@@ -5,12 +5,21 @@ import {
   listBillingDocumentsForCustomer,
   listPaymentHistoryForCustomer,
   listRefundHistoryForCustomer,
+  type BillingList,
 } from './billing-persistence.js';
+import {
+  listBillingDocumentsForCustomerPostgres,
+  listPaymentHistoryForCustomerPostgres,
+  listRefundHistoryForCustomerPostgres,
+} from './billing-history-postgres-persistence.js';
 import { parseBoundedPositiveInt } from './subscription-runtime.js';
 import {
   getW07PaymentWebhookDatabase,
+  getW07PaymentWebhookPostgresPool,
+  resolveW07DatabaseDriver,
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 type BillingReadEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{ D1_04: D1Database }>;
 
@@ -19,6 +28,10 @@ type BillingReadDependencies = Readonly<{
   listPaymentHistory?: typeof listPaymentHistoryForCustomer;
   listRefundHistory?: typeof listRefundHistoryForCustomer;
   getReadDatabase?: (env: BillingReadEnv) => D1Database | undefined;
+  listBillingDocumentsPostgres?: typeof listBillingDocumentsForCustomerPostgres;
+  listPaymentHistoryPostgres?: typeof listPaymentHistoryForCustomerPostgres;
+  listRefundHistoryPostgres?: typeof listRefundHistoryForCustomerPostgres;
+  getPostgresPool?: (env: BillingReadEnv) => W07WebhookPostgresPool | undefined;
 }>;
 
 const ROUTES = new Map<string, 'documents' | 'payments' | 'refunds'>([
@@ -82,15 +95,25 @@ export async function handleCommerceBillingReadRequest(
   }
 
   try {
-    // All D1-04 billing history reads share the selected database authority.
-    // The existing PostgreSQL D1 bridge reuses the same bounded Hyperdrive pool
-    // as signed provider webhooks; D1 remains the default and fallback.
-    const database = (dependencies.getReadDatabase ?? getW07PaymentWebhookDatabase)(env) ?? env.D1_04;
-    const result = kind === 'documents'
-      ? await (dependencies.listBillingDocuments ?? listBillingDocumentsForCustomer)(database, customerId, limit, cursor)
-      : kind === 'payments'
-        ? await (dependencies.listPaymentHistory ?? listPaymentHistoryForCustomer)(database, customerId, limit, cursor)
-        : await (dependencies.listRefundHistory ?? listRefundHistoryForCustomer)(database, customerId, limit, cursor);
+    let result: BillingList<unknown>;
+    if (resolveW07DatabaseDriver(env) === 'neon') {
+      // Neon customer history reads query the existing D1-04 Hyperdrive Pool
+      // natively; they never pass through the D1-compatible webhook facade.
+      const pool = (dependencies.getPostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+      if (!pool) throw new BillingPersistenceError('SERVICE_UNAVAILABLE', 503);
+      result = kind === 'documents'
+        ? await (dependencies.listBillingDocumentsPostgres ?? listBillingDocumentsForCustomerPostgres)(pool, customerId, limit, cursor)
+        : kind === 'payments'
+          ? await (dependencies.listPaymentHistoryPostgres ?? listPaymentHistoryForCustomerPostgres)(pool, customerId, limit, cursor)
+          : await (dependencies.listRefundHistoryPostgres ?? listRefundHistoryForCustomerPostgres)(pool, customerId, limit, cursor);
+    } else {
+      const database = (dependencies.getReadDatabase ?? getW07PaymentWebhookDatabase)(env) ?? env.D1_04;
+      result = kind === 'documents'
+        ? await (dependencies.listBillingDocuments ?? listBillingDocumentsForCustomer)(database, customerId, limit, cursor)
+        : kind === 'payments'
+          ? await (dependencies.listPaymentHistory ?? listPaymentHistoryForCustomer)(database, customerId, limit, cursor)
+          : await (dependencies.listRefundHistory ?? listRefundHistoryForCustomer)(database, customerId, limit, cursor);
+    }
     return Response.json(
       { data: result, requestId: 'req_' + crypto.randomUUID() },
       { status: 200, headers: { 'cache-control': 'no-store' } },
