@@ -614,6 +614,13 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
       paymentId,
       merchantId: MERCHANT,
     }]);
+    expect(f.nativeUpgradeExpiryCalls).toHaveLength(1);
+    expect(f.nativeUpgradeExpiryCalls[0]).toMatchObject({
+      membershipPool: f.membershipPostgresPool,
+      paymentId,
+      merchantId: MERCHANT,
+    });
+    expect(f.legacyUpgradeExpiryCalls).toHaveLength(0);
   });
 
   it('uses the native PostgreSQL Store for Neon refund_details events without resolving the D1-shaped webhook bridge', async () => {
