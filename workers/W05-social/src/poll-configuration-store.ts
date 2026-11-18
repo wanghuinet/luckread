@@ -1,4 +1,3 @@
-/// <reference types="@cloudflare/workers-types" />
 
 import type { PollReadRow } from './poll-read-store.js'
 
