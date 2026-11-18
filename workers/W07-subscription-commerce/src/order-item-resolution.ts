@@ -8,6 +8,7 @@ import {
   resolvePurchasableMembershipPlanOffers,
   SubscriptionRuntimeError,
 } from './subscription-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 export type ResolvedCommerceOrderItem = Readonly<{
   itemType: 'MEMBERSHIP_PLAN';
@@ -50,7 +51,7 @@ function toPlanIds(items: readonly CreateCommerceOrderItem[]): string[] {
  * entitlement changes; unsupported item families fail closed.
  */
 export async function resolveCommerceOrderItems(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   input: unknown,
 ): Promise<ResolvedCommerceOrderItems> {
   const validated = validateCreateCommerceOrderRequest(input);

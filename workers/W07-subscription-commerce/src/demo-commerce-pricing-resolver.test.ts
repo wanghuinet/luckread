@@ -32,6 +32,7 @@ const priced: AuthoritativelyPricedOrder = {
 function env(overrides: Partial<DemoCommercePricingEnv> = {}): DemoCommercePricingEnv {
   return {
     D1_01: d1,
+    W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
     COMMERCE_PRICING_MODE: 'demo',
     HYPERSWITCH_ENVIRONMENT: 'sandbox',
     COMMERCE_DEMO_TAX_PROVIDER: 'taxjar-sandbox',
