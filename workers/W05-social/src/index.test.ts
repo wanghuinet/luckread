@@ -20,6 +20,10 @@ import type { RepostStore } from './repost-store.js'
 import type { ShareStore } from './share-store.js'
 import type { ProfilePinStore } from './profile-pin-store.js'
 import type { SocialTokenSyncStore } from './social-token-sync-store.js'
+import type { PollReadStore } from './poll-read-store.js'
+import type { PollConfigurationStore } from './poll-configuration-store.js'
+import type { PollVoteStore } from './poll-vote-store.js'
+import type { PollDeleteStore } from './poll-delete-store.js'
 
 
 const dbFor = (results: unknown[] = []) => {
@@ -32,6 +36,30 @@ const dbFor = (results: unknown[] = []) => {
     })),
   }))
   return { prepare } as unknown as D1Database
+}
+
+const emptyPollReadStore = (): PollReadStore => ({
+  isBlocked: vi.fn(async () => false),
+  getPoll: vi.fn(async () => null),
+  setEndsAtIfUnset: vi.fn(async () => undefined),
+  listOptionsWithVoteCounts: vi.fn(async () => []),
+  getViewerOptionId: vi.fn(async () => null),
+})
+const emptyPollConfigurationStore: PollConfigurationStore = {
+  getPoll: vi.fn(async () => null),
+  listOptionTexts: vi.fn(async () => []),
+  countVotes: vi.fn(async () => 0),
+  createDraftPoll: vi.fn(async () => undefined),
+  updateDraftPoll: vi.fn(async () => undefined),
+}
+const emptyPollVoteStore: PollVoteStore = {
+  getVote: vi.fn(async () => null),
+  insertVote: vi.fn(async () => undefined),
+}
+const emptyPollDeleteStore: PollDeleteStore = {
+  getPoll: vi.fn(async () => null),
+  countVotes: vi.fn(async () => 0),
+  deleteDraftPoll: vi.fn(async () => true),
 }
 
 const request = (pathname: string, headers: Record<string, string> = {}) =>
@@ -2121,6 +2149,7 @@ describe('W05 social poll transport', () => {
     const response = await worker.fetch(
       request('/internal/social/contents/content-1/poll', transportHeaders),
       { DB: db, W03_CONTENT: binding },
+      { pollReadStore: emptyPollReadStore() },
     )
     expect(response.status).toBe(200)
     expect(binding.fetch).toHaveBeenCalledTimes(1)
@@ -2155,6 +2184,28 @@ describe('W05 social poll transport', () => {
     const prepare = (db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
     expect(prepare.mock.calls.some(([sql]) => /(?:FROM|JOIN)\s+contents/i.test(String(sql)))).toBe(false)
     await expect(response.json()).resolves.toMatchObject({ data: { poll: null } })
+  })
+
+
+  it('fails closed when any required Neon poll Store is missing', async () => {
+    const binding = publishedContextBinding()
+    const get = await worker.fetch(request('/internal/social/contents/content-1/poll', transportHeaders), { W03_CONTENT: binding } as never)
+    expect(get.status).toBe(503)
+
+    const ownerBinding = {
+      fetch: vi.fn(async (input: RequestInfo | URL) => {
+        const request = input instanceof Request ? input : new Request(input)
+        if (new URL(request.url).pathname.endsWith('/published-social-context')) return Response.json({ error: { code: 'NOT_FOUND' } }, { status: 404 })
+        return Response.json({ data: { contentId: 'content-1', ownerUserId: 'viewer-1', contentType: 'post', state: 'DRAFT', updatedAt: '2026-10-17T04:00:00.000Z' } })
+      }),
+    }
+    const headers = { ...transportHeaders, 'Idempotency-Key': 'poll-no-store', 'content-type': 'application/json' }
+    const post = await worker.fetch(new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll', { method: 'POST', headers, body: JSON.stringify({ options: ['Yes', 'No'], durationMinutes: 5 }) }), { W03_CONTENT: ownerBinding } as never)
+    expect(post.status).toBe(503)
+    const del = await worker.fetch(new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll', { method: 'DELETE', headers }), { W03_CONTENT: ownerBinding } as never)
+    expect(del.status).toBe(503)
+    const vote = await worker.fetch(new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll/votes', { method: 'POST', headers, body: JSON.stringify({ optionId: 'option-1' }) }), { W03_CONTENT: binding } as never)
+    expect(vote.status).toBe(503)
   })
 
   it('fails closed before W05 D1 when W03 published context is unavailable for poll reads', async () => {
@@ -2259,7 +2310,8 @@ describe('W05 social poll transport', () => {
         headers: { ...transportHeaders, 'content-type': 'application/json', 'Idempotency-Key': 'poll-invalid-1' },
         body: JSON.stringify({ options: ['Same', ' same '], durationHours: 24 }),
       }),
-      { DB: d1 },
+      { DB: d1, W03_CONTENT: publishedContextBinding() },
+      { pollConfigurationStore: emptyPollConfigurationStore, pollReadStore: emptyPollReadStore() },
     )
     expect(response.status).toBe(422)
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_FAILED' } })
@@ -2276,6 +2328,7 @@ describe('W05 social poll transport', () => {
         body: JSON.stringify({ options: ['Yes', 'No'], durationMinutes: 5, durationHours: 24 }),
       }),
       { DB: db, W03_CONTENT: binding },
+      { pollConfigurationStore: emptyPollConfigurationStore, pollReadStore: emptyPollReadStore() },
     )
     expect(response.status).toBe(422)
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_FAILED' } })
