@@ -1281,7 +1281,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           contentId,
           correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
         })
-        const data = await listContentLikers(dependencies.contentLikerReadStore ?? env.DB, contentId, cursor, limit, viewerUserId, contentContext)
+        if (!dependencies.contentLikerReadStore) throw new LikeRuntimeError('SERVICE_UNAVAILABLE', 503)
+        const data = await listContentLikers(dependencies.contentLikerReadStore, contentId, cursor, limit, viewerUserId, contentContext)
         return json({ data, requestId: createRequestId() })
       }
 
