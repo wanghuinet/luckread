@@ -213,3 +213,13 @@
 - Preserved W03 publication authority, idempotency, rate limiting, parent depth/content checks, final atomic Block and reply-audience predicates, author-only leaf-comment tombstones, deletion race replay, and ETag compare-and-swap updates.
 - Updated runtime and route tests to use provider-neutral Store fixtures; PostgreSQL SQL tests and Reply Audience integration assertions cover the PostgreSQL-only predicate.
 - Scope: Comment Create/Update/Delete writes only. Comment list, remaining W05 D1-compatible routes, production DB/schema, Hyperdrive bindings, Worker deployment, and traffic are unchanged.
+
+
+## W05 Content Liker list read
+
+- Removed `ContentLikerD1QueryExecutor` and `createD1ContentLikerReadStore`; `listContentLikers` now accepts only `ContentLikerReadStore`.
+- The content likes list route requires the injected Neon PostgreSQL Store and fails closed with 503 when composition is absent; no `env.DB` fallback remains for this read path.
+- Existing PostgreSQL adapter remains composed by `workers/W05-social/src/neon/runtime.ts`; PostgreSQL SQL tests and the disposable PostgreSQL 18 rehearsal remain.
+- Preserved W03 published-content validation, owner/viewer bidirectional Block filtering, anonymous viewer semantics, bounded cursor pagination, and microsecond timestamp precision.
+- Updated runtime tests to provider-neutral Store fixtures and route tests to assert fail-closed behavior.
+- Scope: Content Liker list read only. No production DB/schema, Hyperdrive binding, Worker deployment, or traffic change.
