@@ -20,7 +20,7 @@ import { useColorScheme } from 'nativewind';
 
 import { FeedContent, FeedItem } from '~/components/FeedItem';
 import X from '~/assets/svg/aside/x.svg';
-import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, type ApiContentRecord } from '~/lib/content-adapter';
+import { mapContentToFeedContent, readContentBody, readContentSocialBatch, readContentAuthor, type ApiContentRecord } from '~/lib/content-adapter';
 import { fetchNativeFeedPage, incrementNativeFeedReplyCount, nativeFeedQueryKey, type NativeFeedKind, type NativeFeedPage } from '~/lib/feed-query';
 import { selectVisibleFeedHydrationRecords } from '~/lib/feed-hydration';
 import { useAuthStore } from '~/store/auth-store';
@@ -223,6 +223,11 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     if (pendingRecords.length === 0) return;
 
     const generation = hydrationGenerationRef.current;
+    const socialBatchController = new AbortController();
+    const socialBatchPromise = readContentSocialBatch(
+      pendingRecords.map((item) => item.id),
+      socialBatchController.signal,
+    );
     for (const item of pendingRecords) {
       const controller = new AbortController();
       hydrationControllersRef.current.set(item.id, controller);
@@ -231,11 +236,11 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
         const sessionToken = await readSessionToken().catch(() => null);
         if (controller.signal.aborted || !mountedRef.current) return;
 
-        const [bodyResult, socialResult, authorResult] = await Promise.allSettled([
+        const [bodyResult, authorResult] = await Promise.allSettled([
           readContentBody(item, controller.signal, sessionToken),
-          readContentSocial(item.id, controller.signal),
           readContentAuthor(item, controller.signal),
         ]);
+        const socialById = await socialBatchPromise;
         if (
           controller.signal.aborted ||
           !mountedRef.current ||
@@ -244,7 +249,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
         ) return;
 
         const body = bodyResult.status === 'fulfilled' ? bodyResult.value : undefined;
-        const social = socialResult.status === 'fulfilled' ? socialResult.value : item.social ?? null;
+        const social = socialById.get(item.id) ?? item.social ?? null;
         const author = authorResult.status === 'fulfilled' ? authorResult.value : item.creator ?? item.author ?? null;
 
         let hydrated: FeedContent | null = null;
@@ -273,6 +278,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
         }
       });
     }
+    return () => socialBatchController.abort();
   }, [records, hydrationScope, hydrationTargets]);
 
   useEffect(() => {

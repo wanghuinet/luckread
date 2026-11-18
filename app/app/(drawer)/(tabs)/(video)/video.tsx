@@ -31,7 +31,7 @@ import {
   mapContentToFeedContent,
   readContentAuthor,
   readContentBody,
-  readContentSocial,
+  readContentSocialBatch,
   resolveNativeMediaSource,
   unwrapApiData,
   type ApiContentPage,
@@ -484,7 +484,7 @@ export default function VideoFeed() {
       const { body, social, author, playback } = await settleVideoFeedEnrichment(
         {
           body: () => readContentBody(record, controller.signal, sessionToken),
-          social: () => readContentSocial(record.id, controller.signal),
+          social: async () => (await readContentSocialBatch([record.id], controller.signal)).get(record.id) ?? record.social ?? null,
           author: () => readContentAuthor(record, controller.signal),
           playback: () => resolveVideoSource(record, sessionToken, controller.signal),
         },
