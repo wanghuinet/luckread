@@ -312,6 +312,7 @@ function toCheckoutResult(
 
 async function createOrReadOrder(
   env: SubscriptionPlanUpgradeCheckoutEnv,
+  membershipStore: PlanUpgradeAttemptStore,
   subscriberId: string,
   row: PlanChangeAttemptRow,
   preview: SubscriptionPlanChangePreview,
@@ -337,22 +338,19 @@ async function createOrReadOrder(
       order = created.data;
       const updatedAt = new Date().toISOString();
       try {
-        const saved = await env.D1_01.prepare(
-          'UPDATE membership_subscription_plan_change_attempts SET order_id = ?, updated_at = ?, ' +
-          'version = version + 1 WHERE attempt_id = ? AND status = ? AND ' +
-          '(order_id IS NULL OR order_id = ?)',
-        ).bind(order.orderId, updatedAt, row.attempt_id, 'PENDING_PAYMENT', order.orderId).run();
-        if (Number(saved.meta?.changes ?? 0) !== 1) {
-          const latest = await readAttemptById(env.D1_01, row.attempt_id);
-          if (!latest || latest.order_id !== order.orderId) {
-            throw new SubscriptionRuntimeError('CONFLICT', 409);
-          }
-          row = latest;
-        } else {
-          const latest = await readAttemptById(env.D1_01, row.attempt_id);
-          if (!latest) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-          row = latest;
+        const saved = isPostgresPlanUpgradeStore(membershipStore)
+          ? await attachPlanUpgradeOrderPostgres(membershipStore, row.attempt_id, order.orderId, updatedAt)
+          : Number((await membershipStore.prepare(
+              'UPDATE membership_subscription_plan_change_attempts SET order_id = ?, updated_at = ?, ' +
+              'version = version + 1 WHERE attempt_id = ? AND status = ? AND ' +
+              '(order_id IS NULL OR order_id = ?)',
+            ).bind(order.orderId, updatedAt, row.attempt_id, 'PENDING_PAYMENT', order.orderId).run())
+              .meta?.changes ?? 0) === 1;
+        const latest = await readAttemptById(membershipStore, row.attempt_id);
+        if (!latest || latest.order_id !== order.orderId || (!saved && latest.order_id !== order.orderId)) {
+          throw new SubscriptionRuntimeError('CONFLICT', 409);
         }
+        row = latest;
       } catch (error) {
         if (error instanceof SubscriptionRuntimeError) throw error;
         throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
@@ -372,7 +370,7 @@ async function createOrReadOrder(
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
 
-  const latest = row.order_id ? row : await readAttemptById(env.D1_01, row.attempt_id);
+  const latest = row.order_id ? row : await readAttemptById(membershipStore, row.attempt_id);
   if (!latest || latest.order_id !== order.orderId) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   return toCheckoutResult(latest, order, replayed);
 }
