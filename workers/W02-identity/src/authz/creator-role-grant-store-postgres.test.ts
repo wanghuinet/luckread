@@ -5,16 +5,11 @@ const mocks = vi.hoisted(() => ({
   grantCreatorBusinessRolePostgres: vi.fn(),
 }))
 
-vi.mock('../neon/role-assignment-postgres.js', () => {
-  class RoleAssignmentPostgresError extends Error {
-    constructor(readonly code: string, message: string) {
-      super(message)
-      this.name = 'RoleAssignmentPostgresError'
-    }
-  }
+vi.mock('../neon/role-assignment-postgres.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../neon/role-assignment-postgres.js')>()
   return {
+    ...actual,
     grantCreatorBusinessRolePostgres: mocks.grantCreatorBusinessRolePostgres,
-    RoleAssignmentPostgresError,
   }
 })
 
