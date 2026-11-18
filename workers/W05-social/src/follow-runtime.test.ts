@@ -9,6 +9,7 @@ import {
   unfollow,
 } from './follow-runtime.js'
 import { FollowStoreError } from './follow-store.js'
+import type { FollowListReadStore } from './follow-list-read-store.js'
 
 const db = (
   firstResults: unknown[] = [],
@@ -208,34 +209,20 @@ describe('follow runtime', () => {
     expect(sql).toContain('block.actor_user_id = ? AND block.target_user_id = ?')
   })
 
-  it('lists followers with a bounded total count and opaque next cursor', async () => {
-    const d = db([{ total_count: 3 }], [{
-      results: [
-        {
-          relationship_id: 'r2',
-          user_id: 'u4',
-          followed_at: '2026-10-02T00:01:00.000Z',
-        },
-        {
-          relationship_id: 'r1',
-          user_id: 'u3',
-          followed_at: '2026-10-02T00:00:00.000Z',
-        },
-        {
-          relationship_id: 'r0',
-          user_id: 'u2',
-          followed_at: '2026-09-30T00:00:00.000Z',
-        },
-      ],
-    }])
-    const result = await listFollowers(d, 'u9', null, 2)
-    const pageQuery = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
-    const countQuery = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[1]?.[0])
-    expect(pageQuery).toContain("block.relation_type = 'block'")
-    expect(pageQuery).toContain('NOT EXISTS')
-    expect(pageQuery).not.toContain('COUNT(*)')
-    expect(countQuery).toContain('COUNT(*)')
-    expect(countQuery).toContain('rel_count.')
+  it('lists followers through the injected Store with a bounded count and opaque next cursor', async () => {
+    const store: FollowListReadStore = {
+      list: vi.fn(async () => [
+        { relationship_id: 'r2', user_id: 'u4', followed_at: '2026-10-02T00:01:00.000Z', cursor_created_at: '2026-10-02T00:01:00.000000Z' },
+        { relationship_id: 'r1', user_id: 'u3', followed_at: '2026-10-02T00:00:00.000Z', cursor_created_at: '2026-10-02T00:00:00.000000Z' },
+        { relationship_id: 'r0', user_id: 'u2', followed_at: '2026-09-30T00:00:00.000Z', cursor_created_at: '2026-09-30T00:00:00.000000Z' },
+      ]),
+      count: vi.fn(async () => 3),
+    }
+    const result = await listFollowers(store, 'u9', null, 2)
+    expect(store.list).toHaveBeenCalledWith({
+      userId: 'u9', direction: 'followers', cursor: null, limit: 2,
+    })
+    expect(store.count).toHaveBeenCalledWith({ userId: 'u9', direction: 'followers' })
     expect(result).toMatchObject({
       items: [
         { relationshipId: 'r2', userId: 'u4', followedAt: '2026-10-02T00:01:00.000Z' },
@@ -247,25 +234,25 @@ describe('follow runtime', () => {
     expect(result.nextCursor).toEqual(expect.any(String))
   })
 
-  it('uses a cached aggregate count without a second D1 query', async () => {
-    const store = new Map<string, Response>([
+  it('uses a cached aggregate count without calling the Store count method', async () => {
+    const cached = new Map<string, Response>([
       [
         'https://cache.luckread.internal/__social-follow-count?v=1&direction=followers&user=u9',
         Response.json({ totalCount: 17 }),
       ],
     ])
-    const cache = installCache(store)
+    const cache = installCache(cached)
     try {
-      const d = db([], [{
-        results: [{
-          relationship_id: 'r1',
-          user_id: 'u8',
-          followed_at: '2026-10-02T00:00:00.000Z',
-        }],
-      }])
-      const result = await listFollowers(d, 'u9', null, 20)
+      const store: FollowListReadStore = {
+        list: vi.fn(async () => [{
+          relationship_id: 'r1', user_id: 'u8', followed_at: '2026-10-02T00:00:00.000Z',
+        }]),
+        count: vi.fn(async () => 99),
+      }
+      const result = await listFollowers(store, 'u9', null, 20)
       expect(result.totalCount).toBe(17)
-      expect(d.prepare).toHaveBeenCalledTimes(1)
+      expect(store.list).toHaveBeenCalledTimes(1)
+      expect(store.count).not.toHaveBeenCalled()
       expect(cache.match).toHaveBeenCalled()
     } finally {
       uninstallCache()
@@ -282,15 +269,16 @@ describe('follow runtime', () => {
     }
   })
 
-  it('lists following relationships', async () => {
-    const d = db([{ total_count: 1 }], [{
-      results: [{
+  it('lists following relationships through the injected Store', async () => {
+    const store: FollowListReadStore = {
+      list: vi.fn(async () => [{
         relationship_id: 'r3',
         user_id: 'u7',
         followed_at: '2026-10-02T00:00:00.000Z',
-      }],
-    }])
-    await expect(listFollowing(d, 'u5', null, 20)).resolves.toEqual({
+      }]),
+      count: vi.fn(async () => 1),
+    }
+    await expect(listFollowing(store, 'u5', null, 20)).resolves.toEqual({
       items: [{
         relationshipId: 'r3',
         userId: 'u7',

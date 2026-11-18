@@ -6,7 +6,6 @@ import {
   type FollowStore,
 } from './follow-store.js'
 import type { FollowRow } from './follow-store.js'
-import { createD1FollowListReadStore } from './follow-list-read-store.js'
 import type {
   FollowListCursor,
   FollowListDirection,
@@ -181,17 +180,7 @@ const decodeCursor = (value: string | null, direction: FollowListDirection, user
   }
 }
 
-type FollowListDataSource = D1Database | FollowListReadStore
-
-function resolveFollowListReadStore(source: FollowListDataSource): FollowListReadStore {
-  if (
-    typeof (source as FollowListReadStore).list === 'function' &&
-    typeof (source as FollowListReadStore).count === 'function'
-  ) {
-    return source as FollowListReadStore
-  }
-  return createD1FollowListReadStore(source as D1Database)
-}
+type FollowListDataSource = FollowListReadStore
 
 async function listFollowRelations(
   source: FollowListDataSource,
@@ -205,7 +194,7 @@ async function listFollowRelations(
   const cursor: FollowListCursor | null = decodedCursor
     ? { createdAt: decodedCursor.createdAt, relationshipId: decodedCursor.relationshipId }
     : null
-  const store = resolveFollowListReadStore(source)
+  const store = source
 
   const [rows, cachedTotalCount] = await Promise.all([
     store.list({ userId: ownerId, direction, cursor, limit })

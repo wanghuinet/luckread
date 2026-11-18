@@ -19,8 +19,8 @@ export interface FollowListPostgresQueryExecutor {
 
 /**
  * PostgreSQL 18 adapter for follower/following pages and their filtered counts.
- * Block filtering, ordering, timestamp cursors and row bounds mirror the D1
- * adapter. It deliberately does not own relationship-graph or Block/Mute APIs.
+ * Block filtering, ordering, timestamp cursors and row bounds are preserved.
+ * It deliberately does not own relationship-graph or Block/Mute APIs.
  */
 export function createPostgresFollowListReadStore(
   db: FollowListPostgresQueryExecutor,

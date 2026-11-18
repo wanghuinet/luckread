@@ -32,3 +32,10 @@ Comment list reads now require the injected Neon PostgreSQL Store and fail close
 - Removed the D1 query executor and `createD1FollowingAuthorIdsReadStore` adapter.
 - Preserved the bounded 500-author candidate window, author-ID-only contract, bidirectional Block exclusion, viewer-directed Mute exclusion, deterministic ordering, and W03 authority over published content selection.
 - Runtime and route tests use Store fixtures; PostgreSQL adapter tests continue to verify the SQL semantics.
+
+## W05 Follower / Following List Read
+
+- Follower and following list routes now require the explicitly injected Neon PostgreSQL `FollowListReadStore`; missing composition returns 503 and never falls back to `env.DB`.
+- Removed `FollowListD1Database` and `createD1FollowListReadStore`; the PostgreSQL adapter is the only production database implementation for this read path.
+- Preserved public-read transport policy, bidirectional Block filtering, deterministic timestamp/relationship cursor pagination, bounded page size, separate filtered aggregate count, and count-cache behavior.
+- Runtime and route tests use Store fixtures; PostgreSQL adapter tests continue to verify SQL behavior.

@@ -111,27 +111,16 @@ describe('W05 follow-list PostgreSQL runtime injection', () => {
     })
   })
 
-  it('keeps D1 as the default follow-list adapter when no dependency is injected', async () => {
-    const prepare = vi.fn((_sql: string) => ({
-      bind: vi.fn(() => ({
-        first: vi.fn(async () => ({ total_count: 1 })),
-        all: vi.fn(async () => ({ results: [{
-          relationship_id: 'rel-d1',
-          user_id: 'd1-follower',
-          followed_at: '2026-11-11T08:00:00.000Z',
-        }] })),
-      })),
-    }))
+  it('fails closed without the Neon follow-list Store and never touches D1', async () => {
+    const prepare = vi.fn(() => { throw new Error('D1 must not be used') })
     const response = await worker.fetch(
       request('/internal/social/users/target-user/followers', transportHeaders),
       { DB: { prepare } as unknown as D1Database },
       {} as never,
     )
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { items: [{ relationshipId: 'rel-d1', userId: 'd1-follower' }], totalCount: 1 },
-    })
-    expect(prepare).toHaveBeenCalled()
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'SERVICE_UNAVAILABLE' } })
+    expect(prepare).not.toHaveBeenCalled()
   })
 })
 
@@ -1561,36 +1550,35 @@ describe('W05 social query transport', () => {
     expect(response.status).toBe(403)
   })
 
-  it('serves followers without a principal for public reads', async () => {
+  it('fails closed for public follower reads when the Neon Store is not composed', async () => {
     const publicTransportHeaders = {
       'X-LuckRead-Caller': 'W01',
       'X-LuckRead-Transport-Version': '1.0',
       'X-LuckRead-Correlation-Id': 'public-follow-test',
     }
+    const prepare = vi.fn(() => { throw new Error('D1 must not be used') })
     const response = await worker.fetch(
       request('/internal/social/users/creator-1/followers?limit=20', publicTransportHeaders),
-      { DB: dbFor([]) },
+      { DB: { prepare } },
     )
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(503)
+    expect(prepare).not.toHaveBeenCalled()
   })
 
-  it('serves followers with relationship rows and total count', async () => {
-    const env = {
-      DB: dbFor([
-        {
-          relationship_id: 'r1',
-          user_id: 'fan-1',
-          followed_at: '2026-10-02T00:00:00.000Z',
-        },
-        {
-          total_count: 1,
-        },
-      ]),
+  it('serves followers with relationship rows and total count from Neon Store', async () => {
+    const followListReadStore: FollowListReadStore = {
+      list: vi.fn(async () => [{
+        relationship_id: 'r1',
+        user_id: 'fan-1',
+        followed_at: '2026-10-02T00:00:00.000Z',
+        cursor_created_at: '2026-10-02T00:00:00.000000Z',
+      }]),
+      count: vi.fn(async () => 1),
     }
-
-    const response = await worker.fetch(
+    const injectedWorker = createW05SocialWorker({ followListReadStore })
+    const response = await injectedWorker.fetch(
       request('/internal/social/users/creator-1/followers?limit=20', transportHeaders),
-      env,
+      { DB: dbFor([]) },
     )
 
     expect(response.status).toBe(200)
@@ -1610,23 +1598,20 @@ describe('W05 social query transport', () => {
     })
   })
 
-  it('serves following from the same relationship authority', async () => {
-    const env = {
-      DB: dbFor([
-        {
-          relationship_id: 'r2',
-          user_id: 'creator-2',
-          followed_at: '2026-10-02T00:00:00.000Z',
-        },
-        {
-          total_count: 1,
-        },
-      ]),
+  it('serves following from the Neon relationship Store', async () => {
+    const followListReadStore: FollowListReadStore = {
+      list: vi.fn(async () => [{
+        relationship_id: 'r2',
+        user_id: 'creator-2',
+        followed_at: '2026-10-02T00:00:00.000Z',
+        cursor_created_at: '2026-10-02T00:00:00.000000Z',
+      }]),
+      count: vi.fn(async () => 1),
     }
-
-    const response = await worker.fetch(
+    const injectedWorker = createW05SocialWorker({ followListReadStore })
+    const response = await injectedWorker.fetch(
       request('/internal/social/users/user-1/following', transportHeaders),
-      env,
+      { DB: dbFor([]) },
     )
 
     expect(response.status).toBe(200)
