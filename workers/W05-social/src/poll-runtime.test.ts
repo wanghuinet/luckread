@@ -87,7 +87,7 @@ const ownerBinding = (status = 200) => ({
 
 describe('W05 poll runtime — Neon Store ports only', () => {
   it('validates options and duration before Store access', async () => {
-    const stores = pollStores(null)
+    const stores = pollStores([], null)
     await expect(configureContentPoll(stores.configurationStore, stores.readStore, 'author-1', 'content-1', ['Same', ' same '], 1440, draftContext()))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
     await expect(configureContentPoll(stores.configurationStore, stores.readStore, 'author-1', 'content-1', ['Only one'], 1440, draftContext()))
