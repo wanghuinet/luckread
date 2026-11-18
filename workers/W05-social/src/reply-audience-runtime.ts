@@ -152,6 +152,7 @@ export async function getContentReplyAudience(
  * SQL predicate shared by the pre-check and final INSERT. The final INSERT
  * re-evaluates it to close races with follow/block/policy changes.
  */
+// Legacy D1 Comment Create adapter still imports this SQL fragment; the PostgreSQL path uses reply-audience-postgres-predicate.ts.
 export const replyAudienceAllowedSql = `(
   ? = content.owner_user_id
   OR
