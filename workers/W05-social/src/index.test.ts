@@ -1212,64 +1212,6 @@ describe('W05 social query transport', () => {
     expect(response.status).toBe(403)
   })
 
-  it('accepts an idempotent content like and resolves its notification owner through W03', async () => {
-    const contextBinding = {
-      fetch: vi.fn(async (_input: RequestInfo | URL) => Response.json({
-        data: {
-          contentId: 'content-1',
-          ownerUserId: 'owner-1',
-          contentType: 'post',
-          state: 'PUBLISHED',
-          updatedAt: '2026-10-17T04:00:00.000Z',
-        },
-        requestId: 'req_notification_owner',
-      })),
-    }
-    const response = await worker.fetch(
-      new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
-        method: 'POST',
-        headers: { ...transportHeaders, 'content-type': 'application/json', 'Idempotency-Key': 'like-1' },
-        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
-      }),
-      {
-        DB: dbFor([
-          { blocked: 0 },
-          {
-            relationship_id: 'like-1',
-            actor_user_id: 'user-1',
-            target_type: 'content',
-            target_id: 'content-1',
-            created_at: '2026-10-02T00:00:00.000Z',
-          },
-        ]),
-        W03_CONTENT: contextBinding,
-      },
-    )
-    expect(response.status).toBe(200)
-    expect(contextBinding.fetch).toHaveBeenCalledTimes(1)
-    const forwarded = contextBinding.fetch.mock.calls[0]?.[0] as Request
-    expect(forwarded.url).toContain('/internal/content/contents/content-1/published-social-context')
-    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
-    expect(forwarded.headers.has('Authorization')).toBe(false)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { relationshipId: 'like-1', targetId: 'content-1' },
-    })
-  })
-
-  it('reads like status for the authenticated actor', async () => {
-    const response = await worker.fetch(
-      new Request('https://luckread-w05.internal/internal/social/interactions/likes?targetType=content&targetId=content-1', {
-        method: 'GET',
-        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
-      }),
-      { DB: dbFor([{ blocked: 0 }, { liked: 1, like_count: 1 }]), W03_CONTENT: publishedContextBinding() },
-    )
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { liked: true },
-    })
-  })
-
   it('uses injected PostgreSQL like-status and target-context stores without touching D1', async () => {
     const statusStore: LikeStatusReadStore = {
       read: vi.fn(async (_input: LikeStatusReadInput): Promise<LikeStatusReadResult> => ({
@@ -1320,67 +1262,38 @@ describe('W05 social query transport', () => {
     expect(d1Prepare).not.toHaveBeenCalled()
   })
 
-  it('accepts a comment like through the shared interaction transport', async () => {
-    const response = await worker.fetch(
+
+  it('fails closed for Like, Unlike and Like Status when Neon Stores are not composed', async () => {
+    const get = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/likes?targetType=content&targetId=content-1', {
+        method: 'GET', headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
+      }),
+      { W03_CONTENT: publishedContextBinding() } as never,
+      {} as never,
+    )
+    expect(get.status).toBe(503)
+
+    const post = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
         method: 'POST',
-        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'content-type': 'application/json', 'Idempotency-Key': 'comment-like-1' },
-        body: JSON.stringify({ targetType: 'comment', targetId: 'comment-1' }),
-      }),
-      {
-        DB: dbFor([
-          { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'author-1', content_id: 'content-1' },
-          { blocked: 0 },
-          {
-            relationship_id: 'comment-like-1',
-            actor_user_id: 'viewer-1',
-            target_type: 'comment',
-            target_id: 'comment-1',
-            created_at: '2026-10-02T00:00:00.000Z',
-          },
-          {
-            comment_id: 'comment-1',
-            author_user_id: 'author-1',
-            content_id: 'content-1',
-          },
-        ]),
-        W03_CONTENT: publishedContextBinding('owner-1'),
-      },
-    )
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { relationshipId: 'comment-like-1', targetType: 'comment', targetId: 'comment-1' },
-    })
-  })
-
-  it('reads comment like status through the shared interaction transport', async () => {
-    const response = await worker.fetch(
-      new Request('https://luckread-w05.internal/internal/social/interactions/likes?targetType=comment&targetId=comment-1', {
-        method: 'GET',
-        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
-      }),
-      { DB: dbFor([
-          { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'author-1', content_id: 'content-1' },
-          { blocked: 0 },
-          { liked: 1, like_count: 2 },
-        ]), W03_CONTENT: publishedContextBinding('owner-1') },
-    )
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { liked: true, likeCount: 2 },
-    })
-  })
-
-  it('unlikes with a 204 response', async () => {
-    const response = await worker.fetch(
-      new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
-        method: 'DELETE',
-        headers: { ...transportHeaders, 'content-type': 'application/json', 'Idempotency-Key': 'like-delete-1' },
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'content-type': 'application/json', 'Idempotency-Key': 'like-no-store' },
         body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
       }),
-      { DB: dbFor() },
+      { W03_CONTENT: publishedContextBinding() } as never,
+      {} as never,
     )
-    expect(response.status).toBe(204)
+    expect(post.status).toBe(503)
+
+    const del = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
+        method: 'DELETE',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'content-type': 'application/json', 'Idempotency-Key': 'unlike-no-store' },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }),
+      {} as never,
+      {} as never,
+    )
+    expect(del.status).toBe(503)
   })
 
   it('requires idempotency keys for like mutations', async () => {

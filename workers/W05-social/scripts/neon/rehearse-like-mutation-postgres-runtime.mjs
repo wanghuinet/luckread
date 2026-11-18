@@ -48,28 +48,6 @@ let parentOwnerBlockRacePassed = false
 let unlikePassed = false
 let cleanupVerified = false
 
-const policyExecutor = {
-  prepare(sql) {
-    return {
-      bind(..._values) {
-        return {
-          async first() {
-            if (sql.includes('FROM social_comments')) {
-              const id = _values[0]
-              const result = await client.query(
-                'SELECT id, state, author_user_id, content_id FROM social_comments WHERE id = $1 LIMIT 1',
-                [id],
-              )
-              return result.rows[0] ?? null
-            }
-            if (sql.includes('FROM social_user_interactions')) return { blocked: 0 }
-            throw new Error('Unexpected policy query in PostgreSQL like-mutation rehearsal')
-          },
-        }
-      },
-    }
-  },
-}
 const publishedBinding = {
   async fetch(input, init) {
     const request = input instanceof Request ? input : new Request(input, init)
@@ -113,7 +91,6 @@ try {
   commentTargetReadPassed = true
 
   const created = await like(
-    policyExecutor,
     publishedBinding,
     actor,
     { targetType: 'content', targetId: contentId },
@@ -127,7 +104,6 @@ try {
   contentInsertPassed = true
 
   const retried = await like(
-    policyExecutor,
     publishedBinding,
     actor,
     { targetType: 'content', targetId: contentId },
@@ -145,7 +121,6 @@ try {
   contentIdempotencyPassed = true
 
   await expectNotFound(like(
-    policyExecutor,
     publishedBinding,
     actor,
     { targetType: 'content', targetId: draftContentId },
@@ -168,7 +143,6 @@ try {
   assert.equal(await targetContextStore.hasBidirectionalBlock(actor, [owner, owner, actor]), true)
   bidirectionalBlockForwardReadPassed = true
   await expectNotFound(like(
-    policyExecutor,
     publishedBinding,
     actor,
     { targetType: 'content', targetId: blockedContentId },
@@ -185,7 +159,6 @@ try {
   assert.equal(await targetContextStore.hasBidirectionalBlock(actor, [owner]), true)
   bidirectionalBlockReverseReadPassed = true
   await expectNotFound(like(
-    policyExecutor,
     publishedBinding,
     actor,
     { targetType: 'content', targetId: blockedContentId },
@@ -198,7 +171,6 @@ try {
   await client.query('DELETE FROM social_user_interactions WHERE relationship_id = $1', [marker + '-block-reverse'])
 
   const commentCreated = await like(
-    policyExecutor,
     publishedBinding,
     actor,
     { targetType: 'comment', targetId: commentId },
@@ -223,7 +195,6 @@ try {
   assert.equal(await targetContextStore.hasBidirectionalBlock(actor, [marker + '-blocked-comment-author']), true)
   bidirectionalCommentAuthorBlockReadPassed = true
   await expectNotFound(like(
-    policyExecutor,
     publishedBinding,
     actor,
     { targetType: 'comment', targetId: blockedCommentId },
@@ -247,7 +218,6 @@ try {
   assert.equal(await targetContextStore.hasBidirectionalBlock(actor, [owner]), true)
   bidirectionalParentOwnerBlockReadPassed = true
   await expectNotFound(like(
-    policyExecutor,
     publishedBinding,
     actor,
     { targetType: 'comment', targetId: parentBlockedCommentId },
@@ -259,7 +229,7 @@ try {
   parentOwnerBlockRacePassed = true
   await client.query('DELETE FROM social_user_interactions WHERE relationship_id = $1', [marker + '-parent-block'])
 
-  await unlike(policyExecutor, actor, { targetType: 'content', targetId: contentId }, store)
+  await unlike(actor, { targetType: 'content', targetId: contentId }, store)
   const afterUnlike = await client.query(
     'SELECT count(*)::int AS rows FROM interaction_likes WHERE actor_user_id = $1 AND target_type = $2 AND target_id = $3',
     [actor, 'content', contentId],

@@ -1184,8 +1184,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             }
           : await parseJsonTarget(request)
         if (request.method === 'GET') {
+          if (!dependencies.likeTargetContextReadStore) throw new LikeRuntimeError('SERVICE_UNAVAILABLE', 503)
           const result = await getLikeStatus(
-            env.DB,
             env.W03_CONTENT,
             viewerUserId,
             target,
@@ -1207,7 +1207,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             ? await fetchPublishedContentSocialContext(env.W03_CONTENT, { contentId: target.targetId, correlationId })
             : undefined
           if (target.targetType === 'comment') requireCommentNotificationContextStore(dependencies.commentNotificationContextStore)
-          const result = await like(env.DB, env.W03_CONTENT, viewerUserId, target, correlationId, publishedContentContext, dependencies.likeMutationStore, dependencies.likeTargetContextReadStore)
+          if (!dependencies.likeMutationStore || !dependencies.likeTargetContextReadStore) throw new LikeRuntimeError('SERVICE_UNAVAILABLE', 503)
+          const result = await like(env.W03_CONTENT, viewerUserId, target, correlationId, publishedContentContext, dependencies.likeMutationStore, dependencies.likeTargetContextReadStore)
           const notificationContext = publishedContentContext
             ? { recipientUserId: publishedContentContext.ownerUserId, contentId: null }
             : await getInteractionNotificationContext(
@@ -1229,7 +1230,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           }
           return json({ data: result, requestId: createRequestId() }, 200)
         }
-        await unlike(env.DB, viewerUserId, target, dependencies.likeMutationStore)
+        if (!dependencies.likeMutationStore) throw new LikeRuntimeError('SERVICE_UNAVAILABLE', 503)
+        await unlike(viewerUserId, target, dependencies.likeMutationStore)
         return new Response(null, { status: 204 })
       }
 

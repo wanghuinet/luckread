@@ -156,3 +156,12 @@
 - Like status reads use the already-composed Neon PostgreSQL `LikeStatusReadStore`; a missing Store fails closed with 503 when a cache miss requires storage.
 - Preserved W03 publication validation, W05 Block preflight, actor-scoped liked state, shared aggregate cache semantics, and PostgreSQL adapter/rehearsal coverage.
 - Like mutation and like-target-context D1 adapters remain explicitly out of scope for this slice.
+
+
+## W05 Like / Unlike and Like Target Context
+
+- Removed `LikeMutationD1QueryExecutor` / `createD1LikeMutationStore` and `LikeTargetContextD1QueryExecutor` / `createD1LikeTargetContextReadStore`.
+- Like, Unlike and Like Status no longer accept a D1 database argument or construct default D1 stores. The HTTP routes require the relevant injected Neon Store ports and return sanitized 503 when mutation/context composition is missing.
+- The existing Neon runtime composes `createPostgresLikeMutationStore` and `createPostgresLikeTargetContextReadStore`; this slice makes those ports mandatory at the route/runtime boundary.
+- Preserved W03 published-content validation, published-comment target projection, bidirectional Block preflight, final PostgreSQL guarded insert (content owner and comment author plus W03 parent owner), idempotent actor-scoped mutation, sanitized errors, and viewer/aggregate cache invalidation.
+- Scope: W05 Like business slice only. No production database, schema, Hyperdrive binding, Worker deployment, or traffic change.
