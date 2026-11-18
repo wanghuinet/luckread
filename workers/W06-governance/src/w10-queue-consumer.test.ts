@@ -91,13 +91,13 @@ function createDb() {
 }
 
 const queueRuntime = worker as unknown as {
-  queue(batch: MessageBatch<unknown>, env: { D1_03: D1Database }): Promise<void>
+  queue(batch: MessageBatch<unknown>, env: { D1_03: D1Database; W06_MODERATION_DATABASE_DRIVER: 'd1' }): Promise<void>
 }
 
 async function invokeQueue(messages: TestMessage[], db: D1Database): Promise<void> {
   await queueRuntime.queue(
     { messages } as unknown as MessageBatch<unknown>,
-    { D1_03: db },
+    { D1_03: db, W06_MODERATION_DATABASE_DRIVER: 'd1' },
   )
 }
 

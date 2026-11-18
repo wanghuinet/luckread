@@ -36,13 +36,25 @@ describe('W06 moderation database runtime admission', () => {
     }))
   })
 
-  it('keeps D1 as the default and selects the existing D1 moderation database', () => {
+  it('keeps the legacy D1 adapter available only when explicitly selected for isolated compatibility tests', () => {
     const d1 = { prepare() {}, batch() {} } as unknown as D1Database
-    const env = { D1_03: d1 }
+    const env = { D1_03: d1, W06_MODERATION_DATABASE_DRIVER: 'd1' }
 
     expect(resolveW06ModerationDatabaseDriver(env)).toBe('d1')
     expect(getW06ModerationDatabase(env)).toBe(d1)
     expect(getW06ModerationQueueReadStore(env)).toBeUndefined()
+  })
+
+  it('defaults to Neon when the driver is omitted and never falls back to an available D1 binding', () => {
+    const d1 = { prepare() {}, batch() {} } as unknown as D1Database
+    const binding = {
+      connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread_governance',
+    }
+    const env = { D1_03: d1, HYPERDRIVE_D1_03: binding }
+
+    expect(resolveW06ModerationDatabaseDriver(env)).toBe('neon')
+    expect(getW06ModerationDatabase(env)).not.toBe(d1)
+    expect(getW06ModerationQueueReadStore(env)).toBeDefined()
   })
 
   it('rejects unknown drivers instead of silently falling back to D1', () => {
