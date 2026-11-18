@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createComment, deleteComment, listComments, parseCommentLimit, parseCommentSort, updateComment } from './comment-runtime.js'
 import { replyAudienceAllowedSql } from './reply-audience-runtime.js'
+import { buildCommentListReadQuery } from './comment-list-read-store.js'
 import type { PublishedContentSocialContext, W03ContentBinding } from './w03-content-context-client.js'
 
 const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
@@ -13,7 +14,16 @@ const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
       run: vi.fn(async () => ({ success: true, meta: { changes: 1 } })),
     })),
   }))
-  return { prepare } as unknown as D1Database
+  const fixture = {
+    prepare,
+    async list(input: Parameters<import('./comment-list-read-store.js').CommentListReadStore['list']>[0]) {
+      const { sql, values } = buildCommentListReadQuery(input)
+      await prepare(sql).bind(...values).all()
+      const first = allResults[0] as { results?: unknown[] } | undefined
+      return first && Array.isArray(first.results) ? first.results : allResults
+    },
+  }
+  return fixture as unknown as D1Database & import('./comment-list-read-store.js').CommentListReadStore
 }
 
 const publishedContext = (contentId = 'content-1'): PublishedContentSocialContext => ({
@@ -737,7 +747,7 @@ describe('comment runtime', () => {
     })
 
     const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
-    expect(sql).toContain('WITH RECURSIVE viewer AS (SELECT ? AS user_id)')
+    expect(sql).toContain('WITH RECURSIVE viewer AS (SELECT $1::text AS user_id)')
     expect(sql).toContain('FROM interaction_likes liked')
     expect(sql).toContain('JOIN viewer v ON v.user_id = liked.actor_user_id')
     expect(sql).toContain("liked.target_type = 'comment'")
@@ -796,9 +806,9 @@ describe('comment runtime', () => {
     const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
     expect(sql).toContain("block.relation_type = 'block'")
     expect(sql).toContain("mute.relation_type = 'mute'")
-    expect(sql).toContain('block.actor_user_id = ? AND block.target_user_id = c.author_user_id')
-    expect(sql).toContain('block.actor_user_id = c.author_user_id AND block.target_user_id = ?')
-    expect(sql).toContain('mute.actor_user_id = ?')
+    expect(sql).toContain('block.actor_user_id = $3 AND block.target_user_id = c.author_user_id')
+    expect(sql).toContain('block.actor_user_id = c.author_user_id AND block.target_user_id = $4')
+    expect(sql).toContain('mute.actor_user_id = $5')
     expect(sql).toContain('mute.target_user_id = c.author_user_id')
     expect(sql).toContain("child.author_user_id")
   })
@@ -849,7 +859,7 @@ describe('comment runtime', () => {
     const bound = prepared?.bind as ReturnType<typeof vi.fn>
     expect(bound).toHaveBeenCalledTimes(1)
     const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
-    const placeholderCount = (sql.match(/\?/g) ?? []).length
+    const placeholderCount = (sql.match(/\$\d+/g) ?? []).length
     const boundCount = bound.mock.calls[0]?.length ?? 0
     expect(boundCount).toBe(placeholderCount)
   })
@@ -883,8 +893,8 @@ describe('comment runtime', () => {
     const next = db([], [])
     await listComments(next, 'content-1', page.nextCursor, 1, publishedContext(), null, 'liked')
     const nextSql = String((next.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
-    expect(nextSql).toContain('c.thread_like_count < ?')
-    expect(nextSql).toContain('c.thread_like_count = ?')
+    expect(nextSql).toContain('c.thread_like_count < $')
+    expect(nextSql).toContain('c.thread_like_count = $')
     await expect(
       listComments(next, 'content-1', page.nextCursor, 1, publishedContext(), null, 'recent'),
     ).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })

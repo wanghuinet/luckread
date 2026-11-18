@@ -41,20 +41,17 @@ export class CommentListReadStoreError extends Error {
   constructor() { super('COMMENT_LIST_READ_STORE_UNAVAILABLE') }
 }
 
-type CommentListReadDialect = 'd1' | 'postgres'
-
 export function buildCommentListReadQuery(
   input: CommentListReadInput,
-  dialect: CommentListReadDialect,
 ): { sql: string; values: unknown[] } {
   const values: unknown[] = []
   const parameter = (value: unknown): string => {
     values.push(value)
-    return dialect === 'postgres' ? `$${values.length}` : '?'
+    return `${values.length}`
   }
   const timestampParameter = (value: string): string => {
     const placeholder = parameter(value)
-    return dialect === 'postgres' ? `${placeholder}::timestamptz` : placeholder
+    return `${placeholder}::timestamptz`
   }
 
   const viewerParameter = parameter(input.viewerUserId)
@@ -141,7 +138,7 @@ export function buildCommentListReadQuery(
   const threadLikeCountSql = input.sort === 'liked'
     ? `(SELECT COUNT(*) FROM interaction_likes thread_likes WHERE thread_likes.target_type = 'comment' AND thread_likes.target_id = c.thread_id) AS thread_like_count`
     : '0 AS thread_like_count'
-  const mentionsSql = dialect === 'postgres'
+  const mentionsSql = true
     ? `COALESCE((
          SELECT json_agg(json_build_object(
            'userId', mention.mentioned_user_id,
@@ -170,18 +167,18 @@ export function buildCommentListReadQuery(
             LIMIT 100
          ) mention
        ), '[]') AS mentions_json`
-  const createdAtSql = dialect === 'postgres'
+  const createdAtSql = true
     ? 'to_char(c.created_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\')'
     : 'c.created_at'
-  const updatedAtSql = dialect === 'postgres'
+  const updatedAtSql = true
     ? 'to_char(c.updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\')'
     : 'c.updated_at'
-  const threadCreatedAtSql = dialect === 'postgres'
+  const threadCreatedAtSql = true
     ? 'to_char(c.thread_created_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\')'
     : 'c.thread_created_at'
   const limitParameter = parameter(input.limit + 1)
 
-  const viewerSelect = dialect === 'postgres' ? `${viewerParameter}::text` : viewerParameter
+  const viewerSelect = true ? `${viewerParameter}::text` : viewerParameter
   const sql = `WITH RECURSIVE viewer AS (SELECT ${viewerSelect} AS user_id), public_comments AS (
        SELECT
          c.id,
@@ -258,24 +255,3 @@ export function buildCommentListReadQuery(
   return { sql, values }
 }
 
-export interface CommentListReadD1Executor {
-  prepare(sql: string): {
-    bind(...values: unknown[]): {
-      all<Row>(): Promise<{ results?: Row[] }>
-    }
-  }
-}
-
-export function createD1CommentListReadStore(db: CommentListReadD1Executor): CommentListReadStore {
-  return {
-    async list(input) {
-      const { sql, values } = buildCommentListReadQuery(input, 'd1')
-      try {
-        const result = await db.prepare(sql).bind(...values).all<CommentListReadRow>()
-        return result.results ?? []
-      } catch {
-        throw new CommentListReadStoreError()
-      }
-    },
-  }
-}

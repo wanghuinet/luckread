@@ -305,7 +305,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   relationshipGraphReadStore?: RelationshipGraphReadStore
   /** Optional PostgreSQL-capable Following-feed author reader; D1 remains the deployed default. */
   followingAuthorIdsReadStore?: FollowingAuthorIdsReadStore
-  /** Optional PostgreSQL-capable comment page reader; D1 remains the deployed default. */
+  /** Required PostgreSQL comment page reader; missing composition fails closed. */
   commentListReadStore?: CommentListReadStore
   /** Optional PostgreSQL-capable comment creation store; D1 remains the deployed default. */
   commentCreateStore?: CommentCreateStore
@@ -1009,7 +1009,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             contentId: commentContentId,
             correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
           })
-          const page = await listComments(dependencies.commentListReadStore ?? env.DB, commentContentId, cursor, limit, contentContext, viewerUserId, sort)
+          if (!dependencies.commentListReadStore) throw new CommentRuntimeError('SERVICE_UNAVAILABLE', 503)
+          const page = await listComments(dependencies.commentListReadStore, commentContentId, cursor, limit, contentContext, viewerUserId, sort)
           return json({ data: page, requestId: createRequestId() })
         }
 

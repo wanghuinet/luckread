@@ -109,3 +109,11 @@
 - 历史 D1 migration、PostgreSQL 迁移来源、只读核对记录、不可逆操作记录、回滚证据，不因包含 D1 字样而自动列为删除项。
 - `HYPERDRIVE_D1_01` 至 `HYPERDRIVE_D1_05` 若连接 Neon，只是沿用的数据库域命名；除非完成全链路重命名评估，否则保留。
 - 本轮没有删除生产资源、部署 Worker、切换流量或修改线上数据库。
+
+
+## W05 Comment List Read
+
+- Removed the D1 comment-list query dialect, D1 executor adapter, and automatic runtime resolver.
+- Comment list routes now require the injected Neon PostgreSQL `CommentListReadStore`; missing composition returns 503 rather than falling back to `env.DB`.
+- Preserved published-comment visibility, bounded recursive replies, cursor scope, relevant/recent/liked ordering, viewer block/mute filtering, mention identity, and viewer like state.
+- Tests now exercise the Store port using a PostgreSQL query fixture; the production PostgreSQL adapter remains the only database adapter.
