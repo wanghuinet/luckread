@@ -423,7 +423,7 @@ function replayOrConflict(
  * different order, amount, currency, merchant, or provider conflicts.
  */
 export async function createPaymentAttempt(
-  db: D1Database,
+  db: PaymentPersistenceDatabase,
   customerIdInput: string,
   orderIdInput: string,
   idempotencyKeyInput: string | null | undefined,
@@ -460,17 +460,27 @@ export async function createPaymentAttempt(
   // while preserving normal idempotency after the Order lifecycle advances.
   let order: OrderRow | null;
   try {
-    order = await db.prepare(
-      'SELECT order_id, customer_id, status, currency, total_minor, ' +
-      "CASE WHEN EXISTS (SELECT 1 FROM order_lines AS demo_lines WHERE demo_lines.order_id = orders.order_id AND " +
-      (dependencies.databaseDialect === 'postgres'
-        ? "(demo_lines.item_snapshot_json::jsonb #>> '{luckreadPricing,mode}') = 'demo') "
-        : "json_valid(demo_lines.item_snapshot_json) AND json_extract(demo_lines.item_snapshot_json, '$.luckreadPricing.mode') = 'demo') ") +
-      'THEN 1 ELSE 0 END AS has_demo_pricing ' +
-      'FROM orders WHERE order_id = ? AND customer_id = ? LIMIT 1',
-    ).bind(orderIdInput, customerIdInput).first<OrderRow>();
+    if (isPostgresPaymentPersistenceDatabase(db)) {
+      const result = await db.query<OrderRow & Record<string, unknown>>(
+        'SELECT order_id, customer_id, status, currency, total_minor::double precision AS total_minor, ' +
+        "CASE WHEN EXISTS (SELECT 1 FROM order_lines AS demo_lines WHERE demo_lines.order_id = orders.order_id AND " +
+        "(demo_lines.item_snapshot_json::jsonb #>> '{luckreadPricing,mode}') = 'demo') " +
+        'THEN 1 ELSE 0 END AS has_demo_pricing ' +
+        'FROM orders WHERE order_id = $1 AND customer_id = $2 LIMIT 1',
+        [orderIdInput, customerIdInput],
+      );
+      order = result.rows[0] ?? null;
+    } else {
+      order = await db.prepare(
+        'SELECT order_id, customer_id, status, currency, total_minor, ' +
+        "CASE WHEN EXISTS (SELECT 1 FROM order_lines AS demo_lines WHERE demo_lines.order_id = orders.order_id AND " +
+        "json_valid(demo_lines.item_snapshot_json) AND json_extract(demo_lines.item_snapshot_json, '$.luckreadPricing.mode') = 'demo') " +
+        'THEN 1 ELSE 0 END AS has_demo_pricing ' +
+        'FROM orders WHERE order_id = ? AND customer_id = ? LIMIT 1',
+      ).bind(orderIdInput, customerIdInput).first<OrderRow>();
+    }
   } catch {
-    // Missing migration/schema and transient D1 errors must never become a
+    // Missing migration/schema and transient database errors must never become a
     // fabricated payment success or leak SQL/database names to a caller.
     throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
   }
@@ -515,18 +525,33 @@ export async function createPaymentAttempt(
   }
 
   try {
-    const inserted = await db.prepare(
-      'INSERT INTO payments ' +
-      '(payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, status, version, ' +
-      'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at) ' +
-      "VALUES (?, ?, ?, 'hyperswitch', ?, ?, ?, 'INITIATING', 1, ?, ?, NULL, NULL, ?, ?)",
-    ).bind(
-      paymentId, order.order_id, customerIdInput, expectedMerchantIdInput, order.total_minor,
-      order.currency, idempotencyKeyInput, requestHash, createdAt, createdAt,
-    ).run();
-    if (Number(inserted.meta?.changes ?? 0) !== 1) {
-      throw new PaymentPersistenceError('INTEGRITY_VIOLATION', 500);
+    let inserted = false;
+    if (isPostgresPaymentPersistenceDatabase(db)) {
+      const result = await db.query<{ payment_id: string } & Record<string, unknown>>(
+        'INSERT INTO payments ' +
+        '(payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, status, version, ' +
+        'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at) ' +
+        "VALUES ($1, $2, $3, 'hyperswitch', $4, $5, $6, 'INITIATING', 1, $7, $8, NULL, NULL, $9::timestamptz, $10::timestamptz) " +
+        'ON CONFLICT DO NOTHING RETURNING payment_id',
+        [
+          paymentId, order.order_id, customerIdInput, expectedMerchantIdInput, order.total_minor,
+          order.currency, idempotencyKeyInput, requestHash, createdAt, createdAt,
+        ],
+      );
+      inserted = result.rows.length === 1;
+    } else {
+      const result = await db.prepare(
+        'INSERT INTO payments ' +
+        '(payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, status, version, ' +
+        'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at) ' +
+        "VALUES (?, ?, ?, 'hyperswitch', ?, ?, ?, 'INITIATING', 1, ?, ?, NULL, NULL, ?, ?)",
+      ).bind(
+        paymentId, order.order_id, customerIdInput, expectedMerchantIdInput, order.total_minor,
+        order.currency, idempotencyKeyInput, requestHash, createdAt, createdAt,
+      ).run();
+      inserted = Number(result.meta?.changes ?? 0) === 1;
     }
+    if (!inserted) throw new PaymentPersistenceError('INTEGRITY_VIOLATION', 500);
 
     return {
       payment: {
@@ -567,7 +592,7 @@ export async function createPaymentAttempt(
  * after this local comparison succeeds.
  */
 export async function recordUnconfirmedHyperswitchIntent(
-  db: D1Database,
+  db: PaymentPersistenceDatabase,
   customerIdInput: string,
   paymentIdInput: string,
   expectedMerchantIdInput: string,
@@ -654,7 +679,7 @@ export async function recordUnconfirmedHyperswitchIntent(
  * processing state and wait for the signed webhook/reconciliation path.
  */
 export async function recordHyperswitchMerchantInitiatedSubmission(
-  db: D1Database,
+  db: PaymentPersistenceDatabase,
   customerIdInput: string,
   paymentIdInput: string,
   expectedMerchantIdInput: string,
