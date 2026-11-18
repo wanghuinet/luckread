@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { Pool } from 'pg'
 
 import {
-  createD1RoleLayerStore,
   resolveLayerForSubject,
   type RoleLayerStore,
 } from './role-layer-store.js'
+import { createPostgresRoleLayerStore } from '../neon/role-layer-postgres.js'
 
 const NOW = '2026-11-10T12:00:00.000Z'
 
@@ -65,20 +66,15 @@ describe('W02 role-layer authority boundary', () => {
     expect(store.readAccountState).not.toHaveBeenCalled()
   })
 
-  it('keeps the production adapter on the existing D1 authority query', async () => {
-    const statement = {
-      bind: vi.fn().mockReturnThis(),
-      first: vi.fn().mockResolvedValue({ accountState: 'ACTIVE' }),
-    }
-    const db = {
-      prepare: vi.fn().mockReturnValue(statement),
-    } as unknown as D1Database
-    const store = createD1RoleLayerStore(db)
+  it('uses the existing PostgreSQL role-layer adapter and numbered parameter placeholders', async () => {
+    const query = vi.fn(async () => ({ rows: [{ accountState: 'ACTIVE' }] }))
+    const pool = { query } as unknown as Pool
+    const store = createPostgresRoleLayerStore(pool)
 
     await expect(store.readAccountState('subject-1')).resolves.toBe('ACTIVE')
-    expect(db.prepare).toHaveBeenCalledWith(
-      'SELECT account_state AS accountState FROM "user" WHERE id = ? LIMIT 1',
+    expect(query).toHaveBeenCalledWith(
+      'SELECT account_state AS "accountState" FROM "user" WHERE id = $1 LIMIT 1',
+      ['subject-1'],
     )
-    expect(statement.bind).toHaveBeenCalledWith('subject-1')
   })
 })
