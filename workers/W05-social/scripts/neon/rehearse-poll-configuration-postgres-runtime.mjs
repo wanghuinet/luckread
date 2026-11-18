@@ -21,10 +21,6 @@ const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 5_000
 const client = await pool.connect()
 const configurationStore = createPostgresPollConfigurationStore(client)
 const readStore = createPostgresPollReadStore(client)
-const unusedD1 = {
-  prepare() { throw new Error('Unexpected D1 access during PostgreSQL poll-configuration rehearsal') },
-  batch() { throw new Error('Unexpected D1 batch during PostgreSQL poll-configuration rehearsal') },
-}
 const marker = 'w05-poll-config-' + randomUUID()
 const owner = marker + '-owner'
 const contentId = marker + '-content'
@@ -46,7 +42,7 @@ let pollId = null
 
 try {
   const created = await configureContentPoll(
-    unusedD1, owner, contentId, ['Yes', 'No'], 90, draftContext(),
+    configurationStore, readStore, owner, contentId, ['Yes', 'No'], 90, draftContext(),
     configurationStore, readStore,
   )
   pollId = created.pollId
@@ -57,7 +53,7 @@ try {
   createdAndReadBack = true
 
   const updated = await configureContentPoll(
-    unusedD1, owner, contentId, ['Maybe', 'Later', 'Never'], 240,
+    configurationStore, readStore, owner, contentId, ['Maybe', 'Later', 'Never'], 240,
     draftContext(), configurationStore, readStore,
   )
   assert.equal(updated.pollId, pollId)
@@ -79,7 +75,7 @@ try {
   )
 
   const unchanged = await configureContentPoll(
-    unusedD1, owner, contentId, ['Maybe', 'Later', 'Never'], 240,
+    configurationStore, readStore, owner, contentId, ['Maybe', 'Later', 'Never'], 240,
     draftContext(), configurationStore, readStore,
   )
   assert.equal(unchanged.pollId, pollId)
@@ -88,7 +84,7 @@ try {
 
   await assert.rejects(
     configureContentPoll(
-      unusedD1, owner, contentId, ['New', 'Choice'], 360,
+      configurationStore, readStore, owner, contentId, ['New', 'Choice'], 360,
       draftContext(), configurationStore, readStore,
     ),
     error => error instanceof SocialPollError && error.code === 'CONFLICT' && error.status === 409,
@@ -97,7 +93,7 @@ try {
 
   await assert.rejects(
     configureContentPoll(
-      unusedD1, owner, contentId, ['Different', 'Options'], 240,
+      configurationStore, readStore, owner, contentId, ['Different', 'Options'], 240,
       draftContext('PUBLISHED'), configurationStore, readStore,
     ),
     error => error instanceof SocialPollError && error.code === 'CONFLICT' && error.status === 409,
