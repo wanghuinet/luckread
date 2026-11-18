@@ -33,7 +33,7 @@ const fixedNow = '2026-10-12T09:30:00.000Z'
 const pool = {} as Pool
 
 describe('W02 PostgreSQL creator-role grant Store', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => mocks.grantCreatorBusinessRolePostgres.mockReset())
 
   it('delegates the admitted global creator grant to the transactional PostgreSQL command', async () => {
     const result = {
@@ -72,13 +72,12 @@ describe('W02 PostgreSQL creator-role grant Store', () => {
       ),
     )
 
-    await expect(createPostgresCreatorRoleGrantStore(pool).grant(command, fixedNow))
-      .rejects.toBeInstanceOf(RoleAssignmentCommandError)
-    await expect(createPostgresCreatorRoleGrantStore(pool).grant(command, fixedNow))
-      .rejects.toMatchObject({
-        code: 'VERIFIED_ROLE_REQUIRED',
-        message: 'target must hold an effective L2 verified_user role',
-      })
+    const operation = createPostgresCreatorRoleGrantStore(pool).grant(command, fixedNow)
+    await expect(operation).rejects.toBeInstanceOf(RoleAssignmentCommandError)
+    await expect(operation).rejects.toMatchObject({
+      code: 'VERIFIED_ROLE_REQUIRED',
+      message: 'target must hold an effective L2 verified_user role',
+    })
   })
 
   it('preserves unexpected infrastructure failures for the Worker boundary', async () => {
