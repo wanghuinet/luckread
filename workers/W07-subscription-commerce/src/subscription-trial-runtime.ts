@@ -2,7 +2,7 @@
 import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js'
 import { etagForVersion, SubscriptionRuntimeError, validateIdempotencyKey, validatePrincipal } from './subscription-runtime.js'
 
-type TrialPlanRow = Readonly<{
+export type TrialPlanRow = Readonly<{
   plan_id: string
   owner_id: string
   current_version: number
@@ -16,7 +16,7 @@ type TrialPlanRow = Readonly<{
   trial_period_days: number
 }>
 
-type TrialSubscriptionRow = Readonly<{
+export type TrialSubscriptionRow = Readonly<{
   subscription_id: string
   subscriber_id: string
   plan_id: string
@@ -34,15 +34,15 @@ type TrialSubscriptionRow = Readonly<{
   version: number
 }>
 
-type TrialEnv = Readonly<{ D1_01: D1Database; W06_GOVERNANCE?: Fetcher }>
-type TrialDependencies = Readonly<{ now?: () => Date }>
+export type TrialEnv = Readonly<{ D1_01: D1Database; W06_GOVERNANCE?: Fetcher }>
+export type TrialDependencies = Readonly<{ now?: () => Date }>
 
-function iso(date: Date): string {
+export function iso(date: Date): string {
   if (!(date instanceof Date) || !Number.isFinite(date.getTime())) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
   return date.toISOString()
 }
 
-function addTrialDays(start: string, days: number): string {
+export function addTrialDays(start: string, days: number): string {
   const parsed = new Date(start)
   if (!Number.isFinite(parsed.getTime()) || parsed.toISOString() !== start ||
       !Number.isSafeInteger(days) || days < 1 || days > 30) {
@@ -53,7 +53,7 @@ function addTrialDays(start: string, days: number): string {
   return end.toISOString()
 }
 
-function parsePlanId(input: unknown): string {
+export function parsePlanId(input: unknown): string {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   const value = input as Record<string, unknown>
   if (Object.keys(value).length !== 1 || typeof value.planId !== 'string' ||
@@ -63,7 +63,7 @@ function parsePlanId(input: unknown): string {
   return value.planId
 }
 
-async function trialSubscriptionId(subscriberId: string, key: string): Promise<string> {
+export async function trialSubscriptionId(subscriberId: string, key: string): Promise<string> {
   try {
     const digest = await sha256BytesToHex(new TextEncoder().encode(
       'membership-trial-start-v1\u0000' + subscriberId + '\u0000' + key,
@@ -86,7 +86,7 @@ async function readTrialSubscription(db: D1Database, subscriptionId: string): Pr
   }
 }
 
-function publicTrial(row: TrialSubscriptionRow, replayed: boolean) {
+export function publicTrial(row: TrialSubscriptionRow, replayed: boolean) {
   return {
     subscriptionId: row.subscription_id,
     subscriberId: row.subscriber_id,
@@ -106,7 +106,7 @@ function publicTrial(row: TrialSubscriptionRow, replayed: boolean) {
   }
 }
 
-async function auditTrialStarted(
+export async function auditTrialStarted(
   env: TrialEnv,
   row: TrialSubscriptionRow,
   trialPeriodDays: number,
