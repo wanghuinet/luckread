@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 export type SubscriptionStatus = 'PENDING' | 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED'
 
@@ -210,7 +211,7 @@ export async function getSubscription(db: D1Database, subscriberId: string, subs
  * decision and never reads or persists membership rows.
  */
 export async function hasActiveCreatorMembership(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   subscriberIdInput: string,
   creatorIdInput: string,
   now = new Date(),
@@ -223,13 +224,27 @@ export async function hasActiveCreatorMembership(
   const nowValue = now.toISOString()
   let row: { subscription_id: string } | null
   try {
-    row = await db.prepare(
-      "SELECT subscription_id FROM membership_subscriptions " +
-      "WHERE subscriber_id = ? AND creator_id = ? AND status IN ('ACTIVE','TRIALING') " +
-      "AND current_period_start <= ? AND current_period_end > ? " +
-      "AND (cancel_at IS NULL OR cancel_at > ?) " +
-      "ORDER BY current_period_end DESC, subscription_id ASC LIMIT 1",
-    ).bind(subscriberId, creatorId, nowValue, nowValue, nowValue).first<{ subscription_id: string }>()
+    if (typeof (db as W07WebhookPostgresPool).query === 'function') {
+      const result = await (db as W07WebhookPostgresPool).query<
+        { subscription_id: string } & Record<string, unknown>
+      >(
+        "SELECT subscription_id FROM membership_subscriptions " +
+        "WHERE subscriber_id = $1 AND creator_id = $2 AND status IN ('ACTIVE','TRIALING') " +
+        "AND current_period_start <= $3::timestamptz AND current_period_end > $4::timestamptz " +
+        "AND (cancel_at IS NULL OR cancel_at > $5::timestamptz) " +
+        "ORDER BY current_period_end DESC, subscription_id ASC LIMIT 1",
+        [subscriberId, creatorId, nowValue, nowValue, nowValue],
+      )
+      row = result.rows[0] ?? null
+    } else {
+      row = await (db as D1Database).prepare(
+        "SELECT subscription_id FROM membership_subscriptions " +
+        "WHERE subscriber_id = ? AND creator_id = ? AND status IN ('ACTIVE','TRIALING') " +
+        "AND current_period_start <= ? AND current_period_end > ? " +
+        "AND (cancel_at IS NULL OR cancel_at > ?) " +
+        "ORDER BY current_period_end DESC, subscription_id ASC LIMIT 1",
+      ).bind(subscriberId, creatorId, nowValue, nowValue, nowValue).first<{ subscription_id: string }>()
+    }
   } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
