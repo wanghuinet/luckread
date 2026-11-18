@@ -24,6 +24,7 @@ import {
 } from './neon/payment-method-read-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import { receiveHyperswitchRefundWebhookPostgres } from './refund-webhook-postgres-persistence.js';
+import { receiveHyperswitchPaymentWebhookPostgres } from './payment-webhook-payment-postgres.js';
 
 type HyperswitchWebhookRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
   D1_01: D1Database;
@@ -45,6 +46,7 @@ type HyperswitchWebhookRuntimeDependencies = Readonly<{
   getWebhookDatabase?: (env: HyperswitchWebhookRuntimeEnv) => D1Database | undefined;
   getWebhookPostgresPool?: (env: HyperswitchWebhookRuntimeEnv) => W07WebhookPostgresPool | undefined;
   receiveRefundWebhookPostgres?: typeof receiveHyperswitchRefundWebhookPostgres;
+  receivePaymentWebhookPostgres?: typeof receiveHyperswitchPaymentWebhookPostgres;
   syncRenewalOutcome?: (
     env: Readonly<{ D1_01: D1Database; D1_04: D1Database }>,
     paymentId: string,
@@ -204,9 +206,21 @@ export async function handleHyperswitchWebhookRequest(
         postgresPool, webhookInput,
       )
       : null;
+    const nativePayment = postgresPool && !nativeRefund
+      ? await (dependencies.receivePaymentWebhookPostgres ?? receiveHyperswitchPaymentWebhookPostgres)(
+        postgresPool, webhookInput,
+      )
+      : null;
     let result: WebhookReceiptResult;
     if (nativeRefund) {
       result = nativeRefund;
+    } else if (nativePayment) {
+      // Keep the existing read/sync saga on the selected D1-04 Neon facade;
+      // payment_details state, order and renewal-cycle writes are committed natively above.
+      const neonDatabase = (dependencies.getWebhookDatabase ?? getW07PaymentWebhookDatabase)(env);
+      if (!neonDatabase) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+      webhookDatabase = neonDatabase;
+      result = nativePayment;
     } else {
       const receive = dependencies.receive ?? receiveHyperswitchWebhook;
       const neonDatabase = (dependencies.getWebhookDatabase ?? getW07PaymentWebhookDatabase)(env);
