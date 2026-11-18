@@ -192,10 +192,13 @@ test('home feed renders first-page projections while optional detail hydration r
   expect(homeScreen).toContain('const visibleContentIds = hydrationTargets.scope === hydrationScope ? hydrationTargets.ids : [];');
   expect(homeScreen).toContain('onViewableItemsChanged={onViewableItemsChanged}');
   expect(homeScreen).toContain('viewabilityConfig={viewabilityConfig}');
-  expect(homeScreen).toContain('const results = await Promise.allSettled(pendingRecords.map(async (item) => {');
-  expect(homeScreen).toContain('readContentBody(item, undefined, sessionToken)');
-  expect(homeScreen).toContain('readContentSocial(item.id)');
-  expect(homeScreen).toContain('readContentAuthor(item)');
+  expect(homeScreen).toContain('for (const item of pendingRecords) {');
+  expect(homeScreen).toContain('void (async () => {');
+  expect(homeScreen).toContain('const [bodyResult, socialResult, authorResult] = await Promise.allSettled([');
+  expect(homeScreen).not.toContain('pendingRecords.map(async (item) =>');
+  expect(homeScreen).toContain('readContentBody(item, controller.signal, sessionToken)');
+  expect(homeScreen).toContain('readContentSocial(item.id, controller.signal)');
+  expect(homeScreen).toContain('readContentAuthor(item, controller.signal)');
   expect(homeScreen).toContain('generation !== hydrationGenerationRef.current');
   expect(homeScreen).not.toContain('setItems(visibleItems)');
   expect(homeScreen).not.toContain('!loading && !loadingMore');

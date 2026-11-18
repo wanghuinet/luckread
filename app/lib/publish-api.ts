@@ -233,11 +233,11 @@ export async function uploadTextBody(
   return media;
 }
 
-export async function getMediaPlayback(mediaId: string): Promise<MediaPlayback> {
+export async function getMediaPlayback(mediaId: string, signal?: AbortSignal): Promise<MediaPlayback> {
   if (!mediaId.trim()) throw new Error('A server media ID is required to resolve playback.');
   const result = await apiRequest<MediaEnvelope>(
     '/media/' + encodeURIComponent(mediaId) + '/playback',
-    { method: 'GET' },
+    { method: 'GET', signal },
   );
   if (!result.response.ok) {
     throw new Error(apiFailureMessage(result, 'The server could not authorize media playback.'));
