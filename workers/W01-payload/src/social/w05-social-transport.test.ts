@@ -32,3 +32,32 @@ describe('W01 to W05 social transport', () => {
     await expect(forwarded.json()).resolves.toEqual({ contentIds: ['content-1', 'content-2'] })
   })
 })
+
+describe('W01 public W05 social batch transport', () => {
+  it('forwards anonymous batch requests with IP-scoped rate identity and no-store responses', async () => {
+    const captured: { request?: Request } = {}
+    const { createW05SocialPublicCaller } = await import('./w05-social-transport.js')
+    const caller = createW05SocialPublicCaller(async () => ({
+      fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        captured.request = input instanceof Request ? input : new Request(input, init)
+        return Response.json({ data: { items: [] } }, { headers: { etag: '"social-batch"' } })
+      }),
+    }))
+    const response = await caller({
+      request: new Request('https://api.luckread.com/api/v1/contents/social/batch', {
+        method: 'POST',
+        headers: { 'cf-connecting-ip': '203.0.113.5', 'X-LuckRead-Correlation-Id': 'anonymous-batch' },
+      }),
+      pathname: '/internal/social/contents/summary-batch',
+      method: 'POST',
+      body: { contentIds: ['content-1'] },
+    })
+    const forwarded = captured.request as Request
+    expect(forwarded.headers.get('X-LuckRead-Client-IP')).toBe('203.0.113.5')
+    expect(forwarded.headers.get('X-LuckRead-Rate-Key')).toBe('ip:203.0.113.5')
+    expect(forwarded.headers.get('X-LuckRead-Principal-User-Id')).toBeNull()
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(response.headers.get('etag')).toBe('"social-batch"')
+    await expect(forwarded.json()).resolves.toEqual({ contentIds: ['content-1'] })
+  })
+})

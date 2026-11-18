@@ -57,3 +57,49 @@ export function createW05SocialCaller(getService: W05SocialServiceProvider) {
     return relayW05Response(response, responseHeaders)
   }
 }
+
+export type W05SocialPublicCallInput = Readonly<{
+  request: Request
+  pathname: string
+  method: string
+  principal?: ContentPrincipal | null
+  body?: unknown
+}>
+
+/** Public-read transport supports anonymous projections but never caches viewer-specific responses. */
+export function createW05SocialPublicCaller(getService: W05SocialServiceProvider) {
+  return async function callW05SocialPublic(input: W05SocialPublicCallInput): Promise<Response> {
+    const service = await getService()
+    const headers = new Headers({
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Correlation-Id':
+        input.request.headers.get('X-LuckRead-Correlation-Id')?.trim() || crypto.randomUUID(),
+    })
+    if (input.principal?.userId) {
+      headers.set('X-LuckRead-Principal-User-Id', input.principal.userId)
+      headers.set('X-LuckRead-Rate-Key', 'user:' + input.principal.userId)
+    } else {
+      const clientIp = input.request.headers.get('cf-connecting-ip')?.trim()
+      if (clientIp) {
+        headers.set('X-LuckRead-Client-IP', clientIp)
+        headers.set('X-LuckRead-Rate-Key', 'ip:' + clientIp)
+      }
+    }
+    if (input.body !== undefined) headers.set('content-type', 'application/json; charset=utf-8')
+    const response = await service.fetch(
+      new Request('https://luckread-w05.internal' + input.pathname, {
+        method: input.method,
+        headers,
+        body: input.body === undefined ? undefined : JSON.stringify(input.body),
+      }),
+    )
+    const responseHeaders = new Headers({
+      'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    })
+    const etag = response.headers.get('etag')
+    if (etag) responseHeaders.set('etag', etag)
+    return relayW05Response(response, responseHeaders)
+  }
+}
