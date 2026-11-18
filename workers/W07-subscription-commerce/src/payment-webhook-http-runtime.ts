@@ -225,16 +225,16 @@ export async function handleHyperswitchWebhookRequest(
     const paymentId = (result.outcome === 'APPLIED' || result.outcome === 'DUPLICATE')
       ? paymentIdFromSignedPayload(rawBody)
       : null;
-    if (paymentId && isSignedPaymentSucceededEvent(rawBody)) {
-      // A receipt is created only after receiveHyperswitchWebhook has verified
-      // the raw HMAC signature and committed the successful Payment state.
-      // Duplicate signed events safely retry a previously interrupted receipt.
-      const issueReceipt = dependencies.issueReceipt ?? issueReceiptForPaidPayment;
-      await issueReceipt(selectedWebhookDatabase, paymentId, env.HYPERSWITCH_MERCHANT_ID);
-    }
     if (paymentId) {
       const selectedWebhookDatabase = webhookDatabase;
       if (!selectedWebhookDatabase) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+      if (isSignedPaymentSucceededEvent(rawBody)) {
+        // A receipt is created only after the selected provider Store has verified
+        // the raw HMAC signature and durably committed the successful Payment state.
+        // Duplicate signed events safely retry a previously interrupted receipt.
+        const issueReceipt = dependencies.issueReceipt ?? issueReceiptForPaidPayment;
+        await issueReceipt(selectedWebhookDatabase, paymentId, env.HYPERSWITCH_MERCHANT_ID);
+      }
       const sync = dependencies.syncRenewalOutcome ?? syncRenewalCycleOutcomeForPayment;
       const renewalEnv = { D1_01: env.D1_01, D1_04: selectedWebhookDatabase, W06_GOVERNANCE: env.W06_GOVERNANCE };
       subscriptionSync = await sync(

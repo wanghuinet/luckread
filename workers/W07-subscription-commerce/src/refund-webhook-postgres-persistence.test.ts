@@ -140,40 +140,40 @@ function fakePool(options: {
             state: 'RECEIVED',
             outcome_code: null,
           }
-          return { rows: [{ ...storedReceipt }] as Row[] }
+          return { rows: [{ ...storedReceipt }] as unknown as Row[] }
         }
-        return { rows: [] as Row[] }
+        return { rows: [] as unknown as Row[] }
       }
       if (sql.startsWith('SELECT event_row_id, event_id, payload_sha256, state')) {
-        return { rows: storedReceipt ? [{ ...storedReceipt }] as Row[] : [] as Row[] }
+        return { rows: storedReceipt ? [{ ...storedReceipt }] as unknown as Row[] : [] as unknown as Row[] }
       }
       if (sql.startsWith('SELECT refund_id')) {
         return { rows: storedRefund ? [{
           ...storedRefund,
           provider_updated_at: storedRefund.provider_updated_at,
-        }] as Row[] : [] as Row[] }
+        }] as unknown as Row[] : [] as unknown as Row[] }
       }
       if (sql.startsWith('UPDATE refunds SET status')) {
-        if (!storedRefund || Number(storedRefund.version) !== Number(values[4])) return { rows: [] as Row[] }
+        if (!storedRefund || Number(storedRefund.version) !== Number(values[4])) return { rows: [] as unknown as Row[] }
         storedRefund = {
           ...storedRefund,
           status: String(values[0]) as Refund['status'],
           provider_updated_at: String(values[1]),
           version: String(Number(storedRefund.version) + 1),
         }
-        return { rows: [{ refund_id: storedRefund.refund_id }] as Row[] }
+        return { rows: [{ refund_id: storedRefund.refund_id }] as unknown as Row[] }
       }
       if (sql.startsWith('UPDATE payment_provider_events SET state')) {
-        if (!storedReceipt || storedReceipt.state !== 'RECEIVED') return { rows: [] as Row[] }
+        if (!storedReceipt || storedReceipt.state !== 'RECEIVED') return { rows: [] as unknown as Row[] }
         storedReceipt = {
           ...storedReceipt,
           state: String(values[0]) as Receipt['state'],
           outcome_code: values[2] === null ? null : String(values[2]),
         }
-        return { rows: [{ ...storedReceipt }] as Row[] }
+        return { rows: [{ ...storedReceipt }] as unknown as Row[] }
       }
       if (sql.startsWith('SELECT conflict_id')) {
-        return { rows: storedConflict ? [{ ...storedConflict }] as Row[] : [] as Row[] }
+        return { rows: storedConflict ? [{ ...storedConflict }] as unknown as Row[] : [] as unknown as Row[] }
       }
       if (sql.startsWith('INSERT INTO payment_provider_event_conflicts')) {
         if (!storedConflict) {
@@ -184,20 +184,20 @@ function fakePool(options: {
             occurrence_count: '1',
             version: '1',
           }
-          return { rows: [{ conflict_id: storedConflict.conflict_id }] as Row[] }
+          return { rows: [{ conflict_id: storedConflict.conflict_id }] as unknown as Row[] }
         }
-        return { rows: [] as Row[] }
+        return { rows: [] as unknown as Row[] }
       }
       if (sql.startsWith('UPDATE payment_provider_event_conflicts')) {
-        if (!storedConflict) return { rows: [] as Row[] }
+        if (!storedConflict) return { rows: [] as unknown as Row[] }
         storedConflict = {
           ...storedConflict,
           occurrence_count: String(Number(storedConflict.occurrence_count) + 1),
           version: String(Number(storedConflict.version) + 1),
         }
-        return { rows: [{ conflict_id: storedConflict.conflict_id }] as Row[] }
+        return { rows: [{ conflict_id: storedConflict.conflict_id }] as unknown as Row[] }
       }
-      return { rows: [] as Row[] }
+      return { rows: [] as unknown as Row[] }
     },
     release: vi.fn(),
   } as unknown as W07WebhookPostgresClient
