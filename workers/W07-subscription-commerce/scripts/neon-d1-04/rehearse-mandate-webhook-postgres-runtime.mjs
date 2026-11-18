@@ -30,12 +30,13 @@ const marker = 'w07-mandate-pg18-' + randomUUID().replaceAll('-', '')
 const merchantId = marker + '-merchant'
 const secret = 'postgres18-local-mandate-secret-' + randomUUID()
 const now = new Date()
-const nowIso = now.toISOString()
-const priorIso = new Date(now.getTime() - 5 * 60_000).toISOString()
-const consentAcceptedAt = new Date(now.getTime() - 4 * 60_000).toISOString()
-const paymentUpdatedAt = new Date(now.getTime() - 3 * 60_000).toISOString()
-const mandateActiveAt = new Date(now.getTime() - 2 * 60_000).toISOString()
-const mandateRevokedAt = new Date(now.getTime() - 60_000).toISOString()
+const priorIso = new Date(now.getTime() - 10 * 60_000).toISOString()
+const paymentReceivedAt = new Date(now.getTime() - 5 * 60_000).toISOString()
+const consentAcceptedAt = new Date(now.getTime() - 9 * 60_000).toISOString()
+const paymentUpdatedAt = new Date(now.getTime() - 8 * 60_000).toISOString()
+const mandateActiveAt = new Date(now.getTime() - 4 * 60_000).toISOString()
+const providerMethodDeletedAt = new Date(now.getTime() - 3 * 60_000).toISOString()
+const mandateRevokedAt = new Date(now.getTime() - 2 * 60_000).toISOString()
 const checks = {
   paymentSucceededCreatedConsentMandate: false,
   nativeMandateActivationApplied: false,
@@ -113,7 +114,7 @@ function signedPaymentWithConsent({ eventId, payment, paymentMethodId }) {
     event_id: eventId,
     event_type: 'payment_succeeded',
     merchant_id: merchantId,
-    timestamp: nowIso,
+    timestamp: paymentUpdatedAt,
     content: {
       type: 'payment_details',
       object: {
@@ -146,7 +147,7 @@ function signedMandateWebhook({ eventId, eventType, status, paymentId, paymentMe
     event_id: eventId,
     event_type: eventType,
     merchant_id: merchantId,
-    timestamp: nowIso,
+    timestamp: updatedAt,
     content: {
       type: 'mandate_details',
       object: {
@@ -164,7 +165,7 @@ function signedMandateWebhook({ eventId, eventType, status, paymentId, paymentMe
 
 async function receivePayment(input, eventRowId) {
   return receiveHyperswitchPaymentWebhookPostgres(pool, input, {
-    now: () => new Date(now),
+    now: () => new Date(paymentReceivedAt),
     createEventRowId: () => eventRowId,
     createConflictId: () => 'evtconf_' + marker + '-payment-conflict',
   })
@@ -281,7 +282,7 @@ try {
       merchantId,
       payment.customerId,
       marker + '-revoke-method',
-      new Date(now.getTime() - 90_000).toISOString(),
+      providerMethodDeletedAt,
       priorIso,
     ],
   )
