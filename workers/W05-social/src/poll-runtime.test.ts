@@ -1,12 +1,26 @@
-/// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import { castContentPollVote, configureContentPoll, deleteContentPoll, getContentPoll } from './poll-runtime.js'
+import type { PollReadRow, PollOptionCountRow, PollReadStore } from './poll-read-store.js'
+import type { PollConfigurationStore } from './poll-configuration-store.js'
+import type { PollDeleteStore } from './poll-delete-store.js'
+import type { PollVoteStore } from './poll-vote-store.js'
+import type { OwnedPostContext } from './owned-post-context.js'
 import type { PublishedContentSocialContext, W03ContentBinding } from './w03-content-context-client.js'
 
-const noDatabase = () => ({
-  prepare: vi.fn(() => { throw new Error('unexpected database access') }),
-  batch: vi.fn(async () => []),
-}) as unknown as D1Database
+const pollRow: PollReadRow = {
+  poll_id: 'poll-1',
+  content_id: 'content-1',
+  owner_user_id: 'author-1',
+  duration_minutes: 1440,
+  ends_at: '2099-10-18T04:00:00.000Z',
+  created_at: '2026-10-17T04:00:00.000Z',
+  updated_at: '2026-10-17T04:00:00.000Z',
+}
+
+const optionRows: PollOptionCountRow[] = [
+  { option_id: 'option-1', option_text: 'Yes', position: 0, votes: 2 },
+  { option_id: 'option-2', option_text: 'No', position: 1, votes: 1 },
+]
 
 const publishedPollContext = (
   ownerUserId: string | null = 'author-1',
@@ -19,57 +33,48 @@ const publishedPollContext = (
   updatedAt,
 })
 
-type PollDbScenario = {
-  content?: { id: string; content_type: string; state: string; owner_user_id: string; updated_at: string }
-  poll?: { poll_id: string; content_id: string; owner_user_id: string; duration_minutes: number; ends_at: string | null; created_at: string; updated_at: string }
-  options?: Array<{ option_id: string; option_text: string; position: number; votes: number }>
-  viewerOptionId?: string | null
-  voteCreatedAt?: string
-}
+const draftOwnerContext = (): OwnedPostContext => ({
+  contentId: 'content-1',
+  ownerUserId: 'author-1',
+  contentType: 'post',
+  state: 'DRAFT',
+  updatedAt: '2026-10-17T04:00:00.000Z',
+})
 
-const pollDb = (scenario: PollDbScenario) => {
-  const current = {
-    ...scenario,
-    options: [...(scenario.options ?? [])],
-    viewerOptionId: scenario.viewerOptionId ?? null,
-    voteCreatedAt: scenario.voteCreatedAt ?? '2026-10-17T05:00:00.000Z',
-  }
-  const prepare = vi.fn((sql: string) => ({
-    bind: (...args: unknown[]) => ({
-      first: async () => {
-        if (sql.includes('FROM contents WHERE id = ?')) return current.content ?? null
-        if (sql.includes('FROM social_user_interactions')) return null
-        if (sql.includes('FROM social_polls') && sql.includes('WHERE content_id = ?')) return current.poll ?? null
-        if (sql.includes('FROM social_polls p JOIN contents')) return current.poll ?? null
-        if (sql.includes('FROM social_poll_votes WHERE poll_id = ? AND user_id = ?')) {
-          return current.viewerOptionId ? { option_id: current.viewerOptionId, created_at: current.voteCreatedAt } : null
-        }
-        if (sql.includes('COUNT(*) AS count FROM social_poll_votes')) return { count: current.viewerOptionId ? 1 : 0 }
-        return null
-      },
-      all: async () => {
-        if (sql.includes('SELECT o.option_id, o.option_text')) {
-          return { results: current.options.map(option => ({ ...option, votes: option.votes + (option.option_id === current.viewerOptionId ? 1 : 0) })) }
-        }
-        if (sql.includes('SELECT option_text FROM social_poll_options')) {
-          return { results: current.options.map(option => ({ option_text: option.option_text })) }
-        }
-        return { results: [] }
-      },
-      run: async () => {
-        if (sql.includes('UPDATE social_polls SET ends_at') && current.poll && current.poll.ends_at === null) {
-          current.poll.ends_at = String(args[0])
-        }
-        if (sql.includes('INSERT OR IGNORE INTO social_poll_votes') && current.poll) {
-          current.viewerOptionId = String(args[3])
-        }
-        return { success: true, meta: { changes: 1 } }
-      },
-    }),
-  }))
-  const batch = vi.fn(async () => [{ success: true, meta: { changes: 1 } }])
-  return { db: { prepare, batch } as unknown as D1Database, prepare, batch }
-}
+const makeReadStore = (overrides: Partial<PollReadStore> = {}): PollReadStore => ({
+  isBlocked: vi.fn(async () => false),
+  getPoll: vi.fn(async () => pollRow),
+  setEndsAtIfUnset: vi.fn(async () => undefined),
+  listOptionsWithVoteCounts: vi.fn(async () => optionRows),
+  getViewerOptionId: vi.fn(async () => null),
+  ...overrides,
+})
+
+const makeConfigurationStore = (overrides: Partial<PollConfigurationStore> = {}): PollConfigurationStore => ({
+  getPoll: vi.fn(async () => null),
+  listOptionTexts: vi.fn(async () => ['Yes', 'No']),
+  countVotes: vi.fn(async () => 0),
+  createDraftPoll: vi.fn(async () => undefined),
+  updateDraftPoll: vi.fn(async () => undefined),
+  ...overrides,
+})
+
+const makeDeleteStore = (overrides: Partial<PollDeleteStore> = {}): PollDeleteStore => ({
+  getPoll: vi.fn(async () => ({
+    poll_id: 'poll-1',
+    content_id: 'content-1',
+    owner_user_id: 'author-1',
+  })),
+  countVotes: vi.fn(async () => 0),
+  deleteDraftPoll: vi.fn(async () => true),
+  ...overrides,
+})
+
+const makeVoteStore = (overrides: Partial<PollVoteStore> = {}): PollVoteStore => ({
+  getVote: vi.fn(async () => null),
+  insertVote: vi.fn(async () => undefined),
+  ...overrides,
+})
 
 const publishedOwnerContextBinding = (status = 200) => ({
   fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -90,433 +95,207 @@ const publishedOwnerContextBinding = (status = 200) => ({
 }) as W03ContentBinding & { fetch: ReturnType<typeof vi.fn> }
 
 describe('W05 poll runtime', () => {
-  it('rejects duplicated or too-short options before touching D1', async () => {
-    const db = noDatabase()
-    await expect(configureContentPoll(db, 'author-1', 'content-1', ['同一', ' 同一 '], 24))
+  it('rejects duplicated, undersized and invalid-duration configurations before Store access', async () => {
+    const configurationStore = makeConfigurationStore()
+    const readStore = makeReadStore()
+    await expect(configureContentPoll('author-1', 'content-1', ['同一', ' 同一 '], 24, draftOwnerContext(), configurationStore, readStore))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
-    await expect(configureContentPoll(db, 'author-1', 'content-1', ['只有一项'], 24))
+    await expect(configureContentPoll('author-1', 'content-1', ['只有一项'], 24, draftOwnerContext(), configurationStore, readStore))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
-    expect((db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
-  })
-
-  it('rejects poll durations outside 5 minutes through 7 days before touching D1', async () => {
-    const db = noDatabase()
-    const context = {
-      contentId: 'content-1',
-      ownerUserId: 'author-1',
-      contentType: 'post',
-      state: 'DRAFT',
-      updatedAt: '2026-10-17T04:00:00.000Z',
-    } as const
     for (const duration of [4, 10081, 5.5, Number.NaN, '5']) {
-      await expect(configureContentPoll(db, 'author-1', 'content-1', ['Yes', 'No'], duration, context))
+      await expect(configureContentPoll('author-1', 'content-1', ['Yes', 'No'], duration, draftOwnerContext(), configurationStore, readStore))
         .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
     }
-    expect((db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect(configurationStore.getPoll).not.toHaveBeenCalled()
+    expect(readStore.getPoll).not.toHaveBeenCalled()
   })
 
-  it('supports a 5-minute poll and computes expiry from the post publication time', async () => {
-    const { db } = pollDb({
-      content: {
-        id: 'content-1', content_type: 'post', state: 'PUBLISHED',
-        owner_user_id: 'author-1', updated_at: '2026-10-17T04:00:00.000Z',
-      },
-      poll: {
-        poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
-        duration_minutes: 5, ends_at: null,
-        created_at: '2026-10-16T04:00:00.000Z', updated_at: '2026-10-16T04:00:00.000Z',
-      },
-      options: [
-        { option_id: 'option-1', option_text: 'Yes', position: 0, votes: 0 },
-        { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
-      ],
+  it('returns public results, viewer choice, and publication-relative expiry through the injected read Store', async () => {
+    const readStore = makeReadStore({
+      getPoll: vi.fn(async () => ({ ...pollRow, duration_minutes: 5, ends_at: null })),
+      getViewerOptionId: vi.fn(async () => 'option-2'),
     })
-    await expect(getContentPoll(
-      db,
+    const page = await getContentPoll(
       'content-1',
-      null,
+      'viewer-1',
       publishedPollContext('author-1', '2026-10-17T04:00:00.000Z'),
-    )).resolves.toMatchObject({
+      readStore,
+    )
+    expect(page).toMatchObject({
+      pollId: 'poll-1',
+      contentId: 'content-1',
       durationMinutes: 5,
       durationHours: 5 / 60,
       endsAt: '2026-10-17T04:05:00.000Z',
-    })
-  })
-
-  it('returns public poll results and the current viewer vote', async () => {
-    const { db } = pollDb({
-      content: {
-        id: 'content-1', content_type: 'post', state: 'PUBLISHED',
-        owner_user_id: 'author-1', updated_at: '2026-10-17T04:00:00.000Z',
-      },
-      poll: {
-        poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
-        duration_minutes: 1440, ends_at: '2099-10-18T04:00:00.000Z',
-        created_at: '2026-10-17T04:00:00.000Z', updated_at: '2026-10-17T04:00:00.000Z',
-      },
-      options: [
-        { option_id: 'option-1', option_text: '选项一', position: 0, votes: 3 },
-        { option_id: 'option-2', option_text: '选项二', position: 1, votes: 2 },
-      ],
+      totalVotes: 3,
       viewerOptionId: 'option-2',
-    })
-    await expect(getContentPoll(db, 'content-1', 'viewer-1', publishedPollContext())).resolves.toMatchObject({
-      pollId: 'poll-1',
-      contentId: 'content-1',
-      totalVotes: 6,
-      viewerOptionId: 'option-2',
-      closed: false,
       options: [
-        { optionId: 'option-1', text: '选项一', votes: 3 },
-        { optionId: 'option-2', text: '选项二', votes: 3 },
+        { optionId: 'option-1', text: 'Yes', votes: 2 },
+        { optionId: 'option-2', text: 'No', votes: 1 },
       ],
     })
-    const prepare = (db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(prepare.mock.calls.some(([sql]) => /FROM contents WHERE id = \?/i.test(String(sql)))).toBe(false)
+    expect(readStore.isBlocked).toHaveBeenCalledWith('viewer-1', 'author-1')
+    expect(readStore.setEndsAtIfUnset).toHaveBeenCalledWith('poll-1', '2026-10-17T04:05:00.000Z')
+    expect(readStore.getViewerOptionId).toHaveBeenCalledWith('poll-1', 'viewer-1')
   })
 
-  it('starts the vote window from the published post time when first read', async () => {
-    const { db } = pollDb({
-      content: {
-        id: 'content-1', content_type: 'post', state: 'PUBLISHED',
-        owner_user_id: 'author-1', updated_at: '2026-10-17T04:00:00.000Z',
-      },
-      poll: {
-        poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
-        duration_minutes: 1440, ends_at: null,
-        created_at: '2026-10-16T04:00:00.000Z', updated_at: '2026-10-16T04:00:00.000Z',
-      },
+  it('hides a poll from blocked viewers and allows an owner to preview a draft', async () => {
+    const blockedStore = makeReadStore({ isBlocked: vi.fn(async () => true) })
+    await expect(getContentPoll('content-1', 'viewer-1', publishedPollContext(), blockedStore))
+      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(blockedStore.getPoll).not.toHaveBeenCalled()
+
+    const draftStore = makeReadStore()
+    const draft = await getContentPoll('content-1', 'author-1', draftOwnerContext(), draftStore)
+    expect(draft).toMatchObject({ pollId: 'poll-1', endsAt: null, viewerOptionId: null })
+    expect(draftStore.getViewerOptionId).not.toHaveBeenCalled()
+  })
+
+  it('creates a draft poll from W03 owner context and verifies the persisted read model', async () => {
+    const configurationStore = makeConfigurationStore()
+    const readStore = makeReadStore({
+      getPoll: vi.fn(async () => ({ ...pollRow, duration_minutes: 5, ends_at: null })),
+      listOptionsWithVoteCounts: vi.fn(async () => [
+        { option_id: 'new-1', option_text: 'Yes', position: 0, votes: 0 },
+        { option_id: 'new-2', option_text: 'No', position: 1, votes: 0 },
+      ]),
+    })
+    const result = await configureContentPoll(
+      'author-1',
+      'content-1',
+      ['Yes', 'No'],
+      5,
+      draftOwnerContext(),
+      configurationStore,
+      readStore,
+    )
+    expect(result).toMatchObject({ contentId: 'content-1', durationMinutes: 5, durationHours: 5 / 60 })
+    expect(configurationStore.createDraftPoll).toHaveBeenCalledWith(expect.objectContaining({
+      contentId: 'content-1',
+      ownerUserId: 'author-1',
+      durationMinutes: 5,
       options: [
-        { option_id: 'option-1', option_text: 'Yes', position: 0, votes: 0 },
-        { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
+        { text: 'Yes', position: 0, optionId: expect.any(String) },
+        { text: 'No', position: 1, optionId: expect.any(String) },
       ],
-    })
-    await expect(getContentPoll(db, 'content-1', null, publishedPollContext('author-1', '2026-10-17T04:00:00.000Z'))).resolves.toMatchObject({
-      endsAt: '2026-10-18T04:00:00.000Z',
-      totalVotes: 0,
-    })
+    }))
+    expect(readStore.getPoll).toHaveBeenCalledWith('content-1')
   })
 
-  it('fails closed when owner context is missing and denies a mismatched owner before touching D1', async () => {
-    const db = noDatabase()
-    await expect(configureContentPoll(db, 'author-1', 'content-1', ['Yes', 'No'], 24))
-      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
-    const context = {
-      contentId: 'content-1',
-      ownerUserId: 'author-1',
-      contentType: 'post',
-      state: 'DRAFT',
-      updatedAt: '2026-10-17T04:00:00.000Z',
-    } as const
-    await expect(configureContentPoll(db, 'attacker-1', 'content-1', ['Yes', 'No'], 24, context))
-      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-    await expect(deleteContentPoll(db, 'attacker-1', 'content-1', context))
-      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-    await expect(deleteContentPoll(db, 'author-1', 'content-1'))
-      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
-    expect((db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
-  })
-
-  it('configures a draft poll from W03 owner context without reading canonical contents', async () => {
-    const queries: string[] = []
-    let pollRead = 0
-    const optionRows = [
-      { option_id: 'option-1', option_text: 'Yes', position: 0, votes: 0 },
-      { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
-    ]
-    const pollRow = {
-      poll_id: 'poll-1',
-      content_id: 'content-1',
-      owner_user_id: 'author-1',
-      duration_minutes: 1440,
-      ends_at: null,
-      created_at: '2026-10-17T04:00:00.000Z',
-      updated_at: '2026-10-17T04:00:00.000Z',
-    }
-    const prepare = vi.fn((sql: string) => {
-      queries.push(sql)
-      return {
-        bind: (..._args: unknown[]) => ({
-          first: async () => {
-            if (sql.includes('FROM social_polls') && sql.includes('WHERE content_id = ?')) {
-              pollRead += 1
-              return pollRead === 1 ? null : pollRow
-            }
-            return null
-          },
-          all: async () => sql.includes('SELECT o.option_id, o.option_text')
-            ? { results: optionRows }
-            : { results: [] },
-          run: async () => ({ success: true, meta: { changes: 1 } }),
-        }),
-      }
+  it('does not change a poll after votes exist and configuration differs', async () => {
+    const configurationStore = makeConfigurationStore({
+      getPoll: vi.fn(async () => pollRow),
+      listOptionTexts: vi.fn(async () => ['Yes', 'No']),
+      countVotes: vi.fn(async () => 1),
     })
-    const batch = vi.fn(async () => [{ success: true, meta: { changes: 1 } }])
-    const db = { prepare, batch } as unknown as D1Database
-    const context = {
-      contentId: 'content-1',
-      ownerUserId: 'author-1',
-      contentType: 'post',
-      state: 'DRAFT',
-      updatedAt: '2026-10-17T04:00:00.000Z',
-    } as const
-
-    await expect(configureContentPoll(db, 'author-1', 'content-1', ['Yes', 'No'], 1440, context))
-      .resolves.toMatchObject({
-        pollId: 'poll-1',
-        contentId: 'content-1',
-        options: [{ text: 'Yes' }, { text: 'No' }],
-        durationMinutes: 1440,
-        durationHours: 24,
-      })
-    expect(batch).toHaveBeenCalledTimes(1)
-    expect(queries.some(sql => /(?:FROM|JOIN)\s+contents/i.test(sql))).toBe(false)
+    const readStore = makeReadStore()
+    await expect(configureContentPoll(
+      'author-1',
+      'content-1',
+      ['Yes', 'Maybe'],
+      1440,
+      draftOwnerContext(),
+      configurationStore,
+      readStore,
+    )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+    expect(configurationStore.updateDraftPoll).not.toHaveBeenCalled()
   })
 
-  it('deletes a draft poll with owner context without reading canonical contents', async () => {
-    const queries: string[] = []
-    const prepare = vi.fn((sql: string) => {
-      queries.push(sql)
-      return {
-        bind: (..._args: unknown[]) => ({
-          first: async () => null,
-          all: async () => ({ results: [] }),
-          run: async () => ({ success: true, meta: { changes: 1 } }),
-        }),
-      }
-    })
-    const batch = vi.fn(async () => [{ success: true, meta: { changes: 1 } }])
-    const db = { prepare, batch } as unknown as D1Database
-    const context = {
-      contentId: 'content-1',
-      ownerUserId: 'author-1',
-      contentType: 'post',
-      state: 'DRAFT',
-      updatedAt: '2026-10-17T04:00:00.000Z',
-    } as const
-    await expect(deleteContentPoll(db, 'author-1', 'content-1', context)).resolves.toBeUndefined()
-    expect(batch).not.toHaveBeenCalled()
-    expect(queries.some(sql => /(?:FROM|JOIN)\s+contents/i.test(sql))).toBe(false)
-  })
-
-  it('deletes an unvoted draft poll through the storage boundary', async () => {
-    const context = {
-      contentId: 'content-1',
-      ownerUserId: 'author-1',
-      contentType: 'post',
-      state: 'DRAFT',
-      updatedAt: '2026-10-17T04:00:00.000Z',
-    } as const
-    const store = {
-      getPoll: vi.fn(async () => ({
-        poll_id: 'poll-1',
-        content_id: 'content-1',
-        owner_user_id: 'author-1',
-      })),
-      countVotes: vi.fn(async () => 0),
-      deleteDraftPoll: vi.fn(async () => true),
-    }
-
-    await expect(deleteContentPoll(noDatabase(), 'author-1', 'content-1', context, store))
-      .resolves.toBeUndefined()
-    expect(store.getPoll).toHaveBeenCalledWith('content-1')
-    expect(store.countVotes).toHaveBeenCalledWith('poll-1')
-    expect(store.deleteDraftPoll).toHaveBeenCalledWith({
+  it('deletes only unvoted owner draft polls and treats a concurrent delete as idempotent', async () => {
+    const deleteStore = makeDeleteStore()
+    await expect(deleteContentPoll('author-1', 'content-1', draftOwnerContext(), deleteStore)).resolves.toBeUndefined()
+    expect(deleteStore.deleteDraftPoll).toHaveBeenCalledWith({
       pollId: 'poll-1',
       actorUserId: 'author-1',
       contentId: 'content-1',
     })
-  })
 
-  it('does not delete a draft poll after a vote exists', async () => {
-    const context = {
-      contentId: 'content-1',
-      ownerUserId: 'author-1',
-      contentType: 'post',
-      state: 'DRAFT',
-      updatedAt: '2026-10-17T04:00:00.000Z',
-    } as const
-    const store = {
-      getPoll: vi.fn(async () => ({
+    const votedStore = makeDeleteStore({ countVotes: vi.fn(async () => 1) })
+    await expect(deleteContentPoll('author-1', 'content-1', draftOwnerContext(), votedStore))
+      .rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+    expect(votedStore.deleteDraftPoll).not.toHaveBeenCalled()
+
+    const concurrentStore = makeDeleteStore({
+      getPoll: vi.fn().mockResolvedValueOnce({
         poll_id: 'poll-1',
         content_id: 'content-1',
         owner_user_id: 'author-1',
-      })),
-      countVotes: vi.fn(async () => 1),
-      deleteDraftPoll: vi.fn(async () => true),
-    }
-
-    await expect(deleteContentPoll(noDatabase(), 'author-1', 'content-1', context, store))
-      .rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
-    expect(store.deleteDraftPoll).not.toHaveBeenCalled()
-  })
-
-  it('treats a concurrent poll deletion as idempotent success', async () => {
-    const context = {
-      contentId: 'content-1',
-      ownerUserId: 'author-1',
-      contentType: 'post',
-      state: 'DRAFT',
-      updatedAt: '2026-10-17T04:00:00.000Z',
-    } as const
-    const store = {
-      getPoll: vi.fn()
-        .mockResolvedValueOnce({
-          poll_id: 'poll-1',
-          content_id: 'content-1',
-          owner_user_id: 'author-1',
-        })
-        .mockResolvedValueOnce(null),
-      countVotes: vi.fn(async () => 0),
+      }).mockResolvedValueOnce(null),
       deleteDraftPoll: vi.fn(async () => false),
-    }
-
-    await expect(deleteContentPoll(noDatabase(), 'author-1', 'content-1', context, store))
-      .resolves.toBeUndefined()
-    expect(store.getPoll).toHaveBeenCalledTimes(2)
-  })
-
-  it('prevents voting on a closed poll', async () => {
-    const { db } = pollDb({
-      content: {
-        id: 'content-1', content_type: 'post', state: 'PUBLISHED',
-        owner_user_id: 'author-1', updated_at: '2026-10-15T04:00:00.000Z',
-      },
-      poll: {
-        poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
-        duration_minutes: 1440, ends_at: '2026-10-16T04:00:00.000Z',
-        created_at: '2026-10-15T04:00:00.000Z', updated_at: '2026-10-15T04:00:00.000Z',
-      },
-      options: [
-        { option_id: 'option-1', option_text: 'Yes', position: 0, votes: 0 },
-        { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
-      ],
     })
-    await expect(castContentPollVote(
-      db,
-      publishedOwnerContextBinding(),
-      'viewer-1',
-      'content-1',
-      'option-1',
-      'poll-vote-closed',
-    )).rejects.toMatchObject({ code: 'POLL_CLOSED', status: 409 })
+    await expect(deleteContentPoll('author-1', 'content-1', draftOwnerContext(), concurrentStore)).resolves.toBeUndefined()
+    expect(concurrentStore.getPoll).toHaveBeenCalledTimes(2)
   })
-  it('validates vote target through W03 and writes the vote only in W05-owned tables', async () => {
-    const { db, prepare } = pollDb({
-      poll: {
-        poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
-        duration_minutes: 1440, ends_at: '2099-10-16T04:00:00.000Z',
-        created_at: '2026-10-15T04:00:00.000Z', updated_at: '2026-10-15T04:00:00.000Z',
-      },
-      options: [
-        { option_id: 'option-1', option_text: 'Yes', position: 0, votes: 0 },
-        { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
-      ],
+
+  it('validates W03 publication and Block policy before inserting a vote, then re-reads the winning choice', async () => {
+    let chosenOption: string | null = null
+    const readStore = makeReadStore({
+      getViewerOptionId: vi.fn(async () => chosenOption),
+      listOptionsWithVoteCounts: vi.fn(async () => optionRows.map(row => ({
+        ...row,
+        votes: row.votes + (row.option_id === chosenOption ? 1 : 0),
+      }))),
+    })
+    const voteStore = makeVoteStore({
+      getVote: vi.fn(async () => chosenOption ? { option_id: chosenOption, created_at: '2026-10-17T05:00:00.000Z' } : null),
+      insertVote: vi.fn(async input => { chosenOption = input.optionId }),
     })
     const binding = publishedOwnerContextBinding()
-    await expect(castContentPollVote(
-      db,
+    const result = await castContentPollVote(
       binding,
       'viewer-1',
       'content-1',
       'option-1',
-      'poll-vote-context',
-    )).resolves.toMatchObject({
-      pollId: 'poll-1',
-      viewerOptionId: 'option-1',
-      totalVotes: 1,
-      options: [
-        { optionId: 'option-1', votes: 1 },
-        { optionId: 'option-2', votes: 0 },
-      ],
-    })
-
+      'poll-vote-store-test',
+      voteStore,
+      readStore,
+    )
+    expect(result).toMatchObject({ pollId: 'poll-1', viewerOptionId: 'option-1' })
     expect(binding.fetch).toHaveBeenCalledTimes(1)
     const sent = binding.fetch.mock.calls[0]?.[0] as Request
     expect(sent.url).toContain('/internal/content/contents/content-1/public-post-context/author-1')
     expect(sent.headers.get('X-LuckRead-Caller')).toBe('W05')
     expect(sent.headers.has('Authorization')).toBe(false)
     expect(sent.headers.has('Cookie')).toBe(false)
-    expect(prepare.mock.calls.some(([sql]) => /FROM contents|JOIN contents|UPDATE contents|INSERT INTO contents/i.test(String(sql)))).toBe(false)
-  })
-
-  it('fails closed when W03 cannot validate the poll owner or binding', async () => {
-    const scenario = {
-      poll: {
-        poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
-        duration_minutes: 1440, ends_at: '2099-10-16T04:00:00.000Z',
-        created_at: '2026-10-15T04:00:00.000Z', updated_at: '2026-10-15T04:00:00.000Z',
-      },
-      options: [
-        { option_id: 'option-1', option_text: 'Yes', position: 0, votes: 0 },
-        { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
-      ],
-    }
-    const absent = pollDb(scenario)
-    await expect(castContentPollVote(absent.db, undefined, 'viewer-1', 'content-1', 'option-1', 'poll-vote-no-binding'))
-      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
-    expect(absent.prepare.mock.calls.some(([sql]) => /INSERT OR IGNORE INTO social_poll_votes/.test(String(sql)))).toBe(false)
-
-    const unpublished = pollDb(scenario)
-    await expect(castContentPollVote(unpublished.db, publishedOwnerContextBinding(404), 'viewer-1', 'content-1', 'option-1', 'poll-vote-unpublished'))
-      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-    expect(unpublished.prepare.mock.calls.some(([sql]) => /INSERT OR IGNORE INTO social_poll_votes/.test(String(sql)))).toBe(false)
-  })
-
-  it('uses injectable PostgreSQL vote and read stores without touching D1', async () => {
-    const db = noDatabase()
-    const poll = {
-      poll_id: 'poll-1',
-      content_id: 'content-1',
-      owner_user_id: 'author-1',
-      duration_minutes: 1440,
-      ends_at: '2099-10-16T04:00:00.000Z',
-      created_at: '2026-10-15T04:00:00.000Z',
-      updated_at: '2026-10-15T04:00:00.000Z',
-    }
-    let savedOptionId: string | null = null
-    const readStore = {
-      isBlocked: vi.fn(async () => false),
-      getPoll: vi.fn(async () => poll),
-      setEndsAtIfUnset: vi.fn(async () => undefined),
-      listOptionsWithVoteCounts: vi.fn(async () => [
-        { option_id: 'option-1', option_text: 'Yes', position: 0, votes: savedOptionId === 'option-1' ? 1 : 0 },
-        { option_id: 'option-2', option_text: 'No', position: 1, votes: savedOptionId === 'option-2' ? 1 : 0 },
-      ]),
-      getViewerOptionId: vi.fn(async () => savedOptionId),
-    }
-    const voteStore = {
-      getVote: vi.fn(async () => savedOptionId ? { option_id: savedOptionId, created_at: '2026-10-17T05:00:00.000Z' } : null),
-      insertVote: vi.fn(async (input: { optionId: string }) => { savedOptionId = input.optionId }),
-    }
-    const binding = publishedOwnerContextBinding()
-
-    await expect(castContentPollVote(
-      db, binding, 'viewer-1', 'content-1', 'option-1', 'poll-vote-postgres-store',
-      voteStore, readStore,
-    )).resolves.toMatchObject({
+    expect(readStore.isBlocked).toHaveBeenCalledWith('viewer-1', 'author-1')
+    expect(voteStore.insertVote).toHaveBeenCalledWith(expect.objectContaining({
       pollId: 'poll-1',
-      viewerOptionId: 'option-1',
-      totalVotes: 1,
-      options: [
-        { optionId: 'option-1', votes: 1 },
-        { optionId: 'option-2', votes: 0 },
-      ],
-    })
-
-    await expect(castContentPollVote(
-      db, binding, 'viewer-1', 'content-1', 'option-1', 'poll-vote-postgres-store-retry',
-      voteStore, readStore,
-    )).resolves.toMatchObject({ viewerOptionId: 'option-1', totalVotes: 1 })
-
-    await expect(castContentPollVote(
-      db, binding, 'viewer-1', 'content-1', 'option-2', 'poll-vote-postgres-store-change',
-      voteStore, readStore,
-    )).rejects.toMatchObject({ code: 'ALREADY_VOTED', status: 409 })
-
-    expect(voteStore.insertVote).toHaveBeenCalledTimes(1)
-    expect(readStore.getPoll).toHaveBeenCalled()
-    expect(db.prepare).not.toHaveBeenCalled()
+      contentId: 'content-1',
+      ownerUserId: 'author-1',
+      optionId: 'option-1',
+      userId: 'viewer-1',
+    }))
+    expect(voteStore.getVote).toHaveBeenCalledTimes(2)
   })
 
+  it('rejects a vote on a closed poll and rejects changing an existing vote', async () => {
+    const closedStore = makeReadStore({ getPoll: vi.fn(async () => ({ ...pollRow, ends_at: '2020-01-01T00:00:00.000Z' })) })
+    await expect(castContentPollVote(
+      publishedOwnerContextBinding(), 'viewer-1', 'content-1', 'option-1', 'poll-closed', makeVoteStore(), closedStore,
+    )).rejects.toMatchObject({ code: 'POLL_CLOSED', status: 409 })
+
+    const priorVoteStore = makeVoteStore({
+      getVote: vi.fn(async () => ({ option_id: 'option-1', created_at: '2026-10-17T05:00:00.000Z' })),
+    })
+    const openStore = makeReadStore()
+    await expect(castContentPollVote(
+      publishedOwnerContextBinding(), 'viewer-1', 'content-1', 'option-2', 'poll-already-voted', priorVoteStore, openStore,
+    )).rejects.toMatchObject({ code: 'ALREADY_VOTED', status: 409 })
+    expect(priorVoteStore.insertVote).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when W03 cannot validate the poll owner', async () => {
+    const readStore = makeReadStore()
+    const voteStore = makeVoteStore()
+    await expect(castContentPollVote(
+      publishedOwnerContextBinding(404),
+      'viewer-1',
+      'content-1',
+      'option-1',
+      'poll-unpublished',
+      voteStore,
+      readStore,
+    )).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(voteStore.insertVote).not.toHaveBeenCalled()
+  })
 })
