@@ -91,7 +91,7 @@ function fixture(options: Readonly<{
             payload_sha256: 'a'.repeat(64),
             state: 'RECEIVED',
             outcome_code: null,
-          } as Row],
+          } as unknown as Row],
           rowCount: 1,
         }
       }
@@ -103,7 +103,7 @@ function fixture(options: Readonly<{
             payload_sha256: options.existingReceipt.payloadSha256,
             state: options.existingReceipt.state,
             outcome_code: null,
-          } as Row] : [],
+          } as unknown as Row] : [],
           rowCount: options.existingReceipt ? 1 : 0,
         }
       }
@@ -115,15 +115,15 @@ function fixture(options: Readonly<{
             state: 'OPEN',
             occurrence_count: '1',
             version: '1',
-          } as Row] : [],
+          } as unknown as Row] : [],
           rowCount: options.conflictExists ? 1 : 0,
         }
       }
       if (sql.startsWith('INSERT INTO payment_provider_event_conflicts')) {
-        return { rows: [{ conflict_id: 'evtconf_native_test' } as Row], rowCount: 1 }
+        return { rows: [{ conflict_id: 'evtconf_native_test' } as unknown as Row], rowCount: 1 }
       }
       if (sql.startsWith('UPDATE payment_provider_event_conflicts')) {
-        return { rows: [{ conflict_id: 'evtconf_native_test' } as Row], rowCount: 1 }
+        return { rows: [{ conflict_id: 'evtconf_native_test' } as unknown as Row], rowCount: 1 }
       }
       if (sql.startsWith('SELECT payment_id, order_id')) {
         return {
@@ -140,7 +140,7 @@ function fixture(options: Readonly<{
             provider_updated_at: null,
             created_at: CREATED_AT,
             updated_at: CREATED_AT,
-          } as Row],
+          } as unknown as Row],
           rowCount: 1,
         }
       }
@@ -154,16 +154,16 @@ function fixture(options: Readonly<{
             currency: 'USD',
             total_minor: '2500',
             updated_at: CREATED_AT,
-          } as Row],
+          } as unknown as Row],
           rowCount: 1,
         }
       }
       if (sql.startsWith('SELECT cycle_id, state')) return { rows: [], rowCount: 0 }
       if (sql.startsWith('UPDATE payments')) {
-        return { rows: [{ payment_id: PAYMENT_ID } as Row], rowCount: 1 }
+        return { rows: [{ payment_id: PAYMENT_ID } as unknown as Row], rowCount: 1 }
       }
       if (sql.startsWith('UPDATE orders')) {
-        return { rows: [{ order_id: 'ord_native_test' } as Row], rowCount: 1 }
+        return { rows: [{ order_id: 'ord_native_test' } as unknown as Row], rowCount: 1 }
       }
       if (sql.startsWith('UPDATE payment_provider_events SET state')) {
         return {
@@ -173,7 +173,7 @@ function fixture(options: Readonly<{
             payload_sha256: 'a'.repeat(64),
             state: 'APPLIED',
             outcome_code: 'PAYMENT_STATUS_APPLIED_AND_ORDER_CONFIRMED',
-          } as Row],
+          } as unknown as Row],
           rowCount: 1,
         }
       }
