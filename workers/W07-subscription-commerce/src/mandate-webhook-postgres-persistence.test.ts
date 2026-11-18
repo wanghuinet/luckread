@@ -296,7 +296,7 @@ describe('W07 native PostgreSQL Hyperswitch mandate webhook', () => {
       dependencies,
     )
     expect(first?.outcome).toBe('APPLIED')
-    expect(conflict).toMatchObject({ outcome: 'PAYLOAD_CONFLICT', conflictId: 'evtconf_mandate_native_001' })
+    expect(conflict).toMatchObject({ outcome: 'PAYLOAD_CONFLICT', conflictId: 'evtconf_mandate-native-001' })
     expect(f.state.receipt).toMatchObject({
       state: 'APPLIED',
       payload_sha256: first?.payloadSha256,
