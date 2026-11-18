@@ -497,15 +497,15 @@ export async function listActiveMembershipPlans(
     const values: unknown[] = []
     if (creatorId) {
       values.push(creatorId)
-      sql += `AND p.owner_id = ${values.length} `
+      sql += `AND p.owner_id = $${values.length} `
     }
     if (cursor) {
       values.push(cursor.createdAt, cursor.createdAt, cursor.planId)
-      sql += `AND (p.created_at < ${values.length - 2}::timestamptz OR ` +
-        `(p.created_at = ${values.length - 1}::timestamptz AND p.plan_id < ${values.length})) `
+      sql += `AND (p.created_at < $${values.length - 2}::timestamptz OR ` +
+        `(p.created_at = $${values.length - 1}::timestamptz AND p.plan_id < $${values.length})) `
     }
     values.push(safeLimit + 1)
-    sql += `ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ${values.length}`
+    sql += `ORDER BY p.created_at DESC, p.plan_id DESC LIMIT $${values.length}`
     try {
       const result = await db.query<ActiveMembershipPlanRow & Record<string, unknown>>(sql, values)
       candidates = result.rows
@@ -1110,11 +1110,11 @@ export async function listCreatorMembershipPlans(
     const values: unknown[] = [creatorId]
     if (cursor) {
       values.push(cursor.createdAt, cursor.createdAt, cursor.planId)
-      sql += `AND (p.created_at < ${values.length - 2}::timestamptz OR ` +
-        `(p.created_at = ${values.length - 1}::timestamptz AND p.plan_id < ${values.length})) `
+      sql += `AND (p.created_at < $${values.length - 2}::timestamptz OR ` +
+        `(p.created_at = $${values.length - 1}::timestamptz AND p.plan_id < $${values.length})) `
     }
     values.push(safeLimit + 1)
-    sql += `ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ${values.length}`
+    sql += `ORDER BY p.created_at DESC, p.plan_id DESC LIMIT $${values.length}`
     try {
       const result = await db.query<MembershipPlanStoredRow & Record<string, unknown>>(sql, values)
       candidates = result.rows
