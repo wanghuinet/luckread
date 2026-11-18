@@ -428,32 +428,53 @@ async function scheduleSubscriptionPlanChange(
   }
 
   try {
-    const inserted = await env.D1_01.prepare(
-      'INSERT INTO membership_subscription_scheduled_plan_changes ' +
-      '(change_id, subscriber_id, subscription_id, change_type, expected_subscription_version, expected_plan_id, ' +
-      'expected_plan_version, target_plan_id, target_plan_version, effective_at, idempotency_key_hash, ' +
-      'status, applied_at, applied_subscription_version, created_at, updated_at, version) ' +
-      "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED', NULL, NULL, ?, ?, 1 " +
-      'WHERE EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = ? AND s.subscriber_id = ? ' +
-      "AND s.status = 'ACTIVE' AND s.cancel_at IS NULL AND s.version = ? AND s.plan_id = ? AND s.plan_version = ? " +
-      'AND s.current_period_start = ? AND s.current_period_end = ?) ' +
-      'AND EXISTS (SELECT 1 FROM membership_plans p WHERE p.plan_id = ? AND p.owner_type = \'CREATOR\' ' +
-      'AND p.owner_id = (SELECT creator_id FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ?) ' +
-      "AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC') " +
-      "AND NOT EXISTS (SELECT 1 FROM membership_subscription_plan_change_attempts a " +
-       "WHERE a.subscription_id = ? AND a.status IN ('PENDING_PAYMENT', 'RECONCILIATION_REQUIRED')) " +
-       "AND NOT EXISTS (SELECT 1 FROM membership_subscription_scheduled_plan_changes c " +
-       "WHERE c.subscription_id = ? AND c.status IN ('SCHEDULED', 'RECONCILIATION_REQUIRED'))",
-    ).bind(
-      changeId, subscriberId, subscriptionId, expectedChangeType, expectedVersion, preview.currentPlan.planId,
-      preview.currentPlan.planVersion, preview.targetPlan.planId, preview.targetPlan.planVersion,
-      preview.currentPeriodEnd, keyDigest, now, now,
-      subscriptionId, subscriberId, expectedVersion, preview.currentPlan.planId,
-      preview.currentPlan.planVersion, preview.currentPeriodStart, preview.currentPeriodEnd,
-      preview.targetPlan.planId, subscriptionId, subscriberId, subscriptionId, subscriptionId,
-    ).run();
-    if (Number(inserted.meta?.changes ?? 0) !== 1) {
-      const raced = await readScheduledChangeByIdempotency(env.D1_01, subscriberId, keyDigest);
+    let inserted: boolean;
+    if (isPostgresScheduledPlanStore(membershipStore)) {
+      inserted = await insertScheduledPlanChangePostgres(membershipStore, {
+        changeId,
+        subscriberId,
+        subscriptionId,
+        changeType: expectedChangeType,
+        expectedVersion,
+        currentPlanId: preview.currentPlan.planId,
+        currentPlanVersion: preview.currentPlan.planVersion,
+        targetPlanId: preview.targetPlan.planId,
+        targetPlanVersion: preview.targetPlan.planVersion,
+        effectiveAt: preview.currentPeriodEnd,
+        idempotencyKeyHash: keyDigest,
+        now,
+        currentPeriodStart: preview.currentPeriodStart,
+        currentPeriodEnd: preview.currentPeriodEnd,
+      });
+    } else {
+      const result = await membershipStore.prepare(
+        'INSERT INTO membership_subscription_scheduled_plan_changes ' +
+        '(change_id, subscriber_id, subscription_id, change_type, expected_subscription_version, expected_plan_id, ' +
+        'expected_plan_version, target_plan_id, target_plan_version, effective_at, idempotency_key_hash, ' +
+        'status, applied_at, applied_subscription_version, created_at, updated_at, version) ' +
+        "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED', NULL, NULL, ?, ?, 1 " +
+        'WHERE EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = ? AND s.subscriber_id = ? ' +
+        "AND s.status = 'ACTIVE' AND s.cancel_at IS NULL AND s.version = ? AND s.plan_id = ? AND s.plan_version = ? " +
+        'AND s.current_period_start = ? AND s.current_period_end = ?) ' +
+        'AND EXISTS (SELECT 1 FROM membership_plans p WHERE p.plan_id = ? AND p.owner_type = \'CREATOR\' ' +
+        'AND p.owner_id = (SELECT creator_id FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ?) ' +
+        "AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC') " +
+        "AND NOT EXISTS (SELECT 1 FROM membership_subscription_plan_change_attempts a " +
+        "WHERE a.subscription_id = ? AND a.status IN ('PENDING_PAYMENT', 'RECONCILIATION_REQUIRED')) " +
+        "AND NOT EXISTS (SELECT 1 FROM membership_subscription_scheduled_plan_changes c " +
+        "WHERE c.subscription_id = ? AND c.status IN ('SCHEDULED', 'RECONCILIATION_REQUIRED'))",
+      ).bind(
+        changeId, subscriberId, subscriptionId, expectedChangeType, expectedVersion, preview.currentPlan.planId,
+        preview.currentPlan.planVersion, preview.targetPlan.planId, preview.targetPlan.planVersion,
+        preview.currentPeriodEnd, keyDigest, now, now,
+        subscriptionId, subscriberId, expectedVersion, preview.currentPlan.planId,
+        preview.currentPlan.planVersion, preview.currentPeriodStart, preview.currentPeriodEnd,
+        preview.targetPlan.planId, subscriptionId, subscriberId, subscriptionId, subscriptionId,
+      ).run();
+      inserted = Number(result.meta?.changes ?? 0) === 1;
+    }
+    if (!inserted) {
+      const raced = await readScheduledChangeByIdempotency(membershipStore, subscriberId, keyDigest);
       if (raced) {
         const same = toScheduledChange(raced);
         if (same.subscriptionId === subscriptionId && same.targetPlanId === targetPlanId &&
