@@ -61,6 +61,7 @@ type VideoFeedItem = FeedContent & {
 async function resolveVideoSource(
   item: ApiContentRecord,
   sessionToken: string | null,
+  signal?: AbortSignal,
 ): Promise<VideoPlaybackResult> {
   const reference = item.mediaRefs?.find((value) => typeof value === 'string' && value.trim())?.trim();
   if (!reference) return { source: null, error: 'This video has no playable media attached.' };
@@ -77,7 +78,7 @@ async function resolveVideoSource(
 
   // Opaque media IDs must use the existing playback authorization endpoint.
   try {
-    const playback = await getMediaPlayback(reference);
+    const playback = await getMediaPlayback(reference, signal);
     const source = resolveNativeMediaSource(playback.url, sessionToken);
     return source
       ? { source }
@@ -361,6 +362,12 @@ export default function VideoFeed() {
   const [autoPlayEnabled, setAutoPlayEnabled] = useState(false);
   const requestIdRef = useRef(0);
   const loadingMoreRef = useRef(false);
+  const pageControllerRef = useRef<AbortController | null>(null);
+  const hydrationControllerRef = useRef<AbortController | null>(null);
+  const hydrationGenerationRef = useRef(0);
+  const recordsByIdRef = useRef<Map<string, ApiContentRecord>>(new Map());
+  const hydratedIdsRef = useRef<Set<string>>(new Set());
+  const [hydrationRetryVersion, setHydrationRetryVersion] = useState(0);
 
   useEffect(() => {
     if (!isFocused) return;
@@ -376,17 +383,25 @@ export default function VideoFeed() {
   const loadPage = useCallback(async (nextCursor: string | null = null, append = false) => {
     if (append && loadingMoreRef.current) return;
     const requestId = ++requestIdRef.current;
+    pageControllerRef.current?.abort();
+    const controller = new AbortController();
+    pageControllerRef.current = controller;
     loadingMoreRef.current = append;
+
     if (append) setLoadingMore(true);
-    else setLoading(true);
+    else {
+      hydrationControllerRef.current?.abort();
+      hydrationGenerationRef.current += 1;
+      hydratedIdsRef.current.clear();
+      recordsByIdRef.current.clear();
+      setCurrentId(null);
+      setLoading(true);
+    }
     setErrorMessage('');
 
     try {
-      const result = await fetchVideoFeedPage({
-        cursor: nextCursor,
-        limit: PAGE_SIZE,
-      });
-      if (requestId !== requestIdRef.current) return;
+      const result = await fetchVideoFeedPage({ cursor: nextCursor, limit: PAGE_SIZE, signal: controller.signal });
+      if (requestId !== requestIdRef.current || controller.signal.aborted) return;
       const page = unwrapApiData<ApiContentPage>(result.data);
       if (!result.response.ok || !page || !Array.isArray(page.items)) {
         throw new Error(getApiErrorMessage(result.data, 'Could not load LuckRead videos.', result.response.status));
@@ -396,115 +411,45 @@ export default function VideoFeed() {
         (item): item is ApiContentRecord & { id: string } =>
           Boolean(item && typeof item.id === 'string' && item.id.length > 0 && item.contentType === 'video'),
       );
+      const nextRecords = append ? new Map(recordsByIdRef.current) : new Map<string, ApiContentRecord>();
+      for (const record of videoRecords) nextRecords.set(record.id, record);
+      recordsByIdRef.current = nextRecords;
 
-      // Render the canonical list projection first. Optional W03/W05/W01
-      // enrichment and playback authorization must not hold the video screen.
       const visibleItems = videoRecords.flatMap((record): VideoFeedItem[] => {
         try {
           return [{
             ...mapContentToFeedContent(record, undefined, record.social, record.creator ?? record.author),
             contentId: record.id,
             videoSource: null,
-            mediaLoading: true,
+            mediaLoading: false,
           }];
         } catch {
-          // Skip only a malformed record; keep the rest of the video page visible.
           return [];
         }
       });
       if (videoRecords.length > 0 && visibleItems.length === 0) {
         throw new Error('Videos were returned, but could not be displayed. Please retry.');
       }
-
       if (append) {
         setItems((current) => {
           const known = new Set(current.map((item) => item.contentId));
           return [...current, ...visibleItems.filter((item) => !known.has(item.contentId))];
         });
-      } else {
-        setItems(visibleItems);
-      }
-      setCurrentId((current) => {
-        if (append) return current ?? visibleItems[0]?.contentId ?? null;
-        return current && visibleItems.some((item) => item.contentId === current)
-          ? current
-          : visibleItems[0]?.contentId ?? null;
-      });
+      } else setItems(visibleItems);
 
-      const sessionToken = await readSessionToken().catch(() => null);
-      if (requestId !== requestIdRef.current) return;
+      setCurrentId((current) => append
+        ? current ?? visibleItems[0]?.contentId ?? null
+        : visibleItems[0]?.contentId ?? null);
 
-      const projectionById = new Map(
-        visibleItems.map((item): [string, VideoFeedItem] => [item.contentId, item]),
-      );
-      const hydrationResults = await Promise.allSettled(
-        videoRecords.map(async (record): Promise<VideoFeedItem | null> => {
-          const { body, social, author, playback } = await settleVideoFeedEnrichment(
-            {
-              body: () => readContentBody(record, undefined, sessionToken),
-              social: () => readContentSocial(record.id),
-              author: () => readContentAuthor(record),
-              playback: () => resolveVideoSource(record, sessionToken),
-            },
-            {
-              social: record.social ?? null,
-              author: record.creator ?? record.author ?? null,
-            },
-          );
-
-          const fallback = projectionById.get(record.id);
-          try {
-            return {
-              ...mapContentToFeedContent(record, body, social, author, sessionToken),
-              contentId: record.id,
-              videoSource: playback.source,
-              mediaError: playback.source
-                ? undefined
-                : playback.error || 'This video has no playable media source.',
-              mediaLoading: false,
-              mediaSourceVersion: requestId,
-            };
-          } catch {
-            return fallback
-              ? {
-                  ...fallback,
-                  mediaLoading: false,
-                  mediaError: 'Unable to load this video. Please retry.',
-                }
-              : null;
-          }
-        }),
-      );
-      if (requestId !== requestIdRef.current) return;
-
-      // A malformed record or unexpected mapper failure must still settle its
-      // own loading state instead of leaving the whole feed waiting.
-      const hydratedItems = hydrationResults.flatMap((result, index): VideoFeedItem[] => {
-        if (result.status === 'fulfilled' && result.value) return [result.value];
-        const failedRecord = videoRecords[index];
-        const fallback = failedRecord ? projectionById.get(failedRecord.id) : undefined;
-        return fallback
-          ? [{
-              ...fallback,
-              mediaLoading: false,
-              mediaError: 'Unable to load video details. Please retry.',
-            }]
-          : [];
-      });
-      const hydratedById = new Map(
-        hydratedItems.map((item): [string, VideoFeedItem] => [item.contentId, item]),
-      );
-      setItems((current) =>
-        current.map((item) => hydratedById.get(item.contentId) ?? item),
-      );
-
+      // Canonical page cursor is committed before optional enrichment begins.
       setCursor(page.nextCursor || null);
       setHasMore(page.hasMore === true);
     } catch (cause) {
-      if (requestId !== requestIdRef.current) return;
+      if (requestId !== requestIdRef.current || controller.signal.aborted) return;
       setErrorMessage(cause instanceof Error ? cause.message : 'Could not load LuckRead videos.');
     } finally {
       if (requestId === requestIdRef.current) {
+        pageControllerRef.current = null;
         loadingMoreRef.current = false;
         setLoading(false);
         setLoadingMore(false);
@@ -513,28 +458,91 @@ export default function VideoFeed() {
     }
   }, []);
 
+  // Only the active card performs optional reads and obtains playback authority.
+  useEffect(() => {
+    if (!currentId || !isFocused) {
+      hydrationControllerRef.current?.abort();
+      hydrationControllerRef.current = null;
+      hydrationGenerationRef.current += 1;
+      return;
+    }
+    const record = recordsByIdRef.current.get(currentId);
+    if (!record || hydratedIdsRef.current.has(currentId)) return;
+
+    hydrationControllerRef.current?.abort();
+    const controller = new AbortController();
+    hydrationControllerRef.current = controller;
+    const generation = ++hydrationGenerationRef.current;
+    setItems((current) => current.map((item) => item.contentId === currentId
+      ? { ...item, mediaLoading: true, mediaError: undefined }
+      : item));
+
+    void (async () => {
+      const sessionToken = await readSessionToken().catch(() => null);
+      if (controller.signal.aborted || generation !== hydrationGenerationRef.current) return;
+      const { body, social, author, playback } = await settleVideoFeedEnrichment(
+        {
+          body: () => readContentBody(record, controller.signal, sessionToken),
+          social: () => readContentSocial(record.id, controller.signal),
+          author: () => readContentAuthor(record, controller.signal),
+          playback: () => resolveVideoSource(record, sessionToken, controller.signal),
+        },
+        { social: record.social ?? null, author: record.creator ?? record.author ?? null },
+      );
+      if (controller.signal.aborted || generation !== hydrationGenerationRef.current) return;
+
+      const hydrated: VideoFeedItem = {
+        ...mapContentToFeedContent(record, body, social, author, sessionToken),
+        contentId: record.id,
+        videoSource: playback.source,
+        mediaError: playback.source ? undefined : playback.error || 'This video has no playable media source.',
+        mediaLoading: false,
+        mediaSourceVersion: generation,
+      };
+      hydratedIdsRef.current.add(currentId);
+      setItems((current) => current.map((item) => item.contentId === currentId ? hydrated : item));
+    })().catch((cause) => {
+      if (controller.signal.aborted || generation !== hydrationGenerationRef.current) return;
+      hydratedIdsRef.current.add(currentId);
+      setItems((current) => current.map((item) => item.contentId === currentId
+        ? { ...item, mediaLoading: false, mediaError: cause instanceof Error ? cause.message : 'Unable to load video details.' }
+        : item));
+    });
+
+    return () => {
+      controller.abort();
+      if (hydrationControllerRef.current === controller) hydrationControllerRef.current = null;
+    };
+  }, [currentId, isFocused, hydrationRetryVersion]);
   useEffect(() => {
     void loadPage();
     return () => {
       requestIdRef.current += 1;
+      pageControllerRef.current?.abort();
+      hydrationControllerRef.current?.abort();
     };
   }, [loadPage]);
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: Array<ViewToken<VideoFeedItem>> }) => {
       const mostVisible = viewableItems.find((token) => token.isViewable && token.item?.contentId);
-      if (mostVisible?.item?.contentId) setCurrentId(mostVisible.item.contentId);
+      setCurrentId(mostVisible?.item?.contentId ?? null);
     },
   ).current;
   const viewabilityConfig = useMemo(() => ({ itemVisiblePercentThreshold: 65 }), []);
 
   const currentIndex = items.findIndex((item) => item.contentId === currentId);
   const retry = useCallback(() => {
+    if (currentId) {
+      hydratedIdsRef.current.delete(currentId);
+      setHydrationRetryVersion((value) => value + 1);
+      return;
+    }
     setItems([]);
     setCursor(null);
     setCurrentId(null);
     void loadPage();
-  }, [loadPage]);
+  }, [currentId, loadPage]);
 
   const openPost = useCallback((contentId?: string) => {
     if (contentId) router.push(('/post/' + encodeURIComponent(contentId)) as never);

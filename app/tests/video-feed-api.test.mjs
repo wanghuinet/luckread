@@ -94,20 +94,27 @@ test('keeps list projections and reports unavailable media when social or author
   expect(result.playback.error).toContain('private storage');
 });
 
-test('renders video list projections before asynchronous enrichment and settles each record independently', () => {
+test('renders video list projections immediately and hydrates only the visible video', () => {
   const videoScreen = readFileSync(
     new URL('../app/(drawer)/(tabs)/(video)/video.tsx', import.meta.url),
     'utf8',
   );
 
   const projectionIndex = videoScreen.indexOf('const visibleItems = videoRecords.flatMap(');
-  const enrichmentIndex = videoScreen.indexOf('const hydrationResults = await Promise.allSettled(');
+  const enrichmentIndex = videoScreen.indexOf('const { body, social, author, playback } = await settleVideoFeedEnrichment(');
 
   expect(projectionIndex).toBeGreaterThanOrEqual(0);
   expect(enrichmentIndex).toBeGreaterThan(projectionIndex);
   expect(videoScreen).toContain('mediaLoading: true');
   expect(videoScreen).toContain('mediaLoading: false');
   expect(videoScreen).toContain('settleVideoFeedEnrichment(');
+  expect(videoScreen).toContain('recordsByIdRef.current.get(currentId)');
+  expect(videoScreen).toContain('hydratedIdsRef.current.has(currentId)');
+  expect(videoScreen).toContain('signal: controller.signal');
+  expect(videoScreen).toContain('setCursor(page.nextCursor || null)');
+  expect(videoScreen).toContain('playback: () => resolveVideoSource(record, sessionToken, controller.signal)');
+  expect(videoScreen).not.toContain('videoRecords.map(async (record)');
+  expect(videoScreen).not.toContain('const hydrationResults = await Promise.allSettled(');
   expect(videoScreen).toContain('function VideoPlayerSurface(');
   expect(videoScreen).toContain('useVideoPlayer(source');
   expect(videoScreen).toContain('key={item.contentId +');

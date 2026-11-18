@@ -257,7 +257,7 @@ export function mapContentToFeedContent(
 /** Read author metadata from W01's public profile API when W03 only returns creatorId/ownerUserId. */
 const publicAuthorReads = new Map<string, Promise<ApiAuthor | null>>();
 
-export async function readContentAuthor(item: ApiContentRecord): Promise<ApiAuthor | null> {
+export async function readContentAuthor(item: ApiContentRecord, signal?: AbortSignal): Promise<ApiAuthor | null> {
   const embedded = item.creator || item.author;
   // W01 list responses include the complete public projection when available.
   // Treat explicit empty fields as a resolved profile too, so an unknown or
@@ -271,6 +271,17 @@ export async function readContentAuthor(item: ApiContentRecord): Promise<ApiAuth
 
   const authorId = item.creatorId || item.ownerUserId || embedded?.id || embedded?.userId;
   if (!authorId) return null;
+
+  if (signal) {
+    const profile = await resolvePublicProfileById(authorId, signal);
+    if (!profile || signal.aborted) return null;
+    return {
+      id: profile.id,
+      username: profile.username,
+      displayName: profile.displayName,
+      avatar: profile.avatar,
+    };
+  }
 
   let pending = publicAuthorReads.get(authorId);
   if (!pending) {
