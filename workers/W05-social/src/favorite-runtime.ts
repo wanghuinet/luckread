@@ -7,7 +7,6 @@ import {
   type FavoriteListReadStore,
 } from './favorite-list-read-store.js'
 import {
-  createD1FavoriteStatusReadStore,
   FavoriteStatusReadStoreError,
   type FavoriteStatusReadStore,
 } from './favorite-status-read-store.js'
@@ -152,17 +151,8 @@ export async function favorite(
   }
 }
 
-type FavoriteStatusDataSource = D1Database | FavoriteStatusReadStore
-
-function resolveFavoriteStatusReadStore(source: FavoriteStatusDataSource): FavoriteStatusReadStore {
-  if (typeof (source as FavoriteStatusReadStore).isFavorited === 'function') {
-    return source as FavoriteStatusReadStore
-  }
-  return createD1FavoriteStatusReadStore(source as D1Database)
-}
-
 export async function getFavoriteStatus(
-  source: FavoriteStatusDataSource,
+  source: FavoriteStatusReadStore,
   w03Content: W03ContentBinding | undefined,
   actorUserId: string,
   target: FavoriteTarget,
@@ -191,7 +181,7 @@ export async function getFavoriteStatus(
 
   let favorited: boolean
   try {
-    favorited = await resolveFavoriteStatusReadStore(source).isFavorited({
+    favorited = await source.isFavorited({
       actorUserId: actor,
       targetId,
     })
