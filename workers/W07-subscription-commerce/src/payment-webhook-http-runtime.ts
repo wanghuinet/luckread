@@ -24,6 +24,7 @@ import {
 } from './neon/payment-method-read-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import { receiveHyperswitchRefundWebhookPostgres } from './refund-webhook-postgres-persistence.js';
+import { receiveHyperswitchPaymentWebhookPostgres } from './payment-webhook-payment-postgres.js';
 
 type HyperswitchWebhookRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
   D1_01: D1Database;
@@ -45,6 +46,7 @@ type HyperswitchWebhookRuntimeDependencies = Readonly<{
   getWebhookDatabase?: (env: HyperswitchWebhookRuntimeEnv) => D1Database | undefined;
   getWebhookPostgresPool?: (env: HyperswitchWebhookRuntimeEnv) => W07WebhookPostgresPool | undefined;
   receiveRefundWebhookPostgres?: typeof receiveHyperswitchRefundWebhookPostgres;
+  receivePaymentWebhookPostgres?: typeof receiveHyperswitchPaymentWebhookPostgres;
   syncRenewalOutcome?: (
     env: Readonly<{ D1_01: D1Database; D1_04: D1Database }>,
     paymentId: string,
@@ -137,9 +139,15 @@ function paymentIdFromSignedPayload(rawBody: ArrayBuffer): string | null {
     const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(rawBody));
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
     const envelope = parsed as Record<string, unknown>;
-    if (envelope.content_type !== 'payment_details' ||
-        typeof envelope.resource !== 'object' || envelope.resource === null || Array.isArray(envelope.resource)) return null;
-    const paymentId = (envelope.resource as Record<string, unknown>).payment_id;
+    const content = typeof envelope.content === 'object' && envelope.content !== null &&
+      !Array.isArray(envelope.content)
+      ? envelope.content as Record<string, unknown>
+      : null;
+    const contentType = envelope.content_type ?? content?.type;
+    const resourceValue = envelope.resource ?? content?.object;
+    if (contentType !== 'payment_details' ||
+        typeof resourceValue !== 'object' || resourceValue === null || Array.isArray(resourceValue)) return null;
+    const paymentId = (resourceValue as Record<string, unknown>).payment_id;
     return typeof paymentId === 'string' && /^pay_[A-Za-z0-9]{26}$/.test(paymentId) ? paymentId : null;
   } catch {
     return null;
@@ -204,9 +212,21 @@ export async function handleHyperswitchWebhookRequest(
         postgresPool, webhookInput,
       )
       : null;
+    const nativePayment = postgresPool && !nativeRefund
+      ? await (dependencies.receivePaymentWebhookPostgres ?? receiveHyperswitchPaymentWebhookPostgres)(
+        postgresPool, webhookInput,
+      )
+      : null;
     let result: WebhookReceiptResult;
     if (nativeRefund) {
       result = nativeRefund;
+    } else if (nativePayment) {
+      // Keep the existing read/sync saga on the selected D1-04 Neon facade;
+      // payment_details state, order and renewal-cycle writes are committed natively above.
+      const neonDatabase = (dependencies.getWebhookDatabase ?? getW07PaymentWebhookDatabase)(env);
+      if (!neonDatabase) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+      webhookDatabase = neonDatabase;
+      result = nativePayment;
     } else {
       const receive = dependencies.receive ?? receiveHyperswitchWebhook;
       const neonDatabase = (dependencies.getWebhookDatabase ?? getW07PaymentWebhookDatabase)(env);

@@ -38,6 +38,7 @@ function fixture(options: {
   purchaseFulfillmentResult?: PaidMembershipPurchaseFulfillmentResult;
   webhookDatabase?: D1Database;
   nativeRefundResult?: WebhookReceiptResult;
+  nativePaymentResult?: WebhookReceiptResult;
 } = {}) {
   const calls: Array<{ db: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const syncCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
@@ -45,6 +46,7 @@ function fixture(options: {
   const purchaseFulfillmentCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
   const receiptCalls: Array<{ db: unknown; paymentId: string; merchantId: string }> = [];
   const postgresCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
+  const postgresPaymentCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const postgresPool = {} as W07WebhookPostgresPool;
   const receive: Receiver = async (db, input) => {
     calls.push({ db, input });
@@ -90,7 +92,7 @@ function fixture(options: {
     W07_DATABASE_DRIVER: undefined as string | undefined,
   };
   return {
-    env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, postgresCalls,
+    env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, postgresCalls, postgresPaymentCalls,
     dependencies: {
       receive,
       getWebhookDatabase: vi.fn(() => options.webhookDatabase),
@@ -101,6 +103,13 @@ function fixture(options: {
       ) => {
         postgresCalls.push({ pool, input });
         return options.nativeRefundResult ?? null;
+      },
+      receivePaymentWebhookPostgres: async (
+        pool: W07WebhookPostgresPool,
+        input: ReceiveHyperswitchWebhookInput,
+      ) => {
+        postgresPaymentCalls.push({ pool, input });
+        return options.nativePaymentResult ?? null;
       },
       syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder, issueReceipt,
       expirePendingPlanUpgrade: async () => {},
@@ -498,6 +507,58 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     expect(f.receiptCalls[0]?.db).toBe(neonDatabase);
     expect(f.syncCalls[0]?.env).toMatchObject({ D1_01: f.env.D1_01, D1_04: neonDatabase });
     expect(f.purchaseFulfillmentCalls[0]?.env).toMatchObject({ D1_01: f.env.D1_01, D1_04: neonDatabase });
+  });
+
+  it('uses the native PostgreSQL Store for nested Neon payment_details events and continues the post-commit purchase saga', async () => {
+    const neonDatabase = { marker: 'neon-d1-04' } as unknown as D1Database;
+    const paymentId = 'pay_' + 'n'.repeat(26);
+    const f = fixture({
+      nativePaymentResult: receipt('APPLIED'),
+      webhookDatabase: neonDatabase,
+      syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
+      purchaseFulfillmentResult: { outcome: 'APPLIED', fulfilledCount: 1 },
+    });
+    f.env.W07_DATABASE_DRIVER = 'neon';
+    const body = JSON.stringify({
+      event_id: 'evt_payment_native_01',
+      event_type: 'payment_succeeded',
+      merchant_id: MERCHANT,
+      content: {
+        type: 'payment_details',
+        object: {
+          payment_id: paymentId,
+          merchant_id: MERCHANT,
+          customer_id: 'customer_native_test',
+          amount: 300,
+          currency: 'USD',
+          status: 'succeeded',
+          updated: '2026-11-18T12:00:01.000Z',
+        },
+      },
+    });
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body, signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+
+    expect(response?.status).toBe(200);
+    expect(f.postgresPaymentCalls).toHaveLength(1);
+    expect(new TextDecoder().decode(f.postgresPaymentCalls[0]!.input.rawBody)).toBe(body);
+    expect(f.dependencies.getWebhookDatabase).toHaveBeenCalledOnce();
+    expect(f.calls).toHaveLength(0);
+    expect(f.postgresCalls).toHaveLength(1);
+    expect(f.receiptCalls).toMatchObject([{ db: neonDatabase, paymentId, merchantId: MERCHANT }]);
+    expect(f.syncCalls).toMatchObject([{
+      env: { D1_01: f.env.D1_01, D1_04: neonDatabase },
+      paymentId,
+      merchantId: MERCHANT,
+    }]);
+    expect(f.purchaseFulfillmentCalls).toMatchObject([{
+      env: { D1_01: f.env.D1_01, D1_04: neonDatabase },
+      paymentId,
+      merchantId: MERCHANT,
+    }]);
   });
 
   it('uses the native PostgreSQL Store for Neon refund_details events without resolving the D1-shaped webhook bridge', async () => {
