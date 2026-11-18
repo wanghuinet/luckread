@@ -547,6 +547,7 @@ export default function VideoFeed() {
   const currentIndex = items.findIndex((item) => item.contentId === currentId);
   const retry = useCallback(() => {
     if (currentId) {
+      hydratedIdsRef.current.delete(currentId);
       setHydrationRetryVersion((value) => value + 1);
       return;
     }
