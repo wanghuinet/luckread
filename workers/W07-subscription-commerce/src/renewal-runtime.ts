@@ -39,6 +39,7 @@ import {
 import type { OrderCreatePersistenceStore } from './order-persistence.js';
 import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
+import { readRenewalPaymentAttemptPostgres, type RenewalPaymentAttemptRow } from './renewal-payment-postgres.js';
 import {
   isExactRenewalMandateActivePostgres,
   readActiveRenewalMandatePostgres,
@@ -1264,16 +1265,23 @@ export async function processSubscriptionRenewalCycle(
     }
     cycle = leased;
     const config = resolveHyperswitchConfig(env);
-    const payment = await env.D1_04.prepare(
-      'SELECT payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, status, version, ' +
-      'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at ' +
-      'FROM payments WHERE payment_id = ? AND customer_id = ? LIMIT 1',
-    ).bind(cycle.payment_id, cycle.subscriber_id).first<{
-      payment_id: string; order_id: string; customer_id: string; provider: string; merchant_id: string;
-      amount_minor: number; currency: string; status: PaymentAttemptDto['status']; version: number;
-      idempotency_key: string; request_hash: string; provider_updated_at: string | null;
-      failure_code: string | null; created_at: string; updated_at: string;
-    }>();
+    const paymentStore = getW07RenewalCycleStore(env);
+    let payment: RenewalPaymentAttemptRow | null;
+    if (isPostgresRenewalCycleStore(paymentStore)) {
+      try {
+        payment = await readRenewalPaymentAttemptPostgres(
+          paymentStore, cycle.payment_id!, cycle.subscriber_id,
+        );
+      } catch {
+        throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+      }
+    } else {
+      payment = await paymentStore.prepare(
+        'SELECT payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, status, version, ' +
+        'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at ' +
+        'FROM payments WHERE payment_id = ? AND customer_id = ? LIMIT 1',
+      ).bind(cycle.payment_id, cycle.subscriber_id).first<RenewalPaymentAttemptRow>();
+    }
     if (!payment || payment.merchant_id !== cycle.merchant_id || payment.provider !== PROVIDER ||
         payment.order_id !== cycle.order_id || payment.amount_minor !== cycle.amount_minor ||
         payment.currency !== cycle.currency) {
