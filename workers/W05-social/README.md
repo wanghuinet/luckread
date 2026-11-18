@@ -69,3 +69,12 @@ Comment list reads now require the injected Neon PostgreSQL Store and fail close
 - The Neon runtime composes the existing PostgreSQL mutation and target-context Stores. No route passes `env.DB` into the Like runtime.
 - Preserved W03 published-content authority, published-comment checks, bidirectional Block preflight, final PostgreSQL guarded Like insert (including W03 parent owner for comment likes), idempotent Like/Unlike behavior, sanitized storage errors, and viewer/aggregate cache invalidation.
 - This is one Like business slice; it does not mean all W05 routes or the W05 Worker are D1-free.
+
+
+## W05 Favorite / Unfavorite and Favorite Status / List
+
+- Removed the D1 adapters for favorite mutation, favorite status reads, and actor-scoped favorite list reads.
+- The Favorite runtime now accepts only the three Store ports; it no longer resolves D1-or-Store sources or constructs default D1 adapters.
+- Favorite, Unfavorite, Favorite Status, and Favorite List routes require their injected Neon PostgreSQL Stores and fail closed with sanitized 503 when composition is missing.
+- Preserved W03 publication validation before writes and reads, unpublished-content cache invalidation/false status, actor-scoped idempotent favorite upsert, idempotent removal, bounded keyset pagination with exact microsecond cursor precision, and status-cache invalidation after mutations.
+- Existing PostgreSQL adapters, SQL tests, and rehearsal composition remain unchanged. This closes the Favorite business slice only, not all W05 D1-compatible routes.
