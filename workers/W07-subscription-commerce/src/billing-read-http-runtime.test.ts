@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { handleCommerceBillingReadRequest } from './billing-read-http-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 const CUSTOMER_ID = 'customer_history_001';
 
@@ -10,6 +11,9 @@ function createFixture() {
     documents: [] as unknown[][],
     payments: [] as unknown[][],
     refunds: [] as unknown[][],
+    postgresDocuments: [] as unknown[][],
+    postgresPayments: [] as unknown[][],
+    postgresRefunds: [] as unknown[][],
   };
   const page = {
     items: [],
@@ -27,6 +31,18 @@ function createFixture() {
     },
     listRefundHistory: async (...args) => {
       calls.refunds.push(args);
+      return page;
+    },
+    listBillingDocumentsPostgres: async (...args) => {
+      calls.postgresDocuments.push(args);
+      return page;
+    },
+    listPaymentHistoryPostgres: async (...args) => {
+      calls.postgresPayments.push(args);
+      return page;
+    },
+    listRefundHistoryPostgres: async (...args) => {
+      calls.postgresRefunds.push(args);
       return page;
     },
   };
@@ -118,15 +134,19 @@ describe('W07 customer billing and payment history reads', () => {
     }
   });
 
-  it('routes billing documents, payment history and refund history through the selected Neon D1-04 database', async () => {
+  it('routes billing documents, payment history and refund history through native Neon PostgreSQL without selecting D1', async () => {
     const f = createFixture();
-    const neonDatabase = {} as D1Database;
-    const d1Database = {
+    const postgresPool = {} as W07WebhookPostgresPool;
+    let legacyDatabaseSelections = 0;
+    f.env.D1_04 = {
       prepare() { throw new Error('D1 must not be used while Neon is selected'); },
     } as unknown as D1Database;
-    f.env.D1_04 = d1Database;
     f.env.W07_DATABASE_DRIVER = 'neon';
-    f.dependencies.getReadDatabase = () => neonDatabase;
+    f.dependencies.getPostgresPool = () => postgresPool;
+    f.dependencies.getReadDatabase = () => {
+      legacyDatabaseSelections += 1;
+      throw new Error('Neon billing history must not select the D1 compatibility database');
+    };
 
     const responses = await Promise.all([
       handleCommerceBillingReadRequest(
@@ -150,9 +170,13 @@ describe('W07 customer billing and payment history reads', () => {
     ]);
 
     expect(responses.map((response) => response?.status)).toEqual([200, 200, 200]);
-    expect(f.calls.documents[0]?.[0]).toBe(neonDatabase);
-    expect(f.calls.payments[0]?.[0]).toBe(neonDatabase);
-    expect(f.calls.refunds[0]?.[0]).toBe(neonDatabase);
+    expect(f.calls.postgresDocuments[0]?.slice(0, 2)).toEqual([postgresPool, CUSTOMER_ID]);
+    expect(f.calls.postgresPayments[0]?.slice(0, 2)).toEqual([postgresPool, CUSTOMER_ID]);
+    expect(f.calls.postgresRefunds[0]?.slice(0, 2)).toEqual([postgresPool, CUSTOMER_ID]);
+    expect(f.calls.documents).toHaveLength(0);
+    expect(f.calls.payments).toHaveLength(0);
+    expect(f.calls.refunds).toHaveLength(0);
+    expect(legacyDatabaseSelections).toBe(0);
   });
 
   it('maps persistence validation failures to sanitized responses', async () => {
