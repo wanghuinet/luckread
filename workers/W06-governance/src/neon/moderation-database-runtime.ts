@@ -10,10 +10,10 @@ import type { ModerationQueueReadStore } from '../moderation-queue-read-store.js
 
 /**
  * @deprecated-next-version
- * Reason: W06 Neon runtime still exposes a D1-shaped persistence facade and D1 provider branch.
+ * Reason: W06 Neon runtime still exposes a D1-shaped persistence facade and an explicit legacy D1 test/compatibility branch.
  * Replacement: Native PostgreSQL moderation stores and explicit PostgreSQL transaction/query contracts.
  * Removal: Next release.
- * Condition: Report, moderation, audit, and queue consumers accept native PostgreSQL stores without D1Database signatures or SQL translation.
+ * Condition: Report, moderation, audit, and queue consumers accept native PostgreSQL stores without D1Database signatures or SQL translation; then remove the explicitly selected legacy D1 compatibility branch.
  */
 export type W06ModerationDatabaseDriver = 'd1' | 'neon'
 
@@ -31,7 +31,7 @@ const queueStores = new WeakMap<object, ModerationQueueReadStore>()
 export function resolveW06ModerationDatabaseDriver(
   env: W06ModerationDatabaseRuntimeEnv,
 ): W06ModerationDatabaseDriver {
-  const configured = env.W06_MODERATION_DATABASE_DRIVER?.trim().toLowerCase() || 'd1'
+  const configured = env.W06_MODERATION_DATABASE_DRIVER?.trim().toLowerCase() || 'neon'
   if (configured === 'd1' || configured === 'neon') return configured
   throw new Error('W06_MODERATION_DATABASE_DRIVER_UNSUPPORTED')
 }
@@ -61,8 +61,8 @@ function loadW06PostgresPool(binding: object, connectionString: string): Promise
   const cached = pools.get(binding)
   if (cached) return cached
 
-  // Keep the D1 production path free of a Node.js driver import. The dynamic
-  // import runs only after an explicitly Neon-selected DB operation.
+  // Load the Node.js PostgreSQL driver lazily, on the first operation against the
+  // explicitly selected (or default) Neon runtime.
   const pending = import('pg').then(({ Pool }) => {
     const pool = new Pool({
       connectionString,

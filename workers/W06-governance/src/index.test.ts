@@ -19,6 +19,11 @@ const eventInput = {
   reason: 'verification completed',
 }
 
+const legacyD1TestEnv = (database: D1Database) => ({
+  D1_03: database,
+  W06_MODERATION_DATABASE_DRIVER: 'd1' as const,
+})
+
 function createDb(success = true) {
   const run = vi.fn().mockResolvedValue({ success })
   const bind = vi.fn().mockReturnValue({ run })
@@ -115,7 +120,7 @@ describe('W06 moderation queue pagination scope', () => {
         },
       })
 
-    const first = await runtime.default.fetch(requestFor('reviewer_1', 'req_queue_first'), { D1_03: db })
+    const first = await runtime.default.fetch(requestFor('reviewer_1', 'req_queue_first'), legacyD1TestEnv(db))
     expect(first.status).toBe(200)
     const payload = await first.json() as { nextCursor?: string }
     expect(payload.nextCursor).toEqual(expect.any(String))
@@ -124,7 +129,7 @@ describe('W06 moderation queue pagination scope', () => {
 
     const reused = await runtime.default.fetch(
       requestFor('reviewer_2', 'req_queue_second', payload.nextCursor),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(reused.status).toBe(400)
     await expect(reused.json()).resolves.toMatchObject({
@@ -162,7 +167,7 @@ describe('W06 moderation permission proof', () => {
       }),
     ]
     for (const request of requests) {
-      const response = await runtime.default.fetch(request, { D1_03: db })
+      const response = await runtime.default.fetch(request, legacyD1TestEnv(db))
       expect(response.status).toBe(403)
     }
     expect(prepare).not.toHaveBeenCalled()
@@ -444,7 +449,7 @@ describe('W06 runtime', () => {
   it('requires the private W01 transport for membership-plan audit writes', async () => {
     const { db, prepare } = createPlanAuditDb()
     const runtime = await import('./index')
-    const response = await runtime.default.fetch(planAuditRequest(planAuditInput, false), { D1_03: db })
+    const response = await runtime.default.fetch(planAuditRequest(planAuditInput, false), legacyD1TestEnv(db))
     expect(response.status).toBe(403)
     expect(prepare).not.toHaveBeenCalled()
   })
@@ -454,7 +459,7 @@ describe('W06 runtime', () => {
     const runtime = await import('./index')
     const response = await runtime.default.fetch(
       planAuditRequest(planAuditInput, true, 'req_plan_audit_l2', 'L2'),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(response.status).toBe(403)
     expect(await response.json()).toEqual({ error: 'PERMISSION_DENIED' })
@@ -466,7 +471,7 @@ describe('W06 runtime', () => {
     const runtime = await import('./index')
     const response = await runtime.default.fetch(
       planAuditRequest(planAuditInput, true, 'req_plan_audit_l7', 'L7'),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(response.status).toBe(201)
     expect(rows.get(planAuditInput.eventId)).toMatchObject({
@@ -479,7 +484,7 @@ describe('W06 runtime', () => {
   it('persists a canonical membership-plan creation event using the W01 principal', async () => {
     const { db, prepare, rows } = createPlanAuditDb()
     const runtime = await import('./index')
-    const response = await runtime.default.fetch(planAuditRequest(planAuditInput), { D1_03: db })
+    const response = await runtime.default.fetch(planAuditRequest(planAuditInput), legacyD1TestEnv(db))
     expect(response.status).toBe(201)
     expect(await response.json()).toMatchObject({
       eventId: planAuditInput.eventId,
@@ -516,7 +521,7 @@ describe('W06 runtime', () => {
     const runtime = await import('./index')
     const response = await runtime.default.fetch(
       planAuditRequest({ ...planAuditInput, priceMinor: -1 }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(response.status).toBe(400)
     expect(await response.json()).toEqual({ error: 'INVALID_MEMBERSHIP_PLAN_AUDIT' })
@@ -526,8 +531,8 @@ describe('W06 runtime', () => {
   it('replays the same durable audit event without a duplicate write', async () => {
     const { db, rows } = createPlanAuditDb()
     const runtime = await import('./index')
-    const first = await runtime.default.fetch(planAuditRequest(planAuditInput), { D1_03: db })
-    const replay = await runtime.default.fetch(planAuditRequest(planAuditInput, true, 'req_plan_audit_retry'), { D1_03: db })
+    const first = await runtime.default.fetch(planAuditRequest(planAuditInput), legacyD1TestEnv(db))
+    const replay = await runtime.default.fetch(planAuditRequest(planAuditInput, true, 'req_plan_audit_retry'), legacyD1TestEnv(db))
     expect(first.status).toBe(201)
     expect(replay.status).toBe(200)
     expect(await replay.json()).toMatchObject({ eventId: planAuditInput.eventId, replayed: true })
@@ -537,9 +542,9 @@ describe('W06 runtime', () => {
   it('rejects a conflicting payload for an existing plan audit identity', async () => {
     const { db, rows } = createPlanAuditDb()
     const runtime = await import('./index')
-    await runtime.default.fetch(planAuditRequest(planAuditInput), { D1_03: db })
+    await runtime.default.fetch(planAuditRequest(planAuditInput), legacyD1TestEnv(db))
     const conflicting = { ...planAuditInput, creatorId: 'creator_002' }
-    const response = await runtime.default.fetch(planAuditRequest(conflicting), { D1_03: db })
+    const response = await runtime.default.fetch(planAuditRequest(conflicting), legacyD1TestEnv(db))
     expect(response.status).toBe(409)
     expect(await response.json()).toEqual({ error: 'AUDIT_EVENT_CONFLICT' })
     expect(rows.size).toBe(1)
@@ -548,7 +553,7 @@ describe('W06 runtime', () => {
   it('fails closed when the audit database does not confirm persistence', async () => {
     const { db } = createPlanAuditDb(false)
     const runtime = await import('./index')
-    const response = await runtime.default.fetch(planAuditRequest(planAuditInput), { D1_03: db })
+    const response = await runtime.default.fetch(planAuditRequest(planAuditInput), legacyD1TestEnv(db))
     expect(response.status).toBe(503)
     expect(await response.json()).toEqual({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' })
   })
@@ -558,13 +563,13 @@ describe('W06 runtime', () => {
   it('requires the private W01 transport and creator-capable layer for publish intent audit', async () => {
     const { db, prepare } = createPlanAuditDb()
     const runtime = await import('./index')
-    const noTransport = await runtime.default.fetch(planPublishRequestAuditRequest(publishRequestAuditInput, false), { D1_03: db })
+    const noTransport = await runtime.default.fetch(planPublishRequestAuditRequest(publishRequestAuditInput, false), legacyD1TestEnv(db))
     expect(noTransport.status).toBe(403)
     expect(prepare).not.toHaveBeenCalled()
 
     const tooLow = await runtime.default.fetch(
       planPublishRequestAuditRequest(publishRequestAuditInput, true, 'req_plan_publish_intent_l2', 'L2'),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(tooLow.status).toBe(403)
     expect(prepare).not.toHaveBeenCalled()
@@ -573,7 +578,7 @@ describe('W06 runtime', () => {
   it('persists publish intent before lifecycle mutation using W01-derived actor and a stable request identity', async () => {
     const { db, prepare, rows } = createPlanAuditDb()
     const runtime = await import('./index')
-    const response = await runtime.default.fetch(planPublishRequestAuditRequest(publishRequestAuditInput), { D1_03: db })
+    const response = await runtime.default.fetch(planPublishRequestAuditRequest(publishRequestAuditInput), legacyD1TestEnv(db))
     expect(response.status).toBe(201)
     expect(await response.json()).toMatchObject({
       eventId: publishRequestAuditInput.eventId,
@@ -607,17 +612,17 @@ describe('W06 runtime', () => {
   it('confirms an exact semantic intent replay despite a new request timestamp and rejects conflicting facts', async () => {
     const { db, rows } = createPlanAuditDb()
     const runtime = await import('./index')
-    const first = await runtime.default.fetch(planPublishRequestAuditRequest(publishRequestAuditInput), { D1_03: db })
+    const first = await runtime.default.fetch(planPublishRequestAuditRequest(publishRequestAuditInput), legacyD1TestEnv(db))
     const replay = await runtime.default.fetch(
       planPublishRequestAuditRequest(publishRequestAuditInput, true, 'req_plan_publish_intent_retry'),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(first.status).toBe(201)
     expect(replay.status).toBe(200)
     expect(await replay.json()).toMatchObject({ eventId: publishRequestAuditInput.eventId, replayed: true })
     const conflict = await runtime.default.fetch(
       planPublishRequestAuditRequest({ ...publishRequestAuditInput, creatorId: 'creator_002' }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(conflict.status).toBe(409)
     expect(await conflict.json()).toEqual({ error: 'AUDIT_EVENT_CONFLICT' })
@@ -634,7 +639,7 @@ describe('W06 runtime', () => {
     for (const input of cases) {
       const { db, prepare } = createPlanAuditDb()
       const runtime = await import('./index')
-      const response = await runtime.default.fetch(planPublishRequestAuditRequest(input), { D1_03: db })
+      const response = await runtime.default.fetch(planPublishRequestAuditRequest(input), legacyD1TestEnv(db))
       expect(response.status).toBe(400)
       expect(await response.json()).toEqual({ error: 'INVALID_MEMBERSHIP_PLAN_PUBLISH_REQUEST_AUDIT' })
       expect(prepare).not.toHaveBeenCalled()
@@ -644,13 +649,13 @@ describe('W06 runtime', () => {
   it('requires the private W01 transport and creator-capable layer for plan publish audits', async () => {
     const { db, prepare } = createPlanAuditDb()
     const runtime = await import('./index')
-    const noTransport = await runtime.default.fetch(planPublishAuditRequest(publishAuditInput, false), { D1_03: db })
+    const noTransport = await runtime.default.fetch(planPublishAuditRequest(publishAuditInput, false), legacyD1TestEnv(db))
     expect(noTransport.status).toBe(403)
     expect(prepare).not.toHaveBeenCalled()
 
     const tooLow = await runtime.default.fetch(
       planPublishAuditRequest(publishAuditInput, true, 'req_plan_publish_l2', 'L2'),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(tooLow.status).toBe(403)
     expect(prepare).not.toHaveBeenCalled()
@@ -660,10 +665,10 @@ describe('W06 runtime', () => {
   it('durably records membership plan update intent and idempotently confirms semantic retries', async () => {
     const { db, prepare, rows } = createPlanAuditDb()
     const runtime = await import('./index')
-    const first = await runtime.default.fetch(planUpdateRequestAuditRequest(planUpdateRequestAuditInput), { D1_03: db })
+    const first = await runtime.default.fetch(planUpdateRequestAuditRequest(planUpdateRequestAuditInput), legacyD1TestEnv(db))
     const replay = await runtime.default.fetch(
       planUpdateRequestAuditRequest(planUpdateRequestAuditInput, true, 'req_plan_update_intent_retry'),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(first.status).toBe(201)
     expect(replay.status).toBe(200)
@@ -675,7 +680,7 @@ describe('W06 runtime', () => {
     })
     const conflict = await runtime.default.fetch(
       planUpdateRequestAuditRequest({ ...planUpdateRequestAuditInput, priceMinor: 999 }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(conflict.status).toBe(409)
     expect(rows.size).toBe(1)
@@ -686,8 +691,8 @@ describe('W06 runtime', () => {
     const malformed = { ...planUpdateRequestAuditInput, priceMinor: -1 }
     const { db, prepare } = createPlanAuditDb()
     const runtime = await import('./index')
-    const bad = await runtime.default.fetch(planUpdateRequestAuditRequest(malformed), { D1_03: db })
-    const noTransport = await runtime.default.fetch(planUpdateRequestAuditRequest(planUpdateRequestAuditInput, false), { D1_03: db })
+    const bad = await runtime.default.fetch(planUpdateRequestAuditRequest(malformed), legacyD1TestEnv(db))
+    const noTransport = await runtime.default.fetch(planUpdateRequestAuditRequest(planUpdateRequestAuditInput, false), legacyD1TestEnv(db))
     expect(bad.status).toBe(400)
     expect(noTransport.status).toBe(403)
     expect(prepare).not.toHaveBeenCalled()
@@ -696,13 +701,13 @@ describe('W06 runtime', () => {
   it('durably records lifecycle intent and rejects conflicting semantic replay', async () => {
     const { db, rows } = createPlanAuditDb()
     const runtime = await import('./index')
-    const first = await runtime.default.fetch(planLifecycleRequestAuditRequest(planLifecycleRequestAuditInput), { D1_03: db })
-    const replay = await runtime.default.fetch(planLifecycleRequestAuditRequest(planLifecycleRequestAuditInput, true, 'req_plan_lifecycle_retry'), { D1_03: db })
+    const first = await runtime.default.fetch(planLifecycleRequestAuditRequest(planLifecycleRequestAuditInput), legacyD1TestEnv(db))
+    const replay = await runtime.default.fetch(planLifecycleRequestAuditRequest(planLifecycleRequestAuditInput, true, 'req_plan_lifecycle_retry'), legacyD1TestEnv(db))
     expect(first.status).toBe(201)
     expect(replay.status).toBe(200)
     expect(await replay.json()).toMatchObject({ eventId: planLifecycleRequestAuditInput.eventId, action: 'membership.plan.lifecycle_requested', replayed: true })
     const conflict = await runtime.default.fetch(
-      planLifecycleRequestAuditRequest({ ...planLifecycleRequestAuditInput, creatorId: 'creator_002' }), { D1_03: db },
+      planLifecycleRequestAuditRequest({ ...planLifecycleRequestAuditInput, creatorId: 'creator_002' }), legacyD1TestEnv(db),
     )
     expect(conflict.status).toBe(409)
     expect(rows.size).toBe(1)
@@ -712,9 +717,9 @@ describe('W06 runtime', () => {
     const { db, prepare } = createPlanAuditDb()
     const runtime = await import('./index')
     const malformed = await runtime.default.fetch(
-      planLifecycleRequestAuditRequest({ ...planLifecycleRequestAuditInput, requestedStatus: 'ACTIVE' }), { D1_03: db },
+      planLifecycleRequestAuditRequest({ ...planLifecycleRequestAuditInput, requestedStatus: 'ACTIVE' }), legacyD1TestEnv(db),
     )
-    const noTransport = await runtime.default.fetch(planLifecycleRequestAuditRequest(planLifecycleRequestAuditInput, false), { D1_03: db })
+    const noTransport = await runtime.default.fetch(planLifecycleRequestAuditRequest(planLifecycleRequestAuditInput, false), legacyD1TestEnv(db))
     expect(malformed.status).toBe(400)
     expect(noTransport.status).toBe(403)
     expect(prepare).not.toHaveBeenCalled()
@@ -723,7 +728,7 @@ describe('W06 runtime', () => {
   it('persists an immutable plan pause event with before and after state', async () => {
     const { db, rows } = createPlanAuditDb()
     const runtime = await import('./index')
-    const response = await runtime.default.fetch(planLifecycleAuditRequest(planLifecycleAuditInput), { D1_03: db })
+    const response = await runtime.default.fetch(planLifecycleAuditRequest(planLifecycleAuditInput), legacyD1TestEnv(db))
     expect(response.status).toBe(201)
     expect(await response.json()).toMatchObject({ eventId: planLifecycleAuditInput.eventId, action: 'membership.plan.paused', targetId: planId, replayed: false })
     expect(rows.get(planLifecycleAuditInput.eventId)).toMatchObject({
@@ -736,7 +741,7 @@ describe('W06 runtime', () => {
   it('persists a permanent plan retirement audit from PAUSED/PRIVATE to RETIRED/PRIVATE', async () => {
     const { db, rows } = createPlanAuditDb()
     const runtime = await import('./index')
-    const response = await runtime.default.fetch(planLifecycleAuditRequest(planLifecycleRetireAuditInput), { D1_03: db })
+    const response = await runtime.default.fetch(planLifecycleAuditRequest(planLifecycleRetireAuditInput), legacyD1TestEnv(db))
     expect(response.status).toBe(201)
     expect(await response.json()).toMatchObject({
       eventId: planLifecycleRetireAuditInput.eventId,
@@ -757,7 +762,7 @@ describe('W06 runtime', () => {
   it('persists membership plan updated event with exact version and new commercial terms', async () => {
     const { db, rows } = createPlanAuditDb()
     const runtime = await import('./index')
-    const response = await runtime.default.fetch(planUpdatedAuditRequest(planUpdatedAuditInput), { D1_03: db })
+    const response = await runtime.default.fetch(planUpdatedAuditRequest(planUpdatedAuditInput), legacyD1TestEnv(db))
     expect(response.status).toBe(201)
     expect(await response.json()).toMatchObject({
       eventId: planUpdatedAuditInput.eventId,
@@ -780,7 +785,7 @@ describe('W06 runtime', () => {
   it('persists membership plan publication with immutable before/after lifecycle facts', async () => {
     const { db, prepare, rows } = createPlanAuditDb()
     const runtime = await import('./index')
-    const response = await runtime.default.fetch(planPublishAuditRequest(publishAuditInput), { D1_03: db })
+    const response = await runtime.default.fetch(planPublishAuditRequest(publishAuditInput), legacyD1TestEnv(db))
     expect(response.status).toBe(201)
     expect(await response.json()).toMatchObject({
       eventId: publishAuditInput.eventId,
@@ -821,17 +826,17 @@ describe('W06 runtime', () => {
   it('replays an identical plan publication audit and rejects conflicting immutable facts', async () => {
     const { db, rows } = createPlanAuditDb()
     const runtime = await import('./index')
-    const first = await runtime.default.fetch(planPublishAuditRequest(publishAuditInput), { D1_03: db })
+    const first = await runtime.default.fetch(planPublishAuditRequest(publishAuditInput), legacyD1TestEnv(db))
     const replay = await runtime.default.fetch(
       planPublishAuditRequest(publishAuditInput, true, 'req_plan_publish_audit_retry'),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(first.status).toBe(201)
     expect(replay.status).toBe(200)
     expect(await replay.json()).toMatchObject({ eventId: publishAuditInput.eventId, replayed: true })
     const conflict = await runtime.default.fetch(
       planPublishAuditRequest({ ...publishAuditInput, priceMinor: 900 }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(conflict.status).toBe(409)
     expect(await conflict.json()).toEqual({ error: 'AUDIT_EVENT_CONFLICT' })
@@ -848,7 +853,7 @@ describe('W06 runtime', () => {
     for (const input of cases) {
       const { db, prepare } = createPlanAuditDb()
       const runtime = await import('./index')
-      const response = await runtime.default.fetch(planPublishAuditRequest(input), { D1_03: db })
+      const response = await runtime.default.fetch(planPublishAuditRequest(input), legacyD1TestEnv(db))
       expect(response.status).toBe(400)
       expect(await response.json()).toEqual({ error: 'INVALID_MEMBERSHIP_PLAN_PUBLISH_AUDIT' })
       expect(prepare).not.toHaveBeenCalled()
@@ -858,7 +863,7 @@ describe('W06 runtime', () => {
   it('requires the private W01 transport for commerce order audit writes', async () => {
     const { db, prepare } = createPlanAuditDb()
     const runtime = await import('./index')
-    const response = await runtime.default.fetch(orderAuditRequest(orderAuditInput, false), { D1_03: db })
+    const response = await runtime.default.fetch(orderAuditRequest(orderAuditInput, false), legacyD1TestEnv(db))
     expect(response.status).toBe(403)
     expect(prepare).not.toHaveBeenCalled()
   })
@@ -868,7 +873,7 @@ describe('W06 runtime', () => {
     const runtime = await import('./index')
     const response = await runtime.default.fetch(
       orderAuditRequest(orderAuditInput, true, 'req_order_audit_l1', 'L1'),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(response.status).toBe(403)
     expect(await response.json()).toEqual({ error: 'PERMISSION_DENIED' })
@@ -878,7 +883,7 @@ describe('W06 runtime', () => {
   it('persists commerce order facts using the W01-derived actor and immutable audit identity', async () => {
     const { db, prepare, rows } = createPlanAuditDb()
     const runtime = await import('./index')
-    const response = await runtime.default.fetch(orderAuditRequest(orderAuditInput), { D1_03: db })
+    const response = await runtime.default.fetch(orderAuditRequest(orderAuditInput), legacyD1TestEnv(db))
     expect(response.status).toBe(201)
     expect(await response.json()).toMatchObject({
       eventId: orderAuditInput.eventId,
@@ -912,7 +917,7 @@ describe('W06 runtime', () => {
     const runtime = await import('./index')
     const badTotal = await runtime.default.fetch(
       orderAuditRequest({ ...orderAuditInput, totalMinor: 1 }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(badTotal.status).toBe(400)
     expect(await badTotal.json()).toEqual({ error: 'INVALID_COMMERCE_ORDER_AUDIT' })
@@ -920,7 +925,7 @@ describe('W06 runtime', () => {
 
     const spoofedActor = await runtime.default.fetch(
       orderAuditRequest({ ...orderAuditInput, actorId: 'attacker', userId: 'attacker' }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(spoofedActor.status).toBe(400)
     expect(prepare).not.toHaveBeenCalled()
@@ -929,10 +934,10 @@ describe('W06 runtime', () => {
   it('replays an identical commerce order audit and rejects conflicting facts', async () => {
     const { db, rows } = createPlanAuditDb()
     const runtime = await import('./index')
-    const first = await runtime.default.fetch(orderAuditRequest(orderAuditInput), { D1_03: db })
+    const first = await runtime.default.fetch(orderAuditRequest(orderAuditInput), legacyD1TestEnv(db))
     const replay = await runtime.default.fetch(
       orderAuditRequest(orderAuditInput, true, 'req_order_audit_retry'),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(first.status).toBe(201)
     expect(replay.status).toBe(200)
@@ -940,7 +945,7 @@ describe('W06 runtime', () => {
     expect(rows.size).toBe(1)
 
     const conflicting = { ...orderAuditInput, currency: 'EUR' }
-    const conflict = await runtime.default.fetch(orderAuditRequest(conflicting), { D1_03: db })
+    const conflict = await runtime.default.fetch(orderAuditRequest(conflicting), legacyD1TestEnv(db))
     expect(conflict.status).toBe(409)
     expect(await conflict.json()).toEqual({ error: 'AUDIT_EVENT_CONFLICT' })
     expect(rows.size).toBe(1)
@@ -949,7 +954,7 @@ describe('W06 runtime', () => {
   it('fails closed when the commerce order audit write cannot be confirmed', async () => {
     const { db } = createPlanAuditDb(false)
     const runtime = await import('./index')
-    const response = await runtime.default.fetch(orderAuditRequest(orderAuditInput), { D1_03: db })
+    const response = await runtime.default.fetch(orderAuditRequest(orderAuditInput), legacyD1TestEnv(db))
     expect(response.status).toBe(503)
     expect(await response.json()).toEqual({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' })
   })
@@ -964,7 +969,7 @@ describe('W06 runtime', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(eventInput),
       }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
 
     expect(response.status).toBe(201)
@@ -1012,7 +1017,7 @@ describe('W06 runtime', () => {
           afterVersion: 4,
         }),
       }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
 
     expect(response.status).toBe(400)
@@ -1033,7 +1038,7 @@ describe('W06 runtime', () => {
           requestId: 'request-runtime-1',
         }),
       }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
 
     expect(response.status).toBe(400)
@@ -1051,7 +1056,7 @@ describe('W06 runtime', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(eventInput),
       }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
 
     expect(response.status).toBe(503)
@@ -1064,7 +1069,7 @@ describe('W06 runtime', () => {
 
     const response = await runtime.default.fetch(
       new Request('https://w06.internal/health'),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
 
     expect(response.status).toBe(200)
@@ -1114,7 +1119,7 @@ describe('W06 runtime', () => {
           permissionStatus: 'granted',
         }),
       }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
 
     expect(response.status).toBe(201)
@@ -1170,7 +1175,7 @@ describe('W06 runtime', () => {
       new Request('https://w06.internal/internal/audit-events/push-endpoint-mutation-requested', {
         method: 'POST', headers, body: JSON.stringify(body),
       }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(mismatch.status).toBe(409)
     expect(prepare).not.toHaveBeenCalled()
@@ -1181,7 +1186,7 @@ describe('W06 runtime', () => {
         headers: { ...headers, 'Idempotency-Key': body.idempotencyKey, 'X-LuckRead-Principal-Layer': 'L1' },
         body: JSON.stringify(body),
       }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(lowLayer.status).toBe(403)
     expect(prepare).not.toHaveBeenCalled()
@@ -1215,7 +1220,7 @@ describe('W06 runtime', () => {
         },
         body: JSON.stringify({ eventId, preferences: { follow: false, mention: true } }),
       }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(response.status).toBe(201)
     await expect(response.json()).resolves.toMatchObject({
@@ -1248,7 +1253,7 @@ describe('W06 runtime', () => {
         method: 'POST', headers,
         body: JSON.stringify({ eventId, preferences: { follow: false }, userId: 'attacker' }),
       }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(spoofed.status).toBe(400)
     const lowLayer = await runtime.default.fetch(
@@ -1256,7 +1261,7 @@ describe('W06 runtime', () => {
         method: 'POST', headers: { ...headers, 'X-LuckRead-Principal-Layer': 'L1' },
         body: JSON.stringify({ eventId, preferences: { follow: false } }),
       }),
-      { D1_03: db },
+      legacyD1TestEnv(db),
     )
     expect(lowLayer.status).toBe(403)
     expect(prepare).not.toHaveBeenCalled()
