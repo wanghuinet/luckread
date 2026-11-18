@@ -857,8 +857,6 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           contentId,
           (body as { optionId: string }).optionId,
           request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
-          dependencies.pollVoteStore,
-          dependencies.pollReadStore,
         )
         return json({ data: { poll }, requestId: createRequestId() }, 200)
       }
