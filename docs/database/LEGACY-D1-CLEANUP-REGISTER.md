@@ -125,3 +125,11 @@
 - Updated tests to remove the D1 fallback expectation and verify that missing composition does not touch `env.DB`.
 - Preserved the 500-author bounded candidate window, bidirectional Block filtering, viewer-directed Mute filtering, deterministic ordering, and W03 content authority.
 - This slice does not clean up the separate Follow/Unfollow writer, follower/following list reader, or Follow status reader; those remain separate work items.
+
+
+## W02 Role Layer Store
+
+- Removed the deprecated D1 `RoleLayerStore` adapter and its D1-only SQL fixture.
+- The production runtime already composes `createPostgresRoleLayerStore` from the existing Neon PostgreSQL pool; this change removes only the unused compatibility adapter.
+- The role-layer Store contract and deny-on-missing-account behavior remain unchanged. Tests retain the authority-boundary cases and assert the PostgreSQL adapter uses numbered parameters.
+- Other W02 D1-backed test/schema adapters and historical migration sources remain tracked separately; this slice does not delete them.
