@@ -269,6 +269,61 @@ async function markProviderDeleted(
   })
 }
 
+export async function readActiveRenewalMandatePostgres(
+  db: PaymentMethodPostgresQueryExecutor,
+  merchantId: string,
+  customerId: string,
+): Promise<Readonly<{ mandate_record_id: string; payment_method_id: string }> | null> {
+  try {
+    const result = await db.query<{
+      mandate_record_id: string
+      payment_method_id: string
+    }>(
+      'SELECT m.mandate_record_id, m.payment_method_id FROM payment_mandates m ' +
+      'JOIN saved_payment_methods s ON s.provider = m.provider AND s.merchant_id = m.merchant_id ' +
+      'AND s.customer_id = m.customer_id AND s.payment_method_id = m.payment_method_id ' +
+      "WHERE m.provider = $1 AND m.merchant_id = $2 AND m.customer_id = $3 " +
+      "AND m.status = 'ACTIVE' AND m.provider_mandate_id IS NOT NULL " +
+      "AND NOT EXISTS (SELECT 1 FROM payment_method_revocation_requests r JOIN saved_payment_methods rs " +
+      "ON rs.saved_payment_method_id = r.saved_payment_method_id WHERE rs.provider = m.provider " +
+      'AND rs.merchant_id = m.merchant_id AND rs.customer_id = m.customer_id ' +
+      "AND rs.payment_method_id = m.payment_method_id AND r.status <> 'COMPLETED') " +
+      'ORDER BY m.updated_at DESC, m.mandate_record_id DESC LIMIT 1',
+      [PROVIDER, merchantId, customerId],
+    )
+    return result.rows[0] ?? null
+  } catch (error) {
+    throw mapQueryError(error)
+  }
+}
+
+export async function isExactRenewalMandateActivePostgres(
+  db: PaymentMethodPostgresQueryExecutor,
+  mandateRecordId: string,
+  merchantId: string,
+  customerId: string,
+  paymentMethodId: string,
+): Promise<boolean> {
+  try {
+    const result = await db.query<{ active: number }>(
+      'SELECT 1 AS active FROM payment_mandates m ' +
+      'JOIN saved_payment_methods s ON s.provider = m.provider AND s.merchant_id = m.merchant_id ' +
+      'AND s.customer_id = m.customer_id AND s.payment_method_id = m.payment_method_id ' +
+      "WHERE m.mandate_record_id = $1 AND m.provider = $2 AND m.merchant_id = $3 " +
+      "AND m.customer_id = $4 AND m.payment_method_id = $5 AND m.status = 'ACTIVE' " +
+      'AND m.provider_mandate_id IS NOT NULL ' +
+      "AND NOT EXISTS (SELECT 1 FROM payment_method_revocation_requests r JOIN saved_payment_methods rs " +
+      "ON rs.saved_payment_method_id = r.saved_payment_method_id WHERE rs.provider = m.provider " +
+      'AND rs.merchant_id = m.merchant_id AND rs.customer_id = m.customer_id ' +
+      "AND rs.payment_method_id = m.payment_method_id AND r.status <> 'COMPLETED') LIMIT 1",
+      [mandateRecordId, PROVIDER, merchantId, customerId, paymentMethodId],
+    )
+    return result.rows[0]?.active === 1
+  } catch (error) {
+    throw mapQueryError(error)
+  }
+}
+
 export function createPostgresPaymentMethodReadStore(
   db: PaymentMethodPostgresQueryExecutor,
 ): PaymentMethodReadStore {

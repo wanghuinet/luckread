@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   createPostgresPaymentMethodReadStore,
+  isExactRenewalMandateActivePostgres,
+  readActiveRenewalMandatePostgres,
   type PaymentMethodPostgresQueryExecutor,
   type PaymentMethodPostgresTransactionClient,
 } from './payment-method-read-store-postgres.js'
@@ -150,4 +152,74 @@ describe('W07 PostgreSQL payment-method persistence', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
+})
+
+describe('W07 native PostgreSQL renewal mandate reads', () => {
+  it('selects only an active mandate with a surviving vault method and no pending revocation', async () => {
+    const calls: Array<{ sql: string; values?: unknown[] }> = []
+    const db: PaymentMethodPostgresQueryExecutor = {
+      async query<Row extends Record<string, unknown>>(sql: string, values: unknown[] = []) {
+        calls.push({ sql, values })
+        return { rows: [{
+          mandate_record_id: 'mnd_12345678901234567890123456',
+          payment_method_id: 'hyperswitch_pm_001',
+        }] as unknown as Row[] }
+      },
+    }
+
+    await expect(readActiveRenewalMandatePostgres(db, merchantId, customerId)).resolves.toEqual({
+      mandate_record_id: 'mnd_12345678901234567890123456',
+      payment_method_id: 'hyperswitch_pm_001',
+    })
+    expect(calls[0]?.values).toEqual(['hyperswitch', merchantId, customerId])
+    expect(calls[0]?.sql).toContain("m.status = 'ACTIVE'")
+    expect(calls[0]?.sql).toContain('m.provider_mandate_id IS NOT NULL')
+    expect(calls[0]?.sql).toContain('JOIN saved_payment_methods s')
+    expect(calls[0]?.sql).toContain("r.status <> 'COMPLETED'")
+    expect(calls[0]?.sql).toContain('ORDER BY m.updated_at DESC, m.mandate_record_id DESC LIMIT 1')
+  })
+
+  it('rechecks the exact mandate/payment-method tuple and the live revocation block before MIT submission', async () => {
+    const calls: Array<{ sql: string; values?: unknown[] }> = []
+    const db: PaymentMethodPostgresQueryExecutor = {
+      async query<Row extends Record<string, unknown>>(sql: string, values: unknown[] = []) {
+        calls.push({ sql, values })
+        return { rows: [{ active: 1 }] as unknown as Row[] }
+      },
+    }
+
+    await expect(isExactRenewalMandateActivePostgres(
+      db, 'mnd_12345678901234567890123456', merchantId, customerId, 'hyperswitch_pm_001',
+    )).resolves.toBe(true)
+    expect(calls[0]?.values).toEqual([
+      'mnd_12345678901234567890123456', 'hyperswitch', merchantId, customerId, 'hyperswitch_pm_001',
+    ])
+    expect(calls[0]?.sql).toContain("m.status = 'ACTIVE'")
+    expect(calls[0]?.sql).toContain('m.provider_mandate_id IS NOT NULL')
+    expect(calls[0]?.sql).toContain("r.status <> 'COMPLETED'")
+  })
+
+  it('does not consider a missing exact mandate active', async () => {
+    const db: PaymentMethodPostgresQueryExecutor = {
+      async query<Row extends Record<string, unknown>>() {
+        return { rows: [] as unknown as Row[] }
+      },
+    }
+
+    await expect(isExactRenewalMandateActivePostgres(
+      db, 'mnd_12345678901234567890123456', merchantId, customerId, 'hyperswitch_pm_001',
+    )).resolves.toBe(false)
+  })
+
+  it('fails closed on renewal mandate query errors', async () => {
+    const db: PaymentMethodPostgresQueryExecutor = {
+      async query() { throw new Error('private PostgreSQL connection detail') },
+    }
+
+    await expect(readActiveRenewalMandatePostgres(db, merchantId, customerId))
+      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+    await expect(isExactRenewalMandateActivePostgres(
+      db, 'mnd_12345678901234567890123456', merchantId, customerId, 'hyperswitch_pm_001',
+    )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+  })
 })
