@@ -485,7 +485,8 @@ export default {
         }
         requireCreatorLayer(request)
         const creatorId = requireVerifiedCreatorId(request)
-        const result = await publishMembershipPlan(runtimeEnv.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'))
+        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+        const result = await publishMembershipPlan(membershipWriteStore, creatorId, segments[2]!, request.headers.get('If-Match'))
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
       const planRevisionMatch = /^\/membership\/plans\/([^/]+)$/.exec(pathname)
@@ -497,8 +498,9 @@ export default {
         requireCreatorLayer(request)
         const creatorId = requireVerifiedCreatorId(request)
         const input = await readJsonBody(request)
+        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
         const result = await reviseMembershipPlan(
-          runtimeEnv.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'), input,
+          membershipWriteStore, creatorId, segments[2]!, request.headers.get('If-Match'), input,
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
@@ -517,8 +519,9 @@ export default {
             !['pause', 'resume', 'retire'].includes(String((value as Record<string, unknown>).action))) {
           throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         }
+        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
         const result = await transitionMembershipPlanLifecycle(
-          runtimeEnv.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'),
+          membershipWriteStore, creatorId, segments[2]!, request.headers.get('If-Match'),
           (value as { action: 'pause' | 'resume' | 'retire' }).action,
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
