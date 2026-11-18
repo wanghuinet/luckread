@@ -348,7 +348,7 @@ export default {
         const targetPlanId = new URL(request.url).searchParams.get('targetPlanId')
         if (!targetPlanId) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         const result = await previewSubscriptionPlanChange(
-          runtimeEnv.D1_01, principal, operation.subscriptionId, targetPlanId,
+          getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01, principal, operation.subscriptionId, targetPlanId,
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
