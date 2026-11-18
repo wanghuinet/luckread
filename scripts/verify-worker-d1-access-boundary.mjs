@@ -83,9 +83,9 @@ for (const dir of dirs) {
     }
   }
 
-  // W05 retains old D1 store adapters for local/unit-test compatibility only.
-  // Its production entrypoint injects all Neon-backed stores; therefore the production
-  // Wrangler config must be D1-free and pin both existing Neon Hyperdrive resources.
+  // W05 D1-02 social routes require Neon Store injection. The separately scoped
+  // D1-03 Hyperdrive is a PostgreSQL connection to W09-owned endpoint state, not
+  // a Cloudflare D1 binding. Production Wrangler must bind neither D1 database.
   const w05NeonProduction = workerId === 'W05' &&
     config?.name === 'luckread-w05' &&
     (config?.d1_databases ?? []).length === 0 &&
