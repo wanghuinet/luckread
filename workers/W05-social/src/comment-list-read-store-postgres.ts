@@ -21,7 +21,7 @@ export function createPostgresCommentListReadStore(
 ): CommentListReadStore {
   return {
     async list(input: CommentListReadInput): Promise<CommentListReadRow[]> {
-      const { sql, values } = buildCommentListReadQuery(input, 'postgres')
+      const { sql, values } = buildCommentListReadQuery(input)
       try {
         const result = await db.query<CommentListReadRow>(sql, values)
         return result.rows
