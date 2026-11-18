@@ -116,6 +116,7 @@ test('renders video list projections immediately and hydrates only the visible v
   expect(videoScreen).toContain('controller.abort()');
   expect(videoScreen).toContain('videoSource: null, mediaLoading: false');
   expect(videoScreen).toContain('hydratedIdsRef.current.delete(currentId)');
+  expect(videoScreen).toContain('A released/offscreen video must be eligible for fresh playback');
   expect(videoScreen).toContain('item.contentId !== visibleId && item.videoSource');
   expect(videoScreen).toContain('if (isFocused) return');
   expect(videoScreen).not.toContain('videoRecords.map(async (record)');

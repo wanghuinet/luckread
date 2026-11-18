@@ -512,6 +512,9 @@ export default function VideoFeed() {
 
     return () => {
       controller.abort();
+      // A released/offscreen video must be eligible for fresh playback
+      // authorization when it becomes visible again.
+      hydratedIdsRef.current.delete(currentId);
       if (hydrationControllerRef.current === controller) hydrationControllerRef.current = null;
     };
   }, [currentId, isFocused, hydrationRetryVersion]);
