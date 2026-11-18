@@ -44,23 +44,17 @@ describe('reply audience backend closure', () => {
     expect(composer).toContain('setReplyAudience(recoveredReplyAudience)')
   })
 
-  it('enforces every reply audience in W05 both before and inside the final comment insert', () => {
+  it('enforces every reply audience in W05 before and inside the final PostgreSQL comment insert', () => {
     const comments = read('../../workers/W05-social/src/comment-runtime.ts')
-    const d1CreateStore = read('../../workers/W05-social/src/comment-create-store.ts')
     const postgresCreateStore = read('../../workers/W05-social/src/comment-create-store-postgres.ts')
-    const policy = read('../../workers/W05-social/src/reply-audience-runtime.ts')
-    expect(d1CreateStore).toContain('replyAudienceAllowedSql')
-    expect(d1CreateStore).toContain('AS reply_audience_allowed')
-    expect(d1CreateStore).toContain('AND ${replyAudienceAllowedSql}')
+    const predicate = read('../../workers/W05-social/src/reply-audience-postgres-predicate.ts')
     expect(postgresCreateStore).toContain('replyAudienceAllowedPostgresSql')
     expect(postgresCreateStore).toContain('AS reply_audience_allowed')
     expect(postgresCreateStore).toContain('AND ${replyAudienceAllowedPostgresSql}')
     expect(comments).toContain("throw new CommentRuntimeError('PERMISSION_DENIED', 403)")
-    expect(policy).toContain('social_follow_relationships')
-    expect(policy).toContain('json_each')
-    expect(policy).toContain('second_degree')
-    expect(policy).toContain('actorVerified: boolean')
-    expect(policy).toContain('replyAudienceAllowedParams')
+    expect(predicate).toContain('social_follow_relationships')
+    expect(predicate).toContain('second_degree')
+    expect(predicate).toContain('replyAudienceAllowedPostgresParams')
   })
 
   it('stores reply policies outside canonical W03 content and defaults legacy posts to everyone', () => {
