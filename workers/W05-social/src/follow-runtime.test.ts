@@ -9,23 +9,9 @@ import {
   unfollow,
 } from './follow-runtime.js'
 import { FollowStoreError } from './follow-store.js'
+import type { FollowStore } from './follow-store.js'
+import type { FollowStatusReadStore } from './follow-status-read-store.js'
 import type { FollowListReadStore } from './follow-list-read-store.js'
-
-const db = (
-  firstResults: unknown[] = [],
-  allResults: unknown[] = [],
-) => {
-  let firstIndex = 0
-  let allIndex = 0
-  const prepare = vi.fn((sql: string) => ({
-    bind: vi.fn((...args: unknown[]) => ({
-      first: vi.fn(async () => firstResults[firstIndex++] ?? null),
-      all: vi.fn(async () => allResults[allIndex++] ?? { results: [] }),
-      run: vi.fn(async () => ({ sql, args })),
-    })),
-  }))
-  return { prepare } as unknown as D1Database
-}
 
 const installCache = (store = new Map<string, Response>()) => {
   const cache = {
@@ -46,28 +32,37 @@ const uninstallCache = () => {
   Reflect.deleteProperty(globalThis, 'caches')
 }
 
-describe('follow runtime', () => {
-  it('creates a relationship', async () => {
-    const row = {
-      relationship_id: 'r1',
-      follower_user_id: 'u1',
-      target_user_id: 'u2',
-      created_at: '2026-10-02T00:00:00.000Z',
-    }
-    await expect(follow(db([{ blocked: 0 }, row]), 'u1', 'u2')).resolves.toEqual(row)
-  })
+const followRow = (relationshipId = 'r1') => ({
+  relationship_id: relationshipId,
+  follower_user_id: 'u1',
+  target_user_id: 'u2',
+  created_at: '2026-11-10T00:00:00.000Z',
+})
 
-  it('accepts an injected provider-neutral follow store', async () => {
-    const row = {
-      relationship_id: 'pg_r1',
-      follower_user_id: 'u1',
-      target_user_id: 'u2',
-      created_at: '2026-11-10T00:00:00.000Z',
-    }
-    const store = {
-      follow: vi.fn(async () => row),
-      unfollow: vi.fn(async () => {}),
-    }
+const followStore = (overrides: Partial<FollowStore> = {}): FollowStore => ({
+  follow: vi.fn(async () => followRow()),
+  unfollow: vi.fn(async () => {}),
+  ...overrides,
+})
+
+const listStore = (
+  rows: Array<{
+    relationship_id: string
+    user_id: string
+    followed_at: string
+    cursor_created_at?: string
+  }> = [],
+  totalCount = rows.length,
+): FollowListReadStore => ({
+  list: vi.fn(async () => rows),
+  count: vi.fn(async () => totalCount),
+})
+
+describe('follow runtime', () => {
+  it('creates a relationship through the injected Neon Store', async () => {
+    const row = followRow()
+    const store = followStore({ follow: vi.fn(async () => row) })
+
     await expect(follow(store, 'u1', 'u2')).resolves.toEqual(row)
     expect(store.follow).toHaveBeenCalledWith(expect.objectContaining({
       followerUserId: 'u1',
@@ -77,11 +72,20 @@ describe('follow runtime', () => {
     }))
   })
 
-  it('maps provider storage failures to a sanitized service-unavailable error', async () => {
-    const store = {
+  it('returns the existing relationship unchanged when the Store reports an idempotent replay', async () => {
+    const existing = followRow('existing-relationship')
+    const store = followStore({ follow: vi.fn(async () => existing) })
+
+    await expect(follow(store, 'u1', 'u2')).resolves.toBe(existing)
+    expect(store.follow).toHaveBeenCalledTimes(1)
+  })
+
+  it('maps follow and unfollow Store failures to sanitized service-unavailable errors', async () => {
+    const store = followStore({
       follow: vi.fn(async () => { throw new FollowStoreError() }),
       unfollow: vi.fn(async () => { throw new FollowStoreError() }),
-    }
+    })
+
     await expect(follow(store, 'u1', 'u2')).rejects.toMatchObject({
       code: 'SERVICE_UNAVAILABLE',
       status: 503,
@@ -92,86 +96,41 @@ describe('follow runtime', () => {
     })
   })
 
-  it('is idempotent', async () => {
-    const row = {
-      relationship_id: 'r1',
-      follower_user_id: 'u1',
-      target_user_id: 'u2',
-      created_at: '2026-10-02T00:00:00.000Z',
-    }
-    const d = db([{ blocked: 0, ...row }])
-    await expect(follow(d, 'u1', 'u2')).resolves.toEqual(row)
-    expect(d.prepare).toHaveBeenCalledTimes(1)
-  })
+  it('rejects a blocked relationship when the Store returns no row', async () => {
+    const store = followStore({ follow: vi.fn(async () => null) })
 
-  it('rejects follow when either side has an active block', async () => {
-    await expect(
-      follow(
-        db([{ blocked: 1 }]),
-        'u1',
-        'u2',
-      ),
-    ).rejects.toMatchObject({
+    await expect(follow(store, 'u1', 'u2')).rejects.toMatchObject({
       code: 'CONFLICT',
       status: 409,
     })
   })
 
-  it('binds the final follow write to the active block predicate', async () => {
-    const d = db([{ blocked: 0 }])
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    prepare.mockImplementationOnce(() => ({
-      bind: vi.fn(() => ({
-        first: vi.fn(async () => ({ blocked: 0 })),
-      })),
-    })).mockImplementationOnce((sql: string) => ({
-      bind: vi.fn(() => ({
-        first: vi.fn(async () => null),
-      })),
-    }))
+  it('rejects self follow before calling the Store', async () => {
+    const store = followStore()
 
-    await expect(follow(d, 'u1', 'u2')).rejects.toMatchObject({
+    await expect(follow(store, 'u1', 'u1')).rejects.toMatchObject({
       code: 'CONFLICT',
       status: 409,
     })
-    expect(String(prepare.mock.calls[1]?.[0])).toContain("block.relation_type = 'block'")
-    expect(String(prepare.mock.calls[1]?.[0])).toContain('INSERT INTO social_follow_relationships')
-    expect(String(prepare.mock.calls[1]?.[0])).toContain('NOT EXISTS')
+    expect(store.follow).not.toHaveBeenCalled()
   })
 
-  it('rejects self follow', async () => {
-    await expect(follow(db(), 'u1', 'u1')).rejects.toMatchObject({
-      code: 'CONFLICT',
-      status: 409,
-    })
+  it('unfollows through the injected Neon Store', async () => {
+    const store = followStore()
+
+    await expect(unfollow(store, 'u1', 'u2')).resolves.toBeUndefined()
+    expect(store.unfollow).toHaveBeenCalledWith('u1', 'u2')
   })
 
-  it('unfollows', async () => {
-    await expect(unfollow(db(), 'u1', 'u2')).resolves.toBeUndefined()
-  })
-
-  it('reads status', async () => {
-    await expect(
-      getFollowStatus(
-        db([{ relationship_id: 'r1', created_at: '2026-10-02T00:00:00.000Z', blocked: 0 }]),
-        'u1',
-        'u2',
-      ),
-    ).resolves.toEqual({
-      following: true,
-      relationshipId: 'r1',
-      createdAt: '2026-10-02T00:00:00.000Z',
-    })
-  })
-
-  it('accepts an injected provider-neutral follow-status read store', async () => {
-    const store = {
+  it('reads follow status through the injected PostgreSQL Store', async () => {
+    const store: FollowStatusReadStore = {
       getStatus: vi.fn(async () => ({
         relationship_id: 'pg-r1',
         created_at: '2026-11-10T00:00:00.000Z',
         blocked: false,
       })),
     }
+
     await expect(getFollowStatus(store, 'u1', 'u2')).resolves.toEqual({
       following: true,
       relationshipId: 'pg-r1',
@@ -183,10 +142,11 @@ describe('follow runtime', () => {
     })
   })
 
-  it('maps injected follow-status storage failures to a sanitized service-unavailable error', async () => {
-    const store = {
+  it('maps follow-status Store failures to a sanitized service-unavailable error', async () => {
+    const store: FollowStatusReadStore = {
       getStatus: vi.fn(async () => { throw new FollowStoreError() }),
     }
+
     await expect(getFollowStatus(store, 'u1', 'u2')).rejects.toMatchObject({
       code: 'SERVICE_UNAVAILABLE',
       status: 503,
@@ -194,31 +154,29 @@ describe('follow runtime', () => {
   })
 
   it('hides follow status when either side is blocked', async () => {
-    const d = db([{
-      relationship_id: 'r-blocked',
-      created_at: '2026-10-02T00:00:00.000Z',
-      blocked: 1,
-    }])
-    await expect(getFollowStatus(d, 'u1', 'u2')).resolves.toEqual({
+    const store: FollowStatusReadStore = {
+      getStatus: vi.fn(async () => ({
+        relationship_id: 'blocked-r1',
+        created_at: '2026-11-10T00:00:00.000Z',
+        blocked: true,
+      })),
+    }
+
+    await expect(getFollowStatus(store, 'u1', 'u2')).resolves.toEqual({
       following: false,
       relationshipId: null,
       createdAt: null,
     })
-    const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
-    expect(sql).toContain("block.relation_type = 'block'")
-    expect(sql).toContain('block.actor_user_id = ? AND block.target_user_id = ?')
   })
 
   it('lists followers through the injected Store with a bounded count and opaque next cursor', async () => {
-    const store: FollowListReadStore = {
-      list: vi.fn(async () => [
-        { relationship_id: 'r2', user_id: 'u4', followed_at: '2026-10-02T00:01:00.000Z', cursor_created_at: '2026-10-02T00:01:00.000000Z' },
-        { relationship_id: 'r1', user_id: 'u3', followed_at: '2026-10-02T00:00:00.000Z', cursor_created_at: '2026-10-02T00:00:00.000000Z' },
-        { relationship_id: 'r0', user_id: 'u2', followed_at: '2026-09-30T00:00:00.000Z', cursor_created_at: '2026-09-30T00:00:00.000000Z' },
-      ]),
-      count: vi.fn(async () => 3),
-    }
+    const store = listStore([
+      { relationship_id: 'r2', user_id: 'u4', followed_at: '2026-10-02T00:01:00.000Z', cursor_created_at: '2026-10-02T00:01:00.000000Z' },
+      { relationship_id: 'r1', user_id: 'u3', followed_at: '2026-10-02T00:00:00.000Z', cursor_created_at: '2026-10-02T00:00:00.000000Z' },
+      { relationship_id: 'r0', user_id: 'u2', followed_at: '2026-09-30T00:00:00.000Z', cursor_created_at: '2026-09-30T00:00:00.000000Z' },
+    ], 3)
     const result = await listFollowers(store, 'u9', null, 2)
+
     expect(store.list).toHaveBeenCalledWith({
       userId: 'u9', direction: 'followers', cursor: null, limit: 2,
     })
@@ -243,12 +201,9 @@ describe('follow runtime', () => {
     ])
     const cache = installCache(cached)
     try {
-      const store: FollowListReadStore = {
-        list: vi.fn(async () => [{
-          relationship_id: 'r1', user_id: 'u8', followed_at: '2026-10-02T00:00:00.000Z',
-        }]),
-        count: vi.fn(async () => 99),
-      }
+      const store = listStore([
+        { relationship_id: 'r1', user_id: 'u8', followed_at: '2026-10-02T00:00:00.000Z' },
+      ], 99)
       const result = await listFollowers(store, 'u9', null, 20)
       expect(result.totalCount).toBe(17)
       expect(store.list).toHaveBeenCalledTimes(1)
@@ -270,14 +225,12 @@ describe('follow runtime', () => {
   })
 
   it('lists following relationships through the injected Store', async () => {
-    const store: FollowListReadStore = {
-      list: vi.fn(async () => [{
-        relationship_id: 'r3',
-        user_id: 'u7',
-        followed_at: '2026-10-02T00:00:00.000Z',
-      }]),
-      count: vi.fn(async () => 1),
-    }
+    const store = listStore([{
+      relationship_id: 'r3',
+      user_id: 'u7',
+      followed_at: '2026-10-02T00:00:00.000Z',
+    }], 1)
+
     await expect(listFollowing(store, 'u5', null, 20)).resolves.toEqual({
       items: [{
         relationshipId: 'r3',
@@ -290,40 +243,32 @@ describe('follow runtime', () => {
     })
   })
 
-  it('rejects malformed or cross-direction cursors', async () => {
-    const d = db([], [{ results: [] }])
-    await expect(listFollowers(d, 'u1', '%%%INVALID%%%', 20)).rejects.toMatchObject({
+  it('rejects malformed or cross-direction cursors before calling the Store', async () => {
+    const store = listStore([
+      { relationship_id: 'r1', user_id: 'u2', followed_at: '2026-10-02T00:00:00.000Z', cursor_created_at: '2026-10-02T00:00:00.000000Z' },
+      { relationship_id: 'r0', user_id: 'u3', followed_at: '2026-10-01T00:00:00.000Z', cursor_created_at: '2026-10-01T00:00:00.000000Z' },
+    ], 2)
+
+    await expect(listFollowers(store, 'u1', '%%%INVALID%%%', 20)).rejects.toMatchObject({
       code: 'INVALID_CURSOR',
       status: 400,
     })
-    const first = await listFollowers(db([], [{
-      results: [{
-        relationship_id: 'r1',
-        user_id: 'u2',
-        followed_at: '2026-10-02T00:00:00.000Z',
-        total_count: 2,
-      }, {
-        relationship_id: 'r0',
-        user_id: 'u3',
-        followed_at: '2026-10-01T00:00:00.000Z',
-        total_count: 2,
-      }],
-    }]), 'u1', null, 1)
-    await expect(listFollowing(d, 'u1', first.nextCursor, 20)).rejects.toMatchObject({
+    const first = await listFollowers(store, 'u1', null, 1)
+    await expect(listFollowing(store, 'u1', first.nextCursor, 20)).rejects.toMatchObject({
       code: 'INVALID_CURSOR',
       status: 400,
     })
   })
 
   it('rejects follow cursors reused for another target user', async () => {
-    const first = await listFollowers(db([], [{
-      results: [
-        { relationship_id: 'r2', user_id: 'u2', followed_at: '2026-10-02T00:01:00.000Z' },
-        { relationship_id: 'r1', user_id: 'u3', followed_at: '2026-10-02T00:00:00.000Z' },
-      ],
-    }]), 'u1', null, 1)
+    const store = listStore([
+      { relationship_id: 'r2', user_id: 'u2', followed_at: '2026-10-02T00:01:00.000Z', cursor_created_at: '2026-10-02T00:01:00.000000Z' },
+      { relationship_id: 'r1', user_id: 'u3', followed_at: '2026-10-02T00:00:00.000Z', cursor_created_at: '2026-10-02T00:00:00.000000Z' },
+    ], 2)
+    const first = await listFollowers(store, 'u1', null, 1)
+
     expect(first.nextCursor).toEqual(expect.any(String))
-    await expect(listFollowers(db(), 'u9', first.nextCursor, 20)).rejects.toMatchObject({
+    await expect(listFollowers(store, 'u9', first.nextCursor, 20)).rejects.toMatchObject({
       code: 'INVALID_CURSOR',
       status: 400,
     })
@@ -336,10 +281,13 @@ describe('follow runtime', () => {
     expect(() => parseFollowListLimit('51')).toThrow()
   })
 
-  it('rejects invalid ids', async () => {
-    await expect(follow(db(), '', 'u2')).rejects.toMatchObject({
+  it('rejects invalid ids before calling the Follow Store', async () => {
+    const store = followStore()
+
+    await expect(follow(store, '', 'u2')).rejects.toMatchObject({
       code: 'VALIDATION_FAILED',
       status: 400,
     })
+    expect(store.follow).not.toHaveBeenCalled()
   })
 })
