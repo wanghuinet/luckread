@@ -1,4 +1,5 @@
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 export type RevenueCatStore = 'APP_STORE' | 'PLAY_STORE';
 export type RevenueCatStoreInput = RevenueCatStore | 'app_store' | 'play_store';
@@ -56,7 +57,7 @@ const requireCanonicalIdentifier = (value: unknown, maxLength: number): string =
  * subscription, entitlement or financial fact.
  */
 export async function resolveRevenueCatMembershipProduct(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   input: {
     revenueCatAppId: string;
     store: RevenueCatStoreInput;
@@ -77,15 +78,28 @@ export async function resolveRevenueCatMembershipProduct(
 
   let row: RevenueCatMembershipProductBindingRow | null;
   try {
-    row = await db.prepare(
+    const sql =
       'SELECT b.plan_id, b.plan_version, p.owner_id AS creator_id, v.billing_interval ' +
       'FROM membership_revenuecat_product_bindings AS b ' +
       'INNER JOIN membership_plans AS p ON p.plan_id = b.plan_id ' +
       'INNER JOIN membership_plan_versions AS v ON v.plan_id = b.plan_id AND v.plan_version = b.plan_version ' +
-      "WHERE b.revenuecat_app_id = ? AND b.store = ? AND b.product_id = ? AND p.owner_type = 'CREATOR' " +
+      "WHERE b.revenuecat_app_id = __APP_ID__ AND b.store = __STORE__ AND b.product_id = __PRODUCT_ID__ AND p.owner_type = 'CREATOR' " +
       sellableOnly +
-      'LIMIT 1',
-    ).bind(appId, store, productId).first<RevenueCatMembershipProductBindingRow>();
+      'LIMIT 1';
+    if (typeof (db as W07WebhookPostgresPool).query === 'function') {
+      const postgresSql = sql
+        .replace('__APP_ID__', '$1')
+        .replace('__STORE__', '$2')
+        .replace('__PRODUCT_ID__', '$3');
+      const result = await (db as W07WebhookPostgresPool).query<
+        RevenueCatMembershipProductBindingRow & Record<string, unknown>
+      >(postgresSql, [appId, store, productId]);
+      row = result.rows[0] ?? null;
+    } else {
+      row = await (db as D1Database).prepare(
+        sql.replace('__APP_ID__', '?').replace('__STORE__', '?').replace('__PRODUCT_ID__', '?'),
+      ).bind(appId, store, productId).first<RevenueCatMembershipProductBindingRow>();
+    }
   } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
