@@ -25,6 +25,7 @@ import {
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import { receiveHyperswitchRefundWebhookPostgres } from './refund-webhook-postgres-persistence.js';
 import { receiveHyperswitchPaymentWebhookPostgres } from './payment-webhook-payment-postgres.js';
+import { receiveHyperswitchMandateWebhookPostgres } from './mandate-webhook-postgres-persistence.js';
 
 type HyperswitchWebhookRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
   D1_01: D1Database;
@@ -47,6 +48,7 @@ type HyperswitchWebhookRuntimeDependencies = Readonly<{
   getWebhookPostgresPool?: (env: HyperswitchWebhookRuntimeEnv) => W07WebhookPostgresPool | undefined;
   receiveRefundWebhookPostgres?: typeof receiveHyperswitchRefundWebhookPostgres;
   receivePaymentWebhookPostgres?: typeof receiveHyperswitchPaymentWebhookPostgres;
+  receiveMandateWebhookPostgres?: typeof receiveHyperswitchMandateWebhookPostgres;
   syncRenewalOutcome?: (
     env: Readonly<{ D1_01: D1Database; D1_04: D1Database }>,
     paymentId: string,
@@ -212,7 +214,12 @@ export async function handleHyperswitchWebhookRequest(
         postgresPool, webhookInput,
       )
       : null;
-    const nativePayment = postgresPool && !nativeRefund
+    const nativeMandate = postgresPool && !nativeRefund
+      ? await (dependencies.receiveMandateWebhookPostgres ?? receiveHyperswitchMandateWebhookPostgres)(
+        postgresPool, webhookInput,
+      )
+      : null;
+    const nativePayment = postgresPool && !nativeRefund && !nativeMandate
       ? await (dependencies.receivePaymentWebhookPostgres ?? receiveHyperswitchPaymentWebhookPostgres)(
         postgresPool, webhookInput,
       )
@@ -220,6 +227,8 @@ export async function handleHyperswitchWebhookRequest(
     let result: WebhookReceiptResult;
     if (nativeRefund) {
       result = nativeRefund;
+    } else if (nativeMandate) {
+      result = nativeMandate;
     } else if (nativePayment) {
       // Keep the existing read/sync saga on the selected D1-04 Neon facade;
       // payment_details state, order and renewal-cycle writes are committed natively above.
@@ -236,9 +245,9 @@ export async function handleHyperswitchWebhookRequest(
       });
     }
 
-    // receiveHyperswitchWebhook verifies the provider signature and durably
-    // commits the selected D1-04 event/payment/cycle outcome before this point. Only then
-    // may the same signed payload identify a renewal cycle for D1-01 sync.
+    // The selected native PostgreSQL Store or D1-compatible bridge has verified
+    // the exact raw-body signature and committed its provider receipt before any
+    // payment-only post-commit saga is allowed to run.
     let subscriptionSync: RenewalOutcomeSyncResult | undefined;
     let pendingRecovery: RenewalPendingRecoveryResult | undefined;
     let purchaseFulfillment: PaidMembershipPurchaseFulfillmentResult | undefined;
