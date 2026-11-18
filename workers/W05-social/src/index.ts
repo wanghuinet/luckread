@@ -197,8 +197,15 @@ const getPublishedContentOwnerUserId = async (
   }
 }
 
+const requireCommentNotificationContextStore = (
+  store: CommentNotificationContextStore | undefined,
+): CommentNotificationContextStore => {
+  if (!store) throw new CommentNotificationContextRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return store
+}
+
 const getInteractionNotificationContext = async (
-  source: D1Database | CommentNotificationContextStore,
+  source: CommentNotificationContextStore,
   targetType: string,
   targetId: string,
   w03Content: W03ContentBinding | undefined,
@@ -308,7 +315,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   socialTokenSyncStore?: SocialTokenSyncStore
   /** Required PostgreSQL store for social closure, topics, notifications and social summaries. */
   socialClosureReadStore?: SocialClosureReadStore
-  /** Optional PostgreSQL-capable comment notification context reader. */
+  /** PostgreSQL comment notification context reader; comment replies/likes fail closed when absent. */
   commentNotificationContextStore?: CommentNotificationContextStore
   /** Optional PostgreSQL notification enqueue store; notification side effects remain best-effort. */
   notificationEnqueueStore?: NotificationEnqueueStore
@@ -1042,6 +1049,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           throw new CommentRuntimeError('VALIDATION_FAILED', 400)
         }
 
+        if (parentId) requireCommentNotificationContextStore(dependencies.commentNotificationContextStore)
         const actorVerified = request.headers.get('X-LuckRead-Principal-Verified') === 'true'
         const comment = await createComment(env.DB, viewerUserId, commentContentId, {
           body: bodyValue,
@@ -1066,7 +1074,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         )
         if (parentId) {
           const parent = await getPublishedCommentNotificationContext(
-            dependencies.commentNotificationContextStore ?? env.DB,
+            requireCommentNotificationContextStore(dependencies.commentNotificationContextStore),
             parentId,
           )
           if (parent?.author_user_id) {
@@ -1197,11 +1205,12 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           const publishedContentContext = target.targetType === 'content'
             ? await fetchPublishedContentSocialContext(env.W03_CONTENT, { contentId: target.targetId, correlationId })
             : undefined
+          if (target.targetType === 'comment') requireCommentNotificationContextStore(dependencies.commentNotificationContextStore)
           const result = await like(env.DB, env.W03_CONTENT, viewerUserId, target, correlationId, publishedContentContext, dependencies.likeMutationStore, dependencies.likeTargetContextReadStore)
           const notificationContext = publishedContentContext
             ? { recipientUserId: publishedContentContext.ownerUserId, contentId: null }
             : await getInteractionNotificationContext(
-                dependencies.commentNotificationContextStore ?? env.DB,
+                requireCommentNotificationContextStore(dependencies.commentNotificationContextStore),
                 target.targetType,
                 target.targetId,
                 env.W03_CONTENT,

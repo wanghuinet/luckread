@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
+import { createW05SocialWorker } from './index.js'
 import {
   CommentNotificationContextRuntimeError,
   getPublishedCommentNotificationContext,
@@ -23,24 +24,52 @@ describe('W05 comment notification context runtime', () => {
     expect(store.getPublishedContext).toHaveBeenCalledWith('comment-1')
   })
 
-  it('uses D1 as the default data source', async () => {
-    const first = vi.fn(async () => ({
-      comment_id: 'comment-1',
-      content_id: 'content-1',
-      author_user_id: 'author-1',
-    }))
-    const db = {
-      prepare: vi.fn(() => ({
-        bind: vi.fn(() => ({ first })),
-      })),
-    } as unknown as D1Database
+  it('fails closed for nested comment creation when the Neon context store is missing', async () => {
+    const prepare = vi.fn(() => { throw new Error('D1 must not be used') })
+    const worker = createW05SocialWorker()
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/comments', {
+        method: 'POST',
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'comment-context-required',
+          'X-LuckRead-Principal-User-Id': 'viewer-1',
+          'X-LuckRead-Principal-Layer': 'L2',
+          'Idempotency-Key': 'reply-neon-required',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ body: 'reply', parentId: 'parent-1' }),
+      }),
+      { DB: { prepare } } as never,
+      {} as never,
+    )
+    expect(response.status).toBe(503)
+    expect(prepare).not.toHaveBeenCalled()
+  })
 
-    await expect(getPublishedCommentNotificationContext(db, 'comment-1')).resolves.toMatchObject({
-      comment_id: 'comment-1',
-      author_user_id: 'author-1',
-    })
-    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining("state = 'PUBLISHED'"))
-    expect(first).toHaveBeenCalledOnce()
+  it('fails closed for comment likes before mutation when the Neon context store is missing', async () => {
+    const prepare = vi.fn(() => { throw new Error('D1 must not be used') })
+    const worker = createW05SocialWorker()
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
+        method: 'POST',
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'comment-like-context-required',
+          'X-LuckRead-Principal-User-Id': 'viewer-1',
+          'X-LuckRead-Principal-Layer': 'L2',
+          'Idempotency-Key': 'comment-like-neon-required',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ targetType: 'comment', targetId: 'comment-1' }),
+      }),
+      { DB: { prepare } } as never,
+      {} as never,
+    )
+    expect(response.status).toBe(503)
+    expect(prepare).not.toHaveBeenCalled()
   })
 
   it('maps store failures to a sanitized 503', async () => {
