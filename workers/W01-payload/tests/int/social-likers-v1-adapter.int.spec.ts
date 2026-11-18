@@ -40,7 +40,7 @@ describe('content liker list adapter and UI', () => {
     expect(postgresStore).toContain("viewer_block.relation_type = 'block'")
     expect(postgresStore).toContain("liker_block.relation_type = 'block'")
     expect(postgresStore).toContain('ORDER BY il.created_at DESC, il.relationship_id DESC')
-    expect(postgresStore).toContain('LIMIT 
+    expect(postgresStore).toContain('LIMIT')
 
   it('opens a responsive liked-by dialog from the count without replacing like/unlike', () => {
     const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
