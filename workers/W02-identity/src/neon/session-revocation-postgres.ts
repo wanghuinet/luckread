@@ -42,7 +42,8 @@ function validateInput(input: SessionRevocationPostgresInput): void {
  * only a session owned by the authenticated subject and writes its immutable
  * audit outbox intent in the same PostgreSQL transaction.
  *
- * This adapter is deliberately not wired to the production Worker yet.
+ * The Neon-only W02 runtime composes this repository through its session-revocation
+ * Store; the production handler and disposable PostgreSQL 18 rehearsal share it.
  */
 export async function revokeUserSessionPostgres(
   pool: Pool,
