@@ -1,4 +1,3 @@
-/// <reference types="@cloudflare/workers-types" />
 
 export type PollReadRow = {
   poll_id: string
