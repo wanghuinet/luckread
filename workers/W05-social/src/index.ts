@@ -329,13 +329,13 @@ export type W05SocialWorkerDependencies = Readonly<{
   repostStore?: RepostStore
   /** Optional PostgreSQL-capable idempotent Share link store; D1 remains the deployed default. */
   shareStore?: ShareStore
-  /** Optional PostgreSQL-capable poll configuration writer; D1 remains the deployed default. */
+  /** Neon PostgreSQL poll configuration Store; POST route fails closed when missing. */
   pollConfigurationStore?: PollConfigurationStore
-  /** Optional PostgreSQL-capable draft poll deletion store; D1 remains the deployed default. */
+  /** Neon PostgreSQL draft-poll deletion Store; DELETE route fails closed when missing. */
   pollDeleteStore?: PollDeleteStore
-  /** Optional PostgreSQL-capable poll reader; D1 remains the deployed default. */
+  /** Neon PostgreSQL poll reader; GET and vote routes fail closed when missing. */
   pollReadStore?: PollReadStore
-  /** Optional PostgreSQL-capable poll vote writer; D1 remains the deployed default. */
+  /** Neon PostgreSQL poll vote writer; vote route fails closed when missing. */
   pollVoteStore?: PollVoteStore
   /** Optional PostgreSQL Block/Mute list reader; missing composition fails closed. */
   blockMuteListReadStore?: BlockMuteListReadStore
