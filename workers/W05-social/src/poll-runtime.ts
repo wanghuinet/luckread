@@ -307,7 +307,7 @@ export async function configureContentPoll(
       throw new SocialPollError('CONFLICT', 409)
     }
     if (sameOptions && sameDuration) {
-      const current = await getContentPoll(db, contentId, actorUserId, contentContext, readStore)
+      const current = await getContentPoll(readStore, contentId, actorUserId, contentContext)
       if (current) return current
     }
 
@@ -330,7 +330,7 @@ export async function configureContentPoll(
       throw new SocialPollError('INTERNAL_ERROR', 500)
     }
 
-    const refreshed = await getContentPoll(db, contentId, actorUserId, contentContext, readStore)
+    const refreshed = await getContentPoll(readStore, contentId, actorUserId, contentContext)
     if (!refreshed ||
         refreshed.options.length !== options.length ||
         refreshed.durationMinutes !== durationMinutes ||
@@ -360,7 +360,7 @@ export async function configureContentPoll(
     throw new SocialPollError('INTERNAL_ERROR', 500)
   }
 
-  const configured = await getContentPoll(db, contentId, actorUserId, contentContext, readStore)
+  const configured = await getContentPoll(readStore, contentId, actorUserId, contentContext)
   if (!configured ||
       configured.options.length !== options.length ||
       configured.durationMinutes !== durationMinutes ||
@@ -486,7 +486,7 @@ export async function castContentPollVote(
     if (blocked) throw new SocialPollError('NOT_FOUND', 404)
   }
 
-  const currentPoll = await getContentPoll(db, contentId, actorUserId, contentContext, readStore)
+  const currentPoll = await getContentPoll(readStore, contentId, actorUserId, contentContext)
   if (!currentPoll) throw new SocialPollError('NOT_FOUND', 404)
   if (!currentPoll.options.some(option => option.optionId === optionId)) {
     throw new SocialPollError('VALIDATION_FAILED', 400)
@@ -530,7 +530,7 @@ export async function castContentPollVote(
   if (!savedVote) throw new SocialPollError('POLL_CLOSED', 409)
   if (savedVote.option_id !== optionId) throw new SocialPollError('ALREADY_VOTED', 409)
 
-  const refreshed = await getContentPoll(db, contentId, actorUserId, contentContext, readStore)
+  const refreshed = await getContentPoll(readStore, contentId, actorUserId, contentContext)
   if (!refreshed) throw new SocialPollError('NOT_FOUND', 404)
   return refreshed
 }
