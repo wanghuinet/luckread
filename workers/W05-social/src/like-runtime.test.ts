@@ -28,6 +28,18 @@ const publishedContextBinding = (
 
 const correlationId = 'like-runtime-test'
 
+const makeLikeStatusStore = (liked = true, likeCount = 0) => ({
+  read: vi.fn(async () => ({ liked, likeCount })),
+})
+
+const makeLikeTargetContextStore = (
+  blocked = false,
+  comment: { id: string; state: string; author_user_id: string | null; content_id: string } | null = null,
+): LikeTargetContextReadStore => ({
+  readCommentTarget: vi.fn(async () => comment),
+  hasBidirectionalBlock: vi.fn(async () => blocked),
+})
+
 const db = (firstResults: unknown[] = []) => {
   let firstIndex = 0
   const prepare = vi.fn((sql: string) => ({
@@ -60,10 +72,11 @@ describe('like runtime', () => {
       delete: vi.fn(async () => true),
     }
     Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
-    const d = db([{ blocked: 0 }])
-    await expect(getLikeStatus(d, publishedContextBinding(), 'user-1', { targetType: 'content', targetId: 'content-hot' }, correlationId)).resolves.toEqual({ liked: true, likeCount: 9 })
-    expect(d.prepare).toHaveBeenCalledTimes(1)
-    expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).toContain('social_user_interactions')
+    const targetContextStore = makeLikeTargetContextStore()
+    const statusStore = makeLikeStatusStore(true, 0)
+    await expect(getLikeStatus(publishedContextBinding(), 'user-1', { targetType: 'content', targetId: 'content-hot' }, correlationId, statusStore, targetContextStore)).resolves.toEqual({ liked: true, likeCount: 9 })
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith('user-1', ['user-2'])
+    expect(statusStore.read).not.toHaveBeenCalled()
   })
 
   it('reuses a shared aggregate without executing COUNT for another viewer', async () => {
@@ -77,48 +90,48 @@ describe('like runtime', () => {
       delete: vi.fn(async () => true),
     }
     Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
-    const d = db([{ blocked: 0 }])
-    await expect(getLikeStatus(d, publishedContextBinding('user-3'), 'user-2', { targetType: 'content', targetId: 'content-hot' }, correlationId)).resolves.toEqual({ liked: false, likeCount: 21 })
-    expect(d.prepare).toHaveBeenCalledTimes(1)
-    expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).toContain('social_user_interactions')
-    expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).not.toContain('COUNT(*)')
+    const targetContextStore = makeLikeTargetContextStore()
+    const statusStore = makeLikeStatusStore(false, 0)
+    await expect(getLikeStatus(publishedContextBinding('user-3'), 'user-2', { targetType: 'content', targetId: 'content-hot' }, correlationId, statusStore, targetContextStore)).resolves.toEqual({ liked: false, likeCount: 21 })
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith('user-2', ['user-3'])
+    expect(statusStore.read).not.toHaveBeenCalled()
   })
 
   it('reads effective like status from W05 relation tables after W03 visibility validation', async () => {
-    const d = db([{ blocked: 0 }, { liked: 1, like_count: 3 }])
-    await expect(getLikeStatus(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId))
+    const targetContextStore = makeLikeTargetContextStore()
+    const statusStore = makeLikeStatusStore(true, 3)
+    const binding = publishedContextBinding('user-2')
+    await expect(getLikeStatus(binding, 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId, statusStore, targetContextStore))
       .resolves.toEqual({ liked: true, likeCount: 3 })
-    expect(d.prepare).toHaveBeenCalledTimes(2)
-    const sql = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([query]) => String(query))
-    expect(sql[0]).toContain('social_user_interactions')
-    expect(sql[1]).toContain('interaction_likes')
-    expect(sql.every(query => !query.toLowerCase().includes('from contents') && !query.toLowerCase().includes('join contents'))).toBe(true)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith('user-1', ['user-2'])
+    expect(statusStore.read).toHaveBeenCalledWith({
+      actorUserId: 'user-1',
+      targetType: 'content',
+      targetId: 'content-1',
+      includeCount: true,
+    })
 
-    const unpublished = db([])
-    await expect(getLikeStatus(unpublished, publishedContextBinding('user-2', 404), 'user-1', { targetType: 'content', targetId: 'content-3' }, correlationId))
+    const unpublishedStatusStore = makeLikeStatusStore(true, 3)
+    await expect(getLikeStatus(publishedContextBinding('user-2', 404), 'user-1', { targetType: 'content', targetId: 'content-3' }, correlationId, unpublishedStatusStore, makeLikeTargetContextStore()))
       .resolves.toEqual({ liked: false, likeCount: 0 })
-    expect(unpublished.prepare).not.toHaveBeenCalled()
+    expect(unpublishedStatusStore.read).not.toHaveBeenCalled()
   })
 
   it('uses an injected like status store only after W03 visibility and Block checks', async () => {
-    const d = db([{ blocked: 0 }])
-    const statusStore = {
-      read: vi.fn(async () => ({ liked: true, likeCount: 12 })),
-    }
+    const targetContextStore = makeLikeTargetContextStore()
+    const statusStore = makeLikeStatusStore(true, 12)
 
     await expect(getLikeStatus(
-      d,
       publishedContextBinding(),
       'user-1',
       { targetType: 'content', targetId: 'content-1' },
       correlationId,
-      undefined,
       statusStore,
+      targetContextStore,
     )).resolves.toEqual({ liked: true, likeCount: 12 })
 
-    expect(d.prepare).toHaveBeenCalledTimes(1)
-    expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]))
-      .toContain('social_user_interactions')
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith('user-1', ['user-2'])
     expect(statusStore.read).toHaveBeenCalledWith({
       actorUserId: 'user-1',
       targetType: 'content',
@@ -128,28 +141,26 @@ describe('like runtime', () => {
   })
 
   it('does not consult the injected status store for unpublished or Blocked targets', async () => {
-    const statusStore = {
-      read: vi.fn(async () => ({ liked: true, likeCount: 1 })),
-    }
+    const statusStore = makeLikeStatusStore(true, 1)
+    const unpublishedContextStore = makeLikeTargetContextStore()
     await expect(getLikeStatus(
-      db(),
       publishedContextBinding('user-2', 404),
       'user-1',
       { targetType: 'content', targetId: 'content-hidden' },
       correlationId,
-      undefined,
       statusStore,
+      unpublishedContextStore,
     )).resolves.toEqual({ liked: false, likeCount: 0 })
     expect(statusStore.read).not.toHaveBeenCalled()
 
+    const blockedContextStore = makeLikeTargetContextStore(true)
     await expect(getLikeStatus(
-      db([{ blocked: 1 }]),
       publishedContextBinding(),
       'user-1',
       { targetType: 'content', targetId: 'content-blocked' },
       correlationId,
-      undefined,
       statusStore,
+      blockedContextStore,
     )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
     expect(statusStore.read).not.toHaveBeenCalled()
   })
@@ -159,13 +170,12 @@ describe('like runtime', () => {
       read: vi.fn(async () => { throw new LikeStatusReadStoreError() }),
     }
     await expect(getLikeStatus(
-      db([{ blocked: 0 }]),
       publishedContextBinding(),
       'user-1',
       { targetType: 'content', targetId: 'content-1' },
       correlationId,
-      undefined,
       statusStore,
+      makeLikeTargetContextStore(),
     )).rejects.toMatchObject({
       code: 'SERVICE_UNAVAILABLE',
       status: 503,
@@ -173,24 +183,31 @@ describe('like runtime', () => {
   })
 
   it('hides content like status when either actor or owner is blocked', async () => {
-    const d = db([{ blocked: 1 }])
-    await expect(getLikeStatus(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId)).rejects.toMatchObject({
+    const targetContextStore = makeLikeTargetContextStore(true)
+    const statusStore = makeLikeStatusStore()
+    await expect(getLikeStatus(publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId, statusStore, targetContextStore)).rejects.toMatchObject({
       code: 'CONFLICT',
       status: 409,
     })
-    expect(d.prepare).toHaveBeenCalledTimes(1)
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith('user-1', ['user-2'])
+    expect(statusStore.read).not.toHaveBeenCalled()
   })
 
   it('hides comment like status when a comment-side relationship is blocked', async () => {
-    const d = db([
-      { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'user-2', content_id: 'content-1' },
-      { blocked: 1 },
-    ])
-    await expect(getLikeStatus(d, publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId)).rejects.toMatchObject({
+    const targetContextStore = makeLikeTargetContextStore(true, {
+      id: 'comment-1',
+      state: 'PUBLISHED',
+      author_user_id: 'user-2',
+      content_id: 'content-1',
+    })
+    const statusStore = makeLikeStatusStore()
+    await expect(getLikeStatus(publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId, statusStore, targetContextStore)).rejects.toMatchObject({
       code: 'CONFLICT',
       status: 409,
     })
-    expect(d.prepare).toHaveBeenCalledTimes(2)
+    expect(targetContextStore.readCommentTarget).toHaveBeenCalledWith('comment-1')
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith('user-1', ['user-2', 'user-3'])
+    expect(statusStore.read).not.toHaveBeenCalled()
   })
 
   it('binds the final content like write to published visibility and Block policy', async () => {
@@ -302,15 +319,25 @@ describe('like runtime', () => {
     expect(sql[2]).toContain('block.target_user_id = ?')
   })
 
-  it('reads like status for a published comment', async () => {
-    const d = db([
-      { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'user-2', content_id: 'content-1' },
-      { blocked: 0 },
-      { liked: 1, like_count: 4 },
-    ])
-    await expect(getLikeStatus(d, publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId)).resolves.toEqual({
+  it('reads like status for a published comment through the injected PostgreSQL stores', async () => {
+    const targetContextStore = makeLikeTargetContextStore(false, {
+      id: 'comment-1',
+      state: 'PUBLISHED',
+      author_user_id: 'user-2',
+      content_id: 'content-1',
+    })
+    const statusStore = makeLikeStatusStore(true, 4)
+    await expect(getLikeStatus(publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId, statusStore, targetContextStore)).resolves.toEqual({
       liked: true,
       likeCount: 4,
+    })
+    expect(targetContextStore.readCommentTarget).toHaveBeenCalledWith('comment-1')
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith('user-1', ['user-2', 'user-3'])
+    expect(statusStore.read).toHaveBeenCalledWith({
+      actorUserId: 'user-1',
+      targetType: 'comment',
+      targetId: 'comment-1',
+      includeCount: true,
     })
   })
 
@@ -534,12 +561,10 @@ describe('like runtime', () => {
     }
     const database = db()
     await expect(getLikeStatus(
-      database,
       publishedContextBinding(),
       'user-1',
       { targetType: 'content', targetId: 'content-1' },
       correlationId,
-      undefined,
       statusStore,
       blockedContextStore,
     )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
