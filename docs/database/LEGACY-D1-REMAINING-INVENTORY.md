@@ -49,7 +49,9 @@ Search-index results can lag behind `main`; file-level decisions are based on re
 | #1907 | W05 Comment Notification Context D1 adapter/fallback removal | Merged |
 | #1908 | W05 Comment List Read D1 dialect/adapter/resolver removal | Merged |
 | #1910 | W05 Following-feed author candidate D1 adapter/fallback removal | Merged |
-| #1939 | W02 PrincipalAuthorityStore D1 test adapter removal | Merged |\n| #1940 | W02 RoleLayerStore D1 test adapter removal; Neon adapter assertion retained | Merged |\n| This PR | W02 RegistrationRollbackStore D1 test adapter removal; PostgreSQL transaction tests retained | Pending CI/review |
+| #1939 | W02 PrincipalAuthorityStore D1 test adapter removal | Merged |
+| #1940 | W02 RoleLayerStore D1 test adapter removal; Neon adapter assertion retained | Merged |
+| This PR | W02 RegistrationRollbackStore D1 test adapter removal; PostgreSQL transaction tests retained | Pending CI/review |
 
 ## Cross-cutting D-class references to retain
 
