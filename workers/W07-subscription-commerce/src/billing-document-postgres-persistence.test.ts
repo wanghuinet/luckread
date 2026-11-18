@@ -5,6 +5,7 @@ import type {
 } from './payment-webhook-database-postgres.js'
 import { BillingPersistenceError } from './billing-persistence.js'
 import {
+  issueInvoiceForOrderPostgres,
   issueReceiptForPaidPaymentPostgres,
 } from './billing-document-postgres-persistence.js'
 
@@ -270,5 +271,64 @@ describe('W07 native PostgreSQL paid billing documents', () => {
     expect(f.state.documents).toHaveLength(0)
     expect(f.calls.at(-1)?.sql).toBe('ROLLBACK')
     expect(f.client.release).toHaveBeenCalledOnce()
+  })
+})
+
+
+describe('W07 native PostgreSQL order invoice', () => {
+  it('issues an immutable invoice from the owner-scoped Order and OrderLine snapshot', async () => {
+    const f = fixture()
+    const invoice = await issueInvoiceForOrderPostgres(f.pool, CUSTOMER, ORDER_ID, dependencies)
+
+    expect(invoice).toMatchObject({
+      documentType: 'INVOICE',
+      documentNumber: 'INV-NATIVE-001',
+      orderId: ORDER_ID,
+      paymentId: null,
+      amountMinor: 2500,
+      currency: 'USD',
+    })
+    expect(f.state.documents).toHaveLength(1)
+    expect(f.state.documents[0]?.document_type).toBe('INVOICE')
+    expect(JSON.parse(f.state.documents[0]!.snapshot_json)).toMatchObject({
+      orderId: ORDER_ID,
+      orderStatusAtIssue: 'CONFIRMED',
+      totalMinor: 2500,
+      items: [{ itemRef: 'plan_basic', itemVersion: '3', quantity: 1 }],
+    })
+    expect(f.calls[0]?.sql).toBe('BEGIN')
+    expect(f.calls.at(-1)?.sql).toBe('COMMIT')
+    expect(f.client.release).toHaveBeenCalledOnce()
+  })
+
+  it('replays the retained invoice unchanged and does not insert another document', async () => {
+    const existing: DocumentRow = {
+      document_id: 'bdoc-existing-invoice',
+      document_type: 'INVOICE',
+      document_number: 'INV-EXISTING',
+      customer_id: CUSTOMER,
+      order_id: ORDER_ID,
+      payment_id: null,
+      amount_minor: '2500',
+      currency: 'USD',
+      snapshot_json: JSON.stringify({ orderId: ORDER_ID, immutable: true }),
+      issued_at: NOW,
+      created_at: NOW,
+    }
+    const f = fixture({ existingDocuments: [existing] })
+    const invoice = await issueInvoiceForOrderPostgres(f.pool, CUSTOMER, ORDER_ID, dependencies)
+
+    expect(invoice.documentId).toBe(existing.document_id)
+    expect(invoice.snapshot).toEqual({ orderId: ORDER_ID, immutable: true })
+    expect(f.calls.some((call) => call.sql.startsWith('INSERT INTO billing_documents'))).toBe(false)
+    expect(f.calls.at(-1)?.sql).toBe('COMMIT')
+  })
+
+  it('rejects an invoice request for an order not owned by the customer', async () => {
+    const f = fixture()
+    await expect(issueInvoiceForOrderPostgres(f.pool, 'another_customer', ORDER_ID, dependencies))
+      .rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND', status: 404 })
+    expect(f.state.documents).toHaveLength(0)
+    expect(f.calls.at(-1)?.sql).toBe('ROLLBACK')
   })
 })
