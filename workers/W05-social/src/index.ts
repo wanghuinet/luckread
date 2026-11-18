@@ -351,7 +351,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   favoriteMutationStore?: FavoriteMutationStore
   /** Optional PostgreSQL-capable favorite status reader; D1 remains the deployed default. */
   favoriteStatusReadStore?: FavoriteStatusReadStore
-  /** Optional PostgreSQL-capable like-status reader; D1 remains the deployed default. */
+  /** Neon PostgreSQL like-status reader; cache misses fail closed when it is not composed. */
   likeStatusReadStore?: LikeStatusReadStore
   /** Optional PostgreSQL-capable like-target context and Block preflight reader; D1 remains the deployed default. */
   likeTargetContextReadStore?: LikeTargetContextReadStore
