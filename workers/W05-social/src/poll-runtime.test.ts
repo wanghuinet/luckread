@@ -81,7 +81,7 @@ const ownerBinding = (status = 200) => ({
     const parts = new URL(request.url).pathname.split('/').filter(Boolean)
     const contentId = decodeURIComponent(parts.at(-3) ?? '')
     const ownerUserId = decodeURIComponent(parts.at(-1) ?? '')
-    return Response.json(status === 200 ? { data: { contentId, ownerUserId, contentType: 'post', state: 'PUBLISHED', updatedAt: '2026--15T04:00:00.000Z' } } : { error: { code: 'NOT_FOUND' } }, { status })
+    return Response.json(status === 200 ? { data: { contentId, ownerUserId, contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-15T04:00:00.000Z' } } : { error: { code: 'NOT_FOUND' } }, { status })
   }),
 }) as W03ContentBinding & { fetch: ReturnType<typeof vi.fn> }
 
