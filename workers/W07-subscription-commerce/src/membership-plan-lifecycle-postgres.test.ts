@@ -8,11 +8,6 @@ import {
 
 const planId = 'plan_' + 'a'.repeat(64)
 const creatorId = 'creator_01'
-const updatedAt1 = '2026-11-18T12:00:01.000Z'
-const updatedAt2 = '2026-11-18T12:00:02.000Z'
-const updatedAt3 = '2026-11-18T12:00:03.000Z'
-const updatedAt4 = '2026-11-18T12:00:04.000Z'
-
 type PlanRow = Record<string, unknown>
 
 function planRow(overrides: PlanRow = {}): PlanRow {
