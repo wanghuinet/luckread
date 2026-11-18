@@ -334,17 +334,18 @@ try {
     paymentId: native.paymentId,
     amount: 2_499,
   })
+  const nativeConflictId = 'evtconf_' + marker + '-native-conflict-success'
   const nativeConflict = await receiveNative(
     nativeConflicting,
     marker + '-native-receipt-conflict-unused',
-    marker + '-native-conflict-success',
+    nativeConflictId,
   )
   assert.equal(nativeConflict?.outcome, 'PAYLOAD_CONFLICT')
-  assert.equal(nativeConflict?.conflictId, marker + '-native-conflict-success')
+  assert.equal(nativeConflict?.conflictId, nativeConflictId)
   const nativeConflictRow = await pool.query(
     'SELECT existing_payload_sha256, incoming_payload_sha256, state, occurrence_count::int AS occurrence_count ' +
     'FROM payment_provider_event_conflicts WHERE conflict_id = $1',
-    [marker + '-native-conflict-success'],
+    [nativeConflictId],
   )
   assert.deepEqual(nativeConflictRow.rows, [{
     existing_payload_sha256: nativeFirst?.payloadSha256,
