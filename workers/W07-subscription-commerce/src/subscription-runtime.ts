@@ -157,7 +157,7 @@ const SUBSCRIPTION_READ_COLUMNS =
   `CASE WHEN cancel_at IS NULL THEN NULL ELSE to_char(cancel_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS cancel_at, ` +
   'entitlement_snapshot_ref, ' +
   `to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
-  `to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, version';
+  `to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, version`;
 
 const isPostgresSubscriptionStore = (
   db: D1Database | W07WebhookPostgresPool,
