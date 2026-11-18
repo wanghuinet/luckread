@@ -19,6 +19,7 @@ import { issueReceiptForPaidPayment } from './billing-persistence.js';
 import { expirePendingSubscriptionPlanUpgradeForPayment } from './subscription-plan-change-checkout.js';
 import {
   getW07MembershipPostgresPool,
+  type W07MembershipDatabaseRuntimeEnv,
 } from './neon/membership-database-runtime.js';
 import {
   getW07PaymentWebhookDatabase,
