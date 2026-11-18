@@ -1118,17 +1118,38 @@ describe('W05 social query transport', () => {
     expect(mutationStore.remove).toHaveBeenCalledWith({ actorUserId: 'viewer-1', targetType: 'content', targetId: 'content-1' })
   })
 
-  it('fails closed for favorite-list reads when the Neon Store is missing', async () => {
+  it('fails closed for Favorite List, Status and mutations when Neon Stores are missing', async () => {
     const prepare = vi.fn(() => { throw new Error('D1 must not be used') })
-    const response = await worker.fetch(
-      request('/internal/social/interactions/bookmarks/list?limit=20', transportHeaders),
-      { DB: { prepare } } as never,
-      {} as never,
+    const env = { DB: { prepare } } as never
+    const list = await worker.fetch(request('/internal/social/interactions/bookmarks/list?limit=20', transportHeaders), env, {} as never)
+    expect(list.status).toBe(503)
+
+    const status = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks?targetType=content&targetId=content-1', {
+        method: 'GET', headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
+      }), env, {} as never,
     )
-    expect(response.status).toBe(503)
+    expect(status.status).toBe(503)
+
+    const post = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'content-type': 'application/json', 'Idempotency-Key': 'favorite-no-store' },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }), env, {} as never,
+    )
+    expect(post.status).toBe(503)
+
+    const del = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
+        method: 'DELETE',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'content-type': 'application/json', 'Idempotency-Key': 'unfavorite-no-store' },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }), env, {} as never,
+    )
+    expect(del.status).toBe(503)
     expect(prepare).not.toHaveBeenCalled()
   })
-
   it('requires an authenticated transport for favorite-list reads', async () => {
     const response = await worker.fetch(
       request('/internal/social/interactions/bookmarks/list?limit=20', {
