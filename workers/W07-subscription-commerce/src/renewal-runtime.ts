@@ -1276,7 +1276,7 @@ export async function processSubscriptionRenewalCycle(
     } catch (error) {
       now = nowIso(nowFn);
       cycle = await writeCycleReconciliation(
-        env.D1_04,
+        getW07RenewalCycleStore(env),
         cycle,
         error instanceof HyperswitchClientError ? 'PROVIDER_SUBMISSION_UNCERTAIN' : 'PROVIDER_SUBMISSION_DEPENDENCY_ERROR',
         now,
