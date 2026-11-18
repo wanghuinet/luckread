@@ -397,19 +397,30 @@ describe('like runtime', () => {
     })
   })
 
-  it('rejects likes on comments that are no longer public', async () => {
-    const d = db([{ id: 'comment-1', state: 'REJECTED', author_user_id: 'user-2', content_id: 'content-1' }])
-    await expect(like(d, publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId)).rejects.toMatchObject({
+  it('rejects likes on comments that are no longer public before calling the mutation Store', async () => {
+    const mutationStore = makeLikeMutationStore()
+    const targetContextStore = makeLikeTargetContextStore(false, {
+      id: 'comment-1',
+      state: 'REJECTED',
+      author_user_id: 'user-2',
+      content_id: 'content-1',
+    })
+    await expect(like(publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId, undefined, mutationStore, targetContextStore)).rejects.toMatchObject({
       code: 'NOT_FOUND',
       status: 404,
     })
+    expect(mutationStore.create).not.toHaveBeenCalled()
   })
 
-  it('rejects unsupported target types', async () => {
-    await expect(like(db(), undefined, 'user-1', { targetType: 'media', targetId: 'media-1' }, correlationId)).rejects.toMatchObject({
+  it('rejects unsupported target types before calling the injected Stores', async () => {
+    const mutationStore = makeLikeMutationStore()
+    const targetContextStore = makeLikeTargetContextStore()
+    await expect(like(undefined, 'user-1', { targetType: 'media', targetId: 'media-1' }, correlationId, undefined, mutationStore, targetContextStore)).rejects.toMatchObject({
       code: 'VALIDATION_FAILED',
       status: 400,
     })
+    expect(mutationStore.create).not.toHaveBeenCalled()
+    expect(targetContextStore.readCommentTarget).not.toHaveBeenCalled()
   })
 
   it('invalidates viewer and aggregate caches after unlike', async () => {
@@ -420,12 +431,14 @@ describe('like runtime', () => {
     }
     Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
 
-    const database = db()
-    await expect(unlike(database, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toBeUndefined()
+    const mutationStore = makeLikeMutationStore()
+    await expect(unlike('user-1', { targetType: 'content', targetId: 'content-1' }, mutationStore)).resolves.toBeUndefined()
 
-    expect(database.prepare).toHaveBeenCalledTimes(1)
-    expect(String((database.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]))
-      .toContain('DELETE FROM interaction_likes')
+    expect(mutationStore.remove).toHaveBeenCalledWith({
+      actorUserId: 'user-1',
+      targetType: 'content',
+      targetId: 'content-1',
+    })
     expect(cache.delete).toHaveBeenCalledTimes(2)
     const deletedKeys = cache.delete.mock.calls.map(([request]) => request.url)
     expect(deletedKeys).toEqual(expect.arrayContaining([
@@ -434,36 +447,33 @@ describe('like runtime', () => {
     ]))
   })
 
-  it('unlikes idempotently without a read', async () => {
-    await expect(unlike(db(), 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toBeUndefined()
+  it('unlikes idempotently through the injected Store without a preliminary read', async () => {
+    const mutationStore = makeLikeMutationStore()
+    await expect(unlike('user-1', { targetType: 'content', targetId: 'content-1' }, mutationStore)).resolves.toBeUndefined()
+    expect(mutationStore.remove).toHaveBeenCalledTimes(1)
   })
 
   it('uses an injected mutation store after W03 visibility and Block checks', async () => {
-    const d = db([{ blocked: 0 }])
-    const mutationStore = {
-      create: vi.fn(async () => ({
-        relationship_id: 'pg-like-1',
-        actor_user_id: 'user-1',
-        target_type: 'content' as const,
-        target_id: 'content-1',
-        created_at: '2026-11-10T00:00:00.000Z',
-      })),
-      remove: vi.fn(async () => undefined),
-    }
+    const targetContextStore = makeLikeTargetContextStore()
+    const mutationStore = makeLikeMutationStore({
+      relationship_id: 'pg-like-1',
+      actor_user_id: 'user-1',
+      target_type: 'content',
+      target_id: 'content-1',
+      created_at: '2026-11-10T00:00:00.000Z',
+    })
 
     await expect(like(
-      d,
       publishedContextBinding('user-2'),
       'user-1',
       { targetType: 'content', targetId: 'content-1' },
       correlationId,
       undefined,
       mutationStore,
+      targetContextStore,
     )).resolves.toMatchObject({ relationshipId: 'pg-like-1', targetId: 'content-1' })
 
-    expect(d.prepare).toHaveBeenCalledTimes(1)
-    expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]))
-      .toContain('social_user_interactions')
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith('user-1', ['user-2'])
     expect(mutationStore.create).toHaveBeenCalledWith(expect.objectContaining({
       actorUserId: 'user-1',
       targetType: 'content',
@@ -472,30 +482,31 @@ describe('like runtime', () => {
   })
 
   it('passes the W03 parent owner into the final injected comment-like guard', async () => {
-    const d = db([
-      { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'comment-author', content_id: 'content-1' },
-      { blocked: 0 },
-    ])
-    const mutationStore = {
-      create: vi.fn(async () => ({
-        relationship_id: 'pg-comment-like-1',
-        actor_user_id: 'user-1',
-        target_type: 'comment' as const,
-        target_id: 'comment-1',
-        created_at: '2026-11-10T00:00:00.000Z',
-      })),
-      remove: vi.fn(async () => undefined),
-    }
+    const targetContextStore = makeLikeTargetContextStore(false, {
+      id: 'comment-1',
+      state: 'PUBLISHED',
+      author_user_id: 'comment-author',
+      content_id: 'content-1',
+    })
+    const mutationStore = makeLikeMutationStore({
+      relationship_id: 'pg-comment-like-1',
+      actor_user_id: 'user-1',
+      target_type: 'comment',
+      target_id: 'comment-1',
+      created_at: '2026-11-10T00:00:00.000Z',
+    })
 
     await expect(like(
-      d,
       publishedContextBinding('content-owner'),
       'user-1',
       { targetType: 'comment', targetId: 'comment-1' },
       correlationId,
       undefined,
       mutationStore,
+      targetContextStore,
     )).resolves.toMatchObject({ relationshipId: 'pg-comment-like-1' })
+    expect(targetContextStore.readCommentTarget).toHaveBeenCalledWith('comment-1')
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith('user-1', ['comment-author', 'content-owner'])
     expect(mutationStore.create).toHaveBeenCalledWith(expect.objectContaining({
       targetType: 'comment',
       parentOwnerUserId: 'content-owner',
@@ -508,13 +519,13 @@ describe('like runtime', () => {
       remove: vi.fn(async () => undefined),
     }
     await expect(like(
-      db([{ blocked: 0 }]),
       publishedContextBinding(),
       'user-1',
       { targetType: 'content', targetId: 'content-1' },
       correlationId,
       undefined,
       missingStore,
+      makeLikeTargetContextStore(),
     )).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
 
     const failedStore = {
@@ -522,15 +533,15 @@ describe('like runtime', () => {
       remove: vi.fn(async () => { throw new LikeMutationStoreError() }),
     }
     await expect(like(
-      db([{ blocked: 0 }]),
       publishedContextBinding(),
       'user-1',
       { targetType: 'content', targetId: 'content-1' },
       correlationId,
       undefined,
       failedStore,
+      makeLikeTargetContextStore(),
     )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
-    await expect(unlike(db(), 'user-1', { targetType: 'content', targetId: 'content-1' }, failedStore))
+    await expect(unlike('user-1', { targetType: 'content', targetId: 'content-1' }, failedStore))
       .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
   })
 
