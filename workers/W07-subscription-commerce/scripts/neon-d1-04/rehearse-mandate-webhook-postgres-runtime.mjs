@@ -32,9 +32,10 @@ const secret = 'postgres18-local-mandate-secret-' + randomUUID()
 const now = new Date()
 const nowIso = now.toISOString()
 const priorIso = new Date(now.getTime() - 5 * 60_000).toISOString()
-const paymentUpdatedAt = new Date(now.getTime() - 2_000).toISOString()
-const mandateActiveAt = new Date(now.getTime() - 60_000).toISOString()
-const mandateRevokedAt = new Date(now.getTime() - 30_000).toISOString()
+const consentAcceptedAt = new Date(now.getTime() - 4 * 60_000).toISOString()
+const paymentUpdatedAt = new Date(now.getTime() - 3 * 60_000).toISOString()
+const mandateActiveAt = new Date(now.getTime() - 2 * 60_000).toISOString()
+const mandateRevokedAt = new Date(now.getTime() - 60_000).toISOString()
 const checks = {
   paymentSucceededCreatedConsentMandate: false,
   nativeMandateActivationApplied: false,
@@ -127,7 +128,7 @@ function signedPaymentWithConsent({ eventId, payment, paymentMethodId }) {
         mandate_data: {
           customer_acceptance: {
             acceptance_type: 'online',
-            accepted_at: nowIso,
+            accepted_at: consentAcceptedAt,
             online: {
               ip_address: '203.0.113.10',
               user_agent: 'LuckRead PostgreSQL 18 mandate rehearsal',
@@ -280,7 +281,7 @@ try {
       merchantId,
       payment.customerId,
       marker + '-revoke-method',
-      nowIso,
+      new Date(now.getTime() - 90_000).toISOString(),
       priorIso,
     ],
   )
