@@ -338,16 +338,17 @@ async function createOrReadOrder(
       order = created.data;
       const updatedAt = new Date().toISOString();
       try {
-        const saved = isPostgresPlanUpgradeStore(membershipStore)
-          ? await attachPlanUpgradeOrderPostgres(membershipStore, row.attempt_id, order.orderId, updatedAt)
-          : Number((await membershipStore.prepare(
-              'UPDATE membership_subscription_plan_change_attempts SET order_id = ?, updated_at = ?, ' +
-              'version = version + 1 WHERE attempt_id = ? AND status = ? AND ' +
-              '(order_id IS NULL OR order_id = ?)',
-            ).bind(order.orderId, updatedAt, row.attempt_id, 'PENDING_PAYMENT', order.orderId).run())
-              .meta?.changes ?? 0) === 1;
+        if (isPostgresPlanUpgradeStore(membershipStore)) {
+          await attachPlanUpgradeOrderPostgres(membershipStore, row.attempt_id, order.orderId, updatedAt);
+        } else {
+          await membershipStore.prepare(
+            'UPDATE membership_subscription_plan_change_attempts SET order_id = ?, updated_at = ?, ' +
+            'version = version + 1 WHERE attempt_id = ? AND status = ? AND ' +
+            '(order_id IS NULL OR order_id = ?)',
+          ).bind(order.orderId, updatedAt, row.attempt_id, 'PENDING_PAYMENT', order.orderId).run();
+        }
         const latest = await readAttemptById(membershipStore, row.attempt_id);
-        if (!latest || latest.order_id !== order.orderId || (!saved && latest.order_id !== order.orderId)) {
+        if (!latest || latest.order_id !== order.orderId) {
           throw new SubscriptionRuntimeError('CONFLICT', 409);
         }
         row = latest;
@@ -431,7 +432,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
         const order = await (dependencies.getOrder ?? getCommerceOrder)(env.D1_04, subscriberId, attemptRow.order_id)
           .catch(() => { throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503); });
         if (order.status === 'FAILED' || order.status === 'CANCELLED') {
-          await expireAttempt(env.D1_01, attemptRow, now);
+          await expireAttempt(membershipStore, attemptRow, now);
           throw new SubscriptionRuntimeError('CONFLICT', 409);
         }
         const invoice = dependencies.issueInvoice ?? issueInvoiceForOrder;
