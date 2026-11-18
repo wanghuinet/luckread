@@ -100,7 +100,8 @@ describe('W02 policy-scoped session revoke', () => {
 
   it('returns 429 before resolving the Store when a required rate-limit scope is exhausted', async () => {
     const env = makeEnv()
-    vi.mocked(env.AUTH_SESSION_WRITE_LIMITER.limit)
+    const limiter = env.AUTH_SESSION_WRITE_LIMITER!
+    vi.mocked(limiter.limit)
       .mockResolvedValueOnce({ success: true })
       .mockResolvedValueOnce({ success: false })
     const response = await handleCurrentUserSessionRevoke(env, request('target-session'))
@@ -108,7 +109,7 @@ describe('W02 policy-scoped session revoke', () => {
 
     expect(response.status).toBe(429)
     expect(payload.error?.code).toBe('RATE_LIMITED')
-    expect(env.AUTH_SESSION_WRITE_LIMITER.limit).toHaveBeenCalledTimes(2)
+    expect(limiter.limit).toHaveBeenCalledTimes(2)
     expect(mocks.defaultStore.revoke).not.toHaveBeenCalled()
     expect(mocks.getW02PostgresRuntime).not.toHaveBeenCalled()
   })
