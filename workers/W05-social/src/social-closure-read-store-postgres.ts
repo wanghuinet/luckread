@@ -33,6 +33,11 @@ export function createPostgresSocialClosureReadStore(
       return socialTargets.getTargets(input)
     },
 
+    getContentTargetsBatch(contentIds): Promise<Readonly<Record<string, SocialTargetsReadResult>>> {
+      if (!socialTargets.getContentTargetsBatch) return Promise.reject(new SocialClosureReadStoreError())
+      return socialTargets.getContentTargetsBatch(contentIds)
+    },
+
     async getTopicByName(normalizedName): Promise<SocialTopicRow | null> {
       try {
         const result = await db.query<SocialTopicRow>(
