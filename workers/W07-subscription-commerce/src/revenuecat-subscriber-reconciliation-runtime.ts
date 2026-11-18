@@ -9,6 +9,10 @@ import {
   RevenueCatSubscriberReconciliationError,
 } from './revenuecat-subscriber-reconciliation.js';
 import { RevenueCatSubscriberIdentityError } from './revenuecat-subscriber-identity.js';
+import {
+  getW07MembershipPostgresPool,
+  type W07MembershipDatabaseRuntimeEnv,
+} from './neon/membership-database-runtime.js';
 
 const RECONCILIATION_PATH = '/internal/subscriptions/reconcile-revenuecat';
 const MAX_BODY_BYTES = 2_048;
@@ -18,7 +22,7 @@ export type RevenueCatSubscriberReconciliationRuntimeEnv = Readonly<{
   D1_01: D1Database;
   REVENUECAT_SECRET_API_KEY?: string | null;
   REVENUECAT_ALLOWED_APP_IDS?: string | null;
-}>;
+}> & W07MembershipDatabaseRuntimeEnv;
 
 export type RevenueCatSubscriberReconciliationRuntimeDependencies = Readonly<{
   fetchSubscriber?: typeof fetchRevenueCatSubscriber;
@@ -179,8 +183,9 @@ export async function handleRevenueCatSubscriberReconciliationRequest(
       appUserId: principalId,
       secretApiKey: env.REVENUECAT_SECRET_API_KEY,
     });
+    const membershipStore = getW07MembershipPostgresPool(env) ?? env.D1_01;
     const result = await buildCandidates(
-      env.D1_01,
+      membershipStore,
       {
         snapshot,
         expectedAppUserId: principalId,
