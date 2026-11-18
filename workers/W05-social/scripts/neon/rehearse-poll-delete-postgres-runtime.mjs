@@ -20,7 +20,6 @@ const reportPath = process.env.W05_POLL_DELETE_POSTGRES_REPORT ||
 const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 5_000 })
 const client = await pool.connect()
 const store = createPostgresPollDeleteStore(client)
-const unusedD1 = { prepare() { throw new Error('Unexpected D1 access during PostgreSQL poll-delete rehearsal') } }
 const marker = 'w05-poll-delete-' + randomUUID()
 const owner = marker + '-owner'
 const voter = marker + '-voter'
@@ -85,7 +84,7 @@ try {
     contentId: deletableContentId,
     optionIds: deletableOptions,
   })
-  await deleteContentPoll(unusedD1, owner, deletableContentId, draftContext(deletableContentId), store)
+  await deleteContentPoll(store, owner, deletableContentId, draftContext(deletableContentId))
   const deletedPoll = await store.getPoll(deletableContentId)
   const deletedOptions = await client.query(
     'SELECT COUNT(*)::integer AS count FROM social_poll_options WHERE poll_id = $1',
@@ -95,7 +94,7 @@ try {
   assert.equal(deletedOptions.rows[0]?.count, 0)
   unvotedDraftDeleted = true
 
-  await deleteContentPoll(unusedD1, owner, deletableContentId, draftContext(deletableContentId), store)
+  await deleteContentPoll(store, owner, deletableContentId, draftContext(deletableContentId))
   concurrentDeleteIsIdempotent = true
 
   await fixturePoll({
@@ -105,7 +104,7 @@ try {
     voteId,
   })
   await expectConflict(
-    deleteContentPoll(unusedD1, owner, votedContentId, draftContext(votedContentId), store),
+    deleteContentPoll(store, owner, votedContentId, draftContext(votedContentId)),
   )
   const preserved = await client.query(
     `SELECT
@@ -124,7 +123,7 @@ try {
     optionIds: mismatchOptions,
   })
   await expectConflict(
-    deleteContentPoll(unusedD1, owner, mismatchContentId, draftContext(mismatchContentId), store),
+    deleteContentPoll(store, owner, mismatchContentId, draftContext(mismatchContentId)),
   )
   assert.equal((await store.getPoll(mismatchContentId))?.poll_id, mismatchPollId)
   mismatchedPollOwnerPreserved = true
