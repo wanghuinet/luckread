@@ -13,6 +13,7 @@ import {
   getW07MembershipPostgresPool,
   type W07MembershipDatabaseRuntimeEnv,
 } from './neon/membership-database-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 const RECONCILIATION_PATH = '/internal/subscriptions/reconcile-revenuecat';
 const MAX_BODY_BYTES = 2_048;
@@ -28,6 +29,7 @@ export type RevenueCatSubscriberReconciliationRuntimeDependencies = Readonly<{
   fetchSubscriber?: typeof fetchRevenueCatSubscriber;
   buildCandidates?: typeof buildRevenueCatSubscriberReconciliationCandidates;
   nowMs?: () => number;
+  getMembershipPostgresPool?: (env: RevenueCatSubscriberReconciliationRuntimeEnv) => W07WebhookPostgresPool | undefined;
 }>;
 
 class InvalidRequestError extends Error {
@@ -183,7 +185,7 @@ export async function handleRevenueCatSubscriberReconciliationRequest(
       appUserId: principalId,
       secretApiKey: env.REVENUECAT_SECRET_API_KEY,
     });
-    const membershipStore = getW07MembershipPostgresPool(env) ?? env.D1_01;
+    const membershipStore = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env) ?? env.D1_01;
     const result = await buildCandidates(
       membershipStore,
       {
