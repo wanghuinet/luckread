@@ -4,7 +4,7 @@ import { SubscriptionRuntimeError } from './subscription-runtime.js';
 import { expirePendingSubscriptionPlanUpgradeForPaymentPostgres } from './subscription-plan-upgrade-expiry-postgres.js';
 
 function poolWith(results: Array<{ rows: Array<Record<string, unknown>>; rowCount: number | null }>) {
-  const query = vi.fn(async () => results.shift() ?? { rows: [], rowCount: 0 });
+  const query = vi.fn(async (_sql: string, _values: unknown[] = []) => results.shift() ?? { rows: [], rowCount: 0 });
   return { pool: { query, connect: vi.fn() } as unknown as W07WebhookPostgresPool, query };
 }
 
