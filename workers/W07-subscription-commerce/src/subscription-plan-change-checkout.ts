@@ -26,11 +26,11 @@ import {
   previewSubscriptionPlanChange,
   type SubscriptionPlanChangePreview,
 } from './subscription-plan-change-preview.js';
-import { hasPendingScheduledPlanDowngrade } from './subscription-plan-change-schedule.js';
 import {
-  getW07MembershipPostgresPool,
-  type W07MembershipDatabaseRuntimeEnv,
-} from './neon/membership-database-runtime.js';
+  getScheduledPlanChangeStore,
+  hasPendingScheduledPlanDowngrade,
+} from './subscription-plan-change-schedule.js';
+import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
 
 type PlanChangeAttemptRow = Readonly<{
   attempt_id: string;
@@ -421,7 +421,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
   }
 
   const preview = await previewSubscriptionPlanChange(
-    getW07MembershipPostgresPool(env) ?? env.D1_01, subscriberId, subscriptionId, targetPlanId, { now: () => nowDate },
+    getScheduledPlanChangeStore(env), subscriberId, subscriptionId, targetPlanId, { now: () => nowDate },
   );
   if (preview.changeType !== 'UPGRADE' || !preview.paymentRequired || preview.prorationBaseMinor <= 0) {
     throw new SubscriptionRuntimeError('INVALID_STATE', 409);
@@ -505,7 +505,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
           assertAttemptMatches(raced, subscriberId, subscriptionId, targetPlanId);
           throw new SubscriptionRuntimeError('CONFLICT', 409);
         }
-        if (await hasPendingScheduledPlanDowngrade(getW07MembershipPostgresPool(env) ?? env.D1_01, subscriptionId)) {
+        if (await hasPendingScheduledPlanDowngrade(getScheduledPlanChangeStore(env), subscriptionId)) {
           throw new SubscriptionRuntimeError('CONFLICT', 409);
         }
         throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
