@@ -150,12 +150,17 @@ describe('W02 PostgreSQL creator-role grant Store', () => {
     expect(client.release).toHaveBeenCalledTimes(1)
   })
 
-  it('preserves unexpected infrastructure failures for the Worker boundary', async () => {
+  it('maps unexpected PostgreSQL infrastructure failures to a sanitized W02 command error', async () => {
     const error = new Error('PostgreSQL unavailable')
     const client = makeClient(async () => Promise.reject(error))
     const pool = { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool
 
-    await expect(createPostgresCreatorRoleGrantStore(pool).grant(command, fixedNow)).rejects.toBe(error)
+    await expect(createPostgresCreatorRoleGrantStore(pool).grant(command, fixedNow))
+      .rejects.toMatchObject({
+        name: 'RoleAssignmentCommandError',
+        code: 'ROLE_ASSIGNMENT_WRITE_FAILED',
+        message: 'role assignment could not be committed',
+      })
     expect(client.release).toHaveBeenCalledTimes(1)
   })
 })
