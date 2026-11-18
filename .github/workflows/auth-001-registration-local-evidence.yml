@@ -153,6 +153,19 @@ jobs:
           CLOUDFLARE_PERSIST_TO: /tmp/luckread-auth001-state
         run: pnpm payload migrate
 
+      # AUTH-013 owns these lifecycle columns on the shared D1 users table.
+      # The local Payload fixture starts from an empty schema, so replay the
+      # admitted W02 migration before runtime evidence reads account_state.
+      - name: Apply W02 AUTH-013 lifecycle migration to isolated local D1 fixture
+        working-directory: workers/W01-payload
+        env:
+          CLOUDFLARE_PERSIST_TO: /tmp/luckread-auth001-state
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler d1 execute luckread --local --persist-to "$CLOUDFLARE_PERSIST_TO" --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
+          pnpm exec wrangler d1 execute luckread --local --json --persist-to "$CLOUDFLARE_PERSIST_TO" --config wrangler.jsonc --command 'SELECT account_state, account_state_version FROM users LIMIT 0;' > /tmp/auth001-w01-lifecycle-schema.json
+          node --input-type=module -e "import fs from 'node:fs'; const v=JSON.parse(fs.readFileSync('/tmp/auth001-w01-lifecycle-schema.json','utf8')); if (!Array.isArray(v) || v.length !== 1 || v[0]?.success !== true) throw new Error('AUTH-013 local D1 schema verification failed'); console.log('AUTH_013_LOCAL_D1_LIFECYCLE_SCHEMA=PASS')"
+
       - name: Verify AUTH-001 registration idempotency source contract
         working-directory: workers/W01-payload
         run: pnpm exec vitest run tests/int/auth-registration-idempotency.int.spec.ts --config ./vitest.config.mts
