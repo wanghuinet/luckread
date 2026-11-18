@@ -319,7 +319,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   commentNotificationContextStore?: CommentNotificationContextStore
   /** Optional PostgreSQL notification enqueue store; notification side effects remain best-effort. */
   notificationEnqueueStore?: NotificationEnqueueStore
-  /** Optional PostgreSQL-capable owner reply-audience policy store; D1 remains the default. */
+  /** Neon PostgreSQL Reply Audience policy Store; GET/PUT routes fail closed when missing. */
   replyAudienceStore?: ReplyAudienceStore
   /** Optional PostgreSQL per-user notification preferences store; missing composition fails closed. */
   notificationPreferencesStore?: NotificationPreferencesStore
