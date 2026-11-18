@@ -1298,10 +1298,11 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new ProfileChannelRuntimeError('INVALID_CURSOR', 400)
         const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
-        const profileChannelSource = dependencies.profileChannelReadStore ?? env.DB
+        const profileChannelStore = dependencies.profileChannelReadStore
+        if (!profileChannelStore) throw new ProfileChannelRuntimeError('SERVICE_UNAVAILABLE', 503)
         const data = profileChannel.kind === 'replies'
-          ? await listProfileReplies(profileChannelSource, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
-          : await listProfileLikedContents(profileChannelSource, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
+          ? await listProfileReplies(profileChannelStore, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
+          : await listProfileLikedContents(profileChannelStore, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
         return json({ data, requestId: createRequestId() })
       }
 
