@@ -49,6 +49,7 @@ function fixture(options: {
   const postgresCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const postgresPaymentCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const postgresMandateCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
+  const postgresReceiptCalls: Array<{ pool: unknown; paymentId: string; merchantId: string }> = [];
   const postgresPool = {} as W07WebhookPostgresPool;
   const receive: Receiver = async (db, input) => {
     calls.push({ db, input });
@@ -94,7 +95,7 @@ function fixture(options: {
     W07_DATABASE_DRIVER: undefined as string | undefined,
   };
   return {
-    env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, postgresCalls, postgresPaymentCalls, postgresMandateCalls,
+    env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, postgresCalls, postgresPaymentCalls, postgresMandateCalls, postgresReceiptCalls,
     dependencies: {
       receive,
       getWebhookDatabase: vi.fn(() => options.webhookDatabase),
@@ -119,6 +120,14 @@ function fixture(options: {
       ) => {
         postgresMandateCalls.push({ pool, input });
         return options.nativeMandateResult ?? null;
+      },
+      issueReceiptPostgres: async (
+        pool: W07WebhookPostgresPool,
+        paymentId: string,
+        merchantId: string,
+      ) => {
+        postgresReceiptCalls.push({ pool, paymentId, merchantId });
+        return {} as BillingDocumentDto;
       },
       syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder, issueReceipt,
       expirePendingPlanUpgrade: async () => {},
@@ -584,7 +593,8 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     expect(f.dependencies.getWebhookDatabase).toHaveBeenCalledOnce();
     expect(f.calls).toHaveLength(0);
     expect(f.postgresCalls).toHaveLength(1);
-    expect(f.receiptCalls).toMatchObject([{ db: neonDatabase, paymentId, merchantId: MERCHANT }]);
+    expect(f.receiptCalls).toHaveLength(0);
+    expect(f.postgresReceiptCalls).toMatchObject([{ paymentId, merchantId: MERCHANT }]);
     expect(f.syncCalls).toMatchObject([{
       env: { D1_01: f.env.D1_01, D1_04: neonDatabase },
       paymentId,
