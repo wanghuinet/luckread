@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js'
 import {
   PaymentPersistenceError,
   type WebhookReceiptResult,
@@ -235,10 +236,11 @@ describe('W07 native PostgreSQL payment_details webhook store', () => {
   })
 
   it('returns a duplicate for a byte-identical terminal receipt without reapplying payment or order state', async () => {
-    const { pool, calls } = fixture({
-      existingReceipt: receipt('a'.repeat(64), 'APPLIED'),
-    })
     const input = await signedInput()
+    const payloadHash = await sha256BytesToHex(new Uint8Array(input.rawBody))
+    const { pool, calls } = fixture({
+      existingReceipt: receipt(payloadHash, 'APPLIED'),
+    })
     const result = await receiveHyperswitchPaymentWebhookPostgres(pool, input)
 
     expect(result).toMatchObject({ outcome: 'DUPLICATE', state: 'APPLIED' })
