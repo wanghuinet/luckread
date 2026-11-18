@@ -113,7 +113,7 @@ export async function favorite(
   const createdAt = new Date().toISOString()
   let row: FavoriteMutationRow | null
   try {
-    row = await resolveFavoriteMutationStore(source).create({
+    row = await source.create({
       relationshipId,
       actorUserId: actor,
       targetType,
@@ -167,7 +167,7 @@ export async function getFavoriteStatus(
 
   let favorited: boolean
   try {
-    favorited = await resolveFavoriteStatusReadStore(source).isFavorited({
+    favorited = await source.isFavorited({
       actorUserId: actor,
       targetId,
     })
@@ -193,7 +193,7 @@ export async function unfavorite(
   const { targetType, targetId } = validateTarget(target)
 
   try {
-    await resolveFavoriteMutationStore(source).remove({
+    await source.remove({
       actorUserId: actor,
       targetType,
       targetId,
@@ -254,7 +254,7 @@ export async function listFavorites(
   const decoded = cursor ? decodeFavoriteListCursor(cursor, actor) : null
   let rows
   try {
-    rows = await resolveFavoriteListReadStore(source).list({
+    rows = await source.list({
       actorUserId: actor,
       cursor: decoded
         ? { createdAt: decoded.createdAt, relationshipId: decoded.relationshipId }
