@@ -170,7 +170,7 @@ export function buildW05PostgresMigration({ inventory, socialContract, readSourc
     '-- GENERATED FILE. Do not hand-edit.',
     '-- Regenerate with workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.mjs.',
     '-- Template: workers/W05-social/scripts/neon/templates/d1-02-social-postgres.sql.',
-    '-- Source authority: W05 / D1-02; Cloudflare D1 remains the current runtime authority.',
+    '-- Source authority: W05 / D1-02 migration history is retained as schema provenance; Neon PostgreSQL is the current runtime authority.',
     ''
   ].join('\n')
 
