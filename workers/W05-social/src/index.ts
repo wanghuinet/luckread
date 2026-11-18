@@ -1183,8 +1183,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             }
           : await parseJsonTarget(request)
         if (request.method === 'GET') {
+          if (!dependencies.likeTargetContextReadStore) throw new LikeRuntimeError('SERVICE_UNAVAILABLE', 503)
           const result = await getLikeStatus(
-            env.DB,
             env.W03_CONTENT,
             viewerUserId,
             target,
