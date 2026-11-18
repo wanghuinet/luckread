@@ -848,8 +848,10 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         if (!body || typeof body !== 'object' || Array.isArray(body) || typeof (body as { optionId?: unknown }).optionId !== 'string') {
           throw new SocialPollError('VALIDATION_FAILED', 400)
         }
+        if (!dependencies.pollVoteStore || !dependencies.pollReadStore) throw new SocialPollError('SERVICE_UNAVAILABLE', 503)
         const poll = await castContentPollVote(
-          env.DB,
+          dependencies.pollVoteStore,
+          dependencies.pollReadStore,
           env.W03_CONTENT,
           actorUserId,
           contentId,
@@ -883,7 +885,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
               correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
             })
           }
-          const poll = await getContentPoll(env.DB, contentId, viewerUserId, contentContext, dependencies.pollReadStore)
+          if (!dependencies.pollReadStore) throw new SocialPollError('SERVICE_UNAVAILABLE', 503)
+          const poll = await getContentPoll(dependencies.pollReadStore, contentId, viewerUserId, contentContext)
           return json({ data: { poll }, requestId: createRequestId() })
         }
         if (request.method === 'POST') {
@@ -910,15 +913,15 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             contentId,
             correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
           })
+          if (!dependencies.pollConfigurationStore || !dependencies.pollReadStore) throw new SocialPollError('SERVICE_UNAVAILABLE', 503)
           const poll = await configureContentPoll(
-            env.DB,
+            dependencies.pollConfigurationStore,
+            dependencies.pollReadStore,
             actorUserId,
             contentId,
             raw.options,
             durationInput,
             contentContext,
-            dependencies.pollConfigurationStore,
-            dependencies.pollReadStore,
           )
           return json({ data: { poll }, requestId: createRequestId() }, 200)
         }
@@ -934,7 +937,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             contentId,
             correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
           })
-          await deleteContentPoll(env.DB, actorUserId, contentId, contentContext, dependencies.pollDeleteStore)
+          if (!dependencies.pollDeleteStore) throw new SocialPollError('SERVICE_UNAVAILABLE', 503)
+          await deleteContentPoll(dependencies.pollDeleteStore, actorUserId, contentId, contentContext)
           return new Response(null, { status: 204 })
         }
         return new Response(null, { status: 405, headers: { Allow: 'GET, POST, DELETE' } })
