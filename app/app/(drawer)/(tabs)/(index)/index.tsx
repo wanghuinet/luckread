@@ -155,6 +155,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
   // The scope guard prevents even a one-frame flash from a previous account during switches.
   const hydratedById = hydratedState.scope === hydrationScope ? hydratedState.byId : {};
   const hydratedIdsRef = useRef<Set<string>>(new Set());
+  const hydrationControllersRef = useRef<Map<string, AbortController>>(new Map());
   const hydrationScopeRef = useRef(hydrationScope);
   const hydrationGenerationRef = useRef(0);
   const mountedRef = useRef(false);
@@ -183,6 +184,8 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     return () => {
       mountedRef.current = false;
       hydrationGenerationRef.current += 1;
+      for (const controller of hydrationControllersRef.current.values()) controller.abort();
+      hydrationControllersRef.current.clear();
     };
   }, []);
 
@@ -190,6 +193,8 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     if (hydrationScopeRef.current === hydrationScope) return;
     hydrationScopeRef.current = hydrationScope;
     hydrationGenerationRef.current += 1;
+    for (const controller of hydrationControllersRef.current.values()) controller.abort();
+    hydrationControllersRef.current.clear();
     hydratedIdsRef.current.clear();
     setHydratedState({ scope: hydrationScope, byId: {} });
     // Re-hydrate the currently visible cards for the new viewer without
@@ -199,58 +204,74 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
 
   useEffect(() => {
     const visibleContentIds = hydrationTargets.scope === hydrationScope ? hydrationTargets.ids : [];
+    const visibleIdSet = new Set(visibleContentIds);
+
+    // Keep work for cards that remain visible, but cancel every request whose
+    // card has left the viewport. Each card owns its own cancellation scope.
+    for (const [contentId, controller] of hydrationControllersRef.current) {
+      if (!visibleIdSet.has(contentId)) {
+        controller.abort();
+        hydrationControllersRef.current.delete(contentId);
+      }
+    }
+
     const pendingRecords = selectVisibleFeedHydrationRecords(
       records,
       visibleContentIds,
       hydratedIdsRef.current,
-    );
+    ).filter((item) => !hydrationControllersRef.current.has(item.id));
     if (pendingRecords.length === 0) return;
 
-    for (const item of pendingRecords) hydratedIdsRef.current.add(item.id);
     const generation = hydrationGenerationRef.current;
+    for (const item of pendingRecords) {
+      const controller = new AbortController();
+      hydrationControllersRef.current.set(item.id, controller);
 
-    void (async () => {
-      const sessionToken = await readSessionToken().catch(() => null);
-      const results = await Promise.allSettled(pendingRecords.map(async (item) => {
+      void (async () => {
+        const sessionToken = await readSessionToken().catch(() => null);
+        if (controller.signal.aborted || !mountedRef.current) return;
+
         const [bodyResult, socialResult, authorResult] = await Promise.allSettled([
-          readContentBody(item, undefined, sessionToken),
-          readContentSocial(item.id),
-          readContentAuthor(item),
+          readContentBody(item, controller.signal, sessionToken),
+          readContentSocial(item.id, controller.signal),
+          readContentAuthor(item, controller.signal),
         ]);
+        if (
+          controller.signal.aborted ||
+          !mountedRef.current ||
+          generation !== hydrationGenerationRef.current ||
+          hydrationScopeRef.current !== hydrationScope
+        ) return;
 
         const body = bodyResult.status === 'fulfilled' ? bodyResult.value : undefined;
         const social = socialResult.status === 'fulfilled' ? socialResult.value : item.social ?? null;
-        const author = authorResult.status === 'fulfilled' ? authorResult.value : null;
+        const author = authorResult.status === 'fulfilled' ? authorResult.value : item.creator ?? item.author ?? null;
 
+        let hydrated: FeedContent | null = null;
         try {
-          return mapContentToFeedContent(item, body, social, author, sessionToken);
+          hydrated = mapContentToFeedContent(item, body, social, author, sessionToken);
         } catch {
-          return null;
+          // Preserve the canonical list projection if optional hydration is malformed.
         }
-      }));
 
-      if (
-        !mountedRef.current ||
-        generation !== hydrationGenerationRef.current ||
-        hydrationScopeRef.current !== hydrationScope
-      ) return;
-
-      const hydrated: Record<string, FeedContent> = {};
-      for (const result of results) {
-        if (result.status === 'fulfilled' && result.value?.contentId) {
-          hydrated[result.value.contentId] = result.value;
+        hydratedIdsRef.current.add(item.id);
+        if (hydrated?.contentId) {
+          setHydratedState((current) => ({
+            scope: hydrationScope,
+            byId: {
+              ...(current.scope === hydrationScope ? current.byId : {}),
+              [hydrated.contentId!]: hydrated,
+            },
+          }));
         }
-      }
-      if (Object.keys(hydrated).length > 0) {
-        setHydratedState((current) => ({
-          scope: hydrationScope,
-          byId: {
-            ...(current.scope === hydrationScope ? current.byId : {}),
-            ...hydrated,
-          },
-        }));
-      }
-    })();
+      })().catch(() => {
+        // Optional card hydration must never fail the timeline request.
+      }).finally(() => {
+        if (hydrationControllersRef.current.get(item.id) === controller) {
+          hydrationControllersRef.current.delete(item.id);
+        }
+      });
+    }
   }, [records, hydrationScope, hydrationTargets]);
 
   useEffect(() => {

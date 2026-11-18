@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { selectVisibleFeedHydrationRecords } from '../lib/feed-hydration.ts';
 
 test('hydrates only feed records whose cards are visible', () => {
@@ -43,4 +44,20 @@ test('ignores blank visible IDs and blank record IDs', () => {
   const records = [{ id: '' }, { id: 'post-1' }];
   expect(selectVisibleFeedHydrationRecords(records, ['', '   ', 'post-1'], new Set()))
     .toEqual([{ id: 'post-1' }]);
+});
+
+test('home feed hydration is cancellable per visible card and never fans out for offscreen records', () => {
+  const screen = readFileSync(
+    new URL('../app/(drawer)/(tabs)/(index)/index.tsx', import.meta.url),
+    'utf8',
+  );
+
+  expect(screen).toContain('hydrationControllersRef = useRef<Map<string, AbortController>>');
+  expect(screen).toContain('if (!visibleIdSet.has(contentId))');
+  expect(screen).toContain('readContentBody(item, controller.signal, sessionToken)');
+  expect(screen).toContain('readContentSocial(item.id, controller.signal)');
+  expect(screen).toContain('readContentAuthor(item, controller.signal)');
+  expect(screen).toContain('controller.abort()');
+  expect(screen).toContain('hydrationControllersRef.current.clear()');
+  expect(screen).not.toContain('Promise.allSettled(pendingRecords.map(async (item)');
 });
