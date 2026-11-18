@@ -964,3 +964,72 @@ export async function getContentSocialSummary(
     mentions: social.mentions,
   }
 }
+
+export async function getContentSocialSummaryBatch(
+  source: SocialClosureDataSource,
+  w03Content: W03ContentBinding | undefined,
+  contentIdsValue: readonly string[],
+  viewerUserIdValue: string | null | undefined,
+  correlationId: string,
+) {
+  if (!Array.isArray(contentIdsValue) || contentIdsValue.length < 1 || contentIdsValue.length > 50) {
+    throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const contentIds = [...new Set(contentIdsValue.map(value => id(value)))]
+  if (!correlationId.trim()) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+  const viewerUserId = viewerUserIdValue ? id(viewerUserIdValue, 'UNAUTHENTICATED') : null
+  const contexts = await fetchPublishedContentSocialContexts(w03Content, { contentIds, correlationId })
+  const visibleContexts = contentIds.flatMap(contentId => {
+    const context = contexts.get(contentId)
+    if (!context || context.contentId !== contentId || context.state !== 'PUBLISHED' ||
+        !['article', 'post', 'video'].includes(context.contentType)) return []
+    return [context]
+  })
+  if (visibleContexts.length === 0) return []
+  const visibleIds = visibleContexts.map(context => context.contentId)
+  if (!source.getContentSocialBatchRows || !source.getContentTargetsBatch) {
+    throw new SocialClosureRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  const pinnedOwnerUserIds = visibleContexts.map(context =>
+    context.contentType === 'post' ? context.ownerUserId : null,
+  )
+  const [rows, targets] = await Promise.all([
+    withSocialClosureRead(() => source.getContentSocialBatchRows!(visibleIds, pinnedOwnerUserIds, viewerUserId)),
+    (async () => {
+      try {
+        return await source.getContentTargetsBatch!(visibleIds)
+      } catch (error) {
+        if (error instanceof SocialTargetsReadStoreError) {
+          throw new SocialClosureRuntimeError(error.code, error.status)
+        }
+        throw error
+      }
+    })(),
+  ])
+  const rowsById = new Map(rows.map(row => [row.content_id, row]))
+  return visibleContexts.flatMap(context => {
+    const row = rowsById.get(context.contentId)
+    if (!row) return []
+    const social = targets[context.contentId] ?? { topics: [], mentions: [] }
+    return [{
+      contentId: context.contentId,
+      contentType: context.contentType,
+      counts: {
+        likes: Number(row.likes ?? 0), comments: Number(row.comments ?? 0),
+        favorites: Number(row.favorites ?? 0), shares: Number(row.shares ?? 0),
+        reposts: Number(row.reposts ?? 0),
+      },
+      pinned: isSqlTrue(row.pinned),
+      viewer: viewerUserId ? {
+        liked: isSqlTrue(row.liked), favorited: isSqlTrue(row.favorited), reposted: isSqlTrue(row.reposted),
+      } : null,
+      topics: social.topics.map(topic => ({
+        topicId: topic.topic_id, name: topic.normalized_name, displayName: topic.display_name,
+      })),
+      mentions: social.mentions.map(mention => ({
+        userId: mention.mentioned_user_id, handle: mention.handle,
+      })),
+    }]
+  })
+}
+

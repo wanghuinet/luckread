@@ -6,6 +6,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 
 import {
   getContentSocialSummary,
+  getContentSocialSummaryBatch,
   getTopicPage,
   listDiscoveryTopics,
   listNotifications,
@@ -228,6 +229,21 @@ try {
   assert.deepEqual(summary.topics, [])
   assert.deepEqual(summary.mentions, [])
 
+  const batchSummary = await getContentSocialSummaryBatch(
+    store,
+    contentBinding,
+    [contentId, contentId + '-second'],
+    viewerId,
+    'w05-social-closure-read-postgres-batch',
+  )
+  assert.equal(batchSummary.length, 2)
+  assert.deepEqual(batchSummary[0]?.counts, summary.counts)
+  assert.deepEqual(batchSummary[0]?.viewer, summary.viewer)
+  assert.deepEqual(batchSummary[1]?.counts, {
+    likes: 0, comments: 0, favorites: 0, shares: 0, reposts: 0,
+  })
+  assert.equal(batchSummary[1]?.viewer?.liked, false)
+
   runtimePassed = true
 } finally {
   try {
@@ -271,6 +287,7 @@ try {
       singleAndBulkReadUpdatesVerified: true,
       notificationOutboxTriggerObserved: fixturePrepared && notificationOutboxRows === 3,
       contentSocialCountersAndViewerStateVerified: true,
+      contentSocialBatchProjectionVerified: true,
       noW03ContentTableReadByW05: true,
       remainingFixtureRows: remaining,
       remoteNeonTouched: false,

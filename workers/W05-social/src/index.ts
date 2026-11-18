@@ -28,6 +28,7 @@ import {
   SocialClosureRuntimeError,
   enqueueNotification,
   getContentSocialSummary,
+  getContentSocialSummaryBatch,
   getNotificationPreferences,
   getSocialTargets,
   getTopicPage,
@@ -363,7 +364,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url)
-      await enforceRateLimit(request, env, request.method === 'GET' ? 'read:' + url.pathname.split('/').slice(0, 4).join('/') : 'write:' + url.pathname.split('/').slice(0, 4).join('/'))
+      const isBatchSocialRead = url.pathname === '/internal/social/contents/summary-batch'
+      await enforceRateLimit(request, env, request.method === 'GET' || isBatchSocialRead ? 'read:' + url.pathname.split('/').slice(0, 4).join('/') : 'write:' + url.pathname.split('/').slice(0, 4).join('/'))
 
       const repostMatch = /^\/internal\/social\/content\/([^/]+)\/reposts$/.exec(url.pathname)
       if (repostMatch) {
@@ -647,6 +649,34 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           status: 405,
           headers: { Allow: 'PATCH, DELETE' },
         })
+      }
+
+      if (url.pathname === '/internal/social/contents/summary-batch') {
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        requireTransport(request)
+        const rawBody = await request.text()
+        if (rawBody.length > 8192) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+        let body: unknown
+        try { body = JSON.parse(rawBody) } catch {
+          throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+        }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) {
+          throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const rawIds = (body as { contentIds?: unknown }).contentIds
+        if (!Array.isArray(rawIds) || rawIds.length < 1 || rawIds.length > 50 ||
+            rawIds.some(value => typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value.trim()))) {
+          throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        const items = await getContentSocialSummaryBatch(
+          requireSocialClosureReadStore(dependencies.socialClosureReadStore),
+          env.W03_CONTENT,
+          rawIds.map(value => (value as string).trim()),
+          viewerUserId,
+          request.headers.get('X-LuckRead-Correlation-Id') ?? '',
+        )
+        return json({ data: { items }, requestId: crypto.randomUUID() })
       }
 
       if (url.pathname.match(/^\/internal\/social\/contents\/[^/]+\/summary$/)) {

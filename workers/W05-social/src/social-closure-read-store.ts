@@ -65,6 +65,19 @@ export type ContentSocialViewerState = Readonly<{
   reposted: number | boolean
 }>
 
+export type ContentSocialBatchRow = Readonly<{
+  content_id: string
+  likes: number
+  comments: number
+  favorites: number
+  shares: number
+  reposts: number
+  pinned: number | boolean
+  liked: number | boolean
+  favorited: number | boolean
+  reposted: number | boolean
+}>
+
 export interface SocialClosureReadStore extends SocialTargetsReadStore {
   getTopicByName(normalizedName: string): Promise<SocialTopicRow | null>
   listTopicContentEdges(input: {
@@ -82,6 +95,7 @@ export interface SocialClosureReadStore extends SocialTargetsReadStore {
   markAllNotificationsRead(recipientUserId: string): Promise<void>
   getContentSocialCounts(contentId: string, pinnedOwnerUserId: string | null): Promise<ContentSocialCounts | null>
   getContentSocialViewerState(viewerUserId: string, contentId: string): Promise<ContentSocialViewerState | null>
+  getContentSocialBatchRows?(contentIds: readonly string[], pinnedOwnerUserIds: readonly (string | null)[], viewerUserId: string | null): Promise<readonly ContentSocialBatchRow[]>
 }
 
 export class SocialClosureReadStoreError extends Error {

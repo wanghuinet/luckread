@@ -198,10 +198,13 @@ export async function callW05SocialPublic(input: {
     }
   }
 
+  const requestHeaders = new Headers(headers)
+  if (input.body !== undefined) requestHeaders.set('content-type', 'application/json; charset=utf-8')
   const response = await service.fetch(
     new Request('https://luckread-w05.internal' + input.pathname, {
       method: input.method,
-      headers,
+      headers: requestHeaders,
+      body: input.body === undefined ? undefined : JSON.stringify(input.body),
     }),
   )
   const responseHeaders = new Headers({

@@ -4,6 +4,7 @@ import { SocialClosureReadStoreError } from './social-closure-read-store.js'
 import type {
   ContentSocialCounts,
   ContentSocialViewerState,
+  ContentSocialBatchRow,
   NotificationInboxListInput,
   NotificationInboxRow,
   SocialClosureReadStore,
@@ -167,6 +168,49 @@ export function createPostgresSocialClosureReadStore(
           [contentId, contentId, contentId, contentId, contentId, contentId, pinnedOwnerUserId],
         )
         return result.rows[0] ?? null
+      } catch {
+        return fail()
+      }
+    },
+
+    async getContentSocialBatchRows(contentIds, pinnedOwnerUserIds, viewerUserId): Promise<readonly ContentSocialBatchRow[]> {
+      if (contentIds.length === 0) return []
+      if (contentIds.length > 50 || pinnedOwnerUserIds.length !== contentIds.length ||
+          contentIds.some(value => !value.trim() || value.length > 128) ||
+          new Set(contentIds).size !== contentIds.length) return fail()
+      try {
+        const result = await db.query<ContentSocialBatchRow>(
+          `WITH requested AS (
+             SELECT content_id, pinned_owner_user_id
+               FROM unnest($1::text[], $2::text[]) AS item(content_id, pinned_owner_user_id)
+           )
+           SELECT requested.content_id,
+                  (SELECT COUNT(*)::int FROM interaction_likes l
+                    WHERE l.target_type = 'content' AND l.target_id = requested.content_id) AS likes,
+                  (SELECT COUNT(*)::int FROM social_comments c
+                    WHERE c.content_id = requested.content_id AND c.state = 'PUBLISHED') AS comments,
+                  (SELECT COUNT(*)::int FROM interaction_favorites f
+                    WHERE f.target_type = 'content' AND f.target_id = requested.content_id) AS favorites,
+                  (SELECT COUNT(*)::int FROM social_share_links s
+                    WHERE s.content_id = requested.content_id) AS shares,
+                  (SELECT COUNT(*)::int FROM social_reposts r
+                    WHERE r.content_id = requested.content_id) AS reposts,
+                  EXISTS (SELECT 1 FROM social_profile_pins p
+                    WHERE p.content_id = requested.content_id
+                      AND p.user_id = requested.pinned_owner_user_id) AS pinned,
+                  ($3::text IS NOT NULL AND EXISTS (SELECT 1 FROM interaction_likes l
+                    WHERE l.actor_user_id = $3 AND l.target_type = 'content'
+                      AND l.target_id = requested.content_id)) AS liked,
+                  ($3::text IS NOT NULL AND EXISTS (SELECT 1 FROM interaction_favorites f
+                    WHERE f.actor_user_id = $3 AND f.target_type = 'content'
+                      AND f.target_id = requested.content_id)) AS favorited,
+                  ($3::text IS NOT NULL AND EXISTS (SELECT 1 FROM social_reposts r
+                    WHERE r.actor_user_id = $3 AND r.content_id = requested.content_id)) AS reposted
+             FROM requested
+            ORDER BY requested.content_id ASC`,
+          [[...contentIds], [...pinnedOwnerUserIds], viewerUserId],
+        )
+        return result.rows
       } catch {
         return fail()
       }

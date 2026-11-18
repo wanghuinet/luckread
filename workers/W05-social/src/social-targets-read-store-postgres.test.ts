@@ -52,6 +52,32 @@ describe('W05 PostgreSQL SocialTargetsReadStore', () => {
     expect(calls.some(({ sql }) => /JOIN\s+(users|profiles)/i.test(sql))).toBe(false)
   })
 
+  it('loads topics and mentions for a bounded content batch with per-content limits', async () => {
+    const topicRows = [{ target_id: 'content-1', topic_id: 'topic-1', normalized_name: 'one', display_name: 'One' }]
+    const mentionRows = [{ target_id: 'content-2', mentioned_user_id: 'user-2', handle: 'alice' }]
+    const { db, calls } = fakePostgres({ topicRows, mentionRows })
+    const result = await createPostgresSocialTargetsReadStore(db).getContentTargetsBatch!(['content-1', 'content-2'])
+    expect(result).toEqual({
+      'content-1': { topics: [{ topic_id: 'topic-1', normalized_name: 'one', display_name: 'One' }], mentions: [] },
+      'content-2': { topics: [], mentions: [{ mentioned_user_id: 'user-2', handle: 'alice' }] },
+    })
+    expect(calls).toHaveLength(2)
+    expect(calls[0]?.sql).toContain('PARTITION BY st.target_id')
+    expect(calls[0]?.sql).toContain('row_number <= 50')
+    expect(calls[1]?.sql).toContain('PARTITION BY target_id')
+    expect(calls[1]?.sql).toContain('row_number <= 100')
+    expect(calls[0]?.values).toEqual([['content-1', 'content-2']])
+    expect(calls[1]?.values).toEqual([['content-1', 'content-2']])
+  })
+
+  it('rejects batches larger than 50 IDs before issuing SQL', async () => {
+    const { db, calls } = fakePostgres()
+    await expect(createPostgresSocialTargetsReadStore(db).getContentTargetsBatch!(
+      Array.from({ length: 51 }, (_, index) => 'content-' + index),
+    )).rejects.toBeInstanceOf(SocialTargetsReadStoreError)
+    expect(calls).toHaveLength(0)
+  })
+
   it('returns empty arrays when no topic or mention rows exist', async () => {
     const { db } = fakePostgres()
     await expect(createPostgresSocialTargetsReadStore(db)
@@ -63,6 +89,8 @@ describe('W05 PostgreSQL SocialTargetsReadStore', () => {
     const { db } = fakePostgres({ fail: true })
     await expect(createPostgresSocialTargetsReadStore(db)
       .getTargets({ targetType: 'content', targetId: 'content-1' }))
+      .rejects.toBeInstanceOf(SocialTargetsReadStoreError)
+    await expect(createPostgresSocialTargetsReadStore(db).getContentTargetsBatch!(['content-1']))
       .rejects.toBeInstanceOf(SocialTargetsReadStoreError)
   })
 })
