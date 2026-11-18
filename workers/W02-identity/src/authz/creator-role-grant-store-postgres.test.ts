@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   grantCreatorBusinessRolePostgres: vi.fn(),
 }))
 
-vi.mock('./role-assignment-postgres.js', () => {
+vi.mock('../neon/role-assignment-postgres.js', () => {
   class RoleAssignmentPostgresError extends Error {
     constructor(readonly code: string, message: string) {
       super(message)
