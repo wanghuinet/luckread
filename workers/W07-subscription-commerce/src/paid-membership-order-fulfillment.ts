@@ -976,9 +976,9 @@ export async function fulfillPaidMembershipOrder(
     throw new PaidMembershipPurchaseFulfillmentError('VALIDATION_FAILED', 400);
   }
 
-  const financeDatabase = getW07SelectedD104Database(env);
-  const order = await readPaidOrder(financeDatabase, paymentId, merchantId);
-  const lines = await readOrderLines(financeDatabase, order.order_id);
+  const stores = selectedFulfillmentDatabases(env);
+  const order = await readPaidOrder(stores.finance, paymentId, merchantId);
+  const lines = await readOrderLines(stores.finance, order.order_id);
   if (lines.length === 0) return failClosed();
 
   let total = 0;
@@ -1001,10 +1001,10 @@ export async function fulfillPaidMembershipOrder(
   const line = membershipLines[0]!;
   if (!boundedId(line.order_line_id, 255) || !PLAN_ID_PATTERN.test(line.item_ref)) return failClosed();
   const snapshot = parseSnapshot(line.item_snapshot_json, line, order.order_currency);
-  await readPlanVersion(env.D1_01, snapshot);
+  await readPlanVersion(stores.membership, snapshot);
 
   if (snapshot.subscriptionChange) {
-    const result = await applyPaidSubscriptionPlanUpgrade(env, order, line, snapshot);
+    const result = await applyPaidSubscriptionPlanUpgrade(env, stores.membership, order, line, snapshot);
     return {
       outcome: result.outcome,
       fulfilledCount: result.outcome === 'RECONCILIATION_REQUIRED' ? 0 : 1,
@@ -1021,7 +1021,7 @@ export async function fulfillPaidMembershipOrder(
   }
 
   const subscriptionId = await subscriptionIdForPaidOrderLine(order.order_id, line.order_line_id, order.customer_id);
-  const outcome = await createOrReplayPaidSubscription(env.D1_01, {
+  const outcome = await createOrReplayPaidSubscription(stores.membership, {
     subscriptionId,
     subscriberId: order.customer_id,
     orderId: order.order_id,
