@@ -249,7 +249,7 @@ export async function like(
   actorUserId: string,
   target: LikeTarget,
   correlationId: string,
-  prevalidatedContentContext?: PublishedContentSocialContext,
+  prevalidatedContentContext: PublishedContentSocialContext | undefined,
   mutationStore: LikeMutationStore,
   targetContextReadStore: LikeTargetContextReadStore,
 ): Promise<LikeResult> {
@@ -307,8 +307,8 @@ export async function getLikeStatus(
   actorUserId: string,
   target: LikeTarget,
   correlationId: string,
-  prevalidatedContentContext?: PublishedContentSocialContext,
-  statusReadStore?: LikeStatusReadStore,
+  prevalidatedContentContext: PublishedContentSocialContext | undefined,
+  statusReadStore: LikeStatusReadStore | undefined,
   targetContextReadStore: LikeTargetContextReadStore,
 ): Promise<{ liked: boolean; likeCount: number }> {
   const actor = validateActor(actorUserId)
