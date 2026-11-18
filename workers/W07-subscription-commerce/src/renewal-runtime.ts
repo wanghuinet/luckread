@@ -798,7 +798,7 @@ export async function scanDueSubscriptionRenewals(
   }
   const last = rows[rows.length - 1]!;
   const cursorAdvanced = await writeSchedulerCursor(
-    env.D1_04, cursor, last.current_period_end, last.subscription_id, now,
+    cycleStore, cursor, last.current_period_end, last.subscription_id, now,
   );
   return { scanned: rows.length, cycleIds: [...new Set(cycleIds)], cursorAdvanced, cursorReset: false };
 }
