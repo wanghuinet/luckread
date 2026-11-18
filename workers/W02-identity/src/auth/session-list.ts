@@ -1,10 +1,7 @@
 import permissions from '../../../../contracts/authz/permissions.json'
-import { createLuckReadAuth, requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
-import {
-  createD1SessionListStore,
-  type SessionListCursor,
-  type SessionListStore,
-} from './session-list-store.js'
+import { getW02PostgresRuntime } from '../neon/runtime.js'
+import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import type { SessionListCursor, SessionListStore } from './session-list-store.js'
 import {
   enforceSessionListRateLimits,
   sessionRateLimitErrorResponse,
@@ -126,7 +123,7 @@ export async function handleCurrentUserSessionList(
   }
 
   try {
-    const store = dependencies.store ?? createD1SessionListStore(requireLegacyW02D1Database(env))
+    const store = dependencies.store ?? getW02PostgresRuntime(env).sessionListStore
     const result = await store.list({
       userId,
       now,

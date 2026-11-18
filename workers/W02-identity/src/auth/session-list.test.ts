@@ -2,14 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
+  getW02PostgresRuntime: vi.fn(),
+  defaultStore: { list: vi.fn() },
 }))
 
 vi.mock('./better-auth.js', () => ({
   createLuckReadAuth: () => ({ api: { getSession: mocks.getSession } }),
-  requireLegacyW02D1Database: (env: { D1_01?: D1Database }) => {
-    if (!env.D1_01) throw new Error('W02_D1_TEST_BINDING_REQUIRED')
-    return env.D1_01
-  },
+}))
+
+vi.mock('../neon/runtime.js', () => ({
+  getW02PostgresRuntime: mocks.getW02PostgresRuntime,
 }))
 
 import type { BetterAuthEnv } from './better-auth.js'
@@ -21,17 +23,9 @@ const request = (body: unknown) => new Request('https://luckread-w02.internal/in
   body: JSON.stringify(body),
 })
 
-const makeDatabase = (rows: unknown[] = []) => {
-  const statement = {
-    bind: vi.fn().mockReturnThis(),
-    all: vi.fn().mockResolvedValue({ success: true, results: rows }),
-  }
-  const database = { prepare: vi.fn().mockReturnValue(statement) }
-  return { database: database as unknown as D1Database, statement, prepare: database.prepare }
-}
-
-const makeEnv = (database: D1Database): BetterAuthEnv => ({
-  D1_01: database,
+const makeEnv = (): BetterAuthEnv => ({
+  W02_DATABASE_DRIVER: 'neon',
+  HYPERDRIVE: { connectionString: 'postgresql://user:password@localhost:5432/luckread' },
   AUTH_SESSION_READ_LIMITER: {
     limit: vi.fn().mockResolvedValue({ success: true }),
   },
@@ -49,12 +43,9 @@ const decodeCursor = (value: string) => {
 }
 
 const row = (sessionId: string, createdAt: string) => ({
-  permissionGranted: 1,
   sessionId,
   createdAt,
   expiresAt: '2026-12-01T00:00:00.000Z',
-  token: 'never-project-this',
-  userId: 'never-project-this',
 })
 
 describe('W02 bounded session list', () => {
@@ -64,15 +55,20 @@ describe('W02 bounded session list', () => {
       user: { id: 'user-1' },
       session: { id: 'session-2' },
     })
+    mocks.defaultStore.list.mockResolvedValue({ permissionGranted: true, rows: [] })
+    mocks.getW02PostgresRuntime.mockReturnValue({ sessionListStore: mocks.defaultStore })
   })
 
-  it('scopes the SQL to the authenticated user and returns at most the requested page', async () => {
-    const db = makeDatabase([
-      row('session-3', '2026-10-03T00:00:00.000Z'),
-      row('session-2', '2026-10-02T00:00:00.000Z'),
-      row('session-1', '2026-10-01T00:00:00.000Z'),
-    ])
-    const env = makeEnv(db.database)
+  it('uses the Neon runtime Store, authenticated subject and bounded look-ahead page', async () => {
+    mocks.defaultStore.list.mockResolvedValue({
+      permissionGranted: true,
+      rows: [
+        row('session-3', '2026-10-03T00:00:00.000Z'),
+        row('session-2', '2026-10-02T00:00:00.000Z'),
+        row('session-1', '2026-10-01T00:00:00.000Z'),
+      ],
+    })
+    const env = makeEnv()
 
     const response = await handleCurrentUserSessionList(env, request({ limit: 2 }))
     const payload = await response.json() as {
@@ -92,12 +88,13 @@ describe('W02 bounded session list', () => {
       createdAt: '2026-10-02T00:00:00.000Z',
       sessionId: 'session-2',
     })
-    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('role_assignments'))
-    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining("account.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')"))
-    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('WHERE user_id = ? AND expires_at > ?'))
-    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('ORDER BY created_at DESC, id DESC'))
-    expect(db.statement.bind).toHaveBeenCalledWith('user-1', expect.any(String), expect.any(String), 'user-1', expect.any(String), 3)
-    expect(db.statement.all).toHaveBeenCalledTimes(1)
+    expect(mocks.getW02PostgresRuntime).toHaveBeenCalledWith(env)
+    expect(mocks.defaultStore.list).toHaveBeenCalledWith({
+      userId: 'user-1',
+      now: expect.any(String),
+      limit: 3,
+      cursor: null,
+    })
     expect(env.AUTH_SESSION_READ_LIMITER?.limit).toHaveBeenNthCalledWith(1, {
       key: 'auth010:session-list:account:user-1',
     })
@@ -106,53 +103,40 @@ describe('W02 bounded session list', () => {
     })
   })
 
-  it('uses the decoded cursor in the keyset predicate and bounds the look-ahead query', async () => {
-    const db = makeDatabase([row('session-1', '2026-10-01T00:00:00.000Z')])
-    const cursor = encodeCursor({ createdAt: '2026-10-02T00:00:00.000Z', sessionId: 'session-2' })
-    const env = makeEnv(db.database)
+  it('passes the decoded keyset cursor to the PostgreSQL Store', async () => {
+    mocks.defaultStore.list.mockResolvedValue({
+      permissionGranted: true,
+      rows: [row('session-1', '2026-10-01T00:00:00.000Z')],
+    })
+    const cursorValue = { createdAt: '2026-10-02T00:00:00.000Z', sessionId: 'session-2' }
+    const env = makeEnv()
 
-    const response = await handleCurrentUserSessionList(env, request({ limit: 10, cursor }))
+    const response = await handleCurrentUserSessionList(
+      env,
+      request({ limit: 10, cursor: encodeCursor(cursorValue) }),
+    )
     const payload = await response.json() as { items: Array<{ sessionId: string }>; nextCursor: string | null }
 
     expect(response.status).toBe(200)
     expect(payload.items.map((item) => item.sessionId)).toEqual(['session-1'])
     expect(payload.nextCursor).toBeNull()
-    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('(created_at < ? OR (created_at = ? AND id < ?))'))
-    expect(db.statement.bind).toHaveBeenCalledWith(
-      'user-1',
-      expect.any(String),
-      expect.any(String),
-      'user-1',
-      expect.any(String),
-      '2026-10-02T00:00:00.000Z',
-      '2026-10-02T00:00:00.000Z',
-      'session-2',
-      11,
-    )
+    expect(mocks.defaultStore.list).toHaveBeenCalledWith({
+      userId: 'user-1',
+      now: expect.any(String),
+      limit: 11,
+      cursor: cursorValue,
+    })
   })
 
-  it('accepts an injected persistence store and authenticated session resolver', async () => {
-    const db = makeDatabase()
-    const env = makeEnv(db.database)
+  it('accepts an injected persistence Store and authenticated session resolver', async () => {
+    const env = makeEnv()
     const store = {
       list: vi.fn().mockResolvedValue({
         permissionGranted: true,
         rows: [
-          {
-            sessionId: 'postgres-session-3',
-            createdAt: '2026-10-03T00:00:00.000Z',
-            expiresAt: '2026-12-01T00:00:00.000Z',
-          },
-          {
-            sessionId: 'postgres-session-2',
-            createdAt: '2026-10-02T00:00:00.000Z',
-            expiresAt: '2026-12-01T00:00:00.000Z',
-          },
-          {
-            sessionId: 'postgres-session-1',
-            createdAt: '2026-10-01T00:00:00.000Z',
-            expiresAt: '2026-12-01T00:00:00.000Z',
-          },
+          row('postgres-session-3', '2026-10-03T00:00:00.000Z'),
+          row('postgres-session-2', '2026-10-02T00:00:00.000Z'),
+          row('postgres-session-1', '2026-10-01T00:00:00.000Z'),
         ],
       }),
     }
@@ -187,12 +171,12 @@ describe('W02 bounded session list', () => {
     })
     expect(getSession).toHaveBeenCalledTimes(1)
     expect(mocks.getSession).not.toHaveBeenCalled()
-    expect(db.prepare).not.toHaveBeenCalled()
+    expect(mocks.getW02PostgresRuntime).not.toHaveBeenCalled()
   })
 
-  it('denies session listing when the explicit user role permission is not effective', async () => {
-    const db = makeDatabase([{ permissionGranted: 0, sessionId: null, createdAt: null, expiresAt: null }])
-    const env = makeEnv(db.database)
+  it('denies session listing when the effective base-user role is absent', async () => {
+    mocks.defaultStore.list.mockResolvedValue({ permissionGranted: false, rows: [] })
+    const env = makeEnv()
 
     const response = await handleCurrentUserSessionList(env, request({ limit: 10 }))
     const payload = await response.json() as { error?: { code?: string }; items?: unknown[] }
@@ -200,12 +184,11 @@ describe('W02 bounded session list', () => {
     expect(response.status).toBe(403)
     expect(payload.error?.code).toBe('PERMISSION_DENIED')
     expect(payload.items).toBeUndefined()
-    expect(db.statement.all).toHaveBeenCalledTimes(1)
+    expect(mocks.defaultStore.list).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects invalid limits and cursors before authenticating or querying D1', async () => {
-    const db = makeDatabase()
-    const env = makeEnv(db.database)
+  it('rejects invalid limits and cursors before authenticating or resolving the Store', async () => {
+    const env = makeEnv()
 
     const limitResponse = await handleCurrentUserSessionList(env, request({ limit: 51 }))
     const cursorResponse = await handleCurrentUserSessionList(env, request({ limit: 10, cursor: 'not-valid' }))
@@ -213,24 +196,24 @@ describe('W02 bounded session list', () => {
     expect(limitResponse.status).toBe(400)
     expect(cursorResponse.status).toBe(400)
     expect(mocks.getSession).not.toHaveBeenCalled()
-    expect(db.prepare).not.toHaveBeenCalled()
+    expect(mocks.defaultStore.list).not.toHaveBeenCalled()
+    expect(mocks.getW02PostgresRuntime).not.toHaveBeenCalled()
   })
 
-  it('rejects anonymous requests without querying session rows', async () => {
+  it('rejects anonymous requests without resolving the Store or consuming rate limits', async () => {
     mocks.getSession.mockResolvedValueOnce(null)
-    const db = makeDatabase()
-    const env = makeEnv(db.database)
+    const env = makeEnv()
 
     const response = await handleCurrentUserSessionList(env, request({ limit: 10 }))
 
     expect(response.status).toBe(401)
-    expect(db.prepare).not.toHaveBeenCalled()
+    expect(mocks.defaultStore.list).not.toHaveBeenCalled()
     expect(env.AUTH_SESSION_READ_LIMITER?.limit).not.toHaveBeenCalled()
+    expect(mocks.getW02PostgresRuntime).not.toHaveBeenCalled()
   })
 
-  it('returns 429 before D1 when a required account or endpoint scope is exhausted', async () => {
-    const db = makeDatabase()
-    const env = makeEnv(db.database)
+  it('returns 429 before resolving the Store when a required scope is exhausted', async () => {
+    const env = makeEnv()
     const limiter = env.AUTH_SESSION_READ_LIMITER!
     vi.mocked(limiter.limit)
       .mockResolvedValueOnce({ success: true })
@@ -243,13 +226,13 @@ describe('W02 bounded session list', () => {
     expect(response.headers.get('retry-after')).toBe('60')
     expect(payload.error?.code).toBe('RATE_LIMITED')
     expect(limiter.limit).toHaveBeenCalledTimes(2)
-    expect(db.prepare).not.toHaveBeenCalled()
+    expect(mocks.defaultStore.list).not.toHaveBeenCalled()
+    expect(mocks.getW02PostgresRuntime).not.toHaveBeenCalled()
   })
 
-  it('fails closed when D1 reports an unsuccessful session query', async () => {
-    const db = makeDatabase()
-    db.statement.all.mockResolvedValueOnce({ success: false, results: [] })
-    const env = makeEnv(db.database)
+  it('fails closed when the Neon Store cannot serve the session query', async () => {
+    mocks.defaultStore.list.mockRejectedValueOnce(new Error('PostgreSQL unavailable'))
+    const env = makeEnv()
 
     const response = await handleCurrentUserSessionList(env, request({ limit: 10 }))
     const payload = await response.json() as { error?: { code?: string }; items?: unknown[] }
@@ -257,33 +240,5 @@ describe('W02 bounded session list', () => {
     expect(response.status).toBe(503)
     expect(payload.error?.code).toBe('SERVICE_UNAVAILABLE')
     expect(payload.items).toBeUndefined()
-    expect(db.statement.all).toHaveBeenCalledTimes(1)
-  })
-
-  it('fails closed when D1 reports success without a valid results array', async () => {
-    const db = makeDatabase()
-    db.statement.all.mockResolvedValueOnce(
-      { success: true } as unknown as { success: boolean; results: unknown[] },
-    )
-    const env = makeEnv(db.database)
-
-    const response = await handleCurrentUserSessionList(env, request({ limit: 10 }))
-    const payload = await response.json() as { error?: { code?: string }; items?: unknown[] }
-
-    expect(response.status).toBe(503)
-    expect(payload.error?.code).toBe('SERVICE_UNAVAILABLE')
-    expect(payload.items).toBeUndefined()
-  })
-
-  it('fails closed when D1 cannot serve the session query', async () => {
-    const db = makeDatabase()
-    db.statement.all.mockRejectedValueOnce(new Error('D1 unavailable'))
-    const env = makeEnv(db.database)
-
-    const response = await handleCurrentUserSessionList(env, request({ limit: 10 }))
-
-    expect(response.status).toBe(503)
-    const payload = await response.json() as { error?: { code?: string } }
-    expect(payload.error?.code).toBe('SERVICE_UNAVAILABLE')
   })
 })

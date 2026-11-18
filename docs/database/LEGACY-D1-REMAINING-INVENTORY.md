@@ -2,9 +2,9 @@
 
 - Repository: `wanghuinet/luckread`
 - Base branch: `main`
-- Audited base HEAD: `d3478519513b97bbdf58e59aab845428cc5d9011` (2026-11-18)
+- Audited base HEAD: `762d5a2f6a20c2875e6a6ed8cacf5b5e845260ed` (2026-11-18)
 - Related execution brief: PR [#1909](https://github.com/wanghuinet/luckread/pull/1909)
-- Open PRs at this audit base HEAD: none. PR #1909 is merged as the execution brief; PRs #1908, #1910, #1912, #1938, #1939, #1940, #1941 and #1942 are closed (merged where noted below).
+- Open PRs at this audit base HEAD: PR #1949 (W02 AUTH-010 session-list D1 adapter/fallback removal); all preceding cleanup PRs listed below are closed.
 - Status: **initial repository-wide inventory; not the final audit**. Continue updating this file per merged cleanup slice.
 
 ## Scope and method
@@ -28,7 +28,7 @@ Search-index results can lag behind `main`; file-level decisions are based on re
 | Worker | Classification | Remaining D1 references / confirmed state | Neon replacement and next action |
 |---|---|---|---|
 | W01 Payload | B / D | `workers/W01-payload/src/payload.config.ts` still contains `sqliteD1Adapter` selection alongside the Neon adapter. W01 Wrangler/evidence workflows and AUTH-002 schema-generation admission still expect controlled D1/SQLite tooling. Historical Payload migrations and the upstream D1 adapter manifest are separate lineage evidence. | Complete Payload CLI/schema-generation and controlled local-evidence workflows on PostgreSQL before removing the selector/dependency. Preserve upstream Payload behavior; do not patch vendor code. Keep migration lineage and evidence as D. |
-| W02 Identity | A / B / D | PR #1939 removed the unreferenced PrincipalAuthority D1 adapter; PR #1940 removed the RoleLayer D1 adapter. This slice removes the registration-rollback D1 test adapter after confirming production composition in `src/neon/runtime.ts`. Remaining D1-shaped test/schema adapters still include Better Auth schema/test support, account-state transition, CreatorRoleGrant, MFA, session and publisher fixtures. `wrangler.jsonc` and `migrations/**` remain historical/source evidence; production uses `wrangler.neon.jsonc`. | Continue one isolated adapter family at a time, preserving PostgreSQL transaction and authority semantics. Do not delete W02 source migrations, Wrangler history or schema evidence as part of runtime cleanup. |
+| W02 Identity | A / B / D | PR #1939 removed PrincipalAuthority D1; PR #1940 removed RoleLayer D1; PR #1944 removed the registration-rollback D1 adapter/test fixture. PR #1949 removes the AUTH-010 session-list D1 adapter and handler fallback. Remaining D1-shaped test/schema adapters include Better Auth schema/test support, account-state transition, CreatorRoleGrant, MFA, session revoke/logout, username-change and publisher fixtures. `wrangler.jsonc` and `migrations/**` remain historical/source evidence; production uses `wrangler.neon.jsonc`. | Continue isolated adapter families while preserving PostgreSQL transaction and authority semantics. Do not delete W02 source migrations, Wrangler history or schema evidence as part of runtime cleanup. |
 | W03 Content | B / D (provisional) | Initial targeted search did not establish a complete runtime call graph. D1-named migration generators, source SQL templates, PostgreSQL migration artifacts and traffic-guard tests are present. | Inspect all W03 entrypoints, runtime dependencies, deploy configs and scripts; distinguish current Neon PostgreSQL readers/writers from D1 schema source and contract fixtures before assigning any runtime deletion. |
 | W04 Feed/Search | C (audit pending) | No direct `D1Database` / `createD1` adapter was identified in the initial targeted search. This is not a proof of absence; configuration and imported shared stores have not been exhaustively traced. | Verify worker entry/config, shared query clients, scheduled jobs and deployment workflow before marking Neon-only. No deletion authorized by this preliminary scan. |
 | W05 Social | A / B / D | Since the initial inventory, PR #1912 closed the follower/following list reader, #1938 closed the Content Liker reader, #1941 removed orphaned D1-only helper/tests, and #1942 removed the push-endpoint D1 fallback while retaining W09 ownership of the D1-03 logical domain. Current `src/index.ts` still carries a D1 test/local `DB` contract and comments identifying several route families as D1-default (including comment mutations, profile pin, Repost, Share and Like mutation); those paths require a route-by-route callsite audit before deletion. | Continue with isolated route/store slices and verify the actual production composition; do not delete the D1 test/local contract or comments based on text alone. Preserve W05/W09 ownership and the existing Neon-backed Hyperdrive bindings. |
@@ -55,7 +55,8 @@ Search-index results can lag behind `main`; file-level decisions are based on re
 | #1940 | W02 RoleLayerStore D1 adapter removal | Merged |
 | #1941 | W05 orphaned D1-only helper/test cleanup | Merged |
 | #1942 | W05 push endpoint D1 fallback removal (W09-owned Neon D1-03 executor) | Merged |
-| #1944 | W02 RegistrationRollbackStore D1 adapter/test fixture removal | Open; CI/review pending at inventory update |
+| #1944 | W02 RegistrationRollbackStore D1 adapter/test fixture removal | Merged |
+| #1949 | W02 AUTH-010 session-list D1 adapter and handler fallback removal; PostgreSQL keyset/role checks retained | Open; previous PR-head CI passed, refreshed-head CI and Review pending |
 | #1939 | W02 PrincipalAuthorityStore D1 adapter removal | Merged |
 | #1940 | W02 RoleLayerStore D1 adapter removal | Merged |
 
@@ -69,7 +70,7 @@ Search-index results can lag behind `main`; file-level decisions are based on re
 
 ## Immediate queue
 
-1. W02 remaining test-only D1 adapters (Better Auth schema profile, account-state, CreatorRoleGrant, MFA, session, publisher and L8/bootstrap fixtures). Principal Authority (#1939), RoleLayer (#1940) and registration rollback (current slice) are closed; continue with non-overlapping adapter families and keep historical migration/config work separate.
+1. W02 remaining test-only D1 adapters (Better Auth schema profile, account-state, CreatorRoleGrant, MFA, session revoke/logout, username-change, publisher and L8/bootstrap fixtures). Principal Authority (#1939), RoleLayer (#1940) and registration rollback (#1944) are merged; AUTH-010 session-list adapter/fallback removal is tracked in PR #1949. Continue non-overlapping families and keep historical migration/config work separate.
 2. W05: follower/following reads (#1912), Content Liker read (#1938), orphaned D1 residue (#1941) and push endpoint fallback (#1942) are closed. Reconcile the remaining Social routes and D1-compatible test/local contract against current runtime composition before selecting another slice; do not change W09 push-endpoint ownership.
 3. W06 PostgreSQL-native moderation store migration: replace translator/facade only after consumer ports and transactions are migrated.
 4. W07 membership/order/payment/refund/webhook runtime paths: finish PostgreSQL-native store composition before deleting compatibility SQL.
