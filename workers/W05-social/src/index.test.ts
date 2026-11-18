@@ -259,24 +259,16 @@ describe('W05 following-feed author PostgreSQL runtime injection', () => {
     expect(store.list).toHaveBeenCalledWith('viewer-1', 501)
   })
 
-  it('preserves the D1 route fallback when no PostgreSQL store is injected', async () => {
-    const all = vi.fn(async () => ({ results: [{ user_id: 'd1-author-1' }] }))
-    const bind = vi.fn(() => ({ all }))
-    const d1Prepare = vi.fn((_sql: string) => ({ bind }))
-
+  it('fails closed before touching D1 when the Following-feed author Store is missing', async () => {
+    const d1Prepare = vi.fn(() => { throw new Error('D1 must not be used') })
     const response = await worker.fetch(
       request('/internal/social/feed/following-authors', followingFeedHeaders),
       { DB: { prepare: d1Prepare } } as never,
       {} as never,
     )
-
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { items: [{ userId: 'd1-author-1' }], candidateWindowTruncated: false },
-    })
-    expect(d1Prepare).toHaveBeenCalledTimes(1)
-    expect(bind).toHaveBeenCalledWith('viewer-1', 'viewer-1', 'viewer-1', 'viewer-1', 501)
-    expect(all).toHaveBeenCalledTimes(1)
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'SERVICE_UNAVAILABLE' } })
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 })
 
