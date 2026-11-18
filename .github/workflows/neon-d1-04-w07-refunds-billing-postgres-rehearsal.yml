@@ -15,6 +15,10 @@ on:
       - 'workers/W07-subscription-commerce/README-neon-d1-04-postgres-schema.md'
       - 'workers/W07-subscription-commerce/src/index.ts'
       - 'workers/W07-subscription-commerce/src/billing-read-http-runtime.ts'
+      - 'workers/W07-subscription-commerce/src/billing-document-postgres-persistence.ts'
+      - 'workers/W07-subscription-commerce/src/billing-document-postgres-persistence.test.ts'
+      - 'workers/W07-subscription-commerce/src/payment-webhook-http-runtime.ts'
+      - 'workers/W07-subscription-commerce/src/payment-webhook-http-runtime.test.ts'
       - 'workers/W07-subscription-commerce/src/neon/payment-method-read-runtime.ts'
       - 'workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-w07-billing-read-entry-postgres-runtime.mjs'
       - '.github/workflows/neon-d1-04-w07-refunds-billing-postgres-rehearsal.yml'
@@ -109,6 +113,8 @@ jobs:
             workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-refunds-billing-documents-postgres-schema.sql
             workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-w07-billing-read-entry-postgres-runtime.mjs
             workers/W07-subscription-commerce/src/neon/payment-method-read-runtime.ts
+            workers/W07-subscription-commerce/src/billing-document-postgres-persistence.ts
+            workers/W07-subscription-commerce/src/billing-document-postgres-persistence.test.ts
             artifacts/neon/w07-billing-read-entry-postgres-runtime-postflight.json
           if-no-files-found: error
           retention-days: 30
