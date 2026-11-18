@@ -21,6 +21,7 @@ export type SocialTargetsReadResult = Readonly<{
 
 export interface SocialTargetsReadStore {
   getTargets(input: SocialTargetsReadInput): Promise<SocialTargetsReadResult>
+  getContentTargetsBatch?(contentIds: readonly string[]): Promise<Readonly<Record<string, SocialTargetsReadResult>>>
 }
 
 export class SocialTargetsReadStoreError extends Error {

@@ -58,6 +58,18 @@ describe('W05 PostgreSQL social closure read store', () => {
     expect(calls[2]?.values).toEqual(['topic-old', 'content-old', 200])
   })
 
+  it('delegates bounded content topic and mention batches to the PostgreSQL targets store', async () => {
+    const { db, calls } = fakePostgres()
+    const store = createPostgresSocialClosureReadStore(db)
+
+    await expect(store.getContentTargetsBatch!(['content-1'])).resolves.toEqual({
+      'content-1': { topics: [], mentions: [] },
+    })
+    expect(calls).toHaveLength(2)
+    expect(calls[0]?.sql).toContain('FROM social_target_topics')
+    expect(calls[1]?.sql).toContain('FROM social_mentions')
+  })
+
   it('keeps inbox pagination and unread count actor-scoped, and supports single/all read updates', async () => {
     const row = {
       notification_id: 'notification-1',
@@ -124,6 +136,27 @@ describe('W05 PostgreSQL social closure read store', () => {
     expect(calls[1]?.values).toEqual(['viewer-1','content-1','viewer-1','content-1','viewer-1','content-1'])
   })
 
+  it('reads a bounded content social batch in one PostgreSQL query with viewer state scoped to the supplied principal', async () => {
+    const rows = [
+      { content_id: 'content-1', likes: 3, comments: 2, favorites: 1, shares: 4, reposts: 5, pinned: true, liked: true, favorited: false, reposted: true },
+      { content_id: 'content-2', likes: 0, comments: 0, favorites: 0, shares: 0, reposts: 0, pinned: false, liked: false, favorited: false, reposted: false },
+    ]
+    const { db, calls } = fakePostgres({ rows })
+    const store = createPostgresSocialClosureReadStore(db)
+    await expect(store.getContentSocialBatchRows!(
+      ['content-1', 'content-2'], ['owner-1', null], 'viewer-1',
+    )).resolves.toEqual(rows)
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.sql).toContain('jsonb_to_recordset($1::jsonb)')
+    expect(calls[0]?.sql).toContain('FROM interaction_likes')
+    expect(calls[0]?.sql).toContain('FROM social_comments')
+    expect(calls[0]?.sql).toContain('FROM interaction_favorites')
+    expect(calls[0]?.sql).toContain('FROM social_share_links')
+    expect(calls[0]?.sql).toContain('FROM social_reposts')
+    expect(calls[0]?.sql).toContain('FROM social_profile_pins')
+    expect(calls[0]?.values).toEqual([['content-1', 'content-2'], ['owner-1', null], 'viewer-1'])
+  })
+
   it('sanitizes PostgreSQL failures for each read boundary', async () => {
     const { db } = fakePostgres({ fail: true })
     const store = createPostgresSocialClosureReadStore(db)
@@ -141,6 +174,8 @@ describe('W05 PostgreSQL social closure read store', () => {
     await expect(store.markAllNotificationsRead('recipient-1')).rejects.toBeInstanceOf(SocialClosureReadStoreError)
     await expect(store.getContentSocialCounts('content-1', null)).rejects.toBeInstanceOf(SocialClosureReadStoreError)
     await expect(store.getContentSocialViewerState('viewer-1', 'content-1'))
+      .rejects.toBeInstanceOf(SocialClosureReadStoreError)
+    await expect(store.getContentSocialBatchRows!(['content-1'], [null], null))
       .rejects.toBeInstanceOf(SocialClosureReadStoreError)
   })
 })

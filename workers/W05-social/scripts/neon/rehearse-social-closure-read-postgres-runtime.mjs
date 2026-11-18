@@ -6,6 +6,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 
 import {
   getContentSocialSummary,
+  getContentSocialSummaryBatch,
   getTopicPage,
   listDiscoveryTopics,
   listNotifications,
@@ -33,7 +34,20 @@ const marker = 'w05-social-closure-read-' + randomUUID()
 const reportPath = process.env.W05_SOCIAL_CLOSURE_READ_POSTGRES_REPORT ||
   '../../artifacts/neon/w05-social-closure-read-postgres-runtime-postflight.json'
 const pool = new Pool({ connectionString, max: 5, connectionTimeoutMillis: 5_000 })
-const store = createPostgresSocialClosureReadStore(pool)
+const diagnosticDb = {
+  async query(...args) {
+    try {
+      return await pool.query(...args)
+    } catch (error) {
+      console.error('W05 disposable PostgreSQL query diagnostic', {
+        message: error instanceof Error ? error.message : String(error),
+        query: String(args[0]).slice(0, 500),
+      })
+      throw error
+    }
+  },
+}
+const store = createPostgresSocialClosureReadStore(diagnosticDb)
 const now = new Date()
 const nowIso = now.toISOString()
 const timestamp = (offsetSeconds) => new Date(now.getTime() + offsetSeconds * 1000).toISOString()
@@ -228,6 +242,21 @@ try {
   assert.deepEqual(summary.topics, [])
   assert.deepEqual(summary.mentions, [])
 
+  const batchSummary = await getContentSocialSummaryBatch(
+    store,
+    contentBinding,
+    [contentId, contentId + '-second'],
+    viewerId,
+    'w05-social-closure-read-postgres-batch',
+  )
+  assert.equal(batchSummary.length, 2)
+  assert.deepEqual(batchSummary[0]?.counts, summary.counts)
+  assert.deepEqual(batchSummary[0]?.viewer, summary.viewer)
+  assert.deepEqual(batchSummary[1]?.counts, {
+    likes: 0, comments: 0, favorites: 0, shares: 0, reposts: 0,
+  })
+  assert.equal(batchSummary[1]?.viewer?.liked, false)
+
   runtimePassed = true
 } finally {
   try {
@@ -271,6 +300,7 @@ try {
       singleAndBulkReadUpdatesVerified: true,
       notificationOutboxTriggerObserved: fixturePrepared && notificationOutboxRows === 3,
       contentSocialCountersAndViewerStateVerified: true,
+      contentSocialBatchProjectionVerified: true,
       noW03ContentTableReadByW05: true,
       remainingFixtureRows: remaining,
       remoteNeonTouched: false,

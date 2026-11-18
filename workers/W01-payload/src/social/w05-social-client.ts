@@ -9,7 +9,7 @@ import {
 } from '../content/w03-content-client.js'
 import { extractSocialTokens } from './social-token-parser.js'
 import { relayW05Response } from './w05-response.js'
-import { createW05SocialCaller } from './w05-social-transport.js'
+import { createW05SocialCaller, createW05SocialPublicCaller } from './w05-social-transport.js'
 
 type W05SocialService = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
@@ -179,39 +179,9 @@ export async function callW05SocialPublic(input: {
   pathname: string
   method: string
   principal?: ContentPrincipal | null
+  body?: unknown
 }): Promise<Response> {
-  const service = await getW05Service()
-  const headers = new Headers({
-    'X-LuckRead-Caller': 'W01',
-    'X-LuckRead-Transport-Version': '1.0',
-    'X-LuckRead-Correlation-Id':
-      input.request.headers.get('X-LuckRead-Correlation-Id')?.trim() || crypto.randomUUID(),
-  })
-  if (input.principal?.userId) {
-    headers.set('X-LuckRead-Principal-User-Id', input.principal.userId)
-    headers.set('X-LuckRead-Rate-Key', 'user:' + input.principal.userId)
-  } else {
-    const clientIp = input.request.headers.get('cf-connecting-ip')?.trim()
-    if (clientIp) {
-      headers.set('X-LuckRead-Client-IP', clientIp)
-      headers.set('X-LuckRead-Rate-Key', 'ip:' + clientIp)
-    }
-  }
-
-  const response = await service.fetch(
-    new Request('https://luckread-w05.internal' + input.pathname, {
-      method: input.method,
-      headers,
-    }),
-  )
-  const responseHeaders = new Headers({
-    'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
-    'cache-control': 'no-store',
-  })
-  const etag = response.headers.get('etag')
-  if (etag) responseHeaders.set('etag', etag)
-
-  return relayW05Response(response, responseHeaders)
+  return createW05SocialPublicCaller(getW05Service)(input)
 }
 
 export const callW05Social = createW05SocialCaller(getW05Service)
