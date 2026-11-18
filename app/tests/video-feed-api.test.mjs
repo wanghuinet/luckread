@@ -109,10 +109,12 @@ test('renders video list projections immediately and hydrates only the visible v
   expect(videoScreen).toContain('mediaLoading: false');
   expect(videoScreen).toContain('settleVideoFeedEnrichment(');
   expect(videoScreen).toContain('recordsByIdRef.current.get(currentId)');
-  expect(videoScreen).toContain('hydratedIdsRef.current.has(currentId)');
   expect(videoScreen).toContain('signal: controller.signal');
   expect(videoScreen).toContain('setCursor(page.nextCursor || null)');
   expect(videoScreen).toContain('playback: () => resolveVideoSource(record, sessionToken, controller.signal)');
+  expect(videoScreen).toContain('readContentAuthor(record, controller.signal)');
+  expect(videoScreen).toContain('controller.abort()');
+  expect(videoScreen).toContain('videoSource: null, mediaLoading: false');
   expect(videoScreen).not.toContain('videoRecords.map(async (record)');
   expect(videoScreen).not.toContain('const hydrationResults = await Promise.allSettled(');
   expect(videoScreen).toContain('function VideoPlayerSurface(');

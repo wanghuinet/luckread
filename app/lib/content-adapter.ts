@@ -283,6 +283,17 @@ export async function readContentAuthor(item: ApiContentRecord, signal?: AbortSi
     };
   }
 
+  if (signal) {
+    const profile = await resolvePublicProfileById(authorId, signal);
+    if (!profile || signal.aborted) return null;
+    return {
+      id: profile.id,
+      username: profile.username,
+      displayName: profile.displayName,
+      avatar: profile.avatar,
+    };
+  }
+
   let pending = publicAuthorReads.get(authorId);
   if (!pending) {
     pending = (async () => {

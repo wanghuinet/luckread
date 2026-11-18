@@ -366,7 +366,6 @@ export default function VideoFeed() {
   const hydrationControllerRef = useRef<AbortController | null>(null);
   const hydrationGenerationRef = useRef(0);
   const recordsByIdRef = useRef<Map<string, ApiContentRecord>>(new Map());
-  const hydratedIdsRef = useRef<Set<string>>(new Set());
   const [hydrationRetryVersion, setHydrationRetryVersion] = useState(0);
 
   useEffect(() => {
@@ -392,9 +391,9 @@ export default function VideoFeed() {
     else {
       hydrationControllerRef.current?.abort();
       hydrationGenerationRef.current += 1;
-      hydratedIdsRef.current.clear();
       recordsByIdRef.current.clear();
       setCurrentId(null);
+      setHydrationRetryVersion((value) => value + 1);
       setLoading(true);
     }
     setErrorMessage('');
@@ -467,7 +466,7 @@ export default function VideoFeed() {
       return;
     }
     const record = recordsByIdRef.current.get(currentId);
-    if (!record || hydratedIdsRef.current.has(currentId)) return;
+    if (!record) return;
 
     hydrationControllerRef.current?.abort();
     const controller = new AbortController();
@@ -499,11 +498,9 @@ export default function VideoFeed() {
         mediaLoading: false,
         mediaSourceVersion: generation,
       };
-      hydratedIdsRef.current.add(currentId);
       setItems((current) => current.map((item) => item.contentId === currentId ? hydrated : item));
     })().catch((cause) => {
       if (controller.signal.aborted || generation !== hydrationGenerationRef.current) return;
-      hydratedIdsRef.current.add(currentId);
       setItems((current) => current.map((item) => item.contentId === currentId
         ? { ...item, mediaLoading: false, mediaError: cause instanceof Error ? cause.message : 'Unable to load video details.' }
         : item));
@@ -512,6 +509,10 @@ export default function VideoFeed() {
     return () => {
       controller.abort();
       if (hydrationControllerRef.current === controller) hydrationControllerRef.current = null;
+      // Unmount the native player as soon as this card stops being active.
+      setItems((current) => current.map((item) => item.contentId === currentId && item.videoSource
+        ? { ...item, videoSource: null, mediaLoading: false }
+        : item));
     };
   }, [currentId, isFocused, hydrationRetryVersion]);
   useEffect(() => {
@@ -534,7 +535,6 @@ export default function VideoFeed() {
   const currentIndex = items.findIndex((item) => item.contentId === currentId);
   const retry = useCallback(() => {
     if (currentId) {
-      hydratedIdsRef.current.delete(currentId);
       setHydrationRetryVersion((value) => value + 1);
       return;
     }
