@@ -1461,7 +1461,7 @@ const RESOLVABLE_MEMBERSHIP_PLAN_ID_PATTERN = /^plan_[a-f0-9]{64}$/;
  * does not create an order, contact a payment provider, or grant an entitlement.
  */
 export async function resolvePurchasableMembershipPlanOffers(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   planIds: readonly string[],
 ): Promise<Array<ReturnType<typeof mapMembershipPlan>>> {
   if (!Array.isArray(planIds) || planIds.length < 1 || planIds.length > 50) {
@@ -1481,24 +1481,83 @@ export async function resolvePurchasableMembershipPlanOffers(
     seen.add(planId);
   }
 
-  const placeholders = planIds.map(() => '?').join(', ');
-  let result: D1Result<MembershipPlanStoredRow>;
-  try {
-    result = await db.prepare(
-      'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
-      'FROM membership_plans AS p ' +
-      'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
-      "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' " +
-      'AND p.plan_id IN (' + placeholders + ')',
-    ).bind(...planIds).all<MembershipPlanStoredRow>();
-  } catch {
-    // Keep D1/schema failures inside the admitted service error contract. The
-    // caller must not log or return provider/database exception details.
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+  let rows: unknown;
+  if (isPostgresSubscriptionStore(db)) {
+    const placeholders = planIds.map((_, index) => '
+  if (!Array.isArray(rows) || rows.length > planIds.length) {
+    throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
   }
 
-  const rows: unknown = result.results ?? [];
+  const mappedById = new Map<string, ReturnType<typeof mapMembershipPlan>>();
+  for (const candidate of rows as unknown[]) {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+    }
+    const row = candidate as MembershipPlanStoredRow;
+    if (
+      typeof row.plan_id !== 'string' ||
+      !RESOLVABLE_MEMBERSHIP_PLAN_ID_PATTERN.test(row.plan_id) ||
+      !seen.has(row.plan_id) ||
+      mappedById.has(row.plan_id) ||
+      typeof row.owner_id !== 'string' ||
+      row.owner_id.trim() !== row.owner_id ||
+      row.owner_id.length < 1 ||
+      row.owner_id.length > MAX_ID ||
+      row.status !== 'ACTIVE' ||
+      row.visibility !== 'PUBLIC'
+    ) {
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+    }
+    mappedById.set(row.plan_id, mapMembershipPlan(row));
+  }
+
+  // Do not disclose whether an unavailable reference is private, draft, retired,
+  // belongs to a non-creator owner, or simply does not exist.
+  if (mappedById.size !== planIds.length) {
+    throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
+  }
+
+  return planIds.map((planId) => {
+    const plan = mappedById.get(planId);
+    if (!plan) throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+    return plan;
+  });
+}
+
+ + String(index + 1)).join(', ')
+    try {
+      const result = await db.query<MembershipPlanStoredRow & Record<string, unknown>>(
+        'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, ' +
+        `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
+        `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
+        'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+        'FROM membership_plans AS p ' +
+        'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
+        "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' " +
+        'AND p.plan_id IN (' + placeholders + ')',
+        [...planIds],
+      )
+      rows = result.rows
+    } catch {
+      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+    }
+  } else {
+    const placeholders = planIds.map(() => '?').join(', ')
+    let result: D1Result<MembershipPlanStoredRow>
+    try {
+      result = await db.prepare(
+        'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
+        'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+        'FROM membership_plans AS p ' +
+        'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
+        "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' " +
+        'AND p.plan_id IN (' + placeholders + ')',
+      ).bind(...planIds).all<MembershipPlanStoredRow>();
+    } catch {
+      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+    }
+    rows = result.results ?? []
+  }
   if (!Array.isArray(rows) || rows.length > planIds.length) {
     throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
   }
