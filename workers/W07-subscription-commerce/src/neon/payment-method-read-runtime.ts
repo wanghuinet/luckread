@@ -7,8 +7,9 @@ import { createPostgresPaymentMethodReadStore } from '../payment-method-read-sto
 import { createPostgresOrderCreateStore, type OrderPersistencePostgresPool } from '../order-create-store-postgres.js'
 import type { OrderCreatePersistenceStore } from '../order-persistence.js'
 import type { PaymentMethodReadStore } from '../payment-method-read-store.js'
-import { createPostgresWebhookD1Database } from '../payment-webhook-database-postgres.js'
-import type { W07WebhookPostgresPool } from '../payment-webhook-database-postgres.js'
+import { createPostgresWebhookD1Database, type W07WebhookPostgresPool } from '../payment-webhook-database-postgres.js'
+import { createPostgresRevenueCatWebhookReceiptStore } from '../revenuecat-webhook-postgres-persistence.js'
+import type { RevenueCatWebhookReceiptStore } from '../revenuecat-webhook-persistence.js'
 
 export type W07PaymentMethodReadRuntimeEnv = Readonly<{
   D1_04?: D1Database
@@ -23,6 +24,7 @@ const pools = new WeakMap<object, Pool>()
 const stores = new WeakMap<object, PaymentMethodReadStore>()
 const webhookDatabases = new WeakMap<object, D1Database>()
 const orderCreateStores = new WeakMap<object, OrderCreatePersistenceStore>()
+const revenueCatReceiptStores = new WeakMap<object, RevenueCatWebhookReceiptStore>()
 
 export function resolveW07DatabaseDriver(
   env: W07PaymentMethodReadRuntimeEnv,
@@ -142,6 +144,23 @@ export function getW07PaymentWebhookDatabase(
   return database
 }
 
+/** Resolve the native RevenueCat inbox Store on the shared D1-04 Hyperdrive Pool. */
+export function getW07RevenueCatWebhookReceiptStore(
+  env: W07PaymentMethodReadRuntimeEnv,
+  poolFactory: W07PoolFactory = (config) => new Pool(config),
+): RevenueCatWebhookReceiptStore | undefined {
+  if (resolveW07DatabaseDriver(env) === 'd1') return undefined
+  const binding = env.HYPERDRIVE_D1_04
+  if (!binding || typeof binding !== 'object') throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
+  const cached = revenueCatReceiptStores.get(binding)
+  if (cached) return cached
+  const pool = getW07PostgresPool(env, poolFactory)
+  if (!pool) throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
+  const store = createPostgresRevenueCatWebhookReceiptStore(pool as unknown as W07WebhookPostgresPool)
+  revenueCatReceiptStores.set(binding, store)
+  return store
+}
+
 
 /** Resolve the one selected D1-04 finance database for W07 business paths. */
 export function getW07SelectedD104Database(
@@ -171,6 +190,7 @@ export async function closeW07PostgresRuntimeForTest(
   stores.delete(binding)
   webhookDatabases.delete(binding)
   orderCreateStores.delete(binding)
+  revenueCatReceiptStores.delete(binding)
   await pool.end()
 }
 

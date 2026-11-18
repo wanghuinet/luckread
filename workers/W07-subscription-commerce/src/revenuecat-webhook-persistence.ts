@@ -13,7 +13,11 @@ export type RevenueCatWebhookReceiptResult = Readonly<{
   eventId: string;
   receiptId: string;
   payloadSha256: string;
-}>;
+}>
+
+export interface RevenueCatWebhookReceiptStore {
+  record(event: RevenueCatWebhookEvent, rawBody: ArrayBuffer): Promise<RevenueCatWebhookReceiptResult>
+};
 
 export class RevenueCatWebhookPersistenceError extends Error {
   constructor(readonly code: 'SERVICE_UNAVAILABLE' | 'INTEGRITY_VIOLATION') {
