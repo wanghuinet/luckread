@@ -38,6 +38,19 @@ import {
 } from './neon/payment-method-read-runtime.js';
 import type { OrderCreatePersistenceStore } from './order-persistence.js';
 import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
+import {
+  readDueRenewalMembershipsPostgres,
+  readRenewalChargeSubscriptionPostgres,
+  type RenewalMembershipCandidateRow,
+  type RenewalChargeSubscriptionRow,
+} from './renewal-membership-postgres.js';
+
+type RenewalMembershipStore = D1Database | W07WebhookPostgresPool;
+
+function isPostgresRenewalMembershipStore(store: RenewalMembershipStore): store is W07WebhookPostgresPool {
+  return typeof (store as W07WebhookPostgresPool).query === 'function';
+}
 
 export type RenewalCycleState =
   | 'AWAITING_PRICING'
@@ -65,25 +78,7 @@ export type RenewalRuntimeEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDa
   HYPERSWITCH_MERCHANT_ID?: string | null;
 }>;
 
-type RenewalSubscriptionRow = Readonly<{
-  subscription_id: string;
-  subscriber_id: string;
-  plan_id: string;
-  plan_version: number;
-  creator_id: string | null;
-  status: string;
-  current_period_start: string;
-  current_period_end: string;
-  trial_started_at: string | null;
-  trial_ends_at: string | null;
-  cancel_at: string | null;
-  billing_interval: string;
-  price_minor: number;
-  currency: string;
-  name: string;
-  tier: string;
-  benefits_json: string;
-}>;
+type RenewalSubscriptionRow = RenewalMembershipCandidateRow;
 
 type RenewalOfferSnapshot = Readonly<{
   subscriptionId: string;
