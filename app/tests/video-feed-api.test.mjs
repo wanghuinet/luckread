@@ -115,6 +115,9 @@ test('renders video list projections immediately and hydrates only the visible v
   expect(videoScreen).toContain('readContentAuthor(record, controller.signal)');
   expect(videoScreen).toContain('controller.abort()');
   expect(videoScreen).toContain('videoSource: null, mediaLoading: false');
+  expect(videoScreen).toContain('hydratedIdsRef.current.delete(currentId)');
+  expect(videoScreen).toContain('item.contentId !== visibleId && item.videoSource');
+  expect(videoScreen).toContain('if (isFocused) return');
   expect(videoScreen).not.toContain('videoRecords.map(async (record)');
   expect(videoScreen).not.toContain('const hydrationResults = await Promise.allSettled(');
   expect(videoScreen).toContain('function VideoPlayerSurface(');

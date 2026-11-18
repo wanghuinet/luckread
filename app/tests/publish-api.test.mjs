@@ -156,6 +156,19 @@ test('resolves playback from the server using the media ID', async () => {
   expect(playback.status).toBe('READY');
 });
 
+test('forwards an AbortSignal to the media playback authorization request', async () => {
+  nextResult = {
+    response: new Response('{}', { status: 200 }),
+    data: { id: 'media-abort', url: 'https://video.luckread.com/clip.mp4', status: 'READY' },
+    error: null,
+  };
+  const controller = new AbortController();
+  await getMediaPlayback('media-abort', controller.signal);
+
+  expect(calls[0].path).toBe('/media/media-abort/playback');
+  expect(calls[0].options.signal).toBe(controller.signal);
+});
+
 test('surfaces upload failure status, error code and request ID without pretending media was saved', async () => {
   const requestId = 'req_media_upload_503_test';
   nextResult = {
