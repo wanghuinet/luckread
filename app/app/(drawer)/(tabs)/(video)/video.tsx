@@ -509,10 +509,6 @@ export default function VideoFeed() {
     return () => {
       controller.abort();
       if (hydrationControllerRef.current === controller) hydrationControllerRef.current = null;
-      // Unmount the native player as soon as this card stops being active.
-      setItems((current) => current.map((item) => item.contentId === currentId && item.videoSource
-        ? { ...item, videoSource: null, mediaLoading: false }
-        : item));
     };
   }, [currentId, isFocused, hydrationRetryVersion]);
   useEffect(() => {
@@ -527,9 +523,25 @@ export default function VideoFeed() {
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: Array<ViewToken<VideoFeedItem>> }) => {
       const mostVisible = viewableItems.find((token) => token.isViewable && token.item?.contentId);
-      setCurrentId(mostVisible?.item?.contentId ?? null);
+      const visibleId = mostVisible?.item?.contentId ?? null;
+      setCurrentId(visibleId);
+      // Release inactive native players immediately; only the visible card may
+      // retain a resolved source and therefore own an Expo Video player.
+      setItems((current) => current.map((item) =>
+        item.contentId !== visibleId && item.videoSource
+          ? { ...item, videoSource: null, mediaLoading: false }
+          : item,
+      ));
     },
   ).current;
+
+  useEffect(() => {
+    if (isFocused) return;
+    setItems((current) => current.map((item) => item.videoSource
+      ? { ...item, videoSource: null, mediaLoading: false }
+      : item,
+    ));
+  }, [isFocused]);
   const viewabilityConfig = useMemo(() => ({ itemVisiblePercentThreshold: 65 }), []);
 
   const currentIndex = items.findIndex((item) => item.contentId === currentId);
