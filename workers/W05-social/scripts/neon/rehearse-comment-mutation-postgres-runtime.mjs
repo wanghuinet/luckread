@@ -20,7 +20,6 @@ const reportPath = process.env.W05_COMMENT_MUTATION_POSTGRES_REPORT ||
 const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 5_000 })
 const client = await pool.connect()
 const store = createPostgresCommentMutationStore(client)
-const unusedD1 = { prepare() { throw new Error('Unexpected D1 access during PostgreSQL comment-mutation rehearsal') } }
 const marker = 'w05-comment-mutation-' + randomUUID()
 const contentId = marker + '-content'
 const actor = marker + '-actor'
@@ -73,28 +72,28 @@ try {
   const before = await store.getForUpdate(updateId)
   assert.ok(before?.updated_at)
   const updateResult = await updateComment(
-    unusedD1, binding, actor, updateId,
+    store, binding, actor, updateId,
     { body: 'after', ifMatch: '"' + before.updated_at + '"' },
-    marker + '-correlation', store,
+    marker + '-correlation'
   )
   assert.equal(updateResult.item.body, 'after')
   assert.equal(updateResult.etag, '"' + updateResult.item.updatedAt + '"')
   editPassed = true
 
   const replay = await updateComment(
-    unusedD1, binding, actor, updateId,
+    store, binding, actor, updateId,
     { body: 'after', ifMatch: '"' + before.updated_at + '"' },
-    marker + '-correlation-replay', store,
+    marker + '-correlation-replay'
   )
   assert.equal(replay.item.updatedAt, updateResult.item.updatedAt)
   editReplayPassed = true
 
   await expectRuntimeError(
     updateComment(
-      unusedD1, binding, actor, updateId,
+    store, binding, actor, updateId,
       { body: 'stale payload', ifMatch: '"' + before.updated_at + '"' },
-      marker + '-correlation-stale', store,
-    ),
+      marker + '-correlation-stale'
+  ),
     'PRECONDITION_FAILED', 412,
   )
   staleEditRejected = true
@@ -116,7 +115,7 @@ try {
   }
   await expectRuntimeError(
     updateComment(
-      unusedD1, binding, actor, raceUpdateId,
+    store, binding, actor, raceUpdateId,
       { body: 'race-after', ifMatch: '"' + raceBefore.updated_at + '"' },
       marker + '-correlation-race-update', raceUpdateStore,
     ),
@@ -127,14 +126,14 @@ try {
   const deleteId = marker + '-delete'
   await insertFixture(deleteId, actor, 'delete-me')
   assert.equal(
-    await deleteComment(unusedD1, binding, actor, deleteId, marker + '-correlation-delete', store),
+    await deleteComment(store, binding, actor, deleteId, marker + '-correlation-delete'),
     contentId,
   )
   assert.equal(await store.getDeleteState(deleteId, actor), 'AUTHOR_DELETED')
   deletePassed = true
 
   assert.equal(
-    await deleteComment(unusedD1, undefined, actor, deleteId, marker + '-correlation-delete-replay', store),
+    await deleteComment(store, undefined, actor, deleteId, marker + '-correlation-delete-replay'),
     contentId,
   )
   deleteReplayPassed = true
@@ -144,7 +143,7 @@ try {
   await insertFixture(parentId, actor, 'parent')
   await insertFixture(childId, otherActor, 'child', parentId)
   await expectRuntimeError(
-    deleteComment(unusedD1, binding, actor, parentId, marker + '-correlation-has-replies', store),
+    deleteComment(store, binding, actor, parentId, marker + '-correlation-has-replies'),
     'CONFLICT', 409,
   )
   deleteWithRepliesRejected = true
@@ -160,7 +159,7 @@ try {
     },
   }
   await expectRuntimeError(
-    deleteComment(unusedD1, binding, actor, raceDeleteId, marker + '-correlation-race-delete', raceDeleteStore),
+    deleteComment(raceDeleteStore, binding, actor, raceDeleteId, marker + '-correlation-race-delete'),
     'CONFLICT', 409,
   )
   deleteRaceRejected = true
