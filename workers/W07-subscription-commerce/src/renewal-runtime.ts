@@ -770,7 +770,7 @@ export async function scanDueSubscriptionRenewals(
       if (cycle.state === 'AWAITING_PRICING' && dependencies.resolvePricing) {
         cycleIds.push(cycle.cycle_id);
       } else if (cycle.state === 'AWAITING_MANDATE') {
-        const activeMandate = await readActiveMandate(
+        const activeMandate = await readActiveMandateFromStore(
           getW07RenewalCycleStore(env), String(config.expectedMerchantId), cycle.subscriber_id,
         );
         if (activeMandate) cycleIds.push(cycle.cycle_id);
