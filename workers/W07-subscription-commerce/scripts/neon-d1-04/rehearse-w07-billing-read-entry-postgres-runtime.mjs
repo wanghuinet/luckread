@@ -5,7 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 import worker from '../../src/index.ts'
-import { issueReceiptForPaidPayment } from '../../src/billing-persistence.ts'
+import { issueReceiptForPaidPaymentPostgres } from '../../src/billing-document-postgres-persistence.ts'
 import { createPostgresWebhookD1Database } from '../../src/payment-webhook-database-postgres.ts'
 import { receiveHyperswitchWebhook } from '../../src/payment-persistence.ts'
 import { closeW07PostgresRuntimeForTest } from '../../src/neon/payment-method-read-runtime.ts'
@@ -45,6 +45,7 @@ const idempotencyKey = marker + '-order-key'
 const checks = {
   signedPaymentWebhookAppliedToPostgres: false,
   immutableInvoiceAndReceiptIssued: false,
+  nativePostgresBillingStoreUsed: false,
   billingDocumentsReadThroughW07NeonEntry: false,
   billingDocumentPaginationPreserved: false,
   customerIsolationPreserved: false,
@@ -183,12 +184,13 @@ try {
   assert.deepEqual(persistedPayment.rows, [{ status: 'succeeded', version: 2 }])
 
   let issuedDocumentSequence = 0
-  const issuedReceipt = await issueReceiptForPaidPayment(database, paymentId, merchantId, {
+  const issuedReceipt = await issueReceiptForPaidPaymentPostgres(adminPool, paymentId, merchantId, {
     now: () => new Date(now),
     createDocumentId: () => marker + '-document-' + (++issuedDocumentSequence),
     createDocumentNumber: () => (issuedDocumentSequence === 1 ? 'INV-' : 'RCT-') + marker,
   })
   assert.equal(issuedReceipt.documentType, 'RECEIPT')
+  checks.nativePostgresBillingStoreUsed = true
 
   const issuedDocuments = await adminPool.query(
     'SELECT document_type, payment_id, amount_minor::int AS amount_minor, currency FROM billing_documents WHERE customer_id = $1 ORDER BY document_type',
