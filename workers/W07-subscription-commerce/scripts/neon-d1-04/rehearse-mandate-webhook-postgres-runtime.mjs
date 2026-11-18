@@ -174,7 +174,7 @@ async function receivePayment(input, eventRowId) {
 async function receiveMandate(input, suffix) {
   return receiveHyperswitchMandateWebhookPostgres(pool, input, {
     now: () => new Date(now),
-    createEventRowId: () => marker + '-mandate-receipt-' + suffix,
+    createEventRowId: () => 'evtrow_' + marker + '-mandate-receipt-' + suffix,
     createConflictId: () => 'evtconf_' + marker + '-mandate-conflict-' + suffix,
   })
 }
@@ -197,7 +197,7 @@ try {
   const paymentEventId = marker + '-payment-succeeded'
   const paymentResult = await receivePayment(
     signedPaymentWithConsent({ eventId: paymentEventId, payment, paymentMethodId }),
-    marker + '-payment-receipt',
+    'evtrow_' + marker + '-payment-receipt',
   )
   assert.equal(paymentResult?.outcome, 'APPLIED')
 
