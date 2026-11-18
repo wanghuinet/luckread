@@ -40,7 +40,7 @@ const dbFor = (results: unknown[] = []) => {
 }
 
 
-const makeCommentCreateStore = (overrides: Partial<CommentCreateValidation> = {}): CommentCreateStore => ({
+const makeCommentCreateStore = (overrides: Partial<CommentCreateValidation> = {}, inserted?: StoredCommentCreate): CommentCreateStore => ({
   validate: vi.fn(async () => ({
     existing_id: null, existing_content_id: null, existing_parent_id: null, existing_body: null,
     existing_author_user_id: null, existing_state: null, existing_depth: null,
@@ -50,7 +50,7 @@ const makeCommentCreateStore = (overrides: Partial<CommentCreateValidation> = {}
     recent_count: 0, blocked: false, reply_audience_allowed: true,
     ...overrides,
   })),
-  insert: vi.fn(async (input): Promise<StoredCommentCreate> => ({
+  insert: vi.fn(async (input): Promise<StoredCommentCreate> => inserted ?? ({
     id: 'comment-created', content_id: input.contentId, author_user_id: input.actorUserId,
     parent_id: input.parentId, body: input.body, state: 'PUBLISHED', depth: input.depth,
     created_at: input.now, updated_at: input.now,
