@@ -2,11 +2,9 @@
 
 import { strictlyAfterCanonicalUtcTimestamp } from './canonical-utc-timestamp.js';
 import { getW07SelectedD104Database, type W07PaymentMethodReadRuntimeEnv } from './neon/payment-method-read-runtime.js';
+import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
 import {
-  getW07MembershipPostgresPool,
-  type W07MembershipDatabaseRuntimeEnv,
-} from './neon/membership-database-runtime.js';
-import {
+  getScheduledPlanChangeStore,
   readScheduledSubscriptionPlanDowngradeForPeriod,
   readScheduledDowngradeTargetPlan,
   type ScheduledSubscriptionPlanDowngrade,
@@ -454,7 +452,7 @@ export async function syncTerminalRenewalCycleToSubscription(
   }
 
   const scheduledChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
-    getW07MembershipPostgresPool(env) ?? env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
+    getScheduledPlanChangeStore(env), cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
   );
   const currentPlanMatchesCycle =
     subscription.plan_id === cycle.plan_id && subscription.plan_version === cycle.plan_version;
@@ -472,7 +470,7 @@ export async function syncTerminalRenewalCycleToSubscription(
         scheduledChange.subscriptionId !== cycle.subscription_id) {
       return reconcile(env, cycle, 'SCHEDULED_PLAN_CHANGE_IDENTITY_MISMATCH', now);
     }
-    const target = await readScheduledDowngradeTargetPlan(getW07MembershipPostgresPool(env) ?? env.D1_01, scheduledChange);
+    const target = await readScheduledDowngradeTargetPlan(getScheduledPlanChangeStore(env), scheduledChange);
     const validScheduledChange = scheduledChange.status === 'APPLIED'
       ? target?.billingInterval === subscription.billing_interval &&
         target.tier === subscription.tier && target.currency === subscription.currency
@@ -546,7 +544,7 @@ export async function syncTerminalRenewalCycleToSubscription(
     }
     if (scheduledChange?.status === 'SCHEDULED') {
       const appliedChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
-        getW07MembershipPostgresPool(env) ?? env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
+        getScheduledPlanChangeStore(env), cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
       );
       if (!appliedChange || appliedChange.status !== 'APPLIED' ||
           !(await auditAppliedSubscriptionPlanChange(env, cycle, appliedChange))) {
