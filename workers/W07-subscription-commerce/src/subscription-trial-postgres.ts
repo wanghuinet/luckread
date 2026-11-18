@@ -1,5 +1,5 @@
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js'
-import { SubscriptionRuntimeError } from './subscription-runtime.js'
+import { SubscriptionRuntimeError, validateIdempotencyKey, validatePrincipal } from './subscription-runtime.js'
 import {
   addTrialDays,
   auditTrialStarted,
