@@ -8,9 +8,8 @@ import {
   parseFollowListLimit,
   unfollow,
 } from './follow-runtime.js'
-import { FollowStoreError } from './follow-store.js'
+import { FollowStoreError, type FollowStore } from './follow-store.js'
 import type { FollowListReadStore } from './follow-list-read-store.js'
-import type { FollowStore } from './follow-store.js'
 
 const db = (
   firstResults: unknown[] = [],
