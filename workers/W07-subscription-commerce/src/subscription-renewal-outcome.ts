@@ -616,7 +616,7 @@ export async function syncTerminalRenewalCycleToSubscription(
     return reconcile(env, cycle, 'SUBSCRIPTION_STATE_FORBIDS_PAST_DUE_TRANSITION', now);
   }
   const result = await applySubscriptionUpdate(
-    env, cycle, subscription, 'PAST_DUE',
+    membershipStore, cycle, subscription, 'PAST_DUE',
     subscription.current_period_start, subscription.current_period_end, now,
   );
   if (result === 'CAS_LOST') return reconcile(env, cycle, 'SUBSCRIPTION_CAS_LOST', now);
