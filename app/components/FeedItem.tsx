@@ -177,9 +177,23 @@ const ActiveFeedVideoPlayer = ({ uri, headers }: { uri: string; headers?: Record
         instance.play();
     });
 
-    useEffect(() => () => {
-        player.pause();
-        if (activeFeedVideoPlayer === player) activeFeedVideoPlayer = null;
+    useEffect(() => {
+        // Native controls can resume a previously paused row. Observe actual
+        // playback state as well as initial activation so only one feed player
+        // can remain playing at a time.
+        const subscription = player.addListener('playingChange', ({ isPlaying }) => {
+            if (!isPlaying) return;
+            if (activeFeedVideoPlayer && activeFeedVideoPlayer !== player) {
+                activeFeedVideoPlayer.pause();
+            }
+            activeFeedVideoPlayer = player;
+        });
+
+        return () => {
+            subscription.remove();
+            player.pause();
+            if (activeFeedVideoPlayer === player) activeFeedVideoPlayer = null;
+        };
     }, [player]);
 
     return (
