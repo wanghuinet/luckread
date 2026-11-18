@@ -10,6 +10,7 @@ import {
 } from './follow-runtime.js'
 import { FollowStoreError } from './follow-store.js'
 import type { FollowListReadStore } from './follow-list-read-store.js'
+import type { FollowStore } from './follow-store.js'
 
 const db = (
   firstResults: unknown[] = [],
@@ -47,14 +48,22 @@ const uninstallCache = () => {
 }
 
 describe('follow runtime', () => {
-  it('creates a relationship', async () => {
+  it('creates a relationship through the injected Store', async () => {
     const row = {
       relationship_id: 'r1',
       follower_user_id: 'u1',
       target_user_id: 'u2',
       created_at: '2026-10-02T00:00:00.000Z',
     }
-    await expect(follow(db([{ blocked: 0 }, row]), 'u1', 'u2')).resolves.toEqual(row)
+    const store: FollowStore = {
+      follow: vi.fn(async () => row),
+      unfollow: vi.fn(async () => {}),
+    }
+    await expect(follow(store, 'u1', 'u2')).resolves.toEqual(row)
+    expect(store.follow).toHaveBeenCalledWith(expect.objectContaining({
+      followerUserId: 'u1',
+      targetUserId: 'u2',
+    }))
   })
 
   it('accepts an injected provider-neutral follow store', async () => {
@@ -92,62 +101,51 @@ describe('follow runtime', () => {
     })
   })
 
-  it('is idempotent', async () => {
+  it('returns the existing relationship unchanged for an idempotent Store result', async () => {
     const row = {
-      relationship_id: 'r1',
+      relationship_id: 'existing-r1',
       follower_user_id: 'u1',
       target_user_id: 'u2',
       created_at: '2026-10-02T00:00:00.000Z',
     }
-    const d = db([{ blocked: 0, ...row }])
-    await expect(follow(d, 'u1', 'u2')).resolves.toEqual(row)
-    expect(d.prepare).toHaveBeenCalledTimes(1)
+    const store: FollowStore = {
+      follow: vi.fn(async () => row),
+      unfollow: vi.fn(async () => {}),
+    }
+    await expect(follow(store, 'u1', 'u2')).resolves.toEqual(row)
+    expect(store.follow).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects follow when either side has an active block', async () => {
-    await expect(
-      follow(
-        db([{ blocked: 1 }]),
-        'u1',
-        'u2',
-      ),
-    ).rejects.toMatchObject({
+  it('rejects follow when the Store reports an active Block', async () => {
+    const store: FollowStore = {
+      follow: vi.fn(async () => null),
+      unfollow: vi.fn(async () => {}),
+    }
+    await expect(follow(store, 'u1', 'u2')).rejects.toMatchObject({
       code: 'CONFLICT',
       status: 409,
     })
   })
 
-  it('binds the final follow write to the active block predicate', async () => {
-    const d = db([{ blocked: 0 }])
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    prepare.mockImplementationOnce(() => ({
-      bind: vi.fn(() => ({
-        first: vi.fn(async () => ({ blocked: 0 })),
-      })),
-    })).mockImplementationOnce((sql: string) => ({
-      bind: vi.fn(() => ({
-        first: vi.fn(async () => null),
-      })),
-    }))
-
-    await expect(follow(d, 'u1', 'u2')).rejects.toMatchObject({
+  it('rejects self follow before calling the Store', async () => {
+    const store: FollowStore = {
+      follow: vi.fn(async () => null),
+      unfollow: vi.fn(async () => {}),
+    }
+    await expect(follow(store, 'u1', 'u1')).rejects.toMatchObject({
       code: 'CONFLICT',
       status: 409,
     })
-    expect(String(prepare.mock.calls[1]?.[0])).toContain("block.relation_type = 'block'")
-    expect(String(prepare.mock.calls[1]?.[0])).toContain('INSERT INTO social_follow_relationships')
-    expect(String(prepare.mock.calls[1]?.[0])).toContain('NOT EXISTS')
+    expect(store.follow).not.toHaveBeenCalled()
   })
 
-  it('rejects self follow', async () => {
-    await expect(follow(db(), 'u1', 'u1')).rejects.toMatchObject({
-      code: 'CONFLICT',
-      status: 409,
-    })
-  })
-
-  it('unfollows', async () => {
-    await expect(unfollow(db(), 'u1', 'u2')).resolves.toBeUndefined()
+  it('unfollows through the injected Store', async () => {
+    const store: FollowStore = {
+      follow: vi.fn(async () => null),
+      unfollow: vi.fn(async () => {}),
+    }
+    await expect(unfollow(store, 'u1', 'u2')).resolves.toBeUndefined()
+    expect(store.unfollow).toHaveBeenCalledWith('u1', 'u2')
   })
 
   it('reads status', async () => {
