@@ -43,7 +43,6 @@ let pollId = null
 try {
   const created = await configureContentPoll(
     configurationStore, readStore, owner, contentId, ['Yes', 'No'], 90, draftContext(),
-    configurationStore, readStore,
   )
   pollId = created.pollId
   assert.equal(created.contentId, contentId)
@@ -54,7 +53,7 @@ try {
 
   const updated = await configureContentPoll(
     configurationStore, readStore, owner, contentId, ['Maybe', 'Later', 'Never'], 240,
-    draftContext(), configurationStore, readStore,
+    draftContext(),
   )
   assert.equal(updated.pollId, pollId)
   assert.equal(updated.durationMinutes, 240)
@@ -76,7 +75,7 @@ try {
 
   const unchanged = await configureContentPoll(
     configurationStore, readStore, owner, contentId, ['Maybe', 'Later', 'Never'], 240,
-    draftContext(), configurationStore, readStore,
+    draftContext(),
   )
   assert.equal(unchanged.pollId, pollId)
   assert.equal(unchanged.totalVotes, 1)
@@ -85,7 +84,7 @@ try {
   await assert.rejects(
     configureContentPoll(
       configurationStore, readStore, owner, contentId, ['New', 'Choice'], 360,
-      draftContext(), configurationStore, readStore,
+      draftContext(),
     ),
     error => error instanceof SocialPollError && error.code === 'CONFLICT' && error.status === 409,
   )
