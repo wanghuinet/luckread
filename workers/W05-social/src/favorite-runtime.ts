@@ -2,7 +2,6 @@
 
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import {
-  createD1FavoriteListReadStore,
   FavoriteListReadStoreError,
   type FavoriteListReadStore,
 } from './favorite-list-read-store.js'
@@ -255,17 +254,8 @@ const decodeFavoriteListCursor = (cursor: string, actorUserId: string): Favorite
   }
 }
 
-type FavoriteListDataSource = D1Database | FavoriteListReadStore
-
-function resolveFavoriteListReadStore(source: FavoriteListDataSource): FavoriteListReadStore {
-  if (typeof (source as FavoriteListReadStore).list === 'function') {
-    return source as FavoriteListReadStore
-  }
-  return createD1FavoriteListReadStore(source as D1Database)
-}
-
 export async function listFavorites(
-  source: FavoriteListDataSource,
+  source: FavoriteListReadStore,
   actorUserId: string,
   cursor: string | null,
   limit: number,
@@ -277,7 +267,7 @@ export async function listFavorites(
   const decoded = cursor ? decodeFavoriteListCursor(cursor, actor) : null
   let rows
   try {
-    rows = await resolveFavoriteListReadStore(source).list({
+    rows = await source.list({
       actorUserId: actor,
       cursor: decoded
         ? { createdAt: decoded.createdAt, relationshipId: decoded.relationshipId }
