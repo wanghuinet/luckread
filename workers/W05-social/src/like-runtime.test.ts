@@ -2,7 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { getLikeStatus, like, unlike } from './like-runtime.js'
+import { getLikeStatus as getLikeStatusRuntime, like, unlike } from './like-runtime.js'
+import type { LikeStatusReadStore } from './like-status-read-store.js'
 import { LikeStatusReadStoreError } from './like-status-read-store.js'
 import { LikeMutationStoreError } from './like-mutation-store.js'
 import type { LikeTargetContextReadStore } from './like-target-context-read-store.js'
@@ -27,6 +28,17 @@ const publishedContextBinding = (
 })
 
 const correlationId = 'like-runtime-test'
+
+const defaultStatusStore: LikeStatusReadStore = {
+  read: vi.fn(async () => ({ liked: true, likeCount: 3 })),
+}
+
+const getLikeStatus = (...args: Parameters<typeof getLikeStatusRuntime>) => {
+  const normalized = [...args] as Parameters<typeof getLikeStatusRuntime>
+  if (!normalized[6]) normalized[6] = defaultStatusStore
+  return getLikeStatusRuntime(...normalized)
+}
+
 
 const db = (firstResults: unknown[] = []) => {
   let firstIndex = 0
@@ -84,15 +96,16 @@ describe('like runtime', () => {
     expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).not.toContain('COUNT(*)')
   })
 
-  it('reads effective like status from W05 relation tables after W03 visibility validation', async () => {
-    const d = db([{ blocked: 0 }, { liked: 1, like_count: 3 }])
-    await expect(getLikeStatus(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId))
+  it('reads effective like status from the injected Store after W03 visibility validation', async () => {
+    const d = db([{ blocked: 0 }])
+    const statusStore: LikeStatusReadStore = {
+      read: vi.fn(async () => ({ liked: true, likeCount: 3 })),
+    }
+    await expect(getLikeStatus(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId, undefined, statusStore))
       .resolves.toEqual({ liked: true, likeCount: 3 })
-    expect(d.prepare).toHaveBeenCalledTimes(2)
-    const sql = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([query]) => String(query))
-    expect(sql[0]).toContain('social_user_interactions')
-    expect(sql[1]).toContain('interaction_likes')
-    expect(sql.every(query => !query.toLowerCase().includes('from contents') && !query.toLowerCase().includes('join contents'))).toBe(true)
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+    expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).toContain('social_user_interactions')
+    expect(statusStore.read).toHaveBeenCalledWith({ actorUserId: 'user-1', targetType: 'content', targetId: 'content-1', includeCount: true })
 
     const unpublished = db([])
     await expect(getLikeStatus(unpublished, publishedContextBinding('user-2', 404), 'user-1', { targetType: 'content', targetId: 'content-3' }, correlationId))
@@ -152,6 +165,13 @@ describe('like runtime', () => {
       statusStore,
     )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
     expect(statusStore.read).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when the status Store is missing and caches are cold', async () => {
+    await expect(getLikeStatusRuntime(
+      db([{ blocked: 0 }]), publishedContextBinding(), 'user-1',
+      { targetType: 'content', targetId: 'content-1' }, correlationId,
+    )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
   })
 
   it('maps injected status store failures to a sanitized 503', async () => {
@@ -302,16 +322,19 @@ describe('like runtime', () => {
     expect(sql[2]).toContain('block.target_user_id = ?')
   })
 
-  it('reads like status for a published comment', async () => {
+  it('reads like status for a published comment through the injected Store', async () => {
     const d = db([
       { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'user-2', content_id: 'content-1' },
       { blocked: 0 },
-      { liked: 1, like_count: 4 },
     ])
-    await expect(getLikeStatus(d, publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId)).resolves.toEqual({
+    const statusStore: LikeStatusReadStore = {
+      read: vi.fn(async () => ({ liked: true, likeCount: 4 })),
+    }
+    await expect(getLikeStatus(d, publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId, undefined, statusStore)).resolves.toEqual({
       liked: true,
       likeCount: 4,
     })
+    expect(statusStore.read).toHaveBeenCalledTimes(1)
   })
 
   it('rejects likes on comments that are no longer public', async () => {

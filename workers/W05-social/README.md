@@ -52,3 +52,11 @@ Comment list reads now require the injected Neon PostgreSQL Store and fail close
 - The internal Follow Status helper now accepts only the injected Neon PostgreSQL `FollowStatusReadStore`; the D1 adapter and runtime fallback are removed.
 - The helper is currently used by the Neon PostgreSQL rehearsal and focused runtime tests, not by a public production route; this change does not claim a user-facing endpoint migration.
 - Preserved missing-relationship false status, either-direction Block suppression, and sanitized storage failure mapping.
+
+
+## W05 Like Status Read
+
+- Removed the D1 like-status query executor and `createD1LikeStatusReadStore`; the runtime no longer constructs a status reader from the legacy database argument.
+- Like status and aggregate reads now require the injected Neon PostgreSQL `LikeStatusReadStore` on cache misses; missing composition fails closed with 503.
+- Preserved W03 published-content validation, W05 Block preflight ordering, viewer-state and aggregate cache behavior, bounded safe counts, and the existing PostgreSQL adapter/rehearsal coverage.
+- This slice removes only the like-status query adapter; like mutation and like-target context D1 paths remain separate cleanup items.
