@@ -783,14 +783,14 @@ async function isSubscriptionChargeableForCycle(
   if (subscription.plan_id === cycle.plan_id && subscription.plan_version === cycle.plan_version) return true;
 
   const scheduled = await readScheduledSubscriptionPlanDowngradeForPeriod(
-    env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, false,
+    getW07MembershipPostgresPool(env) ?? env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, false,
   );
   if (!scheduled || scheduled.status !== 'SCHEDULED' ||
       scheduled.expectedPlanId !== subscription.plan_id ||
       scheduled.expectedPlanVersion !== subscription.plan_version ||
       scheduled.targetPlanId !== cycle.plan_id ||
       scheduled.targetPlanVersion !== cycle.plan_version) return false;
-  const target = await readScheduledDowngradeTargetPlan(env.D1_01, scheduled);
+  const target = await readScheduledDowngradeTargetPlan(getW07MembershipPostgresPool(env) ?? env.D1_01, scheduled);
   return !!target && target.creatorId === subscription.creator_id &&
     target.billingInterval === cycle.billing_interval && target.currency === cycle.currency;
 }
@@ -981,7 +981,7 @@ async function prepareFailedCycleRetry(
     subscription.plan_id === cycle.plan_id && subscription.plan_version === cycle.plan_version;
   if (!originalPlanMatches) {
     const scheduled = await readScheduledSubscriptionPlanDowngradeForPeriod(
-      env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, false,
+      getW07MembershipPostgresPool(env) ?? env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, false,
     );
     if (!scheduled || scheduled.status !== 'SCHEDULED' ||
         scheduled.expectedPlanId !== subscription.plan_id ||
@@ -989,7 +989,7 @@ async function prepareFailedCycleRetry(
         scheduled.targetPlanId !== cycle.plan_id ||
         scheduled.targetPlanVersion !== cycle.plan_version ||
         scheduled.effectiveAt !== cycle.cycle_start) return 'TERMINAL';
-    const target = await readScheduledDowngradeTargetPlan(env.D1_01, scheduled);
+    const target = await readScheduledDowngradeTargetPlan(getW07MembershipPostgresPool(env) ?? env.D1_01, scheduled);
     if (!target || target.creatorId !== subscription.creator_id ||
         target.billingInterval !== cycle.billing_interval || target.currency !== cycle.currency) {
       return 'TERMINAL';
