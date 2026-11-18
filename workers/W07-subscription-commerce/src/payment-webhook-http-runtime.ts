@@ -139,9 +139,15 @@ function paymentIdFromSignedPayload(rawBody: ArrayBuffer): string | null {
     const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(rawBody));
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
     const envelope = parsed as Record<string, unknown>;
-    if (envelope.content_type !== 'payment_details' ||
-        typeof envelope.resource !== 'object' || envelope.resource === null || Array.isArray(envelope.resource)) return null;
-    const paymentId = (envelope.resource as Record<string, unknown>).payment_id;
+    const content = typeof envelope.content === 'object' && envelope.content !== null &&
+      !Array.isArray(envelope.content)
+      ? envelope.content as Record<string, unknown>
+      : null;
+    const contentType = envelope.content_type ?? content?.type;
+    const resourceValue = envelope.resource ?? content?.object;
+    if (contentType !== 'payment_details' ||
+        typeof resourceValue !== 'object' || resourceValue === null || Array.isArray(resourceValue)) return null;
+    const paymentId = (resourceValue as Record<string, unknown>).payment_id;
     return typeof paymentId === 'string' && /^pay_[A-Za-z0-9]{26}$/.test(paymentId) ? paymentId : null;
   } catch {
     return null;
