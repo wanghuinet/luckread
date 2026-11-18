@@ -17,26 +17,28 @@ describe('content liker list adapter and UI', () => {
     expect(route).not.toContain('env.DB')
   })
 
-  it('uses an authoritative, bounded W05 query with stable pagination and block filters', () => {
+  it('uses the Neon PostgreSQL content-liker query with stable pagination and Block filters', () => {
     const runtime = read('../W05-social/src/like-list-runtime.ts')
-    const d1Store = read('../W05-social/src/like-list-read-store.ts')
+    const storePort = read('../W05-social/src/like-list-read-store.ts')
     const postgresStore = read('../W05-social/src/like-list-read-store-postgres.ts')
     expect(runtime).toContain("contentContext.state !== 'PUBLISHED'")
     expect(runtime).toContain("contentContext.contentId !== contentId")
     expect(runtime).toContain('parsed.contentId !== contentId')
     expect(runtime).toContain('parsed.viewerUserId !== viewerUserId')
+    expect(runtime).toContain('store.list(')
+    expect(runtime).not.toContain('D1Database')
+    expect(runtime).not.toContain('createD1ContentLikerReadStore')
+    expect(storePort).not.toContain('createD1ContentLikerReadStore')
+    expect(storePort).not.toContain('D1QueryExecutor')
 
-    for (const store of [d1Store, postgresStore]) {
-      expect(store).toContain('interaction_likes il')
-      expect(store).toContain("il.target_type = 'content'")
-      expect(store.toLowerCase()).not.toContain('join contents')
-      expect(store.toLowerCase()).not.toContain('from contents')
-      expect(store).toContain("content_block.relation_type = 'block'")
-      expect(store).toContain("viewer_block.relation_type = 'block'")
-      expect(store).toContain("liker_block.relation_type = 'block'")
-      expect(store).toContain('ORDER BY il.created_at DESC, il.relationship_id DESC')
-    }
-    expect(d1Store).toContain('LIMIT ?')
+    expect(postgresStore).toContain('interaction_likes il')
+    expect(postgresStore).toContain("il.target_type = 'content'")
+    expect(postgresStore.toLowerCase()).not.toContain('join contents')
+    expect(postgresStore.toLowerCase()).not.toContain('from contents')
+    expect(postgresStore).toContain("content_block.relation_type = 'block'")
+    expect(postgresStore).toContain("viewer_block.relation_type = 'block'")
+    expect(postgresStore).toContain("liker_block.relation_type = 'block'")
+    expect(postgresStore).toContain('ORDER BY il.created_at DESC, il.relationship_id DESC')
     expect(postgresStore).toContain('LIMIT $')
   })
 

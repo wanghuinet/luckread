@@ -3,7 +3,6 @@
 import { LikeRuntimeError } from './like-runtime.js'
 import type { PublishedContentSocialContext } from './w03-content-context-client.js'
 import {
-  createD1ContentLikerReadStore,
   ContentLikerReadStoreError,
   type ContentLikerReadStore,
 } from './like-list-read-store.js'
@@ -82,17 +81,8 @@ const decodeCursor = (
  * W05/D1-02 remains the sole source of the like relationship; no projection table
  * or per-user copied counter is introduced.
  */
-type ContentLikerDataSource = D1Database | ContentLikerReadStore
-
-function resolveContentLikerReadStore(source: ContentLikerDataSource): ContentLikerReadStore {
-  if (typeof (source as ContentLikerReadStore).list === 'function') {
-    return source as ContentLikerReadStore
-  }
-  return createD1ContentLikerReadStore(source as D1Database)
-}
-
 export async function listContentLikers(
-  source: ContentLikerDataSource,
+  store: ContentLikerReadStore,
   contentIdValue: string,
   cursorValue: string | null,
   limit: number,
@@ -115,7 +105,7 @@ export async function listContentLikers(
 
   let rows
   try {
-    rows = await resolveContentLikerReadStore(source).list({
+    rows = await store.list({
       contentId,
       contentOwnerUserId: contentContext.ownerUserId,
       viewerUserId,
