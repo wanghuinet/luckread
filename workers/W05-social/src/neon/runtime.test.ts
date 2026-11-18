@@ -22,8 +22,6 @@ describe('W05 Neon runtime composition', () => {
     expect(() => getW05SocialWorkerDependencies({}, poolFactory))
       .toThrow('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
     expect(poolFactory).not.toHaveBeenCalled()
-    expect(() => resolveW05SocialDatabaseDriver({ W05_DATABASE_DRIVER: 'd1' }))
-      .toThrow('W05_DATABASE_DRIVER_UNSUPPORTED')
   })
 
   it('rejects unsupported driver values and missing or invalid Hyperdrive connection strings', () => {
