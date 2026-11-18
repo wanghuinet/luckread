@@ -347,6 +347,18 @@ describe('W05 profile-channel PostgreSQL runtime injection', () => {
     expect(d1Prepare).not.toHaveBeenCalled()
     expect(d1Prepare).not.toHaveBeenCalled()
   })
+
+  it('fails closed for profile replies and likes when PostgreSQL Store is missing', async () => {
+    const prepare = vi.fn(() => { throw new Error('D1 must not be used for profile channel reads') })
+    const binding = publishedContextsBatchBinding()
+    const env = { DB: { prepare }, W03_CONTENT: binding } as never
+    const replies = await worker.fetch(request('/internal/social/users/profile-user/replies?limit=6', transportHeaders), env, {} as never)
+    const likes = await worker.fetch(request('/internal/social/users/profile-user/likes?limit=6', transportHeaders), env, {} as never)
+    expect(replies.status).toBe(503)
+    expect(likes.status).toBe(503)
+    expect(binding.fetch).not.toHaveBeenCalled()
+    expect(prepare).not.toHaveBeenCalled()
+  })
 })
 
 describe('W05 topic page transport', () => {
