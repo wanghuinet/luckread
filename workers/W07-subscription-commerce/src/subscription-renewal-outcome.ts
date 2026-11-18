@@ -331,7 +331,7 @@ async function auditAppliedSubscriptionTrialConversion(
 }
 
 async function applySubscriptionUpdate(
-  env: OutcomeSyncEnv,
+  membershipStore: RenewalOutcomeMembershipStore,
   cycle: RenewalOutcomeCycle,
   subscription: SubscriptionOutcomeRow,
   nextStatus: 'ACTIVE' | 'PAST_DUE',
@@ -350,9 +350,25 @@ async function applySubscriptionUpdate(
     ? scheduledChange.targetPlanVersion
     : subscription.plan_version;
   try {
-    if (scheduledChange && nextStatus === 'ACTIVE') {
-      const results = await env.D1_01.batch([
-        env.D1_01.prepare(
+    if (isPostgresRenewalOutcomeStore(membershipStore)) {
+      const result = await applyRenewalSubscriptionUpdatePostgres(membershipStore, {
+        cycle: {
+          subscription_id: cycle.subscription_id,
+          subscriber_id: cycle.subscriber_id,
+          cycle_start: cycle.cycle_start,
+        },
+        subscription,
+        nextStatus,
+        nextPeriodStart,
+        nextPeriodEnd,
+        updatedAt,
+        convertedAt,
+        scheduledChange,
+      });
+      if (result === 'APPLIED') return 'APPLIED';
+    } else if (scheduledChange && nextStatus === 'ACTIVE') {
+      const results = await membershipStore.batch([
+        membershipStore.prepare(
           'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, status = ?, ' +
           'current_period_start = ?, current_period_end = ?, trial_converted_at = ?, updated_at = ?, version = version + 1 ' +
           'WHERE subscription_id = ? AND subscriber_id = ? AND plan_id = ? AND plan_version = ? ' +
@@ -371,7 +387,7 @@ async function applySubscriptionUpdate(
           scheduledChange.expectedPlanId, scheduledChange.expectedPlanVersion,
           scheduledChange.targetPlanId, scheduledChange.targetPlanVersion, scheduledChange.effectiveAt,
         ),
-        env.D1_01.prepare(
+        membershipStore.prepare(
           "UPDATE membership_subscription_scheduled_plan_changes SET status = 'APPLIED', " +
           'applied_at = ?, applied_subscription_version = ?, updated_at = ?, version = version + 1 ' +
           "WHERE change_id = ? AND status = 'SCHEDULED' AND subscription_id = ? AND subscriber_id = ? " +
@@ -392,7 +408,7 @@ async function applySubscriptionUpdate(
       if (Number(results[0]?.meta?.changes ?? 0) === 1 &&
           Number(results[1]?.meta?.changes ?? 0) === 1) return 'APPLIED';
     } else {
-      const result = await env.D1_01.prepare(
+      const result = await membershipStore.prepare(
         'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, status = ?, ' +
         'current_period_start = ?, current_period_end = ?, trial_converted_at = ?, updated_at = ?, version = version + 1 ' +
         'WHERE subscription_id = ? AND subscriber_id = ? AND plan_id = ? AND plan_version = ? ' +
@@ -410,7 +426,7 @@ async function applySubscriptionUpdate(
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
   }
 
-  const latest = await readSubscription(env.D1_01, cycle.subscription_id, cycle.subscriber_id);
+  const latest = await readSubscription(membershipStore, cycle.subscription_id, cycle.subscriber_id);
   if (!latest) return 'CAS_LOST';
   if (latest.plan_id === nextPlanId && latest.plan_version === nextPlanVersion &&
       latest.current_period_start === nextPeriodStart && latest.current_period_end === nextPeriodEnd) {
@@ -455,7 +471,8 @@ export async function syncTerminalRenewalCycleToSubscription(
   }
   if (!validTerminalCycle(cycle)) return reconcile(env, cycle, 'TERMINAL_CYCLE_SNAPSHOT_INVALID', now);
 
-  const subscription = await readSubscription(env.D1_01, cycle.subscription_id, cycle.subscriber_id);
+  const membershipStore = getScheduledPlanChangeStore(env);
+  const subscription = await readSubscription(membershipStore, cycle.subscription_id, cycle.subscriber_id);
   if (!subscription) return reconcile(env, cycle, 'SUBSCRIPTION_NOT_FOUND', now);
   if (subscription.subscription_id !== cycle.subscription_id || subscription.subscriber_id !== cycle.subscriber_id) {
     return reconcile(env, cycle, 'SUBSCRIPTION_IDENTITY_MISMATCH', now);
@@ -558,7 +575,7 @@ export async function syncTerminalRenewalCycleToSubscription(
       return reconcile(env, cycle, 'SCHEDULED_PLAN_ALREADY_APPLIED_WITHOUT_PERIOD_ADVANCE', now);
     }
     const result = await applySubscriptionUpdate(
-      env, cycle, subscription, 'ACTIVE', cycle.cycle_start, cycle.cycle_end, now,
+      membershipStore, cycle, subscription, 'ACTIVE', cycle.cycle_start, cycle.cycle_end, now,
       scheduledChange?.status === 'SCHEDULED' ? scheduledChange : undefined,
     );
     if (result === 'CAS_LOST') return reconcile(env, cycle, 'SUBSCRIPTION_CAS_LOST', now);
