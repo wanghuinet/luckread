@@ -123,7 +123,9 @@ export class BillingPersistenceError extends Error {
 const PROVIDER = 'hyperswitch';
 const MAX_PAGE_SIZE = 50;
 
-function validId(value: unknown, max = 256): value is string {
+export type BillingHistoryCursor = Readonly<{ timestamp: string; id: string }>;
+
+export function isValidBillingId(value: unknown, max = 256): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= max &&
     value.trim() === value && !/[\u0000-\u001f\u007f]/.test(value);
 }
@@ -140,11 +142,11 @@ function defaultDocumentNumber(type: 'INVOICE' | 'RECEIPT'): string {
   return (type === 'INVOICE' ? 'INV-' : 'RCT-') + crypto.randomUUID().replace(/-/g, '').toUpperCase();
 }
 
-function encodeCursor(value: Readonly<{ timestamp: string; id: string }>): string {
+export function encodeBillingHistoryCursor(value: BillingHistoryCursor): string {
   return btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
-function decodeCursor(value: string | null | undefined): { timestamp: string; id: string } | null {
+export function decodeBillingHistoryCursor(value: string | null | undefined): BillingHistoryCursor | null {
   if (value == null || value === '') return null;
   if (!/^[A-Za-z0-9_-]{1,512}$/.test(value)) {
     throw new BillingPersistenceError('VALIDATION_FAILED', 400);
@@ -155,7 +157,7 @@ function decodeCursor(value: string | null | undefined): { timestamp: string; id
     const parsed: unknown = JSON.parse(atob(padded));
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('invalid cursor');
     const candidate = parsed as Record<string, unknown>;
-    if (!validIso(candidate.timestamp) || !validId(candidate.id, 255)) throw new Error('invalid cursor');
+    if (!validIso(candidate.timestamp) || !isValidBillingId(candidate.id, 255)) throw new Error('invalid cursor');
     if (Object.keys(candidate).length !== 2) throw new Error('invalid cursor');
     return { timestamp: candidate.timestamp, id: candidate.id };
   } catch {
@@ -163,7 +165,7 @@ function decodeCursor(value: string | null | undefined): { timestamp: string; id
   }
 }
 
-function pageSize(value: number): number {
+export function validateBillingPageSize(value: number): number {
   if (!Number.isSafeInteger(value) || value < 1 || value > MAX_PAGE_SIZE) {
     throw new BillingPersistenceError('VALIDATION_FAILED', 400);
   }
@@ -272,7 +274,7 @@ export async function issueInvoiceForOrder(
   orderIdInput: string,
   dependencies: Readonly<{ now?: () => Date; createDocumentId?: () => string; createDocumentNumber?: () => string }> = {},
 ): Promise<BillingDocumentDto> {
-  if (!validId(customerIdInput) || !validId(orderIdInput, 255)) {
+  if (!isValidBillingId(customerIdInput) || !isValidBillingId(orderIdInput, 255)) {
     throw new BillingPersistenceError('VALIDATION_FAILED', 400);
   }
   const existing = await readDocument(db, customerIdInput, 'INVOICE', orderIdInput).catch(() => {
@@ -293,7 +295,7 @@ export async function issueInvoiceForOrder(
   const issuedAt = nowDate.toISOString();
   const documentId = (dependencies.createDocumentId ?? defaultDocumentId)();
   const documentNumber = (dependencies.createDocumentNumber ?? (() => defaultDocumentNumber('INVOICE')))();
-  if (!validId(documentId, 128) || !validId(documentNumber, 128)) {
+  if (!isValidBillingId(documentId, 128) || !isValidBillingId(documentNumber, 128)) {
     throw new BillingPersistenceError('INTEGRITY_VIOLATION', 500);
   }
 
@@ -325,7 +327,7 @@ export async function issueReceiptForPaidPayment(
   expectedMerchantIdInput: string,
   dependencies: Readonly<{ now?: () => Date; createDocumentId?: () => string; createDocumentNumber?: () => string }> = {},
 ): Promise<BillingDocumentDto> {
-  if (!/^pay_[A-Za-z0-9]{26}$/.test(paymentIdInput) || !validId(expectedMerchantIdInput, 256)) {
+  if (!/^pay_[A-Za-z0-9]{26}$/.test(paymentIdInput) || !isValidBillingId(expectedMerchantIdInput, 256)) {
     throw new BillingPersistenceError('VALIDATION_FAILED', 400);
   }
   let payment: PaymentForBilling | null;
@@ -379,7 +381,7 @@ export async function issueReceiptForPaidPayment(
   const issuedAt = nowDate.toISOString();
   const documentId = (dependencies.createDocumentId ?? defaultDocumentId)();
   const documentNumber = (dependencies.createDocumentNumber ?? (() => defaultDocumentNumber('RECEIPT')))();
-  if (!validId(documentId, 128) || !validId(documentNumber, 128)) {
+  if (!isValidBillingId(documentId, 128) || !isValidBillingId(documentNumber, 128)) {
     throw new BillingPersistenceError('INTEGRITY_VIOLATION', 500);
   }
   try {
@@ -407,9 +409,9 @@ export async function listBillingDocumentsForCustomer(
   limitInput = 20,
   cursorInput?: string | null,
 ): Promise<BillingList<BillingDocumentDto>> {
-  if (!validId(customerIdInput)) throw new BillingPersistenceError('VALIDATION_FAILED', 400);
-  const limit = pageSize(limitInput);
-  const cursor = decodeCursor(cursorInput);
+  if (!isValidBillingId(customerIdInput)) throw new BillingPersistenceError('VALIDATION_FAILED', 400);
+  const limit = validateBillingPageSize(limitInput);
+  const cursor = decodeBillingHistoryCursor(cursorInput);
   let result: D1Result<BillingDocumentRow>;
   try {
     result = cursor
@@ -431,7 +433,7 @@ export async function listBillingDocumentsForCustomer(
   const last = page.at(-1);
   return {
     items: page.map(toDocumentDto),
-    nextCursor: hasMore && last ? encodeCursor({ timestamp: last.issued_at, id: last.document_id }) : null,
+    nextCursor: hasMore && last ? encodeBillingHistoryCursor({ timestamp: last.issued_at, id: last.document_id }) : null,
     hasMore,
   };
 }
@@ -442,9 +444,9 @@ export async function listPaymentHistoryForCustomer(
   limitInput = 20,
   cursorInput?: string | null,
 ): Promise<BillingList<CustomerPaymentHistoryItem>> {
-  if (!validId(customerIdInput)) throw new BillingPersistenceError('VALIDATION_FAILED', 400);
-  const limit = pageSize(limitInput);
-  const cursor = decodeCursor(cursorInput);
+  if (!isValidBillingId(customerIdInput)) throw new BillingPersistenceError('VALIDATION_FAILED', 400);
+  const limit = validateBillingPageSize(limitInput);
+  const cursor = decodeBillingHistoryCursor(cursorInput);
   let result: D1Result<PaymentForBilling & { refunded_minor: number }>;
   const columns =
     'SELECT p.payment_id, p.order_id, p.customer_id, p.provider, p.merchant_id, p.amount_minor, p.currency, ' +
@@ -481,7 +483,7 @@ export async function listPaymentHistoryForCustomer(
       updatedAt: row.updated_at,
       refundedMinor: Number.isSafeInteger(row.refunded_minor) && row.refunded_minor >= 0 ? row.refunded_minor : 0,
     })),
-    nextCursor: hasMore && last ? encodeCursor({ timestamp: last.created_at, id: last.payment_id }) : null,
+    nextCursor: hasMore && last ? encodeBillingHistoryCursor({ timestamp: last.created_at, id: last.payment_id }) : null,
     hasMore,
   };
 }
@@ -492,9 +494,9 @@ export async function listRefundHistoryForCustomer(
   limitInput = 20,
   cursorInput?: string | null,
 ): Promise<BillingList<CustomerRefundHistoryItem>> {
-  if (!validId(customerIdInput)) throw new BillingPersistenceError('VALIDATION_FAILED', 400);
-  const limit = pageSize(limitInput);
-  const cursor = decodeCursor(cursorInput);
+  if (!isValidBillingId(customerIdInput)) throw new BillingPersistenceError('VALIDATION_FAILED', 400);
+  const limit = validateBillingPageSize(limitInput);
+  const cursor = decodeBillingHistoryCursor(cursorInput);
   let result: D1Result<RefundHistoryRow>;
   const base = 'SELECT refund_id, payment_id, order_id, amount_minor, currency, status, reason, version, provider_updated_at, created_at, updated_at ' +
     'FROM refunds WHERE customer_id = ?';
@@ -527,7 +529,7 @@ export async function listRefundHistoryForCustomer(
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     })),
-    nextCursor: hasMore && last ? encodeCursor({ timestamp: last.created_at, id: last.refund_id }) : null,
+    nextCursor: hasMore && last ? encodeBillingHistoryCursor({ timestamp: last.created_at, id: last.refund_id }) : null,
     hasMore,
   };
 }
