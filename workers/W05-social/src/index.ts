@@ -299,7 +299,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   pushEndpointDatabase?: PushEndpointPostgresExecutor
   /** Required Neon PostgreSQL follower/following list reader; missing composition fails closed. */
   followListReadStore?: FollowListReadStore
-  /** Optional PostgreSQL-capable Follow/Unfollow writer; D1 remains the deployed default. */
+  /** Required Neon PostgreSQL Follow/Unfollow writer; mutation routes fail closed when absent. */
   followStore?: FollowStore
   /** Optional PostgreSQL relationship graph reader; missing composition fails closed. */
   relationshipGraphReadStore?: RelationshipGraphReadStore
@@ -1300,7 +1300,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
           if (!idempotencyKey) throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
           if (idempotencyKey.length > 256) throw new FollowRuntimeError('VALIDATION_FAILED', 400)
-          const row = await follow(dependencies.followStore ?? env.DB, viewerUserId, path.userId)
+          if (!dependencies.followStore) throw new FollowRuntimeError('SERVICE_UNAVAILABLE', 503)
+          const row = await follow(dependencies.followStore, viewerUserId, path.userId)
           await invalidateRelationshipGraph(viewerUserId, path.userId)
           await enqueueNotification(dependencies.notificationEnqueueStore, {
             recipientUserId: path.userId,
@@ -1325,7 +1326,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
           if (!idempotencyKey) throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
           if (idempotencyKey.length > 256) throw new FollowRuntimeError('VALIDATION_FAILED', 400)
-          await unfollow(dependencies.followStore ?? env.DB, viewerUserId, path.userId)
+          if (!dependencies.followStore) throw new FollowRuntimeError('SERVICE_UNAVAILABLE', 503)
+          await unfollow(dependencies.followStore, viewerUserId, path.userId)
           await invalidateRelationshipGraph(viewerUserId, path.userId)
           return new Response(null, { status: 204 })
         }
