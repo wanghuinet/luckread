@@ -332,16 +332,16 @@ export default {
         requireLayer(request)
         const input = await readJsonBody(request)
         const idempotencyKey = request.headers.get('Idempotency-Key')
-        const result = resolveW07MembershipDatabaseDriver(runtimeEnv) === 'neon'
-          ? await startSubscriptionTrialPostgres(
-            runtimeEnv,
-            getW07MembershipPostgresPool(runtimeEnv) ??
-              (() => { throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503) })(),
-            principal,
-            input,
-            idempotencyKey,
+        let result
+        if (resolveW07MembershipDatabaseDriver(runtimeEnv) === 'neon') {
+          const membershipPool = getW07MembershipPostgresPool(runtimeEnv)
+          if (!membershipPool) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+          result = await startSubscriptionTrialPostgres(
+            runtimeEnv, membershipPool, principal, input, idempotencyKey,
           )
-          : await startSubscriptionTrial(runtimeEnv, principal, input, idempotencyKey)
+        } else {
+          result = await startSubscriptionTrial(runtimeEnv, principal, input, idempotencyKey)
+        }
         return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 201, result.etag)
       }
       if (operation?.operation === 'planChangePreview') {
