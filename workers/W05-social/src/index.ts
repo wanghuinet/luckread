@@ -345,11 +345,11 @@ export type W05SocialWorkerDependencies = Readonly<{
   profileChannelReadStore?: ProfileChannelReadStore
   /** Optional PostgreSQL-capable content-liker page reader; D1 remains the deployed default. */
   contentLikerReadStore?: ContentLikerReadStore
-  /** Optional PostgreSQL-capable favorite list reader; D1 remains the deployed default. */
+  /** Neon PostgreSQL favorite list reader; route fails closed when missing. */
   favoriteListReadStore?: FavoriteListReadStore
-  /** Optional PostgreSQL-capable Favorite/Unfavorite writer; D1 remains the deployed default. */
+  /** Neon PostgreSQL Favorite/Unfavorite writer; routes fail closed when missing. */
   favoriteMutationStore?: FavoriteMutationStore
-  /** Optional PostgreSQL-capable favorite status reader; D1 remains the deployed default. */
+  /** Neon PostgreSQL favorite status reader; route fails closed when missing. */
   favoriteStatusReadStore?: FavoriteStatusReadStore
   /** Neon PostgreSQL like-status reader; cache misses fail closed when it is not composed. */
   likeStatusReadStore?: LikeStatusReadStore
