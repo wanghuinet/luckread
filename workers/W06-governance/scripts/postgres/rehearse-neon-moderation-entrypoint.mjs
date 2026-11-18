@@ -7,7 +7,7 @@ import { dirname } from 'node:path'
 import worker from '../../src/index.ts'
 import {
   closeW06ModerationPostgresRuntimeForTest,
-} from '../../src/neon/moderation-database-runtime.ts'
+} from '../../src/neon/moderation-database-runtime.js'
 
 const requireFromW02 = createRequire(new URL('../../../W02-identity/package.json', import.meta.url))
 const { Pool } = requireFromW02('pg')
