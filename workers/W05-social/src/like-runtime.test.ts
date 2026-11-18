@@ -40,6 +40,23 @@ const makeLikeTargetContextStore = (
   hasBidirectionalBlock: vi.fn(async () => blocked),
 })
 
+const makeLikeMutationStore = (row: {
+  relationship_id: string
+  actor_user_id: string
+  target_type: 'content' | 'comment'
+  target_id: string
+  created_at: string
+} | null = {
+  relationship_id: 'like-store-1',
+  actor_user_id: 'user-1',
+  target_type: 'content',
+  target_id: 'content-1',
+  created_at: '2026-11-10T00:00:00.000Z',
+}) => ({
+  create: vi.fn(async () => row),
+  remove: vi.fn(async () => undefined),
+})
+
 const db = (firstResults: unknown[] = []) => {
   let firstIndex = 0
   const prepare = vi.fn((sql: string) => ({
