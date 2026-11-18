@@ -25,18 +25,19 @@ function fakeD1(options: FakeD1Options = {}) {
         },
         async first<T>() {
           if (sql.includes('FROM "user"') && sql.includes('WHERE id = ?')) {
-            if (options.user?.id !== call.values[0]) return null
-            if (sql.includes('account_state AS accountState')) return options.user as unknown as T
+            const persistedUser = options.user
+            if (!persistedUser || persistedUser.id !== call.values[0]) return null
+            if (sql.includes('account_state AS accountState')) return persistedUser as unknown as T
             return ({
-              id: options.user.id,
-              email: options.user.email,
-              username: options.user.username,
+              id: persistedUser.id,
+              email: persistedUser.email,
+              username: persistedUser.username,
             } as unknown as T)
           }
           if (sql.includes('FROM "user"') && sql.includes('WHERE email = ?')) {
-            return options.user?.email === call.values[0]
-              ? ({ id: options.user.id } as unknown as T)
-              : null
+            const persistedUser = options.user
+            if (!persistedUser || persistedUser.email !== call.values[0]) return null
+            return ({ id: persistedUser.id } as unknown as T)
           }
           if (sql.includes('FROM "session"')) return (options.session ?? null) as unknown as T | null
           return null
@@ -81,6 +82,9 @@ function fakePool(options: FakePgOptions = {}) {
     release() {},
   }
   const pool = {
+    async query<T>(sql: string, values: unknown[] = []) {
+      return client.query<T>(sql, values)
+    },
     async connect() { return client },
   } as unknown as Pool
   return { pool, calls }
