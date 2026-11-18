@@ -97,7 +97,7 @@ try {
 
   const firstVote = await castContentPollVote(
     voteStore, readStore, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[0],
-    marker + '-correlation-first', voteStore, readStore,
+    marker + '-correlation-first',
   )
   assert.equal(firstVote.viewerOptionId, pollFixture.options[0])
   assert.equal(firstVote.totalVotes, 1)
@@ -105,7 +105,7 @@ try {
 
   const repeatedVote = await castContentPollVote(
     voteStore, readStore, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[0],
-    marker + '-correlation-repeat', voteStore, readStore,
+    marker + '-correlation-repeat',
   )
   assert.equal(repeatedVote.viewerOptionId, pollFixture.options[0])
   assert.equal(repeatedVote.totalVotes, 1)
@@ -114,7 +114,7 @@ try {
   await expectSocialError(
     castContentPollVote(
       voteStore, readStore, binding, marker + '-voter', pollFixture.contentId, pollFixture.options[1],
-      marker + '-correlation-different', voteStore, readStore,
+      marker + '-correlation-different',
     ),
     'ALREADY_VOTED',
     409,
@@ -138,7 +138,7 @@ try {
   await expectSocialError(
     castContentPollVote(
       voteStore, readStore, binding, blockedVoter, pollFixture.contentId, pollFixture.options[0],
-      marker + '-correlation-block-out', voteStore, readStore,
+      marker + '-correlation-block-out',
     ),
     'NOT_FOUND',
     404,
@@ -146,7 +146,7 @@ try {
   await expectSocialError(
     castContentPollVote(
       voteStore, readStore, binding, reverseBlockedVoter, pollFixture.contentId, pollFixture.options[0],
-      marker + '-correlation-block-in', voteStore, readStore,
+      marker + '-correlation-block-in',
     ),
     'NOT_FOUND',
     404,
@@ -157,7 +157,7 @@ try {
   await expectSocialError(
     castContentPollVote(
       voteStore, readStore, binding, marker + '-invalid-option-viewer', pollFixture.contentId,
-      marker + '-not-a-real-option', marker + '-correlation-invalid-option', voteStore, readStore,
+      marker + '-not-a-real-option', marker + '-correlation-invalid-option',
     ),
     'VALIDATION_FAILED',
     400,
@@ -168,7 +168,7 @@ try {
   await expectSocialError(
     castContentPollVote(
       voteStore, readStore, mismatchedOwnerBinding, marker + '-mismatch-viewer', pollFixture.contentId,
-      pollFixture.options[0], marker + '-correlation-owner-mismatch', voteStore, readStore,
+      pollFixture.options[0], marker + '-correlation-owner-mismatch',
     ),
     'SERVICE_UNAVAILABLE',
     503,
@@ -179,7 +179,7 @@ try {
   await expectSocialError(
     castContentPollVote(
       voteStore, readStore, binding, marker + '-expired-viewer', expiredFixture.contentId,
-      expiredFixture.options[0], marker + '-correlation-expired', voteStore, readStore,
+      expiredFixture.options[0], marker + '-correlation-expired',
     ),
     'POLL_CLOSED',
     409,
