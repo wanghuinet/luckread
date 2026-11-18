@@ -3,9 +3,15 @@
 import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js';
 import { addBillingPeriod } from './subscription-runtime.js';
 import {
+  getW07PaymentWebhookPostgresPool,
   getW07SelectedD104Database,
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
+import {
+  getW07MembershipPostgresPool,
+  type W07MembershipDatabaseRuntimeEnv,
+} from './neon/membership-database-runtime.js';
+import type { W07WebhookPostgresClient, W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 type PaidOrderRow = Readonly<{
   payment_id: string;
@@ -72,7 +78,7 @@ export class PaidMembershipPurchaseFulfillmentError extends Error {
   }
 }
 
-type FulfillmentEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{ D1_01: D1Database; D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>;
+type FulfillmentEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{ D1_01: D1Database; D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>;
 type SubscriptionPlanUpgradeSnapshot = Readonly<{
   kind: 'PLAN_UPGRADE';
   attemptId: string;
@@ -101,6 +107,24 @@ type MembershipOfferSnapshot = Readonly<{
   benefits: string[];
   subscriptionChange: SubscriptionPlanUpgradeSnapshot | null;
 }>;
+
+type FulfillmentDatabase = D1Database | W07WebhookPostgresPool;
+
+function isPostgresFulfillmentDatabase(value: FulfillmentDatabase): value is W07WebhookPostgresPool {
+  return typeof (value as W07WebhookPostgresPool).query === 'function';
+}
+
+function selectedFulfillmentDatabases(env: FulfillmentEnv): Readonly<{
+  finance: FulfillmentDatabase;
+  membership: FulfillmentDatabase;
+}> {
+  const financePool = getW07PaymentWebhookPostgresPool(env);
+  const membershipPool = getW07MembershipPostgresPool(env);
+  return {
+    finance: financePool ?? getW07SelectedD104Database(env),
+    membership: membershipPool ?? env.D1_01,
+  };
+}
 
 const PAYMENT_ID_PATTERN = /^pay_[A-Za-z0-9]{26}$/;
 const PLAN_ID_PATTERN = /^plan_[a-f0-9]{64}$/;
