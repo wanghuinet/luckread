@@ -659,7 +659,7 @@ export async function scanDueSubscriptionRenewals(
       ).all<RenewalSubscriptionRow>()).results ?? [];
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (!/no such column:\\s*(?:s\\.)?trial_(?:started|ends)_at/i.test(message)) {
+      if (!/no such column:\s*(?:s\.)?trial_(?:started|ends)_at/i.test(message)) {
         throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
       }
       // Before migration 0008, only ACTIVE/PAST_DUE subscriptions exist. Keep
@@ -757,7 +757,7 @@ async function readChargeSubscriptionForRenewal(
     ).bind(cycle.subscription_id, cycle.subscriber_id).first<ChargeSubscriptionRow>();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (!/no such column:\\s*(?:trial_started_at|trial_ends_at)/i.test(message)) {
+    if (!/no such column:\s*(?:trial_started_at|trial_ends_at)/i.test(message)) {
       throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
     }
     try {
