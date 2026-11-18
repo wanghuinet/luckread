@@ -1,10 +1,4 @@
-/// <reference types="@cloudflare/workers-types" />
-
 import {
-  createPaymentMethodRevocationRequest,
-  getSavedPaymentMethodMandates,
-  listSavedPaymentMethodRecords,
-  markPaymentMethodProviderDeleted,
   type PaymentMethodRevocationRequest,
   type SavedPaymentMethodMandate,
   type SavedPaymentMethodRecord,
@@ -17,9 +11,8 @@ export type CreatePaymentMethodRevocationResult = Readonly<{
 }>
 
 /**
- * Single persistence boundary for saved methods, mandates and revocation state.
- * D1 and PostgreSQL implementations must preserve identical ownership,
- * idempotency and version-CAS semantics.
+ * PostgreSQL persistence boundary for saved methods, mandates and revocation state.
+ * Ownership, idempotency and version-CAS semantics are enforced by the native Store.
  */
 export interface PaymentMethodReadStore {
   listSavedPaymentMethodRecords(
@@ -48,19 +41,3 @@ export interface PaymentMethodReadStore {
   ): Promise<PaymentMethodRevocationRequest>
 }
 
-/** D1 remains the production adapter until a separate reviewed cutover. */
-export function createD1PaymentMethodReadStore(db: D1Database): PaymentMethodReadStore {
-  return {
-    listSavedPaymentMethodRecords: (customerId, merchantId) =>
-      listSavedPaymentMethodRecords(db, customerId, merchantId),
-    getSavedPaymentMethodMandates: (customerId, merchantId, savedPaymentMethodId) =>
-      getSavedPaymentMethodMandates(db, customerId, merchantId, savedPaymentMethodId),
-    createPaymentMethodRevocationRequest: (
-      customerId, merchantId, savedPaymentMethodId, idempotencyKey, now, createId,
-    ) => createPaymentMethodRevocationRequest(
-      db, customerId, merchantId, savedPaymentMethodId, idempotencyKey, now, createId,
-    ),
-    markPaymentMethodProviderDeleted: (input, now) =>
-      markPaymentMethodProviderDeleted(db, input, now),
-  }
-}

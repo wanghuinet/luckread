@@ -60,6 +60,12 @@ type W07SelectedRuntimeEnv = Omit<Env, 'D1_01' | 'D1_04'> & Readonly<{
   D1_04: D1Database
 }>
 
+const requirePaymentMethodReadStore = (env: Env) => {
+  const store = getW07PaymentMethodReadStore(env)
+  if (!store) throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return store
+}
+
 const getRateKey = (request: Request): string => {
   const principal = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
   if (principal.length > 0 && principal.length <= 256) return 'principal:' + principal
@@ -286,7 +292,9 @@ export default {
       requireLayer(request)
       const paymentMethodPath = new URL(request.url).pathname
       if (request.method === 'GET' && paymentMethodPath === '/payment-methods') {
-        const docs = await listOwnedSavedPaymentMethods(runtimeEnv, principal, getW07PaymentMethodReadStore(runtimeEnv))
+        const docs = await listOwnedSavedPaymentMethods(
+          runtimeEnv, principal, requirePaymentMethodReadStore(runtimeEnv),
+        )
         return json({ data: { docs }, requestId: crypto.randomUUID() })
       }
       const paymentMethodMatch = /^\/payment-methods\/(spm_[A-Za-z0-9]{26})$/.exec(paymentMethodPath)
@@ -297,7 +305,7 @@ export default {
         }
         const result = await revokeOwnedSavedPaymentMethod(
           runtimeEnv, principal, paymentMethodMatch[1], request.headers.get('Idempotency-Key'),
-          getW07PaymentMethodReadStore(runtimeEnv),
+          requirePaymentMethodReadStore(runtimeEnv),
         )
         return json({ data: result, requestId: crypto.randomUUID() }, result.status === 'REMOVED' ? 200 : 202)
       }
