@@ -1276,11 +1276,13 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           throw new LikeRuntimeError('INVALID_CURSOR', 400)
         }
         const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        const listReadStore = dependencies.contentLikerReadStore
+        if (!listReadStore) throw new LikeRuntimeError('SERVICE_UNAVAILABLE', 503)
         const contentContext = await fetchPublishedContentSocialContext(env.W03_CONTENT, {
           contentId,
           correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
         })
-        const data = await listContentLikers(dependencies.contentLikerReadStore ?? env.DB, contentId, cursor, limit, viewerUserId, contentContext)
+        const data = await listContentLikers(listReadStore, contentId, cursor, limit, viewerUserId, contentContext)
         return json({ data, requestId: createRequestId() })
       }
 
