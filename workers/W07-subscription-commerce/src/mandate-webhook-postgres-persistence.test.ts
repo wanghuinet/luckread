@@ -242,7 +242,7 @@ async function signedInput(options: {
 const dependencies = {
   now: () => new Date(NOW),
   createEventRowId: () => 'evtrow_mandate_native_001',
-  createConflictId: () => 'evtconf_mandate_native_001',
+  createConflictId: () => 'evtconf_mandate-native-001',
 }
 
 describe('W07 native PostgreSQL Hyperswitch mandate webhook', () => {
