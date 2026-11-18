@@ -196,7 +196,7 @@ describe('W05 Neon social-closure read route composition', () => {
       h.env as never,
       {} as never,
     )
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(422)
     expect(h.w03Content.fetch).not.toHaveBeenCalled()
   })
 

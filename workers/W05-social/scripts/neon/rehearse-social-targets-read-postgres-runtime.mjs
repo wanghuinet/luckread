@@ -121,7 +121,7 @@ try {
   assert.equal(contentTargets.mentions[0]?.handle, 'historical-0',
     'Mention reads must retain the stored handle rather than re-resolving current usernames')
 
-  const contentBatchTargets = await store.getContentTargetsBatch!([contentTargetId, commentTargetId])
+  const contentBatchTargets = await store.getContentTargetsBatch([contentTargetId, commentTargetId])
   assert.equal(contentBatchTargets[contentTargetId]?.topics.length, 50)
   assert.equal(contentBatchTargets[contentTargetId]?.mentions.length, 100)
   assert.deepEqual(contentBatchTargets[commentTargetId], { topics: [], mentions: [] },
