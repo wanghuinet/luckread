@@ -39,3 +39,9 @@ No Worker deployment is implied by source changes. Remote D1 mutation and contro
 - The role-layer boundary remains a provider-neutral `RoleLayerStore` contract; production composition continues to use the existing Neon PostgreSQL adapter from `src/neon/role-layer-postgres.ts`.
 - Tests retain the account-state authority, deny-on-missing-account, blocked-state, and input-validation cases, and now assert the PostgreSQL adapter uses numbered parameters.
 - This slice does not remove other W02 D1 test adapters, historical SQLite/D1 migrations, or schema-source evidence.
+
+## W02 Registration Rollback Store Cleanup
+
+- Removed the legacy D1 registration rollback adapter and its D1-only test fixture after confirming the production runtime injects `createPostgresRegistrationRollbackStore` from the existing Neon runtime.
+- Registration rollback tests now exercise the PostgreSQL Store contract, including normalized identity matching, idempotent rollback for an absent user, ownership and pending-state guards, active-session rejection, and atomic delete ordering.
+- Historical D1/SQLite migrations, the source Wrangler config, and schema-lineage evidence remain unchanged.
