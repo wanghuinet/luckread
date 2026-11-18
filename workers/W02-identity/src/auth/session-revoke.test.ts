@@ -2,14 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
+  getW02PostgresRuntime: vi.fn(),
+  defaultStore: { revoke: vi.fn() },
 }))
 
 vi.mock('./better-auth.js', () => ({
   createLuckReadAuth: () => ({ api: { getSession: mocks.getSession } }),
-  requireLegacyW02D1Database: (env: { D1_01?: D1Database }) => {
-    if (!env.D1_01) throw new Error('W02_D1_TEST_BINDING_REQUIRED')
-    return env.D1_01
-  },
+}))
+
+vi.mock('../neon/runtime.js', () => ({
+  getW02PostgresRuntime: mocks.getW02PostgresRuntime,
 }))
 
 import type { BetterAuthEnv } from './better-auth.js'
@@ -30,194 +32,134 @@ const request = (sessionId: unknown) => new Request(
   },
 )
 
-const makeEnv = (
-  target: unknown,
-  batchResults: unknown[] = [
-    { success: true, meta: { changes: 1 } },
-    { success: true, meta: { changes: 1 } },
-  ],
-) => {
-  const sequence: string[] = []
-  const targetStatement = {
-    bind: vi.fn().mockReturnThis(),
-    first: vi.fn().mockResolvedValue(
-      target && typeof target === 'object'
-        ? { permissionGranted: 1, ...(target as Record<string, unknown>) }
-        : target,
-    ),
-  }
-  const prepared: Array<{ sql: string; bind: ReturnType<typeof vi.fn> }> = []
-  const prepare = vi.fn((sql: string) => {
-    if (sql.includes('WITH authorization')) {
-      sequence.push('d1:target-session')
-      return targetStatement
-    }
-    const statement = { sql, bind: vi.fn().mockReturnThis() }
-    prepared.push(statement)
-    return statement
-  })
-  const batch = vi.fn(async (_statements: unknown[]) => {
-    sequence.push('d1:atomic-session-delete-and-audit')
-    return batchResults as never
-  })
-  const database = { prepare, batch }
-  const limiter = {
-    limit: vi.fn(async ({ key }: { key: string }) => {
-      sequence.push(key)
-      return { success: true }
-    }),
-  }
-  const env = {
-    D1_01: database as unknown as D1Database,
-    AUTH_SESSION_WRITE_LIMITER: limiter,
-  } as BetterAuthEnv
-  return { env, limiter, prepare, targetStatement, prepared, batch, sequence }
-}
+const makeEnv = () => ({
+  W02_DATABASE_DRIVER: 'neon',
+  HYPERDRIVE: { connectionString: 'postgresql://user:password@localhost:5432/luckread' },
+  AUTH_SESSION_WRITE_LIMITER: {
+    limit: vi.fn().mockResolvedValue({ success: true }),
+  },
+}) as BetterAuthEnv
 
 describe('W02 policy-scoped session revoke', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.getSession.mockResolvedValue({ user: { id: 'user-1' }, session: { id: 'current-session' } })
+    mocks.getSession.mockResolvedValue({
+      user: { id: 'user-1' },
+      session: { id: 'current-session' },
+    })
+    mocks.defaultStore.revoke.mockResolvedValue({ status: 'REVOKED' })
+    mocks.getW02PostgresRuntime.mockReturnValue({
+      sessionRevocationStore: mocks.defaultStore,
+    })
   })
 
-  it('checks self permission then atomically deletes the session and journals one audit event', async () => {
-    const db = makeEnv({ id: 'target-session', userId: 'user-1' })
-    const response = await handleCurrentUserSessionRevoke(db.env, request('target-session'))
+  it('uses the Neon runtime Store after authentication, rate limits and current-session protection', async () => {
+    const env = makeEnv()
+    const response = await handleCurrentUserSessionRevoke(env, request('target-session'))
     const payload = await response.json() as { revoked?: boolean }
 
     expect(response.status).toBe(200)
     expect(payload.revoked).toBe(true)
-    expect(db.limiter.limit).toHaveBeenNthCalledWith(1, { key: 'auth010:session-revoke:account:user-1' })
-    expect(db.limiter.limit).toHaveBeenNthCalledWith(2, { key: 'auth010:session-revoke:session:current-session' })
-    expect(db.limiter.limit).toHaveBeenNthCalledWith(3, { key: 'auth010:session-revoke:endpoint' })
-    expect(db.sequence).toEqual([
-      'auth010:session-revoke:account:user-1',
-      'auth010:session-revoke:session:current-session',
-      'auth010:session-revoke:endpoint',
-      'd1:target-session',
-      'd1:atomic-session-delete-and-audit',
-    ])
-    expect(db.targetStatement.bind).toHaveBeenCalledWith(
-      'user-1', expect.any(String), expect.any(String), 'target-session', 'user-1',
-    )
-    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('role_assignments'))
-    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('"session"'))
-    expect(db.prepared).toHaveLength(2)
-    expect(db.prepared[0]?.sql).toContain('DELETE FROM "session"')
-    expect(db.prepared[0]?.sql).toContain('INNER JOIN role_assignments AS assignment')
-    expect(db.prepared[0]?.sql).toContain("account.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')")
-    expect(db.prepared[0]?.bind).toHaveBeenCalledWith('target-session', 'user-1', 'user-1', expect.any(String), expect.any(String))
-    expect(db.prepared[1]?.sql).toContain('INSERT INTO auth_010_session_revocation_journal')
-    expect(db.prepared[1]?.sql).toContain('WHERE changes() = 1')
-    expect(db.prepared[1]?.bind).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.stringMatching(/^evt_[a-f0-9]{32}$/),
-      'user.session.revoked',
-      '1.0',
-      'target-session',
-      1,
-      expect.stringMatching(/^AUTH010_SESSION_REVOKE_[a-f0-9]{32}$/),
-      expect.stringContaining('"eventType":"user.session.revoked"'),
-      'PENDING',
-      1,
-      null,
-      expect.any(String),
-      null,
-      null,
-    )
-    const outboxPayload = vi.mocked(db.prepared[1]!.bind).mock.calls[0]?.[7] as string
-    expect(JSON.parse(outboxPayload)).toMatchObject({
-      eventType: 'user.session.revoked',
+    expect(env.AUTH_SESSION_WRITE_LIMITER?.limit).toHaveBeenNthCalledWith(1, {
+      key: 'auth010:session-revoke:account:user-1',
+    })
+    expect(env.AUTH_SESSION_WRITE_LIMITER?.limit).toHaveBeenNthCalledWith(2, {
+      key: 'auth010:session-revoke:session:current-session',
+    })
+    expect(env.AUTH_SESSION_WRITE_LIMITER?.limit).toHaveBeenNthCalledWith(3, {
+      key: 'auth010:session-revoke:endpoint',
+    })
+    expect(mocks.getW02PostgresRuntime).toHaveBeenCalledWith(env)
+    expect(mocks.defaultStore.revoke).toHaveBeenCalledWith({
+      userId: 'user-1',
+      sessionId: 'target-session',
+      now: expect.any(String),
       correlationId: 'req_session_revoke_test',
       causationId: 'trace-session-revoke-test',
-      actor: { actorId: 'user-1', actorType: 'user' },
-      resourceId: 'target-session',
     })
     expect(response.headers.get('cache-control')).toBe('no-store')
   })
 
-  it('denies revoke when the explicit user role permission is not effective', async () => {
-    const db = makeEnv({ permissionGranted: 0, id: null, userId: null })
-    const response = await handleCurrentUserSessionRevoke(db.env, request('target-session'))
+  it('denies revoke when the effective base-user permission is not present', async () => {
+    mocks.defaultStore.revoke.mockResolvedValueOnce({ status: 'PERMISSION_DENIED' })
+    const response = await handleCurrentUserSessionRevoke(makeEnv(), request('target-session'))
     const payload = await response.json() as { error?: { code?: string } }
 
     expect(response.status).toBe(403)
     expect(payload.error?.code).toBe('PERMISSION_DENIED')
-    expect(db.batch).not.toHaveBeenCalled()
+    expect(mocks.defaultStore.revoke).toHaveBeenCalledTimes(1)
   })
 
-  it('returns 429 without reading the target when a required scope is exhausted', async () => {
-    const db = makeEnv({ id: 'target-session', userId: 'user-1' })
-    vi.mocked(db.limiter.limit)
-      .mockResolvedValueOnce({ success: true })
+  it('keeps cross-account and missing sessions indistinguishable', async () => {
+    mocks.defaultStore.revoke.mockResolvedValueOnce({ status: 'NOT_FOUND_OR_NOT_OWNED' })
+    const response = await handleCurrentUserSessionRevoke(makeEnv(), request('target-session'))
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ revoked: true })
+  })
+
+  it('returns 429 before resolving the Store when a required rate-limit scope is exhausted', async () => {
+    const env = makeEnv()
+    const limiter = env.AUTH_SESSION_WRITE_LIMITER!
+    vi.mocked(limiter.limit)
       .mockResolvedValueOnce({ success: true })
       .mockResolvedValueOnce({ success: false })
-    const response = await handleCurrentUserSessionRevoke(db.env, request('target-session'))
+    const response = await handleCurrentUserSessionRevoke(env, request('target-session'))
     const payload = await response.json() as { error?: { code?: string } }
 
     expect(response.status).toBe(429)
     expect(payload.error?.code).toBe('RATE_LIMITED')
-    expect(db.prepare).not.toHaveBeenCalled()
-    expect(db.batch).not.toHaveBeenCalled()
+    expect(limiter.limit).toHaveBeenCalledTimes(2)
+    expect(mocks.defaultStore.revoke).not.toHaveBeenCalled()
+    expect(mocks.getW02PostgresRuntime).not.toHaveBeenCalled()
   })
 
   it('fails closed when the W02 rate-limit binding is unavailable', async () => {
-    const db = makeEnv({ id: 'target-session', userId: 'user-1' })
-    delete db.env.AUTH_SESSION_WRITE_LIMITER
-    const response = await handleCurrentUserSessionRevoke(db.env, request('target-session'))
+    const env = makeEnv()
+    delete env.AUTH_SESSION_WRITE_LIMITER
+    const response = await handleCurrentUserSessionRevoke(env, request('target-session'))
+
     expect(response.status).toBe(503)
-    expect(db.prepare).not.toHaveBeenCalled()
-    expect(db.batch).not.toHaveBeenCalled()
+    expect(mocks.defaultStore.revoke).not.toHaveBeenCalled()
+    expect(mocks.getW02PostgresRuntime).not.toHaveBeenCalled()
   })
 
-  it('does not authenticate or query when the current user has no valid session', async () => {
+  it('does not resolve the Store or consume rate limits when the current user has no valid session', async () => {
     mocks.getSession.mockResolvedValueOnce(null)
-    const db = makeEnv({ id: 'target-session', userId: 'user-1' })
-    const response = await handleCurrentUserSessionRevoke(db.env, request('target-session'))
+    const env = makeEnv()
+    const response = await handleCurrentUserSessionRevoke(env, request('target-session'))
+
     expect(response.status).toBe(401)
-    expect(db.limiter.limit).not.toHaveBeenCalled()
-    expect(db.prepare).not.toHaveBeenCalled()
-    expect(db.batch).not.toHaveBeenCalled()
+    expect(env.AUTH_SESSION_WRITE_LIMITER?.limit).not.toHaveBeenCalled()
+    expect(mocks.defaultStore.revoke).not.toHaveBeenCalled()
+    expect(mocks.getW02PostgresRuntime).not.toHaveBeenCalled()
   })
 
-  it('rejects revocation of the authenticated current session before any D1 lookup', async () => {
-    const db = makeEnv({ id: 'current-session', userId: 'user-1' })
-    const response = await handleCurrentUserSessionRevoke(db.env, request('current-session'))
+  it('protects the authenticated current session before resolving the target Store', async () => {
+    const env = makeEnv()
+    const response = await handleCurrentUserSessionRevoke(env, request('current-session'))
     const payload = await response.json() as { error?: { code?: string } }
 
     expect(response.status).toBe(409)
     expect(payload.error?.code).toBe('CURRENT_SESSION_PROTECTED')
-    expect(db.limiter.limit).toHaveBeenCalledTimes(3)
-    expect(db.prepare).not.toHaveBeenCalled()
-    expect(db.batch).not.toHaveBeenCalled()
+    expect(env.AUTH_SESSION_WRITE_LIMITER?.limit).toHaveBeenCalledTimes(3)
+    expect(mocks.defaultStore.revoke).not.toHaveBeenCalled()
+    expect(mocks.getW02PostgresRuntime).not.toHaveBeenCalled()
   })
 
-  it('keeps cross-account and missing sessions indistinguishable', async () => {
-    const db = makeEnv({ id: 'target-session', userId: 'other-user' })
-    const response = await handleCurrentUserSessionRevoke(db.env, request('target-session'))
-    const payload = await response.json() as { revoked?: boolean }
-    expect(response.status).toBe(200)
-    expect(payload.revoked).toBe(true)
-    expect(db.batch).not.toHaveBeenCalled()
+  it('rejects invalid request bodies before authentication or Store resolution', async () => {
+    const env = makeEnv()
+    const response = await handleCurrentUserSessionRevoke(env, request(null))
+
+    expect(response.status).toBe(400)
+    expect(mocks.getSession).not.toHaveBeenCalled()
+    expect(env.AUTH_SESSION_WRITE_LIMITER?.limit).not.toHaveBeenCalled()
+    expect(mocks.defaultStore.revoke).not.toHaveBeenCalled()
+    expect(mocks.getW02PostgresRuntime).not.toHaveBeenCalled()
   })
 
-  it('treats a concurrent already-removed target as a successful no-op without a second event', async () => {
-    const db = makeEnv(
-      { id: 'target-session', userId: 'user-1' },
-      [
-        { success: true, meta: { changes: 0 } },
-        { success: true, meta: { changes: 0 } },
-      ],
-    )
-    const response = await handleCurrentUserSessionRevoke(db.env, request('target-session'))
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ revoked: true })
-    expect(db.batch).toHaveBeenCalledTimes(1)
-    expect(db.prepared[1]?.sql).toContain('WHERE changes() = 1')
-  })
-
-  it('uses an explicitly injected PostgreSQL store and authenticated session resolver without touching D1', async () => {
-    const db = makeEnv({ id: 'target-session', userId: 'user-1' })
+  it('accepts an injected PostgreSQL-compatible Store and authenticated session resolver', async () => {
+    const env = makeEnv()
     const store: SessionRevocationStore = {
       revoke: vi.fn().mockResolvedValue({ status: 'REVOKED' }),
     }
@@ -227,7 +169,7 @@ describe('W02 policy-scoped session revoke', () => {
     })
 
     const response = await handleCurrentUserSessionRevoke(
-      db.env,
+      env,
       request('target-session'),
       { store, getSession },
     )
@@ -242,32 +184,17 @@ describe('W02 policy-scoped session revoke', () => {
       correlationId: 'req_session_revoke_test',
       causationId: 'trace-session-revoke-test',
     })
-    expect(db.prepare).not.toHaveBeenCalled()
-    expect(db.batch).not.toHaveBeenCalled()
+    expect(mocks.getSession).not.toHaveBeenCalled()
+    expect(mocks.getW02PostgresRuntime).not.toHaveBeenCalled()
   })
 
-  it('maps an injected store permission denial to 403 without exposing persistence details', async () => {
-    const db = makeEnv({ id: 'target-session', userId: 'user-1' })
-    const store: SessionRevocationStore = {
-      revoke: vi.fn().mockResolvedValue({ status: 'PERMISSION_DENIED' }),
-    }
+  it('returns 503 without leaking persistence details when the Store transaction fails', async () => {
+    mocks.defaultStore.revoke.mockRejectedValueOnce(new Error('PostgreSQL unavailable'))
+    const response = await handleCurrentUserSessionRevoke(makeEnv(), request('target-session'))
+    const payload = await response.json() as { error?: { code?: string; message?: string } }
 
-    const response = await handleCurrentUserSessionRevoke(db.env, request('target-session'), { store })
-    const payload = await response.json() as { error?: { code?: string } }
-
-    expect(response.status).toBe(403)
-    expect(payload.error?.code).toBe('PERMISSION_DENIED')
-    expect(db.prepare).not.toHaveBeenCalled()
-    expect(db.batch).not.toHaveBeenCalled()
-  })
-
-  it('returns 503 when the atomic delete-plus-outbox transaction fails', async () => {
-    const db = makeEnv({ id: 'target-session', userId: 'user-1' })
-    db.batch.mockRejectedValueOnce(new Error('D1 transaction failed'))
-    const response = await handleCurrentUserSessionRevoke(db.env, request('target-session'))
-    const payload = await response.json() as { error?: { code?: string } }
     expect(response.status).toBe(503)
     expect(payload.error?.code).toBe('SERVICE_UNAVAILABLE')
-    expect(db.batch).toHaveBeenCalledTimes(1)
+    expect(payload.error?.message).toBe('Session service unavailable')
   })
 })

@@ -1,6 +1,7 @@
 import permissions from '../../../../contracts/authz/permissions.json'
-import { createLuckReadAuth, requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
-import { createD1SessionRevocationStore, type SessionRevocationStore } from './session-revoke-store.js'
+import { getW02PostgresRuntime } from '../neon/runtime.js'
+import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import type { SessionRevocationStore } from './session-revoke-store.js'
 import {
   enforceSessionRevokeRateLimits,
   sessionRateLimitErrorResponse,
@@ -82,7 +83,7 @@ export async function handleCurrentUserSessionRevoke(
   }
 
   try {
-    const store = dependencies.store ?? createD1SessionRevocationStore(requireLegacyW02D1Database(env))
+    const store = dependencies.store ?? getW02PostgresRuntime(env).sessionRevocationStore
     const result = await store.revoke({
       userId,
       sessionId,

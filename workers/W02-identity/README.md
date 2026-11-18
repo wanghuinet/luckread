@@ -61,3 +61,11 @@ No Worker deployment is implied by source changes. Remote D1 mutation and contro
 - Production W02 already composes `createPostgresCreatorRoleGrantStore` through `getW02PostgresRuntime` and passes it to the creator-role grant command.
 - PostgreSQL adapter tests cover delegation and typed error mapping; the disposable PostgreSQL 18 runtime rehearsal remains the source of truth for ACTIVE/email-verified target checks, effective L2 verified-user admission, transaction rollback, deterministic replay and conflicting assignments.
 - No role policy, authorization contract, Neon schema or historical D1 migration is changed.
+
+
+## W02 AUTH-010 Session Revocation Store Cleanup
+
+- Removed the legacy D1 session-revocation adapter and the handler's default D1 fallback; the handler now resolves the existing Neon runtime Store by default.
+- Handler tests now exercise the Store contract, rate-limit ordering, current-session protection, ownership privacy, and fail-closed behavior without a D1 binding.
+- PostgreSQL tests cover effective base-user authority locks, owned-session row locking, atomic session deletion plus durable audit outbox insertion, and rollback when the outbox write is incomplete.
+- The shared D1 outbox helper remains temporarily because the separate session-logout D1 adapter still uses it; historical D1 migrations and session-logout behavior are unchanged in this slice.
