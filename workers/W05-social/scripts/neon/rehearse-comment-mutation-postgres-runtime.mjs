@@ -115,9 +115,9 @@ try {
   }
   await expectRuntimeError(
     updateComment(
-    store, binding, actor, raceUpdateId,
+      raceUpdateStore, binding, actor, raceUpdateId,
       { body: 'race-after', ifMatch: '"' + raceBefore.updated_at + '"' },
-      marker + '-correlation-race-update', raceUpdateStore,
+      marker + '-correlation-race-update',
     ),
     'PRECONDITION_FAILED', 412,
   )
