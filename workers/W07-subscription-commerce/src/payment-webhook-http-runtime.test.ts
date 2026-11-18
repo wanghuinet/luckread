@@ -38,6 +38,7 @@ function fixture(options: {
   purchaseFulfillmentResult?: PaidMembershipPurchaseFulfillmentResult;
   webhookDatabase?: D1Database;
   nativeRefundResult?: WebhookReceiptResult;
+  nativePaymentResult?: WebhookReceiptResult;
 } = {}) {
   const calls: Array<{ db: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const syncCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
@@ -45,6 +46,7 @@ function fixture(options: {
   const purchaseFulfillmentCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
   const receiptCalls: Array<{ db: unknown; paymentId: string; merchantId: string }> = [];
   const postgresCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
+  const postgresPaymentCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const postgresPool = {} as W07WebhookPostgresPool;
   const receive: Receiver = async (db, input) => {
     calls.push({ db, input });
@@ -90,7 +92,7 @@ function fixture(options: {
     W07_DATABASE_DRIVER: undefined as string | undefined,
   };
   return {
-    env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, postgresCalls,
+    env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, postgresCalls, postgresPaymentCalls,
     dependencies: {
       receive,
       getWebhookDatabase: vi.fn(() => options.webhookDatabase),
@@ -101,6 +103,13 @@ function fixture(options: {
       ) => {
         postgresCalls.push({ pool, input });
         return options.nativeRefundResult ?? null;
+      },
+      receivePaymentWebhookPostgres: async (
+        pool: W07WebhookPostgresPool,
+        input: ReceiveHyperswitchWebhookInput,
+      ) => {
+        postgresPaymentCalls.push({ pool, input });
+        return options.nativePaymentResult ?? null;
       },
       syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder, issueReceipt,
       expirePendingPlanUpgrade: async () => {},
@@ -498,6 +507,44 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     expect(f.receiptCalls[0]?.db).toBe(neonDatabase);
     expect(f.syncCalls[0]?.env).toMatchObject({ D1_01: f.env.D1_01, D1_04: neonDatabase });
     expect(f.purchaseFulfillmentCalls[0]?.env).toMatchObject({ D1_01: f.env.D1_01, D1_04: neonDatabase });
+  });
+
+  it('uses the native PostgreSQL Store for Neon payment_details events before the compatibility bridge', async () => {
+    const neonDatabase = { marker: 'neon-d1-04' } as unknown as D1Database;
+    const f = fixture({
+      nativePaymentResult: receipt('APPLIED'),
+      webhookDatabase: neonDatabase,
+    });
+    f.env.W07_DATABASE_DRIVER = 'neon';
+    const body = JSON.stringify({
+      event_id: 'evt_payment_native_01',
+      event_type: 'payment_failed',
+      merchant_id: MERCHANT,
+      content: {
+        type: 'payment_details',
+        object: {
+          payment_id: 'pay_' + 'n'.repeat(26),
+          merchant_id: MERCHANT,
+          amount: 300,
+          currency: 'USD',
+          status: 'failed',
+          updated: '2026-11-18T12:00:01.000Z',
+        },
+      },
+    });
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body, signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+
+    expect(response?.status).toBe(200);
+    expect(f.postgresPaymentCalls).toHaveLength(1);
+    expect(new TextDecoder().decode(f.postgresPaymentCalls[0]!.input.rawBody)).toBe(body);
+    expect(f.dependencies.getWebhookDatabase).toHaveBeenCalledOnce();
+    expect(f.calls).toHaveLength(0);
+    expect(f.syncCalls).toHaveLength(0);
+    expect(f.postgresCalls).toHaveLength(1);
   });
 
   it('uses the native PostgreSQL Store for Neon refund_details events without resolving the D1-shaped webhook bridge', async () => {
