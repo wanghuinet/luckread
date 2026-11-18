@@ -10,17 +10,26 @@ import {
 } from './payment-method-read-runtime.js'
 
 describe('W07 payment-method Neon read runtime', () => {
-  it('requires an explicit provider and keeps legacy D1 only for explicit test selection', () => {
+  it('defaults to Neon and uses legacy D1 only when the finance driver is explicitly set to D1', () => {
     const d1 = {} as D1Database
-    const poolFactory = vi.fn()
-    expect(() => resolveW07DatabaseDriver({})).toThrow('SERVICE_UNAVAILABLE')
-    expect(() => getW07PaymentMethodReadStore({}, poolFactory)).toThrow('SERVICE_UNAVAILABLE')
+    const pool = { on: vi.fn(), query: vi.fn(), connect: vi.fn() } as unknown as Pool
+    const poolFactory = vi.fn(() => pool)
+    const binding = {
+      connectionString: 'postgresql://user:password@localhost:5432/luckread_finance',
+    }
+    const neonEnv = { D1_04: d1, HYPERDRIVE_D1_04: binding }
 
-    const env = { D1_04: d1, W07_DATABASE_DRIVER: 'd1' }
-    expect(resolveW07DatabaseDriver(env)).toBe('d1')
-    expect(getW07PaymentMethodReadStore(env, poolFactory)).toBeUndefined()
-    expect(getW07SelectedD104Database(env, poolFactory)).toBe(d1)
-    expect(poolFactory).not.toHaveBeenCalled()
+    expect(resolveW07DatabaseDriver({})).toBe('neon')
+    expect(resolveW07DatabaseDriver(neonEnv)).toBe('neon')
+    expect(getW07PaymentMethodReadStore(neonEnv, poolFactory)).toBeDefined()
+    expect(getW07SelectedD104Database(neonEnv, poolFactory)).not.toBe(d1)
+    expect(poolFactory).toHaveBeenCalledTimes(1)
+
+    const legacyEnv = { D1_04: d1, W07_DATABASE_DRIVER: 'd1' }
+    expect(resolveW07DatabaseDriver(legacyEnv)).toBe('d1')
+    expect(getW07PaymentMethodReadStore(legacyEnv, poolFactory)).toBeUndefined()
+    expect(getW07SelectedD104Database(legacyEnv, poolFactory)).toBe(d1)
+    expect(poolFactory).toHaveBeenCalledTimes(1)
   })
 
   it('fails closed on unsupported driver, missing Hyperdrive or invalid connection string', () => {
