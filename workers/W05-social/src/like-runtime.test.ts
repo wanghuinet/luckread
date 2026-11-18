@@ -321,16 +321,19 @@ describe('like runtime', () => {
     expect(sql[2]).toContain('block.target_user_id = ?')
   })
 
-  it('reads like status for a published comment', async () => {
+  it('reads like status for a published comment through the injected Store', async () => {
     const d = db([
       { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'user-2', content_id: 'content-1' },
       { blocked: 0 },
-      { liked: 1, like_count: 4 },
     ])
-    await expect(getLikeStatus(d, publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId)).resolves.toEqual({
+    const statusStore: LikeStatusReadStore = {
+      read: vi.fn(async () => ({ liked: true, likeCount: 4 })),
+    }
+    await expect(getLikeStatus(d, publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId, undefined, statusStore)).resolves.toEqual({
       liked: true,
       likeCount: 4,
     })
+    expect(statusStore.read).toHaveBeenCalledTimes(1)
   })
 
   it('rejects likes on comments that are no longer public', async () => {
