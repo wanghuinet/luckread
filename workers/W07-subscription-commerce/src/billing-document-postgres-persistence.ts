@@ -385,3 +385,108 @@ export async function issueReceiptForPaidPaymentPostgres(
     client.release()
   }
 }
+
+/**
+ * Issue or replay the immutable invoice at order creation using the native
+ * D1-04 PostgreSQL pool. Locking the owner-scoped Order serializes concurrent
+ * issuance attempts without introducing a new table or database boundary.
+ */
+export async function issueInvoiceForOrderPostgres(
+  pool: W07WebhookPostgresPool,
+  customerIdInput: string,
+  orderIdInput: string,
+  dependencies: BillingDocumentPostgresDependencies = {},
+): Promise<BillingDocumentDto> {
+  if (!validId(customerIdInput, 256) || !validId(orderIdInput, 255)) {
+    throw new BillingPersistenceError('VALIDATION_FAILED', 400)
+  }
+
+  const issuedAt = nowIso(dependencies.now)
+  let client: W07WebhookPostgresClient
+  try {
+    client = await pool.connect()
+  } catch {
+    throw new BillingPersistenceError('SERVICE_UNAVAILABLE', 503)
+  }
+
+  let transactionOpen = false
+  try {
+    await client.query('BEGIN')
+    transactionOpen = true
+
+    const orderResult = await client.query<OrderRow>(
+      'SELECT order_id, customer_id, status, currency, subtotal_minor::text AS subtotal_minor, ' +
+      'discount_minor::text AS discount_minor, tax_minor::text AS tax_minor, total_minor::text AS total_minor, ' +
+      'to_char(created_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\') AS created_at ' +
+      'FROM orders WHERE order_id = $1 AND customer_id = $2 LIMIT 1 FOR UPDATE',
+      [orderIdInput, customerIdInput],
+    )
+    const order = orderResult.rows[0]
+    if (!order) throw new BillingPersistenceError('RESOURCE_NOT_FOUND', 404)
+
+    const orderData = await readOrderSnapshot(client, order)
+    const existing = await readBillingDocument(
+      client, customerIdInput, 'INVOICE', orderIdInput,
+    )
+    if (existing) {
+      const dto = toDocumentDto(existing)
+      if (
+        existing.document_type !== 'INVOICE' ||
+        existing.customer_id !== customerIdInput ||
+        existing.order_id !== orderIdInput ||
+        existing.payment_id !== null ||
+        dto.amountMinor !== orderData.totalMinor ||
+        dto.currency !== order.currency
+      ) {
+        throw new BillingPersistenceError('INTEGRITY_VIOLATION', 500)
+      }
+      await client.query('COMMIT')
+      transactionOpen = false
+      return dto
+    }
+
+    const identity = createIdentity('INVOICE', dependencies)
+    const serializedSnapshot = snapshotJson(orderData.snapshot)
+    await client.query(
+      'INSERT INTO billing_documents ' +
+      '(document_id,document_type,document_number,customer_id,order_id,payment_id,amount_minor,currency,snapshot_json,issued_at,created_at) ' +
+      "VALUES ($1,'INVOICE',$2,$3,$4,NULL,$5,$6,$7,$8::timestamptz,$8::timestamptz) " +
+      'ON CONFLICT (document_type,order_id) DO NOTHING',
+      [
+        identity.documentId,
+        identity.documentNumber,
+        customerIdInput,
+        orderIdInput,
+        orderData.totalMinor,
+        order.currency,
+        serializedSnapshot,
+        issuedAt,
+      ],
+    )
+
+    const created = await readBillingDocument(
+      client, customerIdInput, 'INVOICE', orderIdInput,
+    )
+    if (!created) throw new BillingPersistenceError('SERVICE_UNAVAILABLE', 503)
+    const dto = toDocumentDto(created)
+    if (
+      created.payment_id !== null ||
+      dto.amountMinor !== orderData.totalMinor ||
+      dto.currency !== order.currency
+    ) {
+      throw new BillingPersistenceError('INTEGRITY_VIOLATION', 500)
+    }
+
+    await client.query('COMMIT')
+    transactionOpen = false
+    return dto
+  } catch (error) {
+    if (transactionOpen) {
+      try { await client.query('ROLLBACK') } catch { /* preserve original error */ }
+    }
+    if (error instanceof BillingPersistenceError) throw error
+    throw new BillingPersistenceError('SERVICE_UNAVAILABLE', 503)
+  } finally {
+    client.release()
+  }
+}
