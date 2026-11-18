@@ -732,7 +732,6 @@ async function applyPaidSubscriptionPlanUpgradePostgres(
   attempt: UpgradeAttemptRow,
   change: SubscriptionPlanUpgradeSnapshot,
   order: PaidOrderRow,
-  line: PaidOrderLineRow,
   creatorId: string,
   entitlementRef: string,
   updatedAt: string,
@@ -894,7 +893,7 @@ async function applyPaidSubscriptionPlanUpgrade(
     let applied = false;
     if (isPostgresFulfillmentDatabase(membershipDb)) {
       applied = await applyPaidSubscriptionPlanUpgradePostgres(
-        membershipDb, attempt, change, order, line, snapshot.creatorId, entitlementRef, updatedAt,
+        membershipDb, attempt, change, order, snapshot.creatorId, entitlementRef, updatedAt,
       );
     } else {
       const results = await membershipDb.batch([
