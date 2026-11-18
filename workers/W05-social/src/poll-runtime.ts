@@ -3,10 +3,10 @@ import type { OwnedPostContext } from './owned-post-context.js'
 import type { PublishedContentSocialContext } from './w03-content-context-client.js'
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import { fetchPublishedOwnerPostContext, type W03ContentBinding } from './w03-content-context-client.js'
-import { createD1PollReadStore, type PollReadStore } from './poll-read-store.js'
-import { createD1PollDeleteStore, type PollDeleteStore } from './poll-delete-store.js'
-import { createD1PollConfigurationStore, type PollConfigurationStore } from './poll-configuration-store.js'
-import { createD1PollVoteStore, type PollVoteStore } from './poll-vote-store.js'
+import type { PollReadStore } from './poll-read-store.js'
+import type { PollDeleteStore } from './poll-delete-store.js'
+import type { PollConfigurationStore } from './poll-configuration-store.js'
+import type { PollVoteStore } from './poll-vote-store.js'
 
 export class SocialPollError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -160,11 +160,10 @@ const effectiveEndTime = (row: PollRow, contentUpdatedAt: string, published: boo
 }
 
 export async function getContentPoll(
-  db: D1Database,
+  store: PollReadStore,
   contentIdValue: string,
   viewerUserIdValue: string | null,
   contentContext: PollContentContext,
-  store: PollReadStore = createD1PollReadStore(db),
 ): Promise<PollView | null> {
   const contentId = validateId(contentIdValue)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue, 'UNAUTHENTICATED') : null
@@ -244,14 +243,13 @@ export async function getContentPoll(
 }
 
 export async function configureContentPoll(
-  db: D1Database,
+  configurationStore: PollConfigurationStore,
+  readStore: PollReadStore,
   actorUserIdValue: string,
   contentIdValue: string,
   optionsInput: unknown,
   durationInput: unknown,
   contentContext?: OwnedPostContext,
-  configurationStore: PollConfigurationStore = createD1PollConfigurationStore(db),
-  readStore: PollReadStore = createD1PollReadStore(db),
 ): Promise<PollView> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const contentId = validateId(contentIdValue)
@@ -283,7 +281,7 @@ export async function configureContentPoll(
         JSON.stringify(existingOptions) !== JSON.stringify(options)) {
       throw new SocialPollError('CONFLICT', 409)
     }
-    const current = await getContentPoll(db, contentId, actorUserId, contentContext, readStore)
+    const current = await getContentPoll(readStore, contentId, actorUserId, contentContext)
     if (!current) throw new SocialPollError('CONFLICT', 409)
     return current
   }
@@ -303,7 +301,7 @@ export async function configureContentPoll(
     const sameDuration = Number(existing.duration_minutes) === durationMinutes
     if (voteCount > 0) {
       if (sameOptions && sameDuration) {
-        const current = await getContentPoll(db, contentId, actorUserId, contentContext, readStore)
+        const current = await getContentPoll(readStore, contentId, actorUserId, contentContext)
         if (current) return current
       }
       throw new SocialPollError('CONFLICT', 409)
@@ -373,11 +371,10 @@ export async function configureContentPoll(
 }
 
 export async function deleteContentPoll(
-  db: D1Database,
+  store: PollDeleteStore,
   actorUserIdValue: string,
   contentIdValue: string,
   contentContext?: OwnedPostContext,
-  store: PollDeleteStore = createD1PollDeleteStore(db),
 ): Promise<void> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const contentId = validateId(contentIdValue)
@@ -429,14 +426,13 @@ export async function deleteContentPoll(
 }
 
 export async function castContentPollVote(
-  db: D1Database,
+  voteStore: PollVoteStore,
+  readStore: PollReadStore,
   w03Content: W03ContentBinding | undefined,
   actorUserIdValue: string,
   contentIdValue: string,
   optionIdValue: string,
   correlationId: string,
-  voteStore: PollVoteStore = createD1PollVoteStore(db),
-  readStore: PollReadStore = createD1PollReadStore(db),
 ): Promise<PollView> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const contentId = validateId(contentIdValue)
