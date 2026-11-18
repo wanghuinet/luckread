@@ -149,7 +149,7 @@ async function readSubscription(
     } : null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (!/no such column:\\s*(?:s\\.)?trial_(?:started|ends|converted)_at/i.test(message)) {
+    if (!/no such column:\s*(?:s\.)?trial_(?:started|ends|converted)_at/i.test(message)) {
       throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
     }
     // Explicit D1 test profiles preserve the legacy pre-migration read.
