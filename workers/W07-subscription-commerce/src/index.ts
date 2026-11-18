@@ -570,10 +570,12 @@ export default {
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
         const requestedPage = parseBoundedPositiveInt(url.searchParams.get('page'), 1, 10000)
-        const result = await listSubscriptions(runtimeEnv.D1_01, principal, requestedLimit, requestedPage)
+        const membershipReadStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+        const result = await listSubscriptions(membershipReadStore, principal, requestedLimit, requestedPage)
         return json({ data: result, requestId: crypto.randomUUID() })
       }
-      const result = await getSubscription(runtimeEnv.D1_01, principal, operation.subscriptionId)
+      const membershipReadStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+      const result = await getSubscription(membershipReadStore, principal, operation.subscriptionId)
       return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
     } catch (error) {
       if (error instanceof PaymentMethodRuntimeError) {

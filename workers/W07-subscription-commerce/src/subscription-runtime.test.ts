@@ -1007,6 +1007,8 @@ describe('subscription runtime', () => {
   it('does not expose entitlementSnapshotRef', async () => {
     const db = fakeDb([baseRow({ entitlement_snapshot_ref: 'internal-ref' })]); const result = await getSubscription(db, 'user_1', 'sub_existing'); expect(result).not.toHaveProperty('entitlementSnapshotRef')
   })
+
+
 })
 
 afterEach(() => vi.useRealTimers())

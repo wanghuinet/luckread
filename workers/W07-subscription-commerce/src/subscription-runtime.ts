@@ -146,13 +146,53 @@ const toPublic = (row: SubscriptionRow) => ({
   etag: etagForVersion(row.version),
 })
 
-const readSubscriptionRow = async (db: D1Database, subscriptionId: string, subscriberId?: string): Promise<SubscriptionRow> => {
-  const id = ensureId(subscriptionId)
-  const sql = subscriberId === undefined ? 'SELECT * FROM membership_subscriptions WHERE subscription_id = ? LIMIT 1' : 'SELECT * FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1'
-  const args = subscriberId === undefined ? [id] : [id, ensureId(subscriberId)]
-  const row = await db.prepare(sql).bind(...args).first<SubscriptionRow>()
-  if (!row) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
-  return row
+const SUBSCRIPTION_READ_COLUMNS =
+  'subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, ' +
+  `to_char(started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS started_at, ` +
+  `to_char(current_period_start AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS current_period_start, ` +
+  `to_char(current_period_end AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS current_period_end, ` +
+  `CASE WHEN trial_started_at IS NULL THEN NULL ELSE to_char(trial_started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS trial_started_at, ` +
+  `CASE WHEN trial_ends_at IS NULL THEN NULL ELSE to_char(trial_ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS trial_ends_at, ` +
+  `CASE WHEN trial_converted_at IS NULL THEN NULL ELSE to_char(trial_converted_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS trial_converted_at, ` +
+  `CASE WHEN cancel_at IS NULL THEN NULL ELSE to_char(cancel_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS cancel_at, ` +
+  'entitlement_snapshot_ref, ' +
+  `to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
+  `to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, version`;
+
+const isPostgresSubscriptionStore = (
+  db: D1Database | W07WebhookPostgresPool,
+): db is W07WebhookPostgresPool => typeof (db as W07WebhookPostgresPool).query === 'function';
+
+const readSubscriptionRow = async (
+  db: D1Database | W07WebhookPostgresPool,
+  subscriptionId: string,
+  subscriberId?: string,
+): Promise<SubscriptionRow> => {
+  const id = ensureId(subscriptionId);
+  let row: SubscriptionRow | null;
+  if (isPostgresSubscriptionStore(db)) {
+    const values = subscriberId === undefined ? [id] : [id, ensureId(subscriberId)];
+    try {
+      const result = await db.query<SubscriptionRow & Record<string, unknown>>(
+        `SELECT ${SUBSCRIPTION_READ_COLUMNS} FROM membership_subscriptions ` +
+        (subscriberId === undefined
+          ? 'WHERE subscription_id = $1 LIMIT 1'
+          : 'WHERE subscription_id = $1 AND subscriber_id = $2 LIMIT 1'),
+        values,
+      );
+      row = result.rows[0] ?? null;
+    } catch {
+      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+  } else {
+    const sql = subscriberId === undefined
+      ? 'SELECT * FROM membership_subscriptions WHERE subscription_id = ? LIMIT 1'
+      : 'SELECT * FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1';
+    const args = subscriberId === undefined ? [id] : [id, ensureId(subscriberId)];
+    row = await db.prepare(sql).bind(...args).first<SubscriptionRow>();
+  }
+  if (!row) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
+  return row;
 }
 
 export async function createSubscription(db: D1Database, subscriberId: string, input: { planId: string; idempotencyKey: string }): Promise<ReturnType<typeof toPublic>> {
@@ -200,8 +240,12 @@ export async function createSubscription(db: D1Database, subscriberId: string, i
   return toPublic(row)
 }
 
-export async function getSubscription(db: D1Database, subscriberId: string, subscriptionId: string): Promise<ReturnType<typeof toPublic>> {
-  return toPublic(await readSubscriptionRow(db, subscriptionId, validatePrincipal(subscriberId)))
+export async function getSubscription(
+  db: D1Database | W07WebhookPostgresPool,
+  subscriberId: string,
+  subscriptionId: string,
+): Promise<ReturnType<typeof toPublic>> {
+  return toPublic(await readSubscriptionRow(db, subscriptionId, validatePrincipal(subscriberId)));
 }
 
 
@@ -252,7 +296,7 @@ export async function hasActiveCreatorMembership(
 }
 
 export async function listSubscriptions(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   subscriberId: string,
   limit = 20,
   page = 1,
@@ -266,15 +310,30 @@ export async function listSubscriptions(
   const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), 50) : 20
   const safePage = Number.isFinite(page) ? Math.min(Math.max(Math.trunc(page), 1), 10000) : 1
   const offset = (safePage - 1) * safeLimit
-  const rows = await db.prepare(
-    'SELECT * FROM membership_subscriptions WHERE subscriber_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
-  ).bind(subscriber, safeLimit + 1, offset).all<SubscriptionRow>()
-  const docs = (rows.results ?? []).slice(0, safeLimit).map(toPublic)
+  let resultRows: SubscriptionRow[];
+  if (isPostgresSubscriptionStore(db)) {
+    try {
+      const result = await db.query<SubscriptionRow & Record<string, unknown>>(
+        `SELECT ${SUBSCRIPTION_READ_COLUMNS} FROM membership_subscriptions ` +
+        'WHERE subscriber_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+        [subscriber, safeLimit + 1, offset],
+      )
+      resultRows = result.rows;
+    } catch {
+      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+  } else {
+    const rows = await db.prepare(
+      'SELECT * FROM membership_subscriptions WHERE subscriber_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+    ).bind(subscriber, safeLimit + 1, offset).all<SubscriptionRow>()
+    resultRows = rows.results ?? [];
+  }
+  const docs = resultRows.slice(0, safeLimit).map(toPublic)
   return {
     docs,
     limit: safeLimit,
     page: safePage,
-    hasNextPage: (rows.results ?? []).length > safeLimit,
+    hasNextPage: resultRows.length > safeLimit,
   }
 }
 
