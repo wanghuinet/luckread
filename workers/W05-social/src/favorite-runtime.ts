@@ -10,7 +10,6 @@ import {
   type FavoriteStatusReadStore,
 } from './favorite-status-read-store.js'
 import {
-  createD1FavoriteMutationStore,
   FavoriteMutationStoreError,
   type FavoriteMutationRow,
   type FavoriteMutationStore,
@@ -91,18 +90,6 @@ const fetchPublishedTarget = async (
  * Cross-Worker publication changes cannot be locked in the same transaction,
  * so reads revalidate published visibility through W03 before using the cache.
  */
-type FavoriteMutationDataSource = D1Database | FavoriteMutationStore
-
-function resolveFavoriteMutationStore(source: FavoriteMutationDataSource): FavoriteMutationStore {
-  if (
-    typeof (source as FavoriteMutationStore).create === 'function' &&
-    typeof (source as FavoriteMutationStore).remove === 'function'
-  ) {
-    return source as FavoriteMutationStore
-  }
-  return createD1FavoriteMutationStore(source as D1Database)
-}
-
 function mapFavoriteMutationStoreError(error: unknown): never {
   if (error instanceof FavoriteMutationStoreError) {
     throw new FavoriteRuntimeError(error.code, error.status, error.message)
@@ -111,7 +98,7 @@ function mapFavoriteMutationStoreError(error: unknown): never {
 }
 
 export async function favorite(
-  source: FavoriteMutationDataSource,
+  source: FavoriteMutationStore,
   w03Content: W03ContentBinding | undefined,
   actorUserId: string,
   target: FavoriteTarget,
@@ -126,7 +113,7 @@ export async function favorite(
   const createdAt = new Date().toISOString()
   let row: FavoriteMutationRow | null
   try {
-    row = await resolveFavoriteMutationStore(source).create({
+    row = await source.create({
       relationshipId,
       actorUserId: actor,
       targetType,
@@ -198,7 +185,7 @@ export async function getFavoriteStatus(
 }
 
 export async function unfavorite(
-  source: FavoriteMutationDataSource,
+  source: FavoriteMutationStore,
   actorUserId: string,
   target: FavoriteTarget,
 ): Promise<void> {
@@ -206,7 +193,7 @@ export async function unfavorite(
   const { targetType, targetId } = validateTarget(target)
 
   try {
-    await resolveFavoriteMutationStore(source).remove({
+    await source.remove({
       actorUserId: actor,
       targetType,
       targetId,
