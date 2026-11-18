@@ -406,7 +406,7 @@ async function scheduleSubscriptionPlanChange(
   }
 
   const preview = await previewSubscriptionPlanChange(
-    env.D1_01, subscriberId, subscriptionId, targetPlanId, { now: () => nowDate },
+    membershipStore, subscriberId, subscriptionId, targetPlanId, { now: () => nowDate },
   );
   const previewMatches = preview.changeType === expectedChangeType &&
     !preview.paymentRequired && preview.prorationBaseMinor === 0 &&
