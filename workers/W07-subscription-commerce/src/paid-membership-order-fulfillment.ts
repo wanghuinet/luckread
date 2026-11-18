@@ -518,10 +518,23 @@ type UpgradeSubscriptionRow = Readonly<{
 }>;
 
 async function readUpgradeAttempt(
-  db: D1Database,
+  db: FulfillmentDatabase,
   attemptId: string,
 ): Promise<UpgradeAttemptRow | null> {
   try {
+    if (isPostgresFulfillmentDatabase(db)) {
+      const result = await db.query<UpgradeAttemptRow & Record<string, unknown>>(
+        'SELECT attempt_id, subscriber_id, subscription_id, expected_subscription_version, ' +
+        'expected_plan_id, expected_plan_version, target_plan_id, target_plan_version, ' +
+        'to_char(current_period_start AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS current_period_start, ' +
+        'to_char(current_period_end AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS current_period_end, ' +
+        'order_id, status, to_char(expires_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS expires_at, ' +
+        'to_char(updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS updated_at ' +
+        'FROM membership_subscription_plan_change_attempts WHERE attempt_id = $1 LIMIT 1',
+        [attemptId],
+      )
+      return result.rows[0] ?? null
+    }
     return await db.prepare(
       'SELECT attempt_id, subscriber_id, subscription_id, expected_subscription_version, ' +
       'expected_plan_id, expected_plan_version, target_plan_id, target_plan_version, ' +
@@ -534,11 +547,23 @@ async function readUpgradeAttempt(
 }
 
 async function readUpgradeSubscription(
-  db: D1Database,
+  db: FulfillmentDatabase,
   subscriptionId: string,
   subscriberId: string,
 ): Promise<UpgradeSubscriptionRow | null> {
   try {
+    if (isPostgresFulfillmentDatabase(db)) {
+      const result = await db.query<UpgradeSubscriptionRow & Record<string, unknown>>(
+        'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, ' +
+        'to_char(current_period_start AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS current_period_start, ' +
+        'to_char(current_period_end AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS current_period_end, ' +
+        'CASE WHEN cancel_at IS NULL THEN NULL ELSE to_char(cancel_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') END AS cancel_at, ' +
+        'entitlement_snapshot_ref, to_char(updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS updated_at, version ' +
+        'FROM membership_subscriptions WHERE subscription_id = $1 AND subscriber_id = $2 LIMIT 1',
+        [subscriptionId, subscriberId],
+      )
+      return result.rows[0] ?? null
+    }
     return await db.prepare(
       'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, ' +
       'current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, updated_at, version ' +
@@ -550,17 +575,25 @@ async function readUpgradeSubscription(
 }
 
 async function markUpgradeReconciliation(
-  db: D1Database,
+  db: FulfillmentDatabase,
   attempt: UpgradeAttemptRow,
   now: string,
 ): Promise<void> {
   if (attempt.status !== 'PENDING_PAYMENT') return;
   const updatedAt = new Date(Math.max(Date.parse(attempt.updated_at) + 1, Date.parse(now))).toISOString();
   try {
-    await db.prepare(
-      "UPDATE membership_subscription_plan_change_attempts SET status = 'RECONCILIATION_REQUIRED', " +
-      'updated_at = ?, version = version + 1 WHERE attempt_id = ? AND subscriber_id = ? AND subscription_id = ? AND status = ?',
-    ).bind(updatedAt, attempt.attempt_id, attempt.subscriber_id, attempt.subscription_id, 'PENDING_PAYMENT').run();
+    if (isPostgresFulfillmentDatabase(db)) {
+      await db.query(
+        "UPDATE membership_subscription_plan_change_attempts SET status = 'RECONCILIATION_REQUIRED', " +
+        'updated_at = $1::timestamptz, version = version + 1 WHERE attempt_id = $2 AND subscriber_id = $3 AND subscription_id = $4 AND status = $5',
+        [updatedAt, attempt.attempt_id, attempt.subscriber_id, attempt.subscription_id, 'PENDING_PAYMENT'],
+      )
+    } else {
+      await db.prepare(
+        "UPDATE membership_subscription_plan_change_attempts SET status = 'RECONCILIATION_REQUIRED', " +
+        'updated_at = ?, version = version + 1 WHERE attempt_id = ? AND subscriber_id = ? AND subscription_id = ? AND status = ?',
+      ).bind(updatedAt, attempt.attempt_id, attempt.subscriber_id, attempt.subscription_id, 'PENDING_PAYMENT').run();
+    }
   } catch {
     return failClosed();
   }
