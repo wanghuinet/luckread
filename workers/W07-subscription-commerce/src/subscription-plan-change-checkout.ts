@@ -27,6 +27,10 @@ import {
   type SubscriptionPlanChangePreview,
 } from './subscription-plan-change-preview.js';
 import { hasPendingScheduledPlanDowngrade } from './subscription-plan-change-schedule.js';
+import {
+  getW07MembershipPostgresPool,
+  type W07MembershipDatabaseRuntimeEnv,
+} from './neon/membership-database-runtime.js';
 
 type PlanChangeAttemptRow = Readonly<{
   attempt_id: string;
@@ -86,7 +90,7 @@ export type SubscriptionPlanUpgradeCheckoutResult = Readonly<{
   replayed: boolean;
 }>;
 
-export type SubscriptionPlanUpgradeCheckoutEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
+export type SubscriptionPlanUpgradeCheckoutEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{
   D1_01: D1Database;
   D1_04: D1Database;
 }>;
@@ -501,7 +505,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
           assertAttemptMatches(raced, subscriberId, subscriptionId, targetPlanId);
           throw new SubscriptionRuntimeError('CONFLICT', 409);
         }
-        if (await hasPendingScheduledPlanDowngrade(env.D1_01, subscriptionId)) {
+        if (await hasPendingScheduledPlanDowngrade(getW07MembershipPostgresPool(env) ?? env.D1_01, subscriptionId)) {
           throw new SubscriptionRuntimeError('CONFLICT', 409);
         }
         throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
