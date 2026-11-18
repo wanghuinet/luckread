@@ -81,14 +81,13 @@ describe('favorite runtime', () => {
       .resolves.toMatchObject({ relationshipId: 'favorite-1', targetId: 'content-1' })
   })
 
-  it('reads favorite status from W05 after W03 confirms published visibility', async () => {
-    const d = db([{ favorited: 1 }])
+  it('reads favorite status through the injected Store after W03 confirms published visibility', async () => {
+    const store = { isFavorited: vi.fn(async () => true) }
     const binding = publishedBinding()
-    await expect(getFavoriteStatus(d, binding, 'user-1', { targetType: 'content', targetId: 'content-1' }, 'corr-1'))
+    await expect(getFavoriteStatus(store, binding, 'user-1', { targetType: 'content', targetId: 'content-1' }, 'corr-1'))
       .resolves.toEqual({ favorited: true })
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(String(prepare.mock.calls[0]?.[0])).toContain('FROM interaction_favorites')
-    expect(String(prepare.mock.calls[0]?.[0])).not.toMatch(/\b(?:FROM|JOIN)\s+contents\b/i)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    expect(store.isFavorited).toHaveBeenCalledWith({ actorUserId: 'user-1', targetId: 'content-1' })
   })
 
   it('accepts an injected favorite status store only after W03 publication validation', async () => {
@@ -141,26 +140,23 @@ describe('favorite runtime', () => {
     })
   })
 
-  it('returns false for unpublished targets without reading W05 D1', async () => {
-    const d = db()
-    await expect(getFavoriteStatus(d, publishedBinding(404), 'user-1', { targetType: 'content', targetId: 'content-1' }, 'corr-1'))
+  it('returns false for unpublished targets without reading the injected Store', async () => {
+    const store = { isFavorited: vi.fn(async () => true) }
+    await expect(getFavoriteStatus(store, publishedBinding(404), 'user-1', { targetType: 'content', targetId: 'content-1' }, 'corr-1'))
       .resolves.toEqual({ favorited: false })
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect(store.isFavorited).not.toHaveBeenCalled()
   })
 
-  it('revalidates published visibility before using the local favorite-status cache', async () => {
-    const first = db([{ favorited: 1 }])
-    await expect(getFavoriteStatus(first, publishedBinding(), 'cache-user', { targetType: 'content', targetId: 'cache-content' }, 'corr-1'))
+  it('revalidates W03 visibility before using the local favorite-status cache', async () => {
+    const store = { isFavorited: vi.fn(async () => true) }
+    await expect(getFavoriteStatus(store, publishedBinding(), 'cache-user', { targetType: 'content', targetId: 'cache-content' }, 'corr-1'))
       .resolves.toEqual({ favorited: true })
-    const secondPrepare = vi.fn(() => { throw new Error('D1_SHOULD_NOT_BE_READ') })
-    const second = { prepare: secondPrepare } as unknown as D1Database
     const binding = publishedBinding()
-    await expect(getFavoriteStatus(second, binding, 'cache-user', { targetType: 'content', targetId: 'cache-content' }, 'corr-2'))
+    await expect(getFavoriteStatus(store, binding, 'cache-user', { targetType: 'content', targetId: 'cache-content' }, 'corr-2'))
       .resolves.toEqual({ favorited: true })
     expect(binding.fetch).toHaveBeenCalledTimes(1)
-    expect(secondPrepare).not.toHaveBeenCalled()
-    const unpublished = db()
-    await expect(getFavoriteStatus(unpublished, publishedBinding(404), 'cache-user', { targetType: 'content', targetId: 'cache-content' }, 'corr-3'))
+    expect(store.isFavorited).toHaveBeenCalledTimes(1)
+    await expect(getFavoriteStatus(store, publishedBinding(404), 'cache-user', { targetType: 'content', targetId: 'cache-content' }, 'corr-3'))
       .resolves.toEqual({ favorited: false })
   })
 
