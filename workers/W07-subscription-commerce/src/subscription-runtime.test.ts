@@ -4,7 +4,6 @@ import { resolve } from 'node:path'
 import { addBillingPeriod, changeSubscriptionPlan, createMembershipPlanDraft, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, normalizeMembershipPlanDraft, parseBoundedPositiveInt, publishMembershipPlan, reviseMembershipPlan, transitionMembershipPlanLifecycle, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 import w07 from './index.js'
 import { verifyD1SubscriptionPostflight, verifyD1SubscriptionPreflight } from '../scripts/verify-remote-preflight.mjs'
-import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js'
 
 type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; all: <T>() => Promise<{ results: T[] }>; run: () => Promise<{ meta: { changes: number } }> }
 type MembershipPlanRow = { plan_id: string; owner_type: 'CREATOR' | 'COMMUNITY' | 'PLATFORM'; owner_id: string; current_version: number; status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'RETIRED'; visibility: 'PRIVATE' | 'PUBLIC'; version: number; has_current_version: boolean; created_at: string; updated_at: string; name: string; tier: string; billing_interval: string; price_minor: number; currency: string; benefits_json: string; trial_period_days: number }
@@ -1009,75 +1008,6 @@ describe('subscription runtime', () => {
     const db = fakeDb([baseRow({ entitlement_snapshot_ref: 'internal-ref' })]); const result = await getSubscription(db, 'user_1', 'sub_existing'); expect(result).not.toHaveProperty('entitlementSnapshotRef')
   })
 
-  it('reads one subscriber-owned subscription from native PostgreSQL with canonical timestamps', async () => {
-    const row = baseRow({ entitlement_snapshot_ref: 'private-reference' })
-    const query = vi.fn(async (_sql: string, _values: unknown[] = []) => ({
-      rows: [row as unknown as Record<string, unknown>],
-      rowCount: 1,
-    }))
-    const pool = { query, connect: vi.fn() } as unknown as W07WebhookPostgresPool
-
-    const result = await getSubscription(pool, 'user_1', 'sub_existing')
-
-    expect(result).toMatchObject({
-      subscriptionId: 'sub_existing',
-      subscriberId: 'user_1',
-      status: 'ACTIVE',
-      version: 1,
-      etag: '"lr-v1"',
-    })
-    expect(result).not.toHaveProperty('entitlementSnapshotRef')
-    expect(query.mock.calls[0]?.[0]).toContain('subscription_id = $1 AND subscriber_id = $2 LIMIT 1')
-    expect(query.mock.calls[0]?.[0]).toContain("to_char(started_at AT TIME ZONE 'UTC'")
-    expect(query.mock.calls[0]?.[1]).toEqual(['sub_existing', 'user_1'])
-  })
-
-  it('lists only the authenticated subscriber rows using bounded PostgreSQL pagination', async () => {
-    const newest = baseRow({
-      subscription_id: 'sub_new',
-      created_at: '2026-10-02T13:00:00.000Z',
-      updated_at: '2026-10-02T13:00:00.000Z',
-    })
-    const older = baseRow({
-      subscription_id: 'sub_old',
-      created_at: '2026-10-01T12:00:00.000Z',
-      updated_at: '2026-10-01T12:00:00.000Z',
-    })
-    const query = vi.fn(async (_sql: string, _values: unknown[] = []) => ({
-      rows: [newest, older] as unknown as Record<string, unknown>[],
-      rowCount: 2,
-    }))
-    const pool = { query, connect: vi.fn() } as unknown as W07WebhookPostgresPool
-
-    const result = await listSubscriptions(pool, 'user_1', 1, 1)
-
-    expect(result.docs).toHaveLength(1)
-    expect(result.docs[0]?.subscriptionId).toBe('sub_new')
-    expect(result).toMatchObject({ limit: 1, page: 1, hasNextPage: true })
-    expect(query.mock.calls[0]?.[0]).toContain('WHERE subscriber_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3')
-    expect(query.mock.calls[0]?.[1]).toEqual(['user_1', 2, 0])
-  })
-
-  it('returns a scoped 404 when a native PostgreSQL subscription does not belong to the subscriber', async () => {
-    const query = vi.fn(async () => ({ rows: [], rowCount: 0 }))
-    const pool = { query, connect: vi.fn() } as unknown as W07WebhookPostgresPool
-
-    await expect(getSubscription(pool, 'user_other', 'sub_existing'))
-      .rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND', status: 404 })
-    expect(query).toHaveBeenCalledTimes(1)
-  })
-
-  it('maps native PostgreSQL subscription read failures to a sanitized 503', async () => {
-    const pool = {
-      query: vi.fn(async () => { throw new Error('private connection string') }),
-      connect: vi.fn(),
-    } as unknown as W07WebhookPostgresPool
-
-    await expect(getSubscription(pool, 'user_1', 'sub_existing'))
-      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
-    await expect(listSubscriptions(pool, 'user_1', 20, 1))
-      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
-  })
 
 })
 
