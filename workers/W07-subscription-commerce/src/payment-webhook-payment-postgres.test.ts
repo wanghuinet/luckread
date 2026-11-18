@@ -73,6 +73,7 @@ function receipt(
 
 function fixture(options: Readonly<{
   existingReceipt?: ReturnType<typeof receipt>
+  insertedPayloadHash?: string
   conflictExists?: boolean
 }> = {}) {
   const calls: Array<{ sql: string; values: unknown[] }> = []
@@ -88,7 +89,7 @@ function fixture(options: Readonly<{
           rows: [{
             event_row_id: 'evtrow_native_test',
             event_id: EVENT_ID,
-            payload_sha256: 'a'.repeat(64),
+            payload_sha256: options.insertedPayloadHash ?? 'a'.repeat(64),
             state: 'RECEIVED',
             outcome_code: null,
           } as unknown as Row],
@@ -110,7 +111,7 @@ function fixture(options: Readonly<{
       if (sql.startsWith('SELECT conflict_id, existing_payload_sha256')) {
         return {
           rows: options.conflictExists ? [{
-            conflict_id: 'evtconf_native_test',
+            conflict_id: 'evtconf_nativetest',
             existing_payload_sha256: 'b'.repeat(64),
             state: 'OPEN',
             occurrence_count: '1',
@@ -120,10 +121,10 @@ function fixture(options: Readonly<{
         }
       }
       if (sql.startsWith('INSERT INTO payment_provider_event_conflicts')) {
-        return { rows: [{ conflict_id: 'evtconf_native_test' } as unknown as Row], rowCount: 1 }
+        return { rows: [{ conflict_id: 'evtconf_nativetest' } as unknown as Row], rowCount: 1 }
       }
       if (sql.startsWith('UPDATE payment_provider_event_conflicts')) {
-        return { rows: [{ conflict_id: 'evtconf_native_test' } as unknown as Row], rowCount: 1 }
+        return { rows: [{ conflict_id: 'evtconf_nativetest' } as unknown as Row], rowCount: 1 }
       }
       if (sql.startsWith('SELECT payment_id, order_id')) {
         return {
@@ -170,7 +171,7 @@ function fixture(options: Readonly<{
           rows: [{
             event_row_id: 'evtrow_native_test',
             event_id: EVENT_ID,
-            payload_sha256: 'a'.repeat(64),
+            payload_sha256: options.insertedPayloadHash ?? 'a'.repeat(64),
             state: 'APPLIED',
             outcome_code: 'PAYMENT_STATUS_APPLIED_AND_ORDER_CONFIRMED',
           } as unknown as Row],
@@ -212,8 +213,9 @@ describe('W07 native PostgreSQL payment_details webhook store', () => {
   })
 
   it('commits the payment status, order confirmation and provider receipt in one native transaction', async () => {
-    const { pool, calls, client } = fixture()
     const input = await signedInput()
+    const payloadHash = await sha256BytesToHex(new Uint8Array(input.rawBody))
+    const { pool, calls, client } = fixture({ insertedPayloadHash: payloadHash })
     const result = await receiveHyperswitchPaymentWebhookPostgres(pool, input, {
       now: () => new Date(NOW),
       createEventRowId: () => 'evtrow_native_test',
@@ -255,13 +257,13 @@ describe('W07 native PostgreSQL payment_details webhook store', () => {
     const input = await signedInput()
     const result = await receiveHyperswitchPaymentWebhookPostgres(pool, input, {
       now: () => new Date(NOW),
-      createConflictId: () => 'evtconf_native_test',
+      createConflictId: () => 'evtconf_nativetest',
     })
 
     expect(result).toMatchObject({
       outcome: 'PAYLOAD_CONFLICT',
       receiptId: 'evtrow_native_test',
-      conflictId: 'evtconf_native_test',
+      conflictId: 'evtconf_nativetest',
     })
     expect(calls.some((call) => call.sql.startsWith('INSERT INTO payment_provider_event_conflicts'))).toBe(true)
     expect(calls.some((call) => call.sql.startsWith('UPDATE payments'))).toBe(false)
