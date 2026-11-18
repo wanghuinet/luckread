@@ -29,7 +29,7 @@ const revenueCatReceiptStores = new WeakMap<object, RevenueCatWebhookReceiptStor
 export function resolveW07DatabaseDriver(
   env: W07PaymentMethodReadRuntimeEnv,
 ): 'd1' | 'neon' {
-  const configured = env.W07_DATABASE_DRIVER?.trim().toLowerCase()
+  const configured = env.W07_DATABASE_DRIVER?.trim().toLowerCase() || 'neon'
   /**
    * @deprecated-next-version
    * Reason: The explicit legacy D1 selector remains only for existing D1-backed SQL consumers and isolated tests.

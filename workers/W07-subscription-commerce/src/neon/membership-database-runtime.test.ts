@@ -7,16 +7,24 @@ import {
 } from './membership-database-runtime.js'
 
 describe('W07 D1-01 Neon membership runtime', () => {
-  it('requires an explicit provider and keeps legacy D1 only for explicit test selection', () => {
+  it('defaults to Neon and uses legacy D1 only when the membership driver is explicitly set to D1', () => {
     const d1 = {} as D1Database
-    const poolFactory = vi.fn()
+    const pool = { on: vi.fn(), query: vi.fn(), connect: vi.fn() } as unknown as Pool
+    const poolFactory = vi.fn(() => pool)
+    const binding = {
+      connectionString: 'postgresql://user:password@localhost:5432/luckread',
+    }
+    const neonEnv = { D1_01: d1, HYPERDRIVE_D1_01: binding }
 
-    expect(() => resolveW07MembershipDatabaseDriver({ D1_01: d1 })).toThrow('SERVICE_UNAVAILABLE')
+    expect(resolveW07MembershipDatabaseDriver({})).toBe('neon')
+    expect(resolveW07MembershipDatabaseDriver(neonEnv)).toBe('neon')
+    expect(getW07SelectedD101Database(neonEnv, poolFactory)).not.toBe(d1)
+    expect(poolFactory).toHaveBeenCalledTimes(1)
 
-    const env = { D1_01: d1, W07_MEMBERSHIP_DATABASE_DRIVER: 'd1' }
-    expect(resolveW07MembershipDatabaseDriver(env)).toBe('d1')
-    expect(getW07SelectedD101Database(env, poolFactory)).toBe(d1)
-    expect(poolFactory).not.toHaveBeenCalled()
+    const legacyEnv = { D1_01: d1, W07_MEMBERSHIP_DATABASE_DRIVER: 'd1' }
+    expect(resolveW07MembershipDatabaseDriver(legacyEnv)).toBe('d1')
+    expect(getW07SelectedD101Database(legacyEnv, poolFactory)).toBe(d1)
+    expect(poolFactory).toHaveBeenCalledTimes(1)
   })
 
   it('fails closed for unsupported driver, missing Hyperdrive, and wrong database name', () => {
