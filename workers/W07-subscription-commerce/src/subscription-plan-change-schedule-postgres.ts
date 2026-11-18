@@ -1,11 +1,12 @@
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js'
 import { SubscriptionRuntimeError } from './subscription-runtime.js'
 import type {
+  ScheduledPlanChangeRow,
   ScheduledSubscriptionPlanDowngrade,
   ScheduledSubscriptionPlanDowngradeResult,
 } from './subscription-plan-change-schedule.js'
 
-type ScheduledPlanChangePgRow = Readonly<{
+type ScheduledPlanChangePgRow = ScheduledPlanChangeRow & Readonly<{
   change_id: string
   subscriber_id: string
   subscription_id: string
@@ -71,40 +72,6 @@ function isCanonicalUtc(value: unknown): value is string {
     Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value
 }
 
-function toScheduledChange(row: ScheduledPlanChangePgRow): ScheduledSubscriptionPlanDowngrade {
-  if (!CHANGE_ID_PATTERN.test(row.change_id) ||
-      (row.change_type !== 'DOWNGRADE' && row.change_type !== 'BILLING_INTERVAL_CHANGE') ||
-      !isBoundedText(row.subscriber_id) || !isBoundedText(row.subscription_id) ||
-      !Number.isSafeInteger(row.expected_subscription_version) || row.expected_subscription_version < 1 ||
-      !PLAN_ID_PATTERN.test(row.expected_plan_id) ||
-      !Number.isSafeInteger(row.expected_plan_version) || row.expected_plan_version < 1 ||
-      !PLAN_ID_PATTERN.test(row.target_plan_id) ||
-      !Number.isSafeInteger(row.target_plan_version) || row.target_plan_version < 1 ||
-      !isCanonicalUtc(row.effective_at) || !/^[a-f0-9]{64}$/.test(row.idempotency_key_hash) ||
-      !['SCHEDULED', 'APPLIED', 'CANCELLED', 'RECONCILIATION_REQUIRED'].includes(row.status) ||
-      !isCanonicalUtc(row.created_at) || !isCanonicalUtc(row.updated_at) ||
-      !Number.isSafeInteger(row.version) || row.version < 1 ||
-      !(row.applied_at === null || isCanonicalUtc(row.applied_at)) ||
-      !(row.applied_subscription_version === null ||
-        (Number.isSafeInteger(row.applied_subscription_version) && row.applied_subscription_version > 0))) {
-    return failUnavailable()
-  }
-  return {
-    changeId: row.change_id,
-    subscriberId: row.subscriber_id,
-    subscriptionId: row.subscription_id,
-    changeType: row.change_type,
-    expectedSubscriptionVersion: row.expected_subscription_version,
-    expectedPlanId: row.expected_plan_id,
-    expectedPlanVersion: row.expected_plan_version,
-    targetPlanId: row.target_plan_id,
-    targetPlanVersion: row.target_plan_version,
-    effectiveAt: row.effective_at,
-    status: row.status,
-    appliedAt: row.applied_at,
-    appliedSubscriptionVersion: row.applied_subscription_version,
-  }
-}
 
 const SCHEDULED_CHANGE_COLUMNS = `
   change_id, subscriber_id, subscription_id, change_type,
@@ -124,7 +91,7 @@ export async function readScheduledChangeByIdempotencyPostgres(
   pool: W07WebhookPostgresPool,
   subscriberId: string,
   keyHash: string,
-): Promise<ScheduledSubscriptionPlanDowngrade | null> {
+): Promise<ScheduledPlanChangeRow | null> {
   try {
     const result = await pool.query<ScheduledPlanChangePgRow & Record<string, unknown>>(
       `SELECT ${SCHEDULED_CHANGE_COLUMNS}
@@ -133,7 +100,7 @@ export async function readScheduledChangeByIdempotencyPostgres(
        LIMIT 1`,
       [subscriberId, keyHash],
     )
-    return result.rows[0] ? toScheduledChange(result.rows[0]) : null
+    return result.rows[0] ?? null
   } catch {
     return failUnavailable()
   }
@@ -145,7 +112,7 @@ export async function readScheduledSubscriptionPlanDowngradeForPeriodPostgres(
   subscriberId: string,
   effectiveAt: string,
   includeApplied = true,
-): Promise<ScheduledSubscriptionPlanDowngrade | null> {
+): Promise<ScheduledPlanChangeRow | null> {
   try {
     const result = await pool.query<ScheduledPlanChangePgRow & Record<string, unknown>>(
       `SELECT ${SCHEDULED_CHANGE_COLUMNS}
@@ -158,11 +125,10 @@ export async function readScheduledSubscriptionPlanDowngradeForPeriodPostgres(
     )
     const row = result.rows[0]
     if (!row) return null
-    const change = toScheduledChange(row)
-    if (change.subscriberId !== subscriberId || change.subscriptionId !== subscriptionId) {
+    if (row.subscriber_id !== subscriberId || row.subscription_id !== subscriptionId) {
       throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
     }
-    return change
+    return row
   } catch (error) {
     if (error instanceof SubscriptionRuntimeError) throw error
     return failUnavailable()
