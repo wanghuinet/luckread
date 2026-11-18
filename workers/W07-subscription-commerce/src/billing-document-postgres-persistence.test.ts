@@ -146,7 +146,7 @@ function fixture(options: {
         amount_minor: String(isInvoice ? paymentIdOrAmount : amountOrCurrency),
         currency: String(isInvoice ? amountOrCurrency : currencyOrSnapshot),
         snapshot_json: String(isInvoice ? currencyOrSnapshot : snapshotOrIssuedAt),
-        issued_at: String(isInvoice ? snapshotOrIssuedAt : snapshotOrIssuedAt),
+        issued_at: String(isInvoice ? snapshotOrIssuedAt : maybeIssuedAt),
         created_at: String(isInvoice ? snapshotOrIssuedAt : maybeIssuedAt),
       }
       const existing = state.documents.find((item) => item.document_type === type && item.order_id === ORDER_ID)
