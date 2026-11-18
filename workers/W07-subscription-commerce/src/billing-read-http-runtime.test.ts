@@ -138,34 +138,40 @@ describe('W07 customer billing and payment history reads', () => {
     const f = createFixture();
     const postgresPool = {} as W07WebhookPostgresPool;
     let legacyDatabaseSelections = 0;
-    f.env.D1_04 = {
-      prepare() { throw new Error('D1 must not be used while Neon is selected'); },
-    } as unknown as D1Database;
-    f.env.W07_DATABASE_DRIVER = 'neon';
-    f.dependencies.getPostgresPool = () => postgresPool;
-    f.dependencies.getReadDatabase = () => {
-      legacyDatabaseSelections += 1;
-      throw new Error('Neon billing history must not select the D1 compatibility database');
+    const env = {
+      ...f.env,
+      D1_04: {
+        prepare() { throw new Error('D1 must not be used while Neon is selected'); },
+      } as unknown as D1Database,
+      W07_DATABASE_DRIVER: 'neon',
+    };
+    const dependencies: Dependencies = {
+      ...f.dependencies,
+      getPostgresPool: () => postgresPool,
+      getReadDatabase: () => {
+        legacyDatabaseSelections += 1;
+        throw new Error('Neon billing history must not select the D1 compatibility database');
+      },
     };
 
     const responses = await Promise.all([
       handleCommerceBillingReadRequest(
         new Request('https://luckread-w07.internal/commerce/billing/documents'),
         CUSTOMER_ID,
-        f.env,
-        f.dependencies,
+        env,
+        dependencies,
       ),
       handleCommerceBillingReadRequest(
         new Request('https://luckread-w07.internal/commerce/payments/history'),
         CUSTOMER_ID,
-        f.env,
-        f.dependencies,
+        env,
+        dependencies,
       ),
       handleCommerceBillingReadRequest(
         new Request('https://luckread-w07.internal/commerce/payments/refunds'),
         CUSTOMER_ID,
-        f.env,
-        f.dependencies,
+        env,
+        dependencies,
       ),
     ]);
 
@@ -181,14 +187,17 @@ describe('W07 customer billing and payment history reads', () => {
 
   it('maps persistence validation failures to sanitized responses', async () => {
     const f = createFixture();
-    f.dependencies.listRefundHistory = async () => {
-      throw new Error('database table name and raw SQL must not be exposed');
+    const dependencies: Dependencies = {
+      ...f.dependencies,
+      listRefundHistory: async () => {
+        throw new Error('database table name and raw SQL must not be exposed');
+      },
     };
     const response = await handleCommerceBillingReadRequest(
       new Request('https://luckread-w07.internal/commerce/payments/refunds'),
       CUSTOMER_ID,
       f.env,
-      f.dependencies,
+      dependencies,
     );
     expect(response?.status).toBe(503);
     const body = await response!.text();
