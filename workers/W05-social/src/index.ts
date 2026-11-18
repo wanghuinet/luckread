@@ -345,11 +345,11 @@ export type W05SocialWorkerDependencies = Readonly<{
   profileChannelReadStore?: ProfileChannelReadStore
   /** Optional PostgreSQL-capable content-liker page reader; D1 remains the deployed default. */
   contentLikerReadStore?: ContentLikerReadStore
-  /** Optional PostgreSQL-capable favorite list reader; D1 remains the deployed default. */
+  /** Neon PostgreSQL favorite list reader; route fails closed when missing. */
   favoriteListReadStore?: FavoriteListReadStore
-  /** Optional PostgreSQL-capable Favorite/Unfavorite writer; D1 remains the deployed default. */
+  /** Neon PostgreSQL Favorite/Unfavorite writer; routes fail closed when missing. */
   favoriteMutationStore?: FavoriteMutationStore
-  /** Optional PostgreSQL-capable favorite status reader; D1 remains the deployed default. */
+  /** Neon PostgreSQL favorite status reader; route fails closed when missing. */
   favoriteStatusReadStore?: FavoriteStatusReadStore
   /** Neon PostgreSQL like-status reader; cache misses fail closed when it is not composed. */
   likeStatusReadStore?: LikeStatusReadStore
@@ -1127,8 +1127,9 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         }
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new FavoriteRuntimeError('INVALID_CURSOR', 400)
+        if (!dependencies.favoriteListReadStore) throw new FavoriteRuntimeError('SERVICE_UNAVAILABLE', 503)
         return json({
-          data: await listFavorites(dependencies.favoriteListReadStore ?? env.DB, viewerUserId, cursor, limitText ? Number(limitText) : 20),
+          data: await listFavorites(dependencies.favoriteListReadStore, viewerUserId, cursor, limitText ? Number(limitText) : 20),
           requestId: createRequestId(),
         })
       }
@@ -1154,20 +1155,23 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         }
 
         if (request.method === 'GET') {
+          if (!dependencies.favoriteStatusReadStore) throw new FavoriteRuntimeError('SERVICE_UNAVAILABLE', 503)
           return json({
-            data: await getFavoriteStatus(dependencies.favoriteStatusReadStore ?? env.DB, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
+            data: await getFavoriteStatus(dependencies.favoriteStatusReadStore, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
             requestId: createRequestId(),
           })
         }
 
         if (request.method === 'POST') {
+          if (!dependencies.favoriteMutationStore) throw new FavoriteRuntimeError('SERVICE_UNAVAILABLE', 503)
           return json({
-            data: await favorite(dependencies.favoriteMutationStore ?? env.DB, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
+            data: await favorite(dependencies.favoriteMutationStore, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
             requestId: createRequestId(),
           })
         }
 
-        await unfavorite(dependencies.favoriteMutationStore ?? env.DB, viewerUserId, target)
+        if (!dependencies.favoriteMutationStore) throw new FavoriteRuntimeError('SERVICE_UNAVAILABLE', 503)
+        await unfavorite(dependencies.favoriteMutationStore, viewerUserId, target)
         return new Response(null, { status: 204 })
       }
 

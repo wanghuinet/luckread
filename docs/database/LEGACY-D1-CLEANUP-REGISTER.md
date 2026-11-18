@@ -165,3 +165,12 @@
 - The existing Neon runtime composes `createPostgresLikeMutationStore` and `createPostgresLikeTargetContextReadStore`; this slice makes those ports mandatory at the route/runtime boundary.
 - Preserved W03 published-content validation, published-comment target projection, bidirectional Block preflight, final PostgreSQL guarded insert (content owner and comment author plus W03 parent owner), idempotent actor-scoped mutation, sanitized errors, and viewer/aggregate cache invalidation.
 - Scope: W05 Like business slice only. No production database, schema, Hyperdrive binding, Worker deployment, or traffic change.
+
+
+## W05 Favorite / Unfavorite and Favorite Status / List
+
+- Removed `FavoriteMutationD1Executor` / `createD1FavoriteMutationStore`, `FavoriteStatusD1QueryExecutor` / `createD1FavoriteStatusReadStore`, and `FavoriteListD1QueryExecutor` / `createD1FavoriteListReadStore`.
+- Favorite runtime APIs now accept only explicit Store contracts. The HTTP routes require Neon PostgreSQL mutation/status/list Stores and return sanitized 503 if required composition is missing; no `env.DB` fallback remains for this business slice.
+- Existing PostgreSQL Stores remain the runtime composition: `createPostgresFavoriteMutationStore`, `createPostgresFavoriteStatusReadStore`, and `createPostgresFavoriteListReadStore`.
+- Preserved W03 published-content validation, actor-scoped idempotency, favorite-status cache revalidation/invalidation, bounded keyset pagination and microsecond cursor precision, and sanitized adapter failures.
+- Scope: W05 Favorite business slice only. No production database/schema, Hyperdrive binding, Worker deployment, or traffic change.
