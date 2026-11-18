@@ -353,9 +353,9 @@ export type W05SocialWorkerDependencies = Readonly<{
   favoriteStatusReadStore?: FavoriteStatusReadStore
   /** PostgreSQL like-status reader; GET requests fail closed when absent. */
   likeStatusReadStore?: LikeStatusReadStore
-  /** PostgreSQL comment-context and bidirectional Block reader; GET requests fail closed when absent. */
+  /** PostgreSQL comment-context and bidirectional Block reader; Like GET/POST routes fail closed when absent. */
   likeTargetContextReadStore?: LikeTargetContextReadStore
-  /** Optional PostgreSQL-capable Like/Unlike mutation store; D1 remains the deployed default. */
+  /** PostgreSQL Like/Unlike writer; mutation routes fail closed when absent. */
   likeMutationStore?: LikeMutationStore
 }>
 
@@ -1211,11 +1211,14 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
 
         if (request.method === 'POST') {
           const correlationId = request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
+          const mutationStore = dependencies.likeMutationStore
+          const targetContextReadStore = dependencies.likeTargetContextReadStore
+          if (!mutationStore || !targetContextReadStore) throw new LikeRuntimeError('SERVICE_UNAVAILABLE', 503)
           const publishedContentContext = target.targetType === 'content'
             ? await fetchPublishedContentSocialContext(env.W03_CONTENT, { contentId: target.targetId, correlationId })
             : undefined
           if (target.targetType === 'comment') requireCommentNotificationContextStore(dependencies.commentNotificationContextStore)
-          const result = await like(env.DB, env.W03_CONTENT, viewerUserId, target, correlationId, publishedContentContext, dependencies.likeMutationStore, dependencies.likeTargetContextReadStore)
+          const result = await like(env.W03_CONTENT, viewerUserId, target, correlationId, publishedContentContext, mutationStore, targetContextReadStore)
           const notificationContext = publishedContentContext
             ? { recipientUserId: publishedContentContext.ownerUserId, contentId: null }
             : await getInteractionNotificationContext(
@@ -1237,7 +1240,9 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           }
           return json({ data: result, requestId: createRequestId() }, 200)
         }
-        await unlike(env.DB, viewerUserId, target, dependencies.likeMutationStore)
+        const mutationStore = dependencies.likeMutationStore
+        if (!mutationStore) throw new LikeRuntimeError('SERVICE_UNAVAILABLE', 503)
+        await unlike(viewerUserId, target, mutationStore)
         return new Response(null, { status: 204 })
       }
 
