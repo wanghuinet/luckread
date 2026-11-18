@@ -1,4 +1,3 @@
-/// <reference types="@cloudflare/workers-types" />
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -56,18 +55,6 @@ const makeLikeMutationStore = (row: {
   create: vi.fn(async () => row),
   remove: vi.fn(async () => undefined),
 })
-
-const db = (firstResults: unknown[] = []) => {
-  let firstIndex = 0
-  const prepare = vi.fn((sql: string) => ({
-    bind: vi.fn((...args: unknown[]) => ({
-      first: vi.fn(async () => firstResults[firstIndex++] ?? null),
-      run: vi.fn(async () => ({ sql, args })),
-    })),
-  }))
-  return { prepare } as unknown as D1Database
-}
-
 
 describe('like runtime', () => {
   it('invalidates aggregate cache on like/unlike mutations', () => {
@@ -556,16 +543,11 @@ describe('like runtime', () => {
       create: vi.fn(async () => null),
       remove: vi.fn(async () => undefined),
     }
-    const database = db()
-
     await expect(unlike(
-      database,
       'user-1',
       { targetType: 'comment', targetId: 'comment-1' },
       mutationStore,
     )).resolves.toBeUndefined()
-
-    expect(database.prepare).not.toHaveBeenCalled()
     expect(mutationStore.remove).toHaveBeenCalledWith({
       actorUserId: 'user-1',
       targetType: 'comment',
@@ -575,7 +557,6 @@ describe('like runtime', () => {
   })
 
   it('uses an injected target context store for comment visibility and bidirectional Block preflight', async () => {
-    const database = db()
     const targetContextStore: LikeTargetContextReadStore = {
       readCommentTarget: vi.fn(async () => ({
         id: 'comment-1',
@@ -597,7 +578,6 @@ describe('like runtime', () => {
     }
 
     await expect(like(
-      database,
       publishedContextBinding('content-owner'),
       'user-1',
       { targetType: 'comment', targetId: 'comment-1' },
@@ -606,8 +586,6 @@ describe('like runtime', () => {
       mutationStore,
       targetContextStore,
     )).resolves.toMatchObject({ relationshipId: 'like-pg-context' })
-
-    expect(database.prepare).not.toHaveBeenCalled()
     expect(targetContextStore.readCommentTarget).toHaveBeenCalledWith('comment-1')
     expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith(
       'user-1',
@@ -626,7 +604,6 @@ describe('like runtime', () => {
       readCommentTarget: vi.fn(async () => null),
       hasBidirectionalBlock: vi.fn(async () => true),
     }
-    const database = db()
     await expect(getLikeStatus(
       publishedContextBinding(),
       'user-1',
@@ -636,29 +613,24 @@ describe('like runtime', () => {
       blockedContextStore,
     )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
     expect(statusStore.read).not.toHaveBeenCalled()
-    expect(database.prepare).not.toHaveBeenCalled()
 
     const failedContextStore: LikeTargetContextReadStore = {
       readCommentTarget: vi.fn(async () => { throw new Error('provider credentials leaked') }),
       hasBidirectionalBlock: vi.fn(async () => false),
     }
     await expect(like(
-      database,
       publishedContextBinding(),
       'user-1',
       { targetType: 'comment', targetId: 'comment-1' },
       correlationId,
       undefined,
-      {
-        create: vi.fn(async () => null),
-        remove: vi.fn(async () => undefined),
-      },
+      makeLikeMutationStore(),
       failedContextStore,
     )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
   })
 
   it('rejects invalid actor ids', async () => {
-    await expect(like(db(), undefined, '', { targetType: 'content', targetId: 'content-1' }, correlationId)).rejects.toMatchObject({
+    await expect(like(undefined, '', { targetType: 'content', targetId: 'content-1' }, correlationId, undefined, makeLikeMutationStore(), makeLikeTargetContextStore())).rejects.toMatchObject({
       code: 'UNAUTHENTICATED',
       status: 401,
     })
