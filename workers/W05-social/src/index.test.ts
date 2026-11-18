@@ -189,28 +189,31 @@ describe('W05 Follow/Unfollow PostgreSQL runtime injection', () => {
     expect(d1Prepare).toHaveBeenCalledTimes(callsBeforeUnfollow)
   })
 
-  it('keeps the D1 FollowStore as the default when no provider store is injected', async () => {
-    const statements: string[] = []
-    const prepare = vi.fn((sql: string) => {
-      statements.push(sql)
-      return {
-        bind: vi.fn(() => ({
-          run: vi.fn(async () => ({ meta: { changes: 1 } })),
-        })),
-      }
-    })
-    const response = await worker.fetch(
+  it('fails closed for Follow and Unfollow without the Neon Store and never touches D1', async () => {
+    const prepare = vi.fn(() => { throw new Error('D1 must not be used for Follow/Unfollow') })
+    const env = { DB: { prepare } as unknown as D1Database }
+    const post = await worker.fetch(
+      requestWithMethod('/internal/social/follows/target-1', 'POST', {
+        ...transportHeaders,
+        'X-LuckRead-Principal-Layer': 'L2',
+        'Idempotency-Key': 'missing-store-follow',
+      }),
+      env,
+      {} as never,
+    )
+    const del = await worker.fetch(
       requestWithMethod('/internal/social/follows/target-1', 'DELETE', {
         ...transportHeaders,
         'X-LuckRead-Principal-Layer': 'L2',
-        'Idempotency-Key': 'd1-unfollow-1',
+        'Idempotency-Key': 'missing-store-unfollow',
       }),
-      { DB: { prepare } as unknown as D1Database },
+      env,
       {} as never,
     )
-    expect(response.status).toBe(204)
-    expect(statements).toHaveLength(1)
-    expect(statements[0]).toContain('DELETE FROM social_follow_relationships')
+    expect(post.status).toBe(503)
+    expect(del.status).toBe(503)
+    await expect(post.json()).resolves.toMatchObject({ error: { code: 'SERVICE_UNAVAILABLE' } })
+    expect(prepare).not.toHaveBeenCalled()
   })
 })
 
