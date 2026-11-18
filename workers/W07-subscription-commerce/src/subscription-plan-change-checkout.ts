@@ -421,7 +421,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
   }
 
   const preview = await previewSubscriptionPlanChange(
-    env.D1_01, subscriberId, subscriptionId, targetPlanId, { now: () => nowDate },
+    getW07MembershipPostgresPool(env) ?? env.D1_01, subscriberId, subscriptionId, targetPlanId, { now: () => nowDate },
   );
   if (preview.changeType !== 'UPGRADE' || !preview.paymentRequired || preview.prorationBaseMinor <= 0) {
     throw new SubscriptionRuntimeError('INVALID_STATE', 409);
