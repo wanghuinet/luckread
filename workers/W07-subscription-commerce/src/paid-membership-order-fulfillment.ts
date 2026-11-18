@@ -664,7 +664,7 @@ function isAppliedUpgradeSubscription(
 }
 
 async function markUpgradeApplied(
-  db: D1Database,
+  db: FulfillmentDatabase,
   attempt: UpgradeAttemptRow,
   change: SubscriptionPlanUpgradeSnapshot,
   orderId: string,
@@ -674,6 +674,28 @@ async function markUpgradeApplied(
 ): Promise<boolean> {
   const entitlementRef = 'commerce-plan-upgrade:' + orderId + ':line:' + lineId;
   try {
+    if (isPostgresFulfillmentDatabase(db)) {
+      const result = await db.query<{ attempt_id: string } & Record<string, unknown>>(
+        "UPDATE membership_subscription_plan_change_attempts SET status = 'APPLIED', applied_at = $1::timestamptz, " +
+        'applied_subscription_version = $2, updated_at = $3::timestamptz, version = version + 1 ' +
+        "WHERE attempt_id = $4 AND subscriber_id = $5 AND subscription_id = $6 AND order_id = $7 AND status = 'PENDING_PAYMENT' " +
+        'AND expected_subscription_version = $8 AND expected_plan_id = $9 AND expected_plan_version = $10 ' +
+        'AND target_plan_id = $11 AND target_plan_version = $12 AND current_period_start = $13::timestamptz ' +
+        'AND current_period_end = $14::timestamptz AND expires_at >= $15::timestamptz ' +
+        'AND EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = $16 AND s.subscriber_id = $17 ' +
+        'AND s.plan_id = $18 AND s.plan_version = $19 AND s.version = $20 AND s.entitlement_snapshot_ref = $21) ' +
+        'RETURNING attempt_id',
+        [
+          appliedAt, change.expectedSubscriptionVersion + 1, updatedAt,
+          attempt.attempt_id, change.subscriberId, change.subscriptionId, orderId,
+          change.expectedSubscriptionVersion, change.expectedPlanId, change.expectedPlanVersion,
+          change.targetPlanId, change.targetPlanVersion, change.currentPeriodStart, change.currentPeriodEnd, appliedAt,
+          change.subscriptionId, change.subscriberId, change.targetPlanId, change.targetPlanVersion,
+          change.expectedSubscriptionVersion + 1, entitlementRef,
+        ],
+      )
+      return result.rows.length === 1
+    }
     const result = await db.prepare(
       "UPDATE membership_subscription_plan_change_attempts SET status = 'APPLIED', applied_at = ?, " +
       'applied_subscription_version = ?, updated_at = ?, version = version + 1 ' +
@@ -695,7 +717,6 @@ async function markUpgradeApplied(
     return failClosed();
   }
 }
-
 /**
  * Applies an already-paid upgrade against the existing subscription. Order and
  * Payment remain in D1-04; only plan identity, opaque order reference and CAS
