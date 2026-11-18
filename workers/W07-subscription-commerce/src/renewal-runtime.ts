@@ -754,7 +754,7 @@ export async function scanDueSubscriptionRenewals(
         cycleIds.push(cycle.cycle_id);
       } else if (cycle.state === 'AWAITING_MANDATE') {
         const activeMandate = await readActiveMandate(
-          env.D1_04, String(config.expectedMerchantId), cycle.subscriber_id,
+          getW07RenewalCycleStore(env), String(config.expectedMerchantId), cycle.subscriber_id,
         );
         if (activeMandate) cycleIds.push(cycle.cycle_id);
       } else if (cycle.state === 'FAILED' &&
