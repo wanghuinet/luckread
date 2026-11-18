@@ -1058,22 +1058,14 @@ describe('W05 social query transport', () => {
   })
 
 
-  it('lists the authenticated viewer favorite IDs with an opaque bounded cursor', async () => {
+  it('fails closed when favorite list Store composition is missing', async () => {
+    const db = dbFor()
     const response = await worker.fetch(
       request('/internal/social/interactions/bookmarks/list?limit=1', transportHeaders),
-      { DB: dbFor([
-        { relationship_id: 'favorite-1', target_id: 'content-1', created_at: '2026-10-03T00:00:00.000Z' },
-        { relationship_id: 'favorite-2', target_id: 'content-2', created_at: '2026-10-02T00:00:00.000Z' },
-      ]) },
+      { DB: db },
     )
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: {
-        items: [{ targetId: 'content-1', createdAt: '2026-10-03T00:00:00.000Z' }],
-        hasMore: true,
-        nextCursor: expect.any(String),
-      },
-    })
+    expect(response.status).toBe(503)
+    expect((db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
   it('uses the injected PostgreSQL-capable favorite list store without touching D1', async () => {
