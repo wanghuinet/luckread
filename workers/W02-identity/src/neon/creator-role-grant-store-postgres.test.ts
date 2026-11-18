@@ -18,7 +18,7 @@ vi.mock('./role-assignment-postgres.js', () => {
   }
 })
 
-import { RoleAssignmentCommandError, type CreatorRoleGrantCommand } from '../authz/role-assignment-command.js'
+import type { CreatorRoleGrantCommand } from '../authz/role-assignment-command.js'
 import { RoleAssignmentPostgresError } from './role-assignment-postgres.js'
 import { createPostgresCreatorRoleGrantStore } from './creator-role-grant-store-postgres.js'
 
