@@ -40,6 +40,23 @@ import type { OrderCreatePersistenceStore } from './order-persistence.js';
 import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import {
+  getW07RenewalCycleStore,
+  isPostgresRenewalCycleStore,
+  readRenewalCycleByIdPostgres,
+  readRenewalCycleByPeriodPostgres,
+  readRenewalSchedulerCursorPostgres,
+  writeRenewalSchedulerCursorPostgres,
+  insertRenewalCyclePostgres,
+  updateRenewalCyclePostgres,
+  transitionRenewalCycleToPaymentReadyPostgres,
+  acquireRenewalSubmissionLeasePostgres,
+  retryFailedRenewalCyclePostgres,
+  type RenewalCycleRow,
+  type RenewalCycleState,
+  type RenewalCycleStore,
+  type RenewalCursorRow,
+} from './renewal-cycle-postgres.js';
+import {
   readDueRenewalMembershipsPostgres,
   readRenewalChargeSubscriptionPostgres,
   type RenewalMembershipCandidateRow,
@@ -51,17 +68,6 @@ type RenewalMembershipStore = D1Database | W07WebhookPostgresPool;
 function isPostgresRenewalMembershipStore(store: RenewalMembershipStore): store is W07WebhookPostgresPool {
   return typeof (store as W07WebhookPostgresPool).query === 'function';
 }
-
-export type RenewalCycleState =
-  | 'AWAITING_PRICING'
-  | 'AWAITING_MANDATE'
-  | 'PREPARED'
-  | 'PAYMENT_READY'
-  | 'SUBMITTING'
-  | 'SUBMITTED'
-  | 'SUCCEEDED'
-  | 'FAILED'
-  | 'RECONCILIATION_REQUIRED';
 
 export class RenewalRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) {
@@ -93,47 +99,6 @@ type RenewalOfferSnapshot = Readonly<{
   currency: string;
   benefits: string[];
 }>;
-
-type RenewalCycleRow = {
-  cycle_id: string;
-  provider: 'hyperswitch';
-  merchant_id: string;
-  subscription_id: string;
-  subscriber_id: string;
-  plan_id: string;
-  plan_version: number;
-  cycle_start: string;
-  cycle_end: string;
-  billing_interval: 'MONTHLY' | 'YEARLY';
-  currency: string;
-  offer_snapshot_json: string;
-  amount_minor: number | null;
-  pricing_snapshot_json: string | null;
-  payment_method_id: string | null;
-  mandate_record_id: string | null;
-  order_id: string | null;
-  payment_id: string | null;
-  state: RenewalCycleState;
-  subscription_sync_state: 'PENDING' | 'APPLIED' | 'RECONCILIATION_REQUIRED';
-  subscription_sync_updated_at: string | null;
-  subscription_sync_error_code: string | null;
-  attempt_number: number;
-  provider_response_status: HyperswitchPaymentStatus | null;
-  outcome_code: string | null;
-  lease_token: string | null;
-  lease_expires_at: string | null;
-  version: number;
-  created_at: string;
-  updated_at: string;
-};
-
-type RenewalCursorRow = {
-  state_id: 'subscription-renewals';
-  cursor_period_end: string | null;
-  cursor_subscription_id: string | null;
-  version: number;
-  updated_at: string;
-};
 
 type ActiveMandateRow = Readonly<{
   mandate_record_id: string;
@@ -382,7 +347,17 @@ function normalizePricingDecision(
   return { pricing, totalMinor: total };
 }
 
-async function readCycleById(db: D1Database, cycleId: string): Promise<RenewalCycleRow> {
+async function readCycleById(db: RenewalCycleStore, cycleId: string): Promise<RenewalCycleRow> {
+  if (isPostgresRenewalCycleStore(db)) {
+    try {
+      const row = await readRenewalCycleByIdPostgres(db, cycleId);
+      if (!row) throw new RenewalRuntimeError('RESOURCE_NOT_FOUND', 404);
+      return row;
+    } catch (error) {
+      if (error instanceof RenewalRuntimeError) throw error;
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+  }
   const row = await db.prepare(
     'SELECT * FROM subscription_renewal_cycles WHERE cycle_id = ? LIMIT 1',
   ).bind(cycleId).first<RenewalCycleRow>();
@@ -391,10 +366,17 @@ async function readCycleById(db: D1Database, cycleId: string): Promise<RenewalCy
 }
 
 async function readCycleByPeriod(
-  db: D1Database,
+  db: RenewalCycleStore,
   subscriptionId: string,
   cycleStart: string,
 ): Promise<RenewalCycleRow | null> {
+  if (isPostgresRenewalCycleStore(db)) {
+    try {
+      return await readRenewalCycleByPeriodPostgres(db, subscriptionId, cycleStart);
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+  }
   return db.prepare(
     'SELECT * FROM subscription_renewal_cycles WHERE subscription_id = ? AND cycle_start = ? LIMIT 1',
   ).bind(subscriptionId, cycleStart).first<RenewalCycleRow>();
@@ -431,19 +413,29 @@ async function isExactMandateActive(db: D1Database, cycle: RenewalCycleRow): Pro
 }
 
 async function updateCycle(
-  db: D1Database,
+  db: RenewalCycleStore,
   cycle: RenewalCycleRow,
   now: string,
   assignments: string,
   values: unknown[],
 ): Promise<RenewalCycleRow> {
+  const updatedAt = strictlyAfter(now, cycle.updated_at);
+  if (isPostgresRenewalCycleStore(db)) {
+    try {
+      const updated = await updateRenewalCyclePostgres(db, cycle, updatedAt, assignments, values);
+      if (!updated) throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+      return updated;
+    } catch (error) {
+      if (error instanceof RenewalRuntimeError) throw error;
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+  }
   const result = await db.prepare(
     'UPDATE subscription_renewal_cycles SET ' + assignments +
     ', version = version + 1, updated_at = ? WHERE cycle_id = ? AND version = ?',
-  ).bind(...values, strictlyAfter(now, cycle.updated_at), cycle.cycle_id, cycle.version).run();
+  ).bind(...values, updatedAt, cycle.cycle_id, cycle.version).run();
   if (Number(result.meta?.changes ?? 0) === 1) return readCycleById(db, cycle.cycle_id);
-  const raced = await readCycleById(db, cycle.cycle_id);
-  return raced;
+  return readCycleById(db, cycle.cycle_id);
 }
 
 async function insertOrReadCycle(
