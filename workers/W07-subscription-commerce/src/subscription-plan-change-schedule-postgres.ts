@@ -3,7 +3,6 @@ import { SubscriptionRuntimeError } from './subscription-runtime.js'
 import type {
   ScheduledPlanChangeRow,
   ScheduledSubscriptionPlanDowngrade,
-  ScheduledSubscriptionPlanDowngradeResult,
 } from './subscription-plan-change-schedule.js'
 
 type ScheduledPlanChangePgRow = ScheduledPlanChangeRow & Readonly<{
@@ -26,7 +25,7 @@ type ScheduledPlanChangePgRow = ScheduledPlanChangeRow & Readonly<{
   version: number
 }>
 
-type ScheduleTargetPlan = Readonly<{
+export type ScheduleTargetPlan = Readonly<{
   planId: string
   planVersion: number
   name: string
@@ -55,7 +54,6 @@ type InsertScheduledPlanChangeInput = Readonly<{
   currentPeriodEnd: string
 }>
 
-const CHANGE_ID_PATTERN = /^sudc_[a-f0-9]{64}$/
 const PLAN_ID_PATTERN = /^plan_[a-f0-9]{64}$/
 
 function failUnavailable(): never {
@@ -65,11 +63,6 @@ function failUnavailable(): never {
 function isBoundedText(value: unknown, max = 256): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= max &&
     value.trim() === value && !/[\u0000-\u001f\u007f]/.test(value)
-}
-
-function isCanonicalUtc(value: unknown): value is string {
-  return typeof value === 'string' && value.length <= 64 &&
-    Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value
 }
 
 
@@ -254,24 +247,5 @@ export async function insertScheduledPlanChangePostgres(
       : ''
     if (code === '23505') throw new SubscriptionRuntimeError('CONFLICT', 409)
     return failUnavailable()
-  }
-}
-
-export function scheduledPlanChangeResultFromRow(
-  change: ScheduledSubscriptionPlanDowngrade,
-  subscriptionId: string,
-  replayed: boolean,
-): ScheduledSubscriptionPlanDowngradeResult {
-  if (change.subscriptionId !== subscriptionId) throw new SubscriptionRuntimeError('CONFLICT', 409)
-  return {
-    changeId: change.changeId,
-    subscriptionId,
-    status: change.status === 'APPLIED' ? 'APPLIED' : 'SCHEDULED',
-    changeType: change.changeType,
-    currentPlanId: change.expectedPlanId,
-    targetPlanId: change.targetPlanId,
-    targetPlanVersion: change.targetPlanVersion,
-    effectiveAt: change.effectiveAt,
-    replayed,
   }
 }
