@@ -32,7 +32,7 @@ import {
 } from './subscription-plan-change-schedule.js';
 import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
 
-type PlanChangeAttemptRow = Readonly<{
+export type PlanChangeAttemptRow = Readonly<{
   attempt_id: string;
   subscriber_id: string;
   subscription_id: string;
