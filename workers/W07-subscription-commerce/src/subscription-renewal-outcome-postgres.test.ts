@@ -85,10 +85,10 @@ function postgresPool(
     }),
     release: vi.fn(),
   } as unknown as W07WebhookPostgresClient
-  const pool: W07WebhookPostgresPool = {
+  const pool = {
     query,
     connect: vi.fn(async () => client),
-  }
+  } as unknown as W07WebhookPostgresPool
   return { pool, query, client, transactionCalls }
 }
 
