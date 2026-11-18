@@ -12,11 +12,24 @@ import {
   previewSubscriptionPlanChange,
   type SubscriptionPlanChangePreview,
 } from './subscription-plan-change-preview.js';
+import {
+  getW07MembershipPostgresPool,
+  resolveW07MembershipDatabaseDriver,
+  type W07MembershipDatabaseRuntimeEnv,
+} from './neon/membership-database-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
+import {
+  hasPendingScheduledPlanDowngradePostgres,
+  insertScheduledPlanChangePostgres,
+  readScheduledChangeByIdempotencyPostgres,
+  readScheduledDowngradeTargetPlanPostgres,
+  readScheduledSubscriptionPlanDowngradeForPeriodPostgres,
+} from './subscription-plan-change-schedule-postgres.js';
 
 const PLAN_ID_PATTERN = /^plan_[a-f0-9]{64}$/;
 const CHANGE_ID_PATTERN = /^sudc_[a-f0-9]{64}$/;
 
-type ScheduledPlanChangeRow = Readonly<{
+export type ScheduledPlanChangeRow = Readonly<{
   change_id: string;
   subscriber_id: string;
   subscription_id: string;
@@ -64,8 +77,21 @@ export type ScheduledSubscriptionPlanDowngradeResult = Readonly<{
   replayed: boolean;
 }>;
 
-export type ScheduledPlanDowngradeEnv = Readonly<{ D1_01: D1Database }>;
+export type ScheduledPlanDowngradeEnv = Readonly<{ D1_01: D1Database }> & W07MembershipDatabaseRuntimeEnv;
 export type ScheduledPlanDowngradeDependencies = Readonly<{ now?: () => Date }>;
+
+function selectedScheduledPlanStore(env: ScheduledPlanDowngradeEnv): D1Database | W07WebhookPostgresPool {
+  if (resolveW07MembershipDatabaseDriver(env) === 'd1') return env.D1_01;
+  const pool = getW07MembershipPostgresPool(env);
+  if (!pool) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+  return pool;
+}
+
+function isPostgresScheduledPlanStore(
+  value: D1Database | W07WebhookPostgresPool,
+): value is W07WebhookPostgresPool {
+  return typeof (value as W07WebhookPostgresPool).query === 'function';
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value) &&
@@ -126,10 +152,13 @@ function toScheduledChange(row: ScheduledPlanChangeRow): ScheduledSubscriptionPl
 }
 
 async function readScheduledChangeByIdempotency(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   subscriberId: string,
   keyHash: string,
 ): Promise<ScheduledPlanChangeRow | null> {
+  if (isPostgresScheduledPlanStore(db)) {
+    return readScheduledChangeByIdempotencyPostgres(db, subscriberId, keyHash);
+  }
   try {
     return await db.prepare(
       'SELECT change_id, subscriber_id, subscription_id, change_type, expected_subscription_version, expected_plan_id, ' +
@@ -160,12 +189,23 @@ async function readScheduledChangeByIdempotency(
 }
 
 export async function readScheduledSubscriptionPlanDowngradeForPeriod(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   subscriptionId: string,
   subscriberId: string,
   effectiveAt: string,
   includeApplied = true,
 ): Promise<ScheduledSubscriptionPlanDowngrade | null> {
+  if (isPostgresScheduledPlanStore(db)) {
+    const postgresRow = await readScheduledSubscriptionPlanDowngradeForPeriodPostgres(
+      db, subscriptionId, subscriberId, effectiveAt, includeApplied,
+    );
+    if (!postgresRow) return null;
+    const change = toScheduledChange(postgresRow);
+    if (change.subscriberId !== subscriberId || change.subscriptionId !== subscriptionId) {
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+    }
+    return change;
+  }
   let row: ScheduledPlanChangeRow | null;
   try {
     row = await db.prepare(
@@ -218,9 +258,12 @@ export async function readScheduledSubscriptionPlanDowngradeForPeriod(
 
 /** Returns true while a period-end downgrade is scheduled and not yet applied. */
 export async function hasPendingScheduledPlanDowngrade(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   subscriptionId: string,
 ): Promise<boolean> {
+  if (isPostgresScheduledPlanStore(db)) {
+    return hasPendingScheduledPlanDowngradePostgres(db, subscriptionId);
+  }
   try {
     const row = await db.prepare(
       "SELECT change_id FROM membership_subscription_scheduled_plan_changes WHERE subscription_id = ? " +
@@ -235,9 +278,12 @@ export async function hasPendingScheduledPlanDowngrade(
   }
 }
 export async function readScheduledDowngradeTargetPlan(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   change: ScheduledSubscriptionPlanDowngrade,
 ): Promise<Readonly<{
+  if (isPostgresScheduledPlanStore(db)) {
+    return readScheduledDowngradeTargetPlanPostgres(db, change);
+  }
   planId: string;
   planVersion: number;
   name: string;
@@ -332,7 +378,8 @@ async function scheduleSubscriptionPlanChange(
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
   const now = nowDate.toISOString();
-  const existing = await readScheduledChangeByIdempotency(env.D1_01, subscriberId, keyDigest);
+  const membershipStore = selectedScheduledPlanStore(env);
+  const existing = await readScheduledChangeByIdempotency(membershipStore, subscriberId, keyDigest);
   if (existing) {
     const change = toScheduledChange(existing);
     if (change.subscriptionId !== subscriptionId || change.targetPlanId !== targetPlanId ||
