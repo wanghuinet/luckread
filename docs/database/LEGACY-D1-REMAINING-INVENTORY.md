@@ -55,7 +55,7 @@ Search-index results can lag behind `main`; file-level decisions are based on re
 | #1940 | W02 RoleLayerStore D1 adapter removal | Merged |
 | #1941 | W05 orphaned D1-only helper/test cleanup | Merged |
 | #1942 | W05 push endpoint D1 fallback removal (W09-owned Neon D1-03 executor) | Merged |
-| Current slice | W02 RegistrationRollbackStore D1 adapter/test fixture removal | PR pending |
+| #1944 | W02 RegistrationRollbackStore D1 adapter/test fixture removal | Open; CI/review pending at inventory update |
 | #1939 | W02 PrincipalAuthorityStore D1 adapter removal | Merged |
 | #1940 | W02 RoleLayerStore D1 adapter removal | Merged |
 
