@@ -82,8 +82,8 @@ function receiptResponse(
   pendingRecovery?: RenewalPendingRecoveryResult,
   purchaseFulfillment?: PaidMembershipPurchaseFulfillmentResult,
 ): Response {
-  // D1-04 receipt application and D1-01 subscription synchronization are a
-  // retryable saga. A durable receipt can be acknowledged as 202 when the
+  // Neon finance receipt application and membership subscription synchronization form a
+  // retryable cross-domain saga. A durable receipt can be acknowledged as 202 when the
   // entitlement-affecting Subscription state or bounded recovery batch needs work.
   const subscriptionSyncNeedsWork = subscriptionSync?.outcome === 'RECONCILIATION_REQUIRED' ||
     subscriptionSync?.outcome === 'PENDING_RETRY';
