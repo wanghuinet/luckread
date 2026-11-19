@@ -43,6 +43,7 @@ const successKey = marker + '-decision-idempotency'
 const checks = {
   selectsNeonWorkerEntryWithNoD1Binding: false,
   decisionRequestPassesW01AndCASLHeaders: false,
+  caseDetailReadUsesNativePostgresStore: false,
   postgresDecisionAndAuditCommitted: false,
   enforcementOutboxDelivered: false,
   sameKeyReplayReturnsStoredDecision: false,
@@ -51,6 +52,25 @@ const checks = {
 }
 let passed = false
 let failure
+
+function caseDetailRequest(caseId, requestIdValue) {
+  return new Request('https://w06.internal/admin/moderation/cases/' + encodeURIComponent(caseId), {
+    headers: {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Principal-User-Id': reviewerId,
+      'X-LuckRead-Principal-Layer': 'L6',
+      'X-LuckRead-Correlation-Id': correlationId,
+      'X-LuckRead-Request-Id': requestIdValue,
+      'X-LuckRead-Authz-Decision': 'ALLOW',
+      'X-LuckRead-Authz-Permission': 'moderation.case.read',
+      'X-LuckRead-Authz-Resource-Type': 'ModerationCase',
+      'X-LuckRead-Authz-Policy-Version': 'casl-l0-l8-v1',
+      'X-LuckRead-Authz-Subject-Id': reviewerId,
+      'X-LuckRead-Authz-Layer': 'L6',
+    },
+  })
+}
 
 function decisionRequest(caseId, key, requestIdValue) {
   return new Request('https://w06.internal/admin/moderation/cases/' + encodeURIComponent(caseId) + '/decision', {
@@ -157,6 +177,25 @@ try {
   assert.equal(first.version, 2)
   assert.equal(typeof first.decisionId, 'string')
   checks.decisionRequestPassesW01AndCASLHeaders = true
+
+  const detailResponse = await worker.fetch(
+    caseDetailRequest(successfulCaseId, 'req_' + randomUUID().replaceAll('-', '')),
+    env,
+  )
+  assert.equal(detailResponse.status, 200)
+  const detail = await detailResponse.json()
+  assert.equal(detail.caseId, successfulCaseId)
+  assert.equal(detail.status, 'ACTION_TAKEN')
+  assert.equal(detail.version, 2)
+  assert.deepEqual(detail.currentDecision, {
+    decisionId: first.decisionId,
+    outcome: 'APPROVED',
+    policyVersion: 'moderation-v1',
+    effectiveAt: detail.currentDecision.effectiveAt,
+  })
+  assert.equal(typeof detail.currentDecision.effectiveAt, 'string')
+  assert.match(detail.currentDecision.effectiveAt, /\\.\\d{6}Z$/)
+  checks.caseDetailReadUsesNativePostgresStore = true
 
   const caseRows = await pool.query(
     'SELECT state, version::int AS version, current_decision_id FROM moderation_cases WHERE case_id = $1',
