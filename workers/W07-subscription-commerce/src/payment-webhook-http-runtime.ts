@@ -16,7 +16,6 @@ import {
   type PaidMembershipPurchaseFulfillmentResult,
 } from './paid-membership-order-fulfillment.js';
 import { issueReceiptForPaidPayment } from './billing-persistence.js';
-import { expirePendingSubscriptionPlanUpgradeForPayment } from './subscription-plan-change-checkout.js';
 import {
   getW07MembershipPostgresPool,
   type W07MembershipDatabaseRuntimeEnv,
@@ -34,7 +33,6 @@ import { issueReceiptForPaidPaymentPostgres } from './billing-document-postgres-
 import { expirePendingSubscriptionPlanUpgradeForPaymentPostgres } from './subscription-plan-upgrade-expiry-postgres.js';
 
 type HyperswitchWebhookRuntimeEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{
-  D1_01: D1Database;
   D1_04: D1Database;
   W06_GOVERNANCE?: Fetcher;
   HYPERSWITCH_WEBHOOK_SECRET?: string | null;
@@ -58,17 +56,16 @@ type HyperswitchWebhookRuntimeDependencies = Readonly<{
   receiveMandateWebhookPostgres?: typeof receiveHyperswitchMandateWebhookPostgres;
   issueReceiptPostgres?: typeof issueReceiptForPaidPaymentPostgres;
   syncRenewalOutcome?: (
-    env: Readonly<{ D1_01: D1Database; D1_04: D1Database }>,
+    env: Readonly<{ D1_04: D1Database }>,
     paymentId: string,
     merchantId: string,
   ) => Promise<RenewalOutcomeSyncResult>;
   syncPendingOutcomes?: (
-    env: Readonly<{ D1_01: D1Database; D1_04: D1Database }>,
+    env: Readonly<{ D1_04: D1Database }>,
     options?: Readonly<{ limit?: number }>,
   ) => Promise<RenewalPendingRecoveryResult>;
   fulfillPaidOrder?: typeof fulfillPaidMembershipOrder;
   issueReceipt?: typeof issueReceiptForPaidPayment;
-  expirePendingPlanUpgrade?: typeof expirePendingSubscriptionPlanUpgradeForPayment;
   expirePendingPlanUpgradePostgres?: typeof expirePendingSubscriptionPlanUpgradeForPaymentPostgres;
 }>;
 
@@ -279,7 +276,7 @@ export async function handleHyperswitchWebhookRequest(
         }
       }
       const sync = dependencies.syncRenewalOutcome ?? syncRenewalCycleOutcomeForPayment;
-      const renewalEnv = { ...env, D1_01: env.D1_01, D1_04: selectedWebhookDatabase, W06_GOVERNANCE: env.W06_GOVERNANCE };
+      const renewalEnv = { ...env, D1_04: selectedWebhookDatabase, W06_GOVERNANCE: env.W06_GOVERNANCE };
       subscriptionSync = await sync(
         renewalEnv,
         paymentId,
@@ -288,17 +285,15 @@ export async function handleHyperswitchWebhookRequest(
 
       // Signed provider outcomes are already durable in D1-04. Expire only a
       // matching unpaid plan-upgrade reservation when the stored Payment is terminally failed.
-      if (postgresPool) {
-        const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
-        if (!membershipPool) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
-        const expireUpgrade = dependencies.expirePendingPlanUpgradePostgres ??
-          expirePendingSubscriptionPlanUpgradeForPaymentPostgres;
-        await expireUpgrade(postgresPool, membershipPool, paymentId, env.HYPERSWITCH_MERCHANT_ID);
-      } else {
-        const expireUpgrade = dependencies.expirePendingPlanUpgrade ??
-          expirePendingSubscriptionPlanUpgradeForPayment;
-        await expireUpgrade(renewalEnv, paymentId, env.HYPERSWITCH_MERCHANT_ID);
+      const financePool = postgresPool ??
+        (dependencies.getWebhookPostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+      const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
+      if (!financePool || !membershipPool) {
+        throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
       }
+      const expireUpgrade = dependencies.expirePendingPlanUpgradePostgres ??
+        expirePendingSubscriptionPlanUpgradeForPaymentPostgres;
+      await expireUpgrade(financePool, membershipPool, paymentId, env.HYPERSWITCH_MERCHANT_ID);
 
       // Initial creator-membership purchases have no renewal-cycle row. Only a
       // verified payment_succeeded event may fulfill one, and fulfillment reads
