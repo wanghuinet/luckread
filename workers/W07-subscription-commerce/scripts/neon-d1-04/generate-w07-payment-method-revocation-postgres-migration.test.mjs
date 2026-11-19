@@ -32,12 +32,12 @@ test('PAY-007 fails closed if mandate receipt identity replay rules are weakened
  }),/mandate reconciliation replay source guard is incomplete/)
 })
 
-test('PAY-007 fails closed if either renewal read stops consulting pending revocations',()=>{
- const runtimePath='workers/W07-subscription-commerce/src/renewal-runtime.ts'
+test('PAY-007 fails closed if either PostgreSQL renewal mandate read stops consulting pending revocations',()=>{
+ const mandateStorePath='workers/W07-subscription-commerce/src/payment-method-read-store-postgres.ts'
  assert.throws(()=>buildW07D104PaymentMethodRevocationMigration({
   readSource(file){
    const value=readFileSync(new URL('../../../../'+file,import.meta.url),'utf8')
-   return file===runtimePath?value.replaceAll("r.status <> 'COMPLETED'","r.status = 'COMPLETED'"):value
+   return file===mandateStorePath?value.replaceAll("r.status <> 'COMPLETED'","r.status = 'COMPLETED'"):value
   }
- }),/W07 renewal runtime lost the pending-revocation block/)
+ }),/W07 PostgreSQL renewal mandate adapter lost the pending-revocation block/)
 })
