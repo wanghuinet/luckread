@@ -19,6 +19,11 @@ const eventInput = {
   reason: 'verification completed',
 }
 
+const legacyD1TestEnv = (database: D1Database) => ({
+  D1_03: database,
+  W06_MODERATION_DATABASE_DRIVER: 'd1' as const,
+})
+
 function createDb(success = true) {
   const run = vi.fn().mockResolvedValue({ success })
   const bind = vi.fn().mockReturnValue({ run })
