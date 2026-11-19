@@ -14,7 +14,6 @@ import {
 } from './subscription-plan-change-preview.js';
 import {
   getW07MembershipPostgresPool,
-  resolveW07MembershipDatabaseDriver,
   type W07MembershipDatabaseRuntimeEnv,
 } from './neon/membership-database-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
@@ -77,19 +76,17 @@ export type ScheduledSubscriptionPlanDowngradeResult = Readonly<{
   replayed: boolean;
 }>;
 
-export type ScheduledPlanDowngradeEnv = Readonly<{ D1_01: D1Database }> & W07MembershipDatabaseRuntimeEnv;
+export type ScheduledPlanDowngradeEnv = W07MembershipDatabaseRuntimeEnv;
 export type ScheduledPlanDowngradeDependencies = Readonly<{ now?: () => Date }>;
 
 export function getScheduledPlanChangeStore(
   env: ScheduledPlanDowngradeEnv,
-): D1Database | W07WebhookPostgresPool {
-  // Explicit Neon production configuration must fail closed when its existing
-  // Hyperdrive binding is missing. Only unconfigured isolated tests retain D1.
-  if (!env.W07_MEMBERSHIP_DATABASE_DRIVER?.trim() && !env.HYPERDRIVE_D1_01) return env.D1_01;
-  if (resolveW07MembershipDatabaseDriver(env) === 'd1') return env.D1_01;
-  const pool = getW07MembershipPostgresPool(env);
-  if (!pool) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-  return pool;
+): W07WebhookPostgresPool {
+  try {
+    return getW07MembershipPostgresPool(env);
+  } catch {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
 }
 
 function isPostgresScheduledPlanStore(
