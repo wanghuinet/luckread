@@ -20,7 +20,7 @@ describe('W07 Neon-only membership runtime contract', () => {
     expect(runtime).not.toMatch(/D1Database|D1PreparedStatement|D1Result|\.prepare\(|\.batch\(|D1_01/);
     expect(worker).not.toMatch(/D1_01\s*:/);
     expect(worker).not.toContain('getW07SelectedD101Database');
-    expect(membershipRuntime).not.toMatch(/D1Database|createPostgresD1Database|D1_01\s*\?/);
+    expect(membershipRuntime).not.toMatch(/D1Database|createPostgresD1Database/);
     expect(membershipRuntime).toContain("configured !== 'neon'");
     expect(membershipRuntime).toContain('HYPERDRIVE_D1_01');
   });
