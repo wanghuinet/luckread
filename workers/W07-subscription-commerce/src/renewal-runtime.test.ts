@@ -2,15 +2,112 @@ import { describe, expect, it, vi } from 'vitest';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import { runRenewalScheduledBatch, type RenewalScheduledDependencies } from './renewal-scheduler.js';
 import {
+  createRenewalPaymentAttempt,
   processSubscriptionRenewalCycle,
   renewalCycleIdFor,
   scanDueSubscriptionRenewals,
   type RenewalRuntimeEnv,
 } from './renewal-runtime.js';
+import type { PaymentAttemptCreation } from './payment-persistence.js';
 
 const CYCLE_START = '2026-10-28T00:00:00.000Z';
 const CYCLE_END = '2026-11-28T00:00:00.000Z';
 const SCAN_NOW = '2026-10-28T12:00:00.000Z';
+
+describe('renewal payment-attempt persistence selection', () => {
+  const created: PaymentAttemptCreation = {
+    payment: {
+      paymentId: 'pay_' + 'a'.repeat(26),
+      orderId: 'ord_renewal_1',
+      amountMinor: 1500,
+      currency: 'USD',
+      status: 'INITIATING',
+      version: 1,
+      providerUpdatedAt: null,
+      createdAt: SCAN_NOW,
+      updatedAt: SCAN_NOW,
+    },
+    replayed: false,
+    pricingMode: 'live',
+  };
+
+  it('creates renewal Payment attempts through the native D1-04 Neon PostgreSQL pool', async () => {
+    const financePool = {
+      async query() { return { rows: [], rowCount: 0 }; },
+      async connect() { throw new Error('single payment-attempt creation does not open a transaction'); },
+    } as unknown as W07WebhookPostgresPool;
+    const env: RenewalRuntimeEnv = {
+      W07_DATABASE_DRIVER: 'neon',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+      HYPERDRIVE_D1_04: { connectionString: 'postgresql://test.invalid/luckread' },
+      D1_04: {} as D1Database,
+      HYPERSWITCH_ENVIRONMENT: 'sandbox',
+    };
+    const now = () => new Date(SCAN_NOW);
+    const createPostgres = vi.fn().mockResolvedValue(created);
+    const createLegacy = vi.fn().mockResolvedValue(created);
+    const getFinancePostgresPool = vi.fn(() => financePool);
+
+    const result = await createRenewalPaymentAttempt(
+      env, 'user_1', 'ord_renewal_1', 'renew_cycle_1', 'merchant_test',
+      { now, getFinancePostgresPool, createPaymentAttemptPostgres: createPostgres, createPaymentAttempt: createLegacy },
+    );
+
+    expect(result).toBe(created);
+    expect(getFinancePostgresPool).toHaveBeenCalledWith(env);
+    expect(createPostgres).toHaveBeenCalledWith(
+      financePool,
+      'user_1',
+      'ord_renewal_1',
+      'renew_cycle_1',
+      'merchant_test',
+      { now, paymentEnvironment: 'sandbox' },
+    );
+    expect(createLegacy).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the Neon finance pool is unavailable instead of falling back to D1', async () => {
+    const env: RenewalRuntimeEnv = {
+      W07_DATABASE_DRIVER: 'neon',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+      HYPERDRIVE_D1_04: { connectionString: 'postgresql://test.invalid/luckread' },
+      D1_04: {} as D1Database,
+      HYPERSWITCH_ENVIRONMENT: 'production',
+    };
+    const createLegacy = vi.fn().mockResolvedValue(created);
+
+    await expect(createRenewalPaymentAttempt(
+      env, 'user_1', 'ord_renewal_1', 'renew_cycle_1', 'merchant_test',
+      { getFinancePostgresPool: () => undefined, createPaymentAttempt: createLegacy },
+    )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
+    expect(createLegacy).not.toHaveBeenCalled();
+  });
+
+  it('keeps the explicit legacy D1 fixture path isolated from Neon selection', async () => {
+    const database = {} as D1Database;
+    const env: RenewalRuntimeEnv = {
+      W07_DATABASE_DRIVER: 'd1',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+      D1_04: database,
+      HYPERSWITCH_ENVIRONMENT: 'sandbox',
+    };
+    const now = () => new Date(SCAN_NOW);
+    const createLegacy = vi.fn().mockResolvedValue(created);
+    const getFinancePostgresPool = vi.fn();
+
+    const result = await createRenewalPaymentAttempt(
+      env, 'user_1', 'ord_renewal_1', 'renew_cycle_1', 'merchant_test',
+      { now, getFinancePostgresPool, createPaymentAttempt: createLegacy },
+    );
+
+    expect(result).toBe(created);
+    expect(createLegacy).toHaveBeenCalledWith(
+      database, 'user_1', 'ord_renewal_1', 'renew_cycle_1', 'merchant_test',
+      { now, databaseDialect: 'd1' },
+    );
+    expect(getFinancePostgresPool).not.toHaveBeenCalled();
+  });
+});
 
 describe('renewal cycle runtime', () => {
   it('uses a stable cycle id for a subscription and one exact billing period', async () => {
