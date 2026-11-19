@@ -147,8 +147,8 @@ jobs:
           if (config.name !== 'luckread-w07' || config.main !== 'src/index.ts') throw new Error('W07 production Worker identity/entrypoint mismatch')
           if ((config.d1_databases || []).length !== 0) throw new Error('W07 Neon production config must not declare Cloudflare D1 bindings')
           if (config.vars?.W07_DATABASE_DRIVER !== 'neon' || config.vars?.W07_MEMBERSHIP_DATABASE_DRIVER !== 'neon') throw new Error('W07 membership and finance drivers must both select Neon')
-          if (find('HYPERDRIVE_MEMBERSHIP_DB')?.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') throw new Error('W07 D1-01 Neon Hyperdrive target mismatch')
-          if (find('HYPERDRIVE_FINANCE_DB')?.id !== '3ae15e6dfb5e4b44979eee30e1d5ede4') throw new Error('W07 D1-04 Neon Hyperdrive target mismatch')
+          if (find('HYPERDRIVE_MEMBERSHIP_DB')?.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') throw new Error('W07 membership Neon Hyperdrive target mismatch')
+          if (find('HYPERDRIVE_FINANCE_DB')?.id !== '3ae15e6dfb5e4b44979eee30e1d5ede4') throw new Error('W07 finance Neon Hyperdrive target mismatch')
           if (!(config.services || []).some((item) => item.binding === 'W06_GOVERNANCE' && item.service === 'luckread-w06')) throw new Error('W07 W06_GOVERNANCE Service Binding mismatch')
           console.log('W07_NEON_ONLY_MEMBERSHIP_AND_FINANCE_CONFIG=PASS')
           NODE
