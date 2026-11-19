@@ -189,6 +189,84 @@ describe('renewal cycle runtime', () => {
     expect(statements).toHaveLength(1);
   });
 
+  it('requires the native Neon order-create Store for a prepared renewal without an order', async () => {
+    const planId = 'plan_' + 'b'.repeat(64);
+    const cycle = {
+      cycle_id: 'rcy_' + 'a'.repeat(26),
+      provider: 'hyperswitch',
+      merchant_id: 'merchant_test',
+      subscription_id: 'sub_creator_monthly',
+      subscriber_id: 'user_1',
+      plan_id: planId,
+      plan_version: 1,
+      cycle_start: CYCLE_START,
+      cycle_end: CYCLE_END,
+      billing_interval: 'MONTHLY',
+      currency: 'USD',
+      offer_snapshot_json: JSON.stringify({
+        subscriptionId: 'sub_creator_monthly',
+        subscriberId: 'user_1',
+        creatorId: 'creator_1',
+        planId,
+        planVersion: 1,
+        name: 'Creator Plus',
+        tier: 'plus',
+        billingInterval: 'MONTHLY',
+        priceMinor: 1000,
+        currency: 'USD',
+        benefits: ['member-posts'],
+      }),
+      amount_minor: 1000,
+      pricing_snapshot_json: '{}',
+      payment_method_id: 'pm_' + 'c'.repeat(26),
+      mandate_record_id: 'mandate_1',
+      order_id: null,
+      payment_id: null,
+      state: 'PREPARED',
+      subscription_sync_state: 'PENDING',
+      subscription_sync_updated_at: null,
+      subscription_sync_error_code: null,
+      attempt_number: 0,
+      provider_response_status: null,
+      outcome_code: null,
+      lease_token: null,
+      lease_expires_at: null,
+      version: 1,
+      created_at: CYCLE_START,
+      updated_at: CYCLE_START,
+    };
+    const cycleStore = {
+      async query<Row extends Record<string, unknown>>() {
+        return { rows: [structuredClone(cycle) as unknown as Row], rowCount: 1 };
+      },
+    } as unknown as W07WebhookPostgresPool;
+    const membershipPool = {
+      async query<Row extends Record<string, unknown>>() {
+        return { rows: [] as Row[], rowCount: 0 };
+      },
+      async connect() { throw new Error('membership queries are not reached without the order Store'); },
+    } as unknown as W07WebhookPostgresPool;
+    const env: RenewalRuntimeEnv = {
+      W07_DATABASE_DRIVER: 'neon',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+      D1_04: {} as D1Database,
+      HYPERSWITCH_ENVIRONMENT: 'sandbox',
+    };
+    const getOrderCreateStore = vi.fn(() => undefined);
+    const createOrder = vi.fn();
+
+    await expect(processSubscriptionRenewalCycle(env, cycle.cycle_id, {
+      getDatabase: () => ({} as D1Database),
+      getRenewalCycleStore: () => cycleStore,
+      getOrderCreateStore,
+      getMembershipPostgresPool: () => membershipPool,
+      createOrder,
+    })).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
+
+    expect(getOrderCreateStore).toHaveBeenCalledOnce();
+    expect(createOrder).not.toHaveBeenCalled();
+  });
+
   it('uses a stable cycle id for a subscription and one exact billing period', async () => {
     const first = await renewalCycleIdFor('sub_creator_monthly', CYCLE_START, CYCLE_END);
     const replay = await renewalCycleIdFor('sub_creator_monthly', CYCLE_START, CYCLE_END);
