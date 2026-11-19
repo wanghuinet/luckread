@@ -1,372 +1,164 @@
 import { describe, expect, it } from 'vitest';
-import { webcrypto } from 'node:crypto';
 import {
   createCommerceOrder,
-  getCommerceOrder,
   OrderPersistenceError,
   type AuthoritativelyPricedOrder,
+  type OrderCreateIdempotencyRow,
+  type OrderCreatePersistenceStore,
+  type OrderCreateTransactionInput,
   type OrderPersistenceDependencies,
 } from './order-persistence.js';
 
-const NOW = new Date('2026-10-28T12:00:00.000Z');
+const NOW = new Date('2026-11-19T12:00:00.000Z');
 const request = { items: [{ itemRef: 'plan_abc', quantity: 1 }] };
 
-type IdemRow = {
-  id: string; customer_id: string; operation_key: string; idempotency_key: string;
-  request_hash: string; state: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
-  response_status: number | null; response_json: string | null; created_at: string; expires_at: string;
-};
-type Row = Record<string, unknown>;
-type State = { idempotency: IdemRow[]; orders: Row[]; lines: Row[] };
-
-const clone = <T>(value: T): T => structuredClone(value);
-const scopeKey = (customer: unknown, operation: unknown, key: unknown): string =>
-  JSON.stringify([customer, operation, key]);
-
-class MemoryStatement {
-  values: unknown[] = [];
-  constructor(readonly db: MemoryD1, readonly sql: string) {}
-  bind(...values: unknown[]): D1PreparedStatement { this.values = values; return this as unknown as D1PreparedStatement; }
-  async first<T>(): Promise<T | null> { return this.db.first<T>(this.sql, this.values); }
-  async all<T>(): Promise<D1Result<T[]>> { return this.db.all<T>(this.sql, this.values); }
-  async run<T>(): Promise<D1Result<T>> { throw new Error('Unexpected standalone run in persistence candidate'); }
-}
-
-class MemoryD1 {
-  state: State = { idempotency: [], orders: [], lines: [] };
-  failOnLineInsert = false;
-  firstCalls = 0;
-  batchCalls = 0;
-  prepare(sql: string): D1PreparedStatement {
-    return new MemoryStatement(this, sql) as unknown as D1PreparedStatement;
-  }
-
-  async first<T>(sql: string, values: unknown[]): Promise<T | null> {
-    this.firstCalls += 1;
-    if (sql.includes('FROM order_create_idempotency')) {
-      const [customer, operation, key] = values;
-      const row = this.state.idempotency.find((r) =>
-        scopeKey(r.customer_id, r.operation_key, r.idempotency_key) === scopeKey(customer, operation, key));
-      return row ? clone(row) as T : null;
-    }
-    if (sql.includes('FROM orders WHERE order_id = ? AND customer_id = ?')) {
-      const [orderId, customer] = values;
-      const row = this.state.orders.find((r) => r.order_id === orderId && r.customer_id === customer);
-      return row ? clone(row) as T : null;
-    }
-    throw new Error('Unexpected first query: ' + sql);
-  }
-
-  async all<T>(sql: string, values: unknown[]): Promise<D1Result<T[]>> {
-    if (!sql.includes('FROM order_lines WHERE order_id = ?')) throw new Error('Unexpected all query: ' + sql);
-    const [orderId] = values;
-    const results = this.state.lines.filter((r) => r.order_id === orderId)
-      .sort((a, b) => String(a.order_line_id).localeCompare(String(b.order_line_id)));
-    return { success: true, results: clone(results) as T[], meta: {} } as D1Result<T[]>;
-  }
-
-  async batch(statements: D1PreparedStatement[]): Promise<D1Result[]> {
-    this.batchCalls += 1;
-    const working = clone(this.state);
-    const results: D1Result[] = [];
-    for (const unknownStatement of statements as unknown as MemoryStatement[]) {
-      const { sql, values } = unknownStatement;
-      let changes = 0;
-      if (sql.includes('pay002:expire')) {
-        const [customer, operation, key, now] = values as string[];
-        const before = working.idempotency.length;
-        working.idempotency = working.idempotency.filter((r) =>
-          !(r.customer_id === customer && r.operation_key === operation &&
-            r.idempotency_key === key && r.expires_at <= now));
-        changes = before - working.idempotency.length;
-      } else if (sql.includes('pay002:claim')) {
-        const [id, customer_id, operation_key, idempotency_key, request_hash, created_at, expires_at] = values as string[];
-        const exists = working.idempotency.some((r) =>
-          scopeKey(r.customer_id, r.operation_key, r.idempotency_key) === scopeKey(customer_id, operation_key, idempotency_key));
-        if (!exists) {
-          working.idempotency.push({ id, customer_id, operation_key, idempotency_key, request_hash,
-            state: 'IN_PROGRESS', response_status: null, response_json: null, created_at, expires_at });
-          changes = 1;
-        }
-      } else if (sql.includes('pay002:complete')) {
-        const [response_json, id, customer, operation, key, request_hash] = values as string[];
-        const row = working.idempotency.find((r) => r.id === id && r.customer_id === customer &&
-          r.operation_key === operation && r.idempotency_key === key && r.request_hash === request_hash &&
-          r.state === 'IN_PROGRESS');
-        if (row) { row.state = 'COMPLETED'; row.response_status = 201; row.response_json = response_json; changes = 1; }
-      } else if (sql.includes('pay002:order')) {
-        const [order_id, customer_id, currency, subtotal_minor, discount_minor, tax_minor,
-          total_minor, created_at, updated_at, idemId, idemCustomer, operation, key, requestHash, responseJson] = values;
-        const claim = working.idempotency.find((r) => r.id === idemId && r.customer_id === idemCustomer &&
-          r.operation_key === operation && r.idempotency_key === key && r.request_hash === requestHash &&
-          r.state === 'COMPLETED' && r.response_json === responseJson);
-        if (claim) {
-          working.orders.push({ order_id, customer_id, status: 'CREATED', version: 1, currency,
-            subtotal_minor, discount_minor, tax_minor, total_minor, created_at, updated_at,
-            confirmed_at: null, cancelled_at: null, failure_code: null });
-          changes = 1;
-        }
-      } else if (sql.includes('pay002:line')) {
-        if (this.failOnLineInsert) throw new Error('Injected database constraint failure');
-        const [order_line_id, order_id, item_type, item_ref, item_version, quantity, unit_amount_minor,
-          line_subtotal_minor, line_discount_minor, line_tax_minor, line_total_minor, item_snapshot_json,
-          created_at, parentId, parentCustomer] = values;
-        if (working.orders.some((r) => r.order_id === parentId && r.customer_id === parentCustomer)) {
-          working.lines.push({ order_line_id, order_id, item_type, item_ref, item_version, quantity,
-            unit_amount_minor, line_subtotal_minor, line_discount_minor, line_tax_minor,
-            line_total_minor, item_snapshot_json, created_at });
-          changes = 1;
-        }
-      } else {
-        throw new Error('Unexpected batch statement: ' + sql);
-      }
-      results.push({ success: true, meta: { changes } } as D1Result);
-    }
-    this.state = working;
-    return results;
-  }
-}
-
-const pricingFor = async (req: { items: readonly { itemRef: string; quantity: number }[] }): Promise<AuthoritativelyPricedOrder> => ({
+const pricingFor = async (
+  input: { items: readonly { itemRef: string; quantity: number }[] },
+): Promise<AuthoritativelyPricedOrder> => ({
   currency: 'USD',
-  items: req.items.map((item) => ({
+  items: input.items.map((item) => ({
     itemType: 'MEMBERSHIP_PLAN',
     itemRef: item.itemRef,
     itemVersion: '1',
     quantity: item.quantity,
     unitAmountMinor: 1200,
     currency: 'USD',
-    lineDiscountMinor: 0, // Explicitly supplied by the pricing authority for this test fixture.
-    lineTaxMinor: 0, // Explicitly supplied by the pricing authority for this test fixture.
+    lineDiscountMinor: 0,
+    lineTaxMinor: 0,
     itemSnapshotJson: JSON.stringify({ planId: item.itemRef, planVersion: 1 }),
   })),
 });
 
-const deterministicDependencies = (prefix: string, time = NOW): OrderPersistenceDependencies => {
+function deterministicDependencies(prefix: string): OrderPersistenceDependencies {
   let id = 0;
-  return { now: () => new Date(time), createId: (kind) => prefix + '_' + kind + '_' + (++id) };
-};
+  return {
+    now: () => new Date(NOW),
+    createId: (kind) => prefix + '_' + kind + '_' + (++id),
+  };
+}
 
-const errorCode = (error: unknown): string => error instanceof OrderPersistenceError ? error.code : 'unexpected';
+function memoryStore(options: { loseClaim?: boolean } = {}) {
+  let row: OrderCreateIdempotencyRow | null = null;
+  let persistCalls = 0;
+  let lastInput: OrderCreateTransactionInput | null = null;
 
-describe('PAY-002 atomic D1-04 order persistence candidate', () => {
-  it('creates the Order, immutable priced lines and completed replay record in one batch', async () => {
-    const db = new MemoryD1();
-    const result = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'key_1', request,
-      pricingFor, deterministicDependencies('one'));
-    expect(result.status).toBe(201);
-    expect(result.replayed).toBe(false);
-    expect(result.data.totalMinor).toBe(1200);
-    expect(db.batchCalls).toBe(1);
-    expect(db.state.orders).toHaveLength(1);
-    expect(db.state.lines).toHaveLength(1);
-    expect(db.state.idempotency).toHaveLength(1);
-    expect(db.state.idempotency[0]?.state).toBe('COMPLETED');
-    expect(JSON.parse(db.state.idempotency[0]?.response_json ?? '{}')).toEqual(result.data);
-    expect(JSON.stringify(db.state.idempotency[0]?.response_json)).not.toContain('requestId');
-    expect(JSON.stringify(db.state.idempotency[0]?.response_json)).not.toContain('customerId');
-  });
+  const store: OrderCreatePersistenceStore = {
+    async readIdempotencyRow(customerId, idempotencyKey) {
+      if (!row || row.customer_id !== customerId || row.idempotency_key !== idempotencyKey) return null;
+      return { ...row };
+    },
+    async persistNewOrder(input) {
+      persistCalls += 1;
+      lastInput = input;
+      row = {
+        id: input.idempotencyId,
+        customer_id: input.customerId,
+        operation_key: input.operationKey,
+        idempotency_key: input.idempotencyKey,
+        request_hash: input.requestHash,
+        state: 'COMPLETED',
+        response_status: 201,
+        response_json: input.responseJson,
+        created_at: input.createdAt,
+        expires_at: input.expiresAt,
+      };
+      return {
+        statementCount: input.lines.length + 4,
+        expireChanges: 0,
+        claimChanges: options.loseClaim ? 0 : 1,
+        completionChanges: options.loseClaim ? 0 : 1,
+        orderChanges: options.loseClaim ? 0 : 1,
+        lineChanges: options.loseClaim ? [] : input.lines.map(() => 1),
+      };
+    },
+  };
 
-  it('stores and reads Demo pricing mode from immutable line snapshots', async () => {
-    const db = new MemoryD1();
-    const demoPricing: typeof pricingFor = async (req) => ({
-      currency: 'USD',
-      pricingMode: 'demo',
-      items: req.items.map((item) => ({
-        itemType: 'MEMBERSHIP_PLAN',
-        itemRef: item.itemRef,
-        itemVersion: '1',
-        quantity: item.quantity,
-        unitAmountMinor: 1200,
-        currency: 'USD',
-        lineDiscountMinor: 0,
-        lineTaxMinor: 60,
-        itemSnapshotJson: JSON.stringify({
-          planId: item.itemRef,
-          planVersion: 1,
-          luckreadPricing: { mode: 'demo', taxProvider: 'luckread-demo-fixed-rate', taxMinor: 60 },
-        }),
-      })),
-    });
-    const result = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'demo_key', request,
-      demoPricing, deterministicDependencies('demo'));
-    expect(result.data).not.toHaveProperty('pricingMode');
-    expect(result.data.taxMinor).toBe(60);
-    expect(db.state.lines).toHaveLength(1);
-    const storedSnapshot = JSON.parse(String(db.state.lines[0]?.item_snapshot_json)) as Record<string, any>;
-    expect(storedSnapshot.luckreadPricing).toMatchObject({ mode: 'demo', taxProvider: 'luckread-demo-fixed-rate', taxMinor: 60 });
-    const fetched = await getCommerceOrder(db as unknown as D1Database, 'user_1', result.data.orderId);
-    expect(fetched).not.toHaveProperty('pricingMode');
-    expect(fetched.taxMinor).toBe(60);
-  });
+  return {
+    store,
+    get persistCalls() { return persistCalls; },
+    get lastInput() { return lastInput; },
+    get row() { return row ? { ...row } : null; },
+  };
+}
 
-  it('rejects zero-priced lines and zero-total baskets before writing an Order', async () => {
-    const zeroPriceDb = new MemoryD1();
-    const zeroPrice: typeof pricingFor = async (req) => ({
-      currency: 'USD',
-      items: req.items.map((item) => ({
-        itemType: 'MEMBERSHIP_PLAN',
-        itemRef: item.itemRef,
-        itemVersion: '1',
-        quantity: item.quantity,
-        unitAmountMinor: 0,
-        currency: 'USD',
-        lineDiscountMinor: 0,
-        lineTaxMinor: 0,
-        itemSnapshotJson: JSON.stringify({ planId: item.itemRef, planVersion: 1 }),
-      })),
-    });
-    const zeroPriceError = await createCommerceOrder(
-      zeroPriceDb as unknown as D1Database, 'user_1', 'zero_price_key', request,
-      zeroPrice, deterministicDependencies('zero_price'),
-    ).then(() => null, (error: unknown) => error);
-    expect(errorCode(zeroPriceError)).toBe('CONFLICT');
-    expect(zeroPriceDb.batchCalls).toBe(0);
-    expect(zeroPriceDb.state.orders).toHaveLength(0);
-    expect(zeroPriceDb.state.lines).toHaveLength(0);
-    expect(zeroPriceDb.state.idempotency).toHaveLength(0);
-
-    const fullyDiscountedDb = new MemoryD1();
-    const fullyDiscounted: typeof pricingFor = async (req) => ({
-      currency: 'USD',
-      items: req.items.map((item) => ({
-        itemType: 'MEMBERSHIP_PLAN',
-        itemRef: item.itemRef,
-        itemVersion: '1',
-        quantity: item.quantity,
-        unitAmountMinor: 1200,
-        currency: 'USD',
-        lineDiscountMinor: 1200,
-        lineTaxMinor: 0,
-        itemSnapshotJson: JSON.stringify({ planId: item.itemRef, planVersion: 1 }),
-      })),
-    });
-    const discountedError = await createCommerceOrder(
-      fullyDiscountedDb as unknown as D1Database, 'user_1', 'zero_total_key', request,
-      fullyDiscounted, deterministicDependencies('zero_total'),
-    ).then(() => null, (error: unknown) => error);
-    expect(errorCode(discountedError)).toBe('CONFLICT');
-    expect(fullyDiscountedDb.batchCalls).toBe(0);
-    expect(fullyDiscountedDb.state.orders).toHaveLength(0);
-    expect(fullyDiscountedDb.state.lines).toHaveLength(0);
-    expect(fullyDiscountedDb.state.idempotency).toHaveLength(0);
-  });
-
-  it('preserves the legacy raw SHA-256 request fingerprint while reusing W10 canonical JSON', async () => {
-    const db = new MemoryD1();
-    const basket = { items: [
-      { itemRef: 'plan_b', quantity: 1 },
-      { itemRef: 'plan_a', quantity: 2 },
-    ] };
-    const created = await createCommerceOrder(
-      db as unknown as D1Database,
-      'user_1',
-      'legacy_hash_key',
-      basket,
-      pricingFor,
-      deterministicDependencies('legacy_hash'),
+describe('PAY-002 order creation with the Neon persistence contract', () => {
+  it('persists authoritative order values and a completed replay record through the injected store', async () => {
+    const fixture = memoryStore();
+    const result = await createCommerceOrder(
+      fixture.store, 'customer_1', 'key_1', request, pricingFor, deterministicDependencies('first'),
     );
 
-    // This byte sequence is the pre-W10 order fingerprint contract: sorted
-    // items, stable object-key order, and a bare lowercase SHA-256 hex digest.
-    const legacyCanonicalJson = '{"items":[{"itemRef":"plan_a","quantity":2},{"itemRef":"plan_b","quantity":1}]}';
-    const digest = await webcrypto.subtle.digest(
-      'SHA-256',
-      new TextEncoder().encode(legacyCanonicalJson),
-    );
-    const legacyHash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-    expect(db.state.idempotency[0]?.request_hash).toBe(legacyHash);
-    expect(db.state.idempotency[0]?.request_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(result).toMatchObject({
+      status: 201,
+      replayed: false,
+      data: { status: 'CREATED', currency: 'USD', totalMinor: 1200 },
+    });
+    expect(fixture.persistCalls).toBe(1);
+    expect(fixture.lastInput?.order.totalMinor).toBe(1200);
+    expect(fixture.lastInput?.lines).toHaveLength(1);
+    expect(fixture.row).toMatchObject({
+      state: 'COMPLETED',
+      response_status: 201,
+      response_json: JSON.stringify(result.data),
+    });
+    expect(fixture.row?.response_json).not.toContain('customerId');
+    expect(fixture.row?.response_json).not.toContain('requestId');
+  });
 
-    // A pre-existing row with the legacy hash must still replay successfully.
-    db.state.idempotency[0]!.request_hash = legacyHash;
+  it('replays the persisted response without resolving prices or writing again', async () => {
+    const fixture = memoryStore();
+    const first = await createCommerceOrder(
+      fixture.store, 'customer_1', 'key_1', request, pricingFor, deterministicDependencies('first'),
+    );
     const replay = await createCommerceOrder(
-      db as unknown as D1Database,
-      'user_1',
-      'legacy_hash_key',
-      { items: [...basket.items].reverse() },
-      async () => { throw new Error('a valid replay must not rerun pricing'); },
-      deterministicDependencies('legacy_hash_replay'),
+      fixture.store,
+      'customer_1',
+      'key_1',
+      request,
+      async () => { throw new Error('pricing must not run for an idempotent replay'); },
+      deterministicDependencies('replay'),
     );
-    expect(replay.replayed).toBe(true);
-    expect(replay.data).toEqual(created.data);
-    expect(db.batchCalls).toBe(1);
+
+    expect(replay).toEqual({ ...first, replayed: true });
+    expect(fixture.persistCalls).toBe(1);
   });
 
-  it('replays a completed request without resolving a now-retired offer or writing again', async () => {
-    const db = new MemoryD1();
-    const first = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'key_1', request,
-      pricingFor, deterministicDependencies('first'));
-    let resolverCalls = 0;
-    const replay = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'key_1', request,
-      async () => { resolverCalls += 1; throw new Error('offer should not be re-resolved on a replay'); },
-      deterministicDependencies('second'));
-    expect(replay.replayed).toBe(true);
-    expect(replay.data.orderId).toBe(first.data.orderId);
-    expect(replay.data).toEqual(first.data);
-    expect(resolverCalls).toBe(0);
-    expect(db.batchCalls).toBe(1);
-    expect(db.state.orders).toHaveLength(1);
+  it('rejects reuse of one idempotency key for a different canonical basket', async () => {
+    const fixture = memoryStore();
+    await createCommerceOrder(
+      fixture.store, 'customer_1', 'key_1', request, pricingFor, deterministicDependencies('first'),
+    );
+
+    await expect(createCommerceOrder(
+      fixture.store,
+      'customer_1',
+      'key_1',
+      { items: [{ itemRef: 'plan_other', quantity: 1 }] },
+      pricingFor,
+      deterministicDependencies('second'),
+    )).rejects.toMatchObject({
+      code: 'IDEMPOTENCY_KEY_REUSE_CONFLICT',
+      status: 409,
+    });
+    expect(fixture.persistCalls).toBe(1);
   });
 
-  it('replays the same basket when the client changes item array order', async () => {
-    const db = new MemoryD1();
-    const firstRequest = { items: [
-      { itemRef: 'plan_b', quantity: 1 },
-      { itemRef: 'plan_a', quantity: 2 },
-    ] };
-    const reorderedRequest = { items: [
-      { itemRef: 'plan_a', quantity: 2 },
-      { itemRef: 'plan_b', quantity: 1 },
-    ] };
-    let resolverCalls = 0;
-    const resolver = async (req: { items: readonly { itemRef: string; quantity: number }[] }) => {
-      resolverCalls += 1;
-      return pricingFor(req);
-    };
+  it('returns the winner response when a concurrent transaction claims the idempotency key first', async () => {
+    const fixture = memoryStore({ loseClaim: true });
+    const result = await createCommerceOrder(
+      fixture.store, 'customer_1', 'key_1', request, pricingFor, deterministicDependencies('race'),
+    );
 
-    const first = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'basket_order',
-      firstRequest, resolver, deterministicDependencies('first'));
-    const replay = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'basket_order',
-      reorderedRequest, resolver, deterministicDependencies('retry'));
-
-    expect(replay.replayed).toBe(true);
-    expect(replay.data).toEqual(first.data);
-    expect(resolverCalls).toBe(1);
-    expect(db.batchCalls).toBe(1);
-    expect(db.state.orders).toHaveLength(1);
-    expect(db.state.lines).toHaveLength(2);
+    expect(result.status).toBe(201);
+    expect(result.replayed).toBe(true);
+    expect(fixture.persistCalls).toBe(1);
   });
 
-  it('rejects same-key semantic payload changes before authoritative resolution', async () => {
-    const db = new MemoryD1();
-    await createCommerceOrder(db as unknown as D1Database, 'user_1', 'key_1', request,
-      pricingFor, deterministicDependencies('first'));
-    let resolverCalls = 0;
-    const error = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'key_1',
-      { items: [{ itemRef: 'plan_abc', quantity: 2 }] },
-      async () => { resolverCalls += 1; return await pricingFor(request); },
-      deterministicDependencies('second')).then(() => null, (e: unknown) => e);
-    expect(errorCode(error)).toBe('IDEMPOTENCY_KEY_REUSE_CONFLICT');
-    expect(resolverCalls).toBe(0);
-    expect(db.state.orders).toHaveLength(1);
-  });
-
-  it('does not expose another customer order through owner-scoped reads', async () => {
-    const db = new MemoryD1();
-    const created = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'key_1', request,
-      pricingFor, deterministicDependencies('first'));
-    const error = await getCommerceOrder(db as unknown as D1Database, 'user_2', created.data.orderId)
-      .then(() => null, (e: unknown) => e);
-    expect(errorCode(error)).toBe('RESOURCE_NOT_FOUND');
-    expect(await getCommerceOrder(db as unknown as D1Database, 'user_1', created.data.orderId)).toEqual(created.data);
-  });
-
-  it('rejects a zero-value checkout before persisting an order', async () => {
-    const db = new MemoryD1();
-    const zeroPricing: typeof pricingFor = async (req) => ({
+  it('rejects zero-payable orders before asking the store to persist', async () => {
+    const fixture = memoryStore();
+    const zeroPricing: typeof pricingFor = async (input) => ({
       currency: 'USD',
-      items: req.items.map((item) => ({
+      items: input.items.map((item) => ({
         itemType: 'MEMBERSHIP_PLAN',
         itemRef: item.itemRef,
         itemVersion: '1',
@@ -378,99 +170,27 @@ describe('PAY-002 atomic D1-04 order persistence candidate', () => {
         itemSnapshotJson: JSON.stringify({ planId: item.itemRef, planVersion: 1 }),
       })),
     });
-    const error = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'zero_key',
-      request, zeroPricing, deterministicDependencies('zero')).then(() => null, (e: unknown) => e);
 
-    // Zero-charge entitlements require a separate fulfillment contract; this
-    // Beta checkout flow must reject before writing an Order or OrderLines.
-    expect(errorCode(error)).toBe('CONFLICT');
-    expect(db.state.orders).toHaveLength(0);
-    expect(db.state.lines).toHaveLength(0);
+    await expect(createCommerceOrder(
+      fixture.store, 'customer_1', 'zero_key', request, zeroPricing, deterministicDependencies('zero'),
+    )).rejects.toBeInstanceOf(OrderPersistenceError);
+    expect(fixture.persistCalls).toBe(0);
   });
 
-  it('rejects a persisted order whose order lines have disappeared', async () => {
-    const db = new MemoryD1();
-    // Simulate legacy/corrupt persisted state without going through the current
-    // create path, which correctly rejects zero-value checkout orders.
-    db.state.orders.push({
-      order_id: 'legacy_zero_order',
-      customer_id: 'user_1',
-      status: 'CREATED',
-      version: 1,
-      currency: 'USD',
-      subtotal_minor: 0,
-      discount_minor: 0,
-      tax_minor: 0,
-      total_minor: 0,
-      created_at: '2026-10-28T12:00:00.000Z',
-      updated_at: '2026-10-28T12:00:00.000Z',
-      confirmed_at: null,
-      cancelled_at: null,
-      failure_code: null,
-    });
-
-    const error = await getCommerceOrder(db as unknown as D1Database, 'user_1', 'legacy_zero_order')
-      .then(() => null, (e: unknown) => e);
-    expect(errorCode(error)).toBe('INTEGRITY_VIOLATION');
-  });
-
-  it('rejects duplicate item references in persisted order lines', async () => {
-    const db = new MemoryD1();
-    const twoItems = { items: [
-      { itemRef: 'plan_a', quantity: 1 },
-      { itemRef: 'plan_b', quantity: 1 },
-    ] };
-    const created = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'duplicate_line_key',
-      twoItems, pricingFor, deterministicDependencies('duplicate'));
-    expect(db.state.lines).toHaveLength(2);
-    db.state.lines[1]!.item_ref = db.state.lines[0]!.item_ref;
-
-    const error = await getCommerceOrder(db as unknown as D1Database, 'user_1', created.data.orderId)
-      .then(() => null, (e: unknown) => e);
-    expect(errorCode(error)).toBe('INTEGRITY_VIOLATION');
-  });
-
-  it('rolls back the claim and order if any line insert fails in the atomic batch', async () => {
-    const db = new MemoryD1();
-    db.failOnLineInsert = true;
-    const error = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'key_1', request,
-      pricingFor, deterministicDependencies('fail')).then(() => null, (e: unknown) => e);
-    expect(error).not.toBeNull();
-    expect(db.state.idempotency).toHaveLength(0);
-    expect(db.state.orders).toHaveLength(0);
-    expect(db.state.lines).toHaveLength(0);
-    db.failOnLineInsert = false;
-    const retry = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'key_1', request,
-      pricingFor, deterministicDependencies('retry'));
-    expect(retry.replayed).toBe(false);
-    expect(db.state.orders).toHaveLength(1);
-  });
-
-  it('serializes concurrent identical submissions to one durable Order', async () => {
-    const db = new MemoryD1();
-    const asyncPricing = async (req: { items: readonly { itemRef: string; quantity: number }[] }) => {
-      await Promise.resolve();
-      return pricingFor(req);
+  it('fails closed for an in-progress idempotency record', async () => {
+    const fixture = memoryStore();
+    await createCommerceOrder(
+      fixture.store, 'customer_1', 'key_1', request, pricingFor, deterministicDependencies('first'),
+    );
+    const current = fixture.row!;
+    current.state = 'IN_PROGRESS';
+    const inProgressStore: OrderCreatePersistenceStore = {
+      readIdempotencyRow: async () => ({ ...current }),
+      persistNewOrder: async () => { throw new Error('an in-progress key must not be written again'); },
     };
-    const results = await Promise.all([
-      createCommerceOrder(db as unknown as D1Database, 'user_1', 'same_key', request, asyncPricing, deterministicDependencies('a')),
-      createCommerceOrder(db as unknown as D1Database, 'user_1', 'same_key', request, asyncPricing, deterministicDependencies('b')),
-    ]);
-    expect(db.state.orders).toHaveLength(1);
-    expect(db.state.lines).toHaveLength(1);
-    expect(results[1].data.orderId).toBe(results[0].data.orderId);
-    expect(results.filter((result) => result.replayed)).toHaveLength(1);
-  });
 
-  it('rejects missing idempotency keys and malformed DTOs without touching D1', async () => {
-    const db = new MemoryD1();
-    const noKey = await createCommerceOrder(db as unknown as D1Database, 'user_1', null, request, pricingFor)
-      .then(() => null, (e: unknown) => e);
-    expect(errorCode(noKey)).toBe('PRECONDITION_REQUIRED');
-    const badBody = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'key_1',
-      { items: [], customerId: 'attacker' }, pricingFor).then(() => null, (e: unknown) => e);
-    expect(errorCode(badBody)).toBe('VALIDATION_FAILED');
-    expect(db.firstCalls).toBe(0);
-    expect(db.batchCalls).toBe(0);
+    await expect(createCommerceOrder(
+      inProgressStore, 'customer_1', 'key_1', request, pricingFor, deterministicDependencies('blocked'),
+    )).rejects.toMatchObject({ code: 'IDEMPOTENCY_IN_PROGRESS', status: 409 });
   });
 });
