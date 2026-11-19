@@ -112,10 +112,11 @@ export async function runRenewalScheduledBatch(
   const selectedEnv: RenewalRuntimeEnv = { ...env, D1_04: selectedD104 };
   const getSelectedDatabase = () => selectedD104;
   const getSelectedMembershipPool = () => membershipPool;
+  let membershipPool: W07WebhookPostgresPool;
   let membershipTables: Set<string>;
   let financeTables: Set<string>;
   try {
-    const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
+    membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
     [membershipTables, financeTables] = await Promise.all([
       (dependencies.readMembershipTableNames ?? readMembershipTableNames)(membershipPool, REQUIRED_MEMBERSHIP_TABLES),
       getTableNames(selectedD104, REQUIRED_D1_04_TABLES, databaseDialect),
