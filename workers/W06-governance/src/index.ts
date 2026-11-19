@@ -18,6 +18,7 @@ import { createReport, ReportRuntimeError } from './report-runtime'
 import {
   getW06ModerationDatabase,
   getW06ModerationQueueReadStore,
+  getW06ModerationCaseDetailReadStore,
   type W06ModerationDatabaseRuntimeEnv,
 } from './neon/moderation-database-runtime.js'
 
@@ -1181,7 +1182,7 @@ export default {
         const principal = requireW01Transport(request)
         requireModerationPermission('getModerationCase', principal, request)
         return json({
-          ...(await getModerationCase(getW06ModerationDatabase(env), principal.userId, decodeURIComponent(caseMatch[1]))),
+          ...(await getModerationCase(getW06ModerationCaseDetailReadStore(env) ?? getW06ModerationDatabase(env), principal.userId, decodeURIComponent(caseMatch[1]))),
           requestId: principal.requestId,
         })
       } catch (error) {

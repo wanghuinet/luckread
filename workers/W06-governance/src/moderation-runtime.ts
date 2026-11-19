@@ -5,6 +5,11 @@ import {
   type ModerationQueueReadCursor,
   type ModerationQueueReadStore,
 } from './moderation-queue-read-store.js'
+import {
+  ModerationCaseDetailReadStoreError,
+  type ModerationCaseDetailReadStore,
+  type ModerationCaseDetailReadRow,
+} from './moderation-case-detail-read-store-postgres.js'
 
 const OPEN_QUEUE_STATES = ['OPEN', 'UNDER_REVIEW', 'ESCALATED', 'APPEALED'] as const
 type ModerationCaseState =
@@ -270,34 +275,65 @@ export async function listModerationQueue(
   }
 }
 export async function getModerationCase(
-  db: D1Database,
+  source: D1Database | ModerationCaseDetailReadStore,
   reviewerId: string,
   caseId: string,
 ): Promise<ReturnType<typeof responseForCase>> {
   requireResource('reviewer_id', reviewerId)
   requireResource('case_id', caseId)
-  const row = await db.prepare(
-    `SELECT c.case_id,c.target_type,c.target_id,c.target_version,c.policy_version,c.state,c.priority,
-            c.assigned_reviewer_id,c.current_decision_id,c.evidence_bundle_ref,c.version,c.created_at,c.updated_at,
-            d.decision_id,d.case_version,d.outcome,d.policy_version AS decision_policy_version,
-            d.effective_at AS decision_effective_at,d.reason_code,d.severity,d.scope,d.expires_at,
-            d.source_kind,d.reviewer_id,d.reviewer_layer,d.request_id,d.created_at AS decision_created_at,
-            d.target_type AS decision_target_type,d.target_id AS decision_target_id,
-            d.target_version AS decision_target_version
-       FROM moderation_cases c
-       LEFT JOIN moderation_decisions d ON d.decision_id = c.current_decision_id
-      WHERE c.case_id = ?
-        AND c.target_type = 'content'
-        AND (c.assigned_reviewer_id IS NULL OR c.assigned_reviewer_id = ?)
-      LIMIT 1`,
-  ).bind(caseId, reviewerId).first<ModerationCaseRow & Partial<ModerationDecisionRow & {
+
+  let row: (ModerationCaseRow & Partial<ModerationDecisionRow & {
     decision_policy_version: string
     decision_effective_at: string
     decision_created_at: string
     decision_target_type: string
     decision_target_id: string
     decision_target_version: number | null
-  }>>()
+  }>) | null
+
+  if (typeof (source as ModerationCaseDetailReadStore).get === 'function') {
+    try {
+      row = await (source as ModerationCaseDetailReadStore).get(caseId, reviewerId) as
+        | (ModerationCaseRow & Partial<ModerationDecisionRow & {
+            decision_policy_version: string
+            decision_effective_at: string
+            decision_created_at: string
+            decision_target_type: string
+            decision_target_id: string
+            decision_target_version: number | null
+          }>)
+        | null
+    } catch (error) {
+      if (error instanceof ModerationCaseDetailReadStoreError) {
+        throw new ModerationRuntimeError(error.code, error.status)
+      }
+      throw error
+    }
+  } else {
+    row = await (source as D1Database).prepare(
+      `SELECT c.case_id,c.target_type,c.target_id,c.target_version,c.policy_version,c.state,c.priority,
+              c.assigned_reviewer_id,c.current_decision_id,c.evidence_bundle_ref,c.version,c.created_at,c.updated_at,
+              d.decision_id,d.case_version,d.outcome,d.policy_version AS decision_policy_version,
+              d.effective_at AS decision_effective_at,d.reason_code,d.severity,d.scope,d.expires_at,
+              d.source_kind,d.reviewer_id,d.reviewer_layer,d.request_id,d.created_at AS decision_created_at,
+              d.target_type AS decision_target_type,d.target_id AS decision_target_id,
+              d.target_version AS decision_target_version
+         FROM moderation_cases c
+         LEFT JOIN moderation_decisions d ON d.decision_id = c.current_decision_id
+        WHERE c.case_id = ?
+          AND c.target_type = 'content'
+          AND (c.assigned_reviewer_id IS NULL OR c.assigned_reviewer_id = ?)
+        LIMIT 1`,
+    ).bind(caseId, reviewerId).first<ModerationCaseRow & Partial<ModerationDecisionRow & {
+      decision_policy_version: string
+      decision_effective_at: string
+      decision_created_at: string
+      decision_target_type: string
+      decision_target_id: string
+      decision_target_version: number | null
+    }>>()
+  }
+
   if (!row) throw new ModerationRuntimeError('NOT_FOUND', 404)
   const decision = row.decision_id ? ({
     decision_id: row.decision_id,

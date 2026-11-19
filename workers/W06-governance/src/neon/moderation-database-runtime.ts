@@ -7,6 +7,10 @@ import {
 } from '../neon-postgres-d1-database.js'
 import { createPostgresModerationQueueReadStore } from '../moderation-queue-read-store-postgres.js'
 import type { ModerationQueueReadStore } from '../moderation-queue-read-store.js'
+import {
+  createPostgresModerationCaseDetailReadStore,
+  type ModerationCaseDetailReadStore,
+} from '../moderation-case-detail-read-store-postgres.js'
 
 /**
  * @deprecated-next-version
@@ -27,6 +31,7 @@ const pools = new WeakMap<object, Promise<NodePostgresPool>>()
 const poolAdapters = new WeakMap<object, W06ModerationPostgresPool>()
 const databases = new WeakMap<object, D1Database>()
 const queueStores = new WeakMap<object, ModerationQueueReadStore>()
+const caseDetailStores = new WeakMap<object, ModerationCaseDetailReadStore>()
 
 export function resolveW06ModerationDatabaseDriver(
   env: W06ModerationDatabaseRuntimeEnv,
@@ -174,6 +179,24 @@ export function getW06ModerationQueueReadStore(
   return store
 }
 
+/** Dedicated PostgreSQL detail reader for the single-case moderation endpoint. */
+export function getW06ModerationCaseDetailReadStore(
+  env: W06ModerationDatabaseRuntimeEnv,
+): ModerationCaseDetailReadStore | undefined {
+  if (resolveW06ModerationDatabaseDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_03
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+  }
+  const cached = caseDetailStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresModerationCaseDetailReadStore(getW06ModerationPostgresPool(env))
+  caseDetailStores.set(binding, store)
+  return store
+}
+
 /** Close the Neon pool cached for a disposable PostgreSQL entrypoint rehearsal. */
 export async function closeW06ModerationPostgresRuntimeForTest(
   binding: NonNullable<W06ModerationDatabaseRuntimeEnv['HYPERDRIVE_D1_03']>,
@@ -185,6 +208,7 @@ export async function closeW06ModerationPostgresRuntimeForTest(
   poolAdapters.delete(binding)
   databases.delete(binding)
   queueStores.delete(binding)
+  caseDetailStores.delete(binding)
 
   const pool = await pending
   await pool.end()

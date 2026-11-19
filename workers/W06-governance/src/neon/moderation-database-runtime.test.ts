@@ -5,6 +5,7 @@ import {
   getW06ModerationDatabase,
   getW06ModerationPostgresPool,
   getW06ModerationQueueReadStore,
+  getW06ModerationCaseDetailReadStore,
   resolveW06ModerationDatabaseDriver,
 } from './moderation-database-runtime.js'
 
@@ -43,6 +44,7 @@ describe('W06 moderation database runtime admission', () => {
     expect(resolveW06ModerationDatabaseDriver(env)).toBe('d1')
     expect(getW06ModerationDatabase(env)).toBe(d1)
     expect(getW06ModerationQueueReadStore(env)).toBeUndefined()
+    expect(getW06ModerationCaseDetailReadStore(env)).toBeUndefined()
   })
 
   it('defaults to Neon when the driver is omitted and never falls back to an available D1 binding', () => {
@@ -55,6 +57,7 @@ describe('W06 moderation database runtime admission', () => {
     expect(resolveW06ModerationDatabaseDriver(env)).toBe('neon')
     expect(getW06ModerationDatabase(env)).not.toBe(d1)
     expect(getW06ModerationQueueReadStore(env)).toBeDefined()
+    expect(getW06ModerationCaseDetailReadStore(env)).toBeDefined()
   })
 
   it('rejects unknown drivers instead of silently falling back to D1', () => {
@@ -95,6 +98,7 @@ describe('W06 moderation database runtime admission', () => {
     expect(getW06ModerationPostgresPool(env)).toBe(poolAdapter)
     expect(getW06ModerationDatabase(env)).toBe(getW06ModerationDatabase(env))
     expect(getW06ModerationQueueReadStore(env)).toBe(getW06ModerationQueueReadStore(env))
+    expect(getW06ModerationCaseDetailReadStore(env)).toBe(getW06ModerationCaseDetailReadStore(env))
     expect(getW06ModerationQueueReadStore(env)).toBeDefined()
   })
 })
