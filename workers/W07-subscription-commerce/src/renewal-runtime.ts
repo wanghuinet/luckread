@@ -475,7 +475,6 @@ async function updateCycle(
 }
 
 async function insertOrReadCycle(
-  env: RenewalRuntimeEnv,
   membershipStore: RenewalMembershipStore,
   cycleStore: RenewalCycleStore,
   subscription: RenewalSubscriptionRow,
@@ -691,12 +690,12 @@ export async function scanDueSubscriptionRenewals(
   const cycleIds: string[] = [];
   for (const row of rows) {
     try {
-      const cycle = await insertOrReadCycle(env, membershipStore, cycleStore, row, String(config.expectedMerchantId), now);
+      const cycle = await insertOrReadCycle(membershipStore, cycleStore, row, String(config.expectedMerchantId), now);
       if (cycle.state === 'AWAITING_PRICING' && dependencies.resolvePricing) {
         cycleIds.push(cycle.cycle_id);
       } else if (cycle.state === 'AWAITING_MANDATE') {
         const activeMandate = await readActiveMandateFromStore(
-          getW07RenewalCycleStore(env), String(config.expectedMerchantId), cycle.subscriber_id,
+          cycleStore, String(config.expectedMerchantId), cycle.subscriber_id,
         );
         if (activeMandate) cycleIds.push(cycle.cycle_id);
       } else if (cycle.state === 'FAILED' &&
@@ -835,7 +834,6 @@ async function advanceAwaitingMandate(
 }
 
 async function storeOrderReference(
-  env: RenewalRuntimeEnv,
   cycleStore: RenewalCycleStore,
   cycle: RenewalCycleRow,
   orderId: string,
@@ -847,7 +845,6 @@ async function storeOrderReference(
 }
 
 async function storePaymentReference(
-  env: RenewalRuntimeEnv,
   cycleStore: RenewalCycleStore,
   cycle: RenewalCycleRow,
   payment: PaymentAttemptDto,
@@ -1091,7 +1088,7 @@ export async function processSubscriptionRenewalCycle(
           },
         },
       );
-      cycle = await storeOrderReference(env, cycleStore, cycle, order.data.orderId, now);
+      cycle = await storeOrderReference(cycleStore, cycle, order.data.orderId, now);
       if (cycle.order_id !== order.data.orderId) {
         throw new RenewalRuntimeError('CYCLE_ORDER_REFERENCE_CONFLICT', 409);
       }
@@ -1111,7 +1108,7 @@ export async function processSubscriptionRenewalCycle(
         cycle.merchant_id,
         dependencies,
       );
-      cycle = await storePaymentReference(env, cycleStore, cycle, attempt.payment, attemptNumber, now);
+      cycle = await storePaymentReference(cycleStore, cycle, attempt.payment, attemptNumber, now);
       if (cycle.payment_id !== attempt.payment.paymentId || cycle.attempt_number !== attemptNumber) {
         throw new RenewalRuntimeError('CYCLE_PAYMENT_REFERENCE_CONFLICT', 409);
       }
@@ -1204,7 +1201,7 @@ export async function processSubscriptionRenewalCycle(
         providerPayment,
         { now: nowFn },
       );
-        } catch {
+    } catch {
       now = nowIso(nowFn);
       cycle = await writeCycleReconciliation(cycleStore, cycle, 'PROVIDER_RESPONSE_NOT_DURABLY_RECORDED', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED', ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
