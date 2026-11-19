@@ -55,7 +55,7 @@ function loadW06PostgresPool(binding: object, connectionString: string): Promise
   if (cached) return cached
 
   // Load the Node.js PostgreSQL driver lazily, on the first operation against the
-  // explicitly selected (or default) Neon runtime.
+  // Neon runtime.
   const pending = import('pg').then(({ Pool }) => {
     const pool = new Pool({
       connectionString,
@@ -77,7 +77,7 @@ function loadW06PostgresPool(binding: object, connectionString: string): Promise
 }
 
 /**
- * Lazy structural pool adapter. Resolving the W06 Neon database does not load
+ * Lazy structural pool adapter. Resolving the W06 PostgreSQL pool does not load
  * pg; the driver is imported only on the first actual query/connect operation.
  */
 export function getW06ModerationPostgresPool(
@@ -198,7 +198,6 @@ export function getW06ModerationQueueReadStore(
 export function getW06ModerationCaseDetailReadStore(
   env: W06ModerationDatabaseRuntimeEnv,
 ): ModerationCaseDetailReadStore {
-
   const binding = env.HYPERDRIVE_D1_03
   if (!binding || typeof binding !== 'object') {
     throw new Error('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
