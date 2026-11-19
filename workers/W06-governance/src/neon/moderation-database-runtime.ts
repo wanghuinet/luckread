@@ -7,6 +7,8 @@ import {
 } from '../neon-postgres-d1-database.js'
 import { createPostgresModerationQueueReadStore } from '../moderation-queue-read-store-postgres.js'
 import type { ModerationQueueReadStore } from '../moderation-queue-read-store.js'
+import { createPostgresModerationReportWriteStore } from '../moderation-report-write-store-postgres.js'
+import type { ModerationReportWriteStore } from '../moderation-report-write-store.js'
 import {
   createPostgresModerationCaseDetailReadStore,
   type ModerationCaseDetailReadStore,
@@ -31,6 +33,7 @@ const pools = new WeakMap<object, Promise<NodePostgresPool>>()
 const poolAdapters = new WeakMap<object, W06ModerationPostgresPool>()
 const databases = new WeakMap<object, D1Database>()
 const queueStores = new WeakMap<object, ModerationQueueReadStore>()
+const reportStores = new WeakMap<object, ModerationReportWriteStore>()
 const caseDetailStores = new WeakMap<object, ModerationCaseDetailReadStore>()
 
 export function resolveW06ModerationDatabaseDriver(
@@ -161,6 +164,23 @@ export function getW06ModerationDatabase(env: W06ModerationDatabaseRuntimeEnv): 
   return database
 }
 
+/** W06-owned Report writes use native PostgreSQL transactions and W09's AuditEvent append-only guard. */
+export function getW06ModerationReportWriteStore(
+  env: W06ModerationDatabaseRuntimeEnv,
+): ModerationReportWriteStore {
+  const pool = getW06ModerationPostgresPool(env)
+  const binding = env.HYPERDRIVE_D1_03
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+  }
+  const cached = reportStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresModerationReportWriteStore(pool)
+  reportStores.set(binding, store)
+  return store
+}
+
 /** Dedicated PostgreSQL projection preserves native keyset timestamp precision. */
 export function getW06ModerationQueueReadStore(
   env: W06ModerationDatabaseRuntimeEnv,
@@ -207,6 +227,7 @@ export async function closeW06ModerationPostgresRuntimeForTest(
   poolAdapters.delete(binding)
   databases.delete(binding)
   queueStores.delete(binding)
+  reportStores.delete(binding)
   caseDetailStores.delete(binding)
 
   const pool = await pending

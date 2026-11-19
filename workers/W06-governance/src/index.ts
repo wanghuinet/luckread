@@ -18,6 +18,7 @@ import { createReport, ReportRuntimeError } from './report-runtime'
 import {
   getW06ModerationDatabase,
   getW06ModerationQueueReadStore,
+  getW06ModerationReportWriteStore,
   getW06ModerationCaseDetailReadStore,
   type W06ModerationDatabaseRuntimeEnv,
 } from './neon/moderation-database-runtime.js'
@@ -1141,7 +1142,7 @@ export default {
           (description !== undefined && typeof description !== 'string') ||
           (evidenceRefs !== undefined && (!Array.isArray(evidenceRefs) || evidenceRefs.some((value) => typeof value !== 'string')))
         ) throw new ReportRuntimeError('VALIDATION_FAILED', 400)
-        const result = await createReport(getW06ModerationDatabase(env), {
+        const result = await createReport(getW06ModerationReportWriteStore(env), {
           actorUserId: principal.userId,
           targetType,
           targetId,
