@@ -87,7 +87,7 @@ export class RenewalRuntimeError extends Error {
   }
 }
 
-export type RenewalRuntimeEnv = Omit<W07PaymentMethodReadRuntimeEnv, 'D1_04'> & W07MembershipDatabaseRuntimeEnv & Readonly<{
+export type RenewalRuntimeEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{
   HYPERSWITCH_ENVIRONMENT?: string | null;
   HYPERSWITCH_API_KEY?: string | null;
   HYPERSWITCH_MERCHANT_ID?: string | null;
