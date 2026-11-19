@@ -1,4 +1,10 @@
 import { ingestAnalyticsBatch } from './analytics-ingest'
+import { ingestAnalyticsBatchPostgres } from './analytics-ingest-postgres.js'
+import {
+  checkAnalyticsPostgresHealth,
+  readAnalyticsPostgresSchemaObjects,
+  type AnalyticsPostgresPool,
+} from './analytics-postgres-store.js'
 import type {
   AnalyticsD1PreparedStatement,
   AnalyticsD1Result,
@@ -28,7 +34,10 @@ interface W11AnalyticsDatabase {
  * Condition: Analytics health probes, ingestion batches, and schema checks use PostgreSQL-native SQL and transaction APIs.
  */
 export interface W11Env {
-  D1_05: W11AnalyticsDatabase
+  /** Legacy binding retained for the existing migration-only deployment profile. */
+  D1_05?: W11AnalyticsDatabase
+  /** Neon production composition; when supplied, all persistence uses native PostgreSQL. */
+  W11_POSTGRES?: AnalyticsPostgresPool
 }
 
 const REQUIRED_SCHEMA_OBJECTS = [
@@ -272,7 +281,11 @@ async function ingestClientTelemetry(request: Request, env: W11Env): Promise<Res
   }))
 
   try {
-    const result = await ingestAnalyticsBatch(env.D1_05, events, { now })
+    const result = env.W11_POSTGRES
+      ? await ingestAnalyticsBatchPostgres(env.W11_POSTGRES, events, { now })
+      : env.D1_05
+        ? await ingestAnalyticsBatch(env.D1_05, events, { now })
+        : (() => { throw new Error('W11 analytics database is not configured') })()
     return jsonResponse({
       data: {
         received: events.length,
@@ -311,8 +324,12 @@ const worker = {
 
     if (url.pathname === '/healthz') {
       try {
-        const probe = await env.D1_05.prepare('SELECT 1 AS ok').first()
-        if (probe?.ok !== 1) throw new Error('D1-05 health probe returned no result')
+        const healthy = env.W11_POSTGRES
+          ? await checkAnalyticsPostgresHealth(env.W11_POSTGRES)
+          : env.D1_05
+            ? (await env.D1_05.prepare('SELECT 1 AS ok').first())?.ok === 1
+            : false
+        if (!healthy) throw new Error('W11 analytics database health probe failed')
         return jsonResponse({ worker: 'W11', status: 'ok', database: 'reachable' })
       } catch {
         return jsonResponse({ worker: 'W11', status: 'degraded', database: 'unavailable' }, 503)
@@ -320,8 +337,11 @@ const worker = {
     }
 
     try {
-      const result = await env.D1_05.prepare(ANALYTICS_SCHEMA_PROBE).all()
-      const schemaRows = result.results ?? []
+      const schemaRows = env.W11_POSTGRES
+        ? await readAnalyticsPostgresSchemaObjects(env.W11_POSTGRES)
+        : env.D1_05
+          ? (await env.D1_05.prepare(ANALYTICS_SCHEMA_PROBE).all()).results ?? []
+          : []
       const found = new Set(schemaRows.map(({ type, name }) => `${type}:${name}`))
       const eventLedgerDefinition = schemaRows.find(
         ({ type, name }) => type === 'table' && name === 'analytics_event_dedupe',
