@@ -592,8 +592,8 @@ async function markUpgradeApplied(
 
 /**
  * Applies an already-paid upgrade against the existing subscription. Order and
- * Payment remain in D1-04; only plan identity, opaque order reference and CAS
- * version are changed in authoritative D1-01.
+ * Payment remain in the Neon finance database; only plan identity, opaque order
+ * reference and CAS version change in the Neon membership database.
  */
 async function applyPaidSubscriptionPlanUpgradePostgres(
   pool: W07WebhookPostgresPool,
