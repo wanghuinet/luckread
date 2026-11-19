@@ -843,7 +843,7 @@ export async function publishMembershipPlan(
   return mapMembershipPlan(published, false);
 }
 
-/**/**
+/**
  * Create a new immutable commercial plan version and CAS the plan's current
  * pointer. Existing subscriptions keep their original plan_version snapshot.
  * Replaying the same expected ETag and exact terms after a successful write
@@ -924,7 +924,7 @@ export async function reviseMembershipPlan(
   return mapMembershipPlan(revised, false);
 }
 
-/**/** Pause/resume new sales or permanently retire a paused plan with lifecycle CAS; existing subscribers keep their accepted plan_version. */
+/** Pause/resume new sales or permanently retire a paused plan with lifecycle CAS; existing subscribers keep their accepted plan_version. */
 export async function transitionMembershipPlanLifecycle(
   db: W07WebhookPostgresPool,
   verifiedCreatorId: string,
@@ -1047,7 +1047,7 @@ export async function listCreatorMembershipPlans(
   };
 }
 
-const RESOLVABLE_MEMBERSHIP_PLAN_ID_PATTERNconst RESOLVABLE_MEMBERSHIP_PLAN_ID_PATTERN = /^plan_[a-f0-9]{64}$/;
+const RESOLVABLE_MEMBERSHIP_PLAN_ID_PATTERN = /^plan_[a-f0-9]{64}$/;
 
 /**
  * Resolve public, active creator membership offers from their authoritative
