@@ -1,10 +1,9 @@
 import type { Pool as NodePostgresPool } from 'pg'
 
-import {
-  createPostgresModerationD1Database,
-  type W06ModerationPostgresClient,
-  type W06ModerationPostgresPool,
-} from '../neon-postgres-d1-database.js'
+import type {
+  W06ModerationPostgresClient,
+  W06ModerationPostgresPool,
+} from '../moderation-postgres-pool.js'
 import { createPostgresModerationQueueReadStore } from '../moderation-queue-read-store-postgres.js'
 import type { ModerationQueueReadStore } from '../moderation-queue-read-store.js'
 import { createPostgresModerationReportWriteStore } from '../moderation-report-write-store-postgres.js'
@@ -18,37 +17,17 @@ import {
 import { createPostgresModerationDecisionWriteStore } from '../moderation-decision-write-store-postgres.js'
 import type { ModerationDecisionWriteStore } from '../moderation-decision-write-store-postgres.js'
 
-/**
- * @deprecated-next-version
- * Reason: The remaining D1-shaped facade and explicit legacy D1 branch are retained only for the single-case moderation detail fallback.
- * Replacement: Native PostgreSQL case-detail reads for every supported runtime profile.
- * Removal: Next release.
- * Condition: Remove the D1 detail fallback and its remaining call sites, then delete the compatibility facade and legacy D1 driver branch.
- */
-export type W06ModerationDatabaseDriver = 'd1' | 'neon'
-
 export type W06ModerationDatabaseRuntimeEnv = Readonly<{
-  D1_03?: D1Database
-  W06_MODERATION_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_03?: Readonly<{ connectionString?: string }>
 }>
 
 const pools = new WeakMap<object, Promise<NodePostgresPool>>()
 const poolAdapters = new WeakMap<object, W06ModerationPostgresPool>()
-const databases = new WeakMap<object, D1Database>()
 const queueStores = new WeakMap<object, ModerationQueueReadStore>()
 const reportStores = new WeakMap<object, ModerationReportWriteStore>()
 const auditEventStores = new WeakMap<object, AuditEventStore>()
 const caseDetailStores = new WeakMap<object, ModerationCaseDetailReadStore>()
 const decisionWriteStores = new WeakMap<object, ModerationDecisionWriteStore>()
-
-export function resolveW06ModerationDatabaseDriver(
-  env: W06ModerationDatabaseRuntimeEnv,
-): W06ModerationDatabaseDriver {
-  const configured = env.W06_MODERATION_DATABASE_DRIVER?.trim().toLowerCase() || 'neon'
-  if (configured === 'd1' || configured === 'neon') return configured
-  throw new Error('W06_MODERATION_DATABASE_DRIVER_UNSUPPORTED')
-}
 
 function validateHyperdriveConnectionString(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 4096) {
@@ -104,9 +83,6 @@ function loadW06PostgresPool(binding: object, connectionString: string): Promise
 export function getW06ModerationPostgresPool(
   env: W06ModerationDatabaseRuntimeEnv,
 ): W06ModerationPostgresPool {
-  if (resolveW06ModerationDatabaseDriver(env) !== 'neon') {
-    throw new Error('W06_POSTGRES_POOL_REQUIRES_NEON_DRIVER')
-  }
   const binding = env.HYPERDRIVE_D1_03
   if (!binding || typeof binding !== 'object') {
     throw new Error('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
@@ -150,24 +126,6 @@ export function getW06ModerationPostgresPool(
   }
   poolAdapters.set(binding, adapter)
   return adapter
-}
-
-export function getW06ModerationDatabase(env: W06ModerationDatabaseRuntimeEnv): D1Database {
-  if (resolveW06ModerationDatabaseDriver(env) === 'd1') {
-    if (!env.D1_03) throw new Error('W06_D1_03_BINDING_REQUIRED')
-    return env.D1_03
-  }
-
-  const binding = env.HYPERDRIVE_D1_03
-  if (!binding || typeof binding !== 'object') {
-    throw new Error('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
-  }
-  const cached = databases.get(binding)
-  if (cached) return cached
-
-  const database = createPostgresModerationD1Database(getW06ModerationPostgresPool(env))
-  databases.set(binding, database)
-  return database
 }
 
 /** W06-owned Report writes use native PostgreSQL transactions and W09's AuditEvent append-only guard. */
@@ -239,8 +197,7 @@ export function getW06ModerationQueueReadStore(
 /** Dedicated PostgreSQL detail reader for the single-case moderation endpoint. */
 export function getW06ModerationCaseDetailReadStore(
   env: W06ModerationDatabaseRuntimeEnv,
-): ModerationCaseDetailReadStore | undefined {
-  if (resolveW06ModerationDatabaseDriver(env) === 'd1') return undefined
+): ModerationCaseDetailReadStore {
 
   const binding = env.HYPERDRIVE_D1_03
   if (!binding || typeof binding !== 'object') {
@@ -263,7 +220,6 @@ export async function closeW06ModerationPostgresRuntimeForTest(
 
   pools.delete(binding)
   poolAdapters.delete(binding)
-  databases.delete(binding)
   queueStores.delete(binding)
   reportStores.delete(binding)
   auditEventStores.delete(binding)
