@@ -33,7 +33,7 @@ function environment(
       success: true,
       meta: { changes: index === 0 ? 1 : 0 },
     })),
-): W11Env & { D1_05: NonNullable<W11Env['D1_05']> } {
+): W11Env {
   return {
     D1_05: {
       prepare: vi.fn((query: string) => {
