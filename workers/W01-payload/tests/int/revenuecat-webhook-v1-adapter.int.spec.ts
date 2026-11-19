@@ -7,7 +7,6 @@ const client = readFileSync(resolve(process.cwd(), 'src/subscription/w07-subscri
 const bodyReader = readFileSync(resolve(process.cwd(), 'src/subscription/provider-webhook-body.ts'), 'utf8')
 const receiver = readFileSync(resolve(process.cwd(), '../../workers/W07-subscription-commerce/src/revenuecat-webhook-http-runtime.ts'), 'utf8')
 const signature = readFileSync(resolve(process.cwd(), '../../workers/W07-subscription-commerce/src/revenuecat-webhook-signature.ts'), 'utf8')
-const persistence = readFileSync(resolve(process.cwd(), '../../workers/W07-subscription-commerce/src/revenuecat-webhook-persistence.ts'), 'utf8')
 const postgresPersistence = readFileSync(resolve(process.cwd(), '../../workers/W07-subscription-commerce/src/revenuecat-webhook-postgres-persistence.ts'), 'utf8')
 const migration = readFileSync(resolve(process.cwd(), '../../workers/W07-subscription-commerce/migrations-d1-04/0005_revenuecat_webhook_inbox.sql'), 'utf8')
 const openapi = readFileSync(resolve(process.cwd(), '../../contracts/openapi/v1/openapi.yaml'), 'utf8')
@@ -50,9 +49,9 @@ describe('RevenueCat provider webhook ingress', () => {
   })
 
   it('deduplicates app/event identity and retains changed-payload conflicts without granting access', () => {
-    expect(persistence).toContain('sha256BytesToHex')
-    expect(persistence).toContain('ON CONFLICT(app_id,event_id) DO NOTHING')
-    expect(persistence).toContain('revenuecat_webhook_event_conflicts')
+    expect(postgresPersistence).toContain('sha256BytesToHex')
+    expect(postgresPersistence).toContain('ON CONFLICT (app_id,event_id) DO NOTHING')
+    expect(postgresPersistence).toContain('revenuecat_webhook_event_conflicts')
     expect(postgresPersistence).toContain('BEGIN')
     expect(postgresPersistence).toContain('ON CONFLICT (app_id,event_id) DO NOTHING')
     expect(postgresPersistence).toContain('ON CONFLICT (app_id,event_id,incoming_payload_sha256) DO UPDATE')

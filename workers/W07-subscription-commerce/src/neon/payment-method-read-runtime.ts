@@ -9,7 +9,7 @@ import type { OrderCreatePersistenceStore } from '../order-persistence.js'
 import type { PaymentMethodReadStore } from '../payment-method-read-store.js'
 import type { W07WebhookPostgresPool } from '../payment-webhook-database-postgres.js'
 import { createPostgresRevenueCatWebhookReceiptStore } from '../revenuecat-webhook-postgres-persistence.js'
-import type { RevenueCatWebhookReceiptStore } from '../revenuecat-webhook-persistence.js'
+import type { RevenueCatWebhookReceiptStore } from '../revenuecat-webhook-contracts.js'
 
 export type W07PaymentMethodReadRuntimeEnv = Readonly<{
   W07_DATABASE_DRIVER?: string
