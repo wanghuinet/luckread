@@ -80,8 +80,8 @@ export async function getCommerceOrderPostgres(
       'SELECT order_id, status, version::text AS version, currency, ' +
       'subtotal_minor::text AS subtotal_minor, discount_minor::text AS discount_minor, ' +
       'tax_minor::text AS tax_minor, total_minor::text AS total_minor, ' +
-      'to_char(created_at AT TIME ZONE \\'UTC\\', \\'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\\') AS created_at, ' +
-      'to_char(updated_at AT TIME ZONE \\'UTC\\', \\'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\\') AS updated_at ' +
+      'to_char(created_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS created_at, ' +
+      'to_char(updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS updated_at ' +
       'FROM orders WHERE order_id = $1 AND customer_id = $2 LIMIT 1',
       [orderIdInput, customerIdInput],
     )
