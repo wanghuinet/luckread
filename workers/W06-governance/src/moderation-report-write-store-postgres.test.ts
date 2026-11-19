@@ -184,8 +184,14 @@ describe('W06 native PostgreSQL report write store', () => {
     ])
 
     const store = createPostgresModerationReportWriteStore(fake.pool)
-    await expect(store.create(command)).rejects.toBeInstanceOf(ModerationReportWriteStoreError)
-    await expect(store.create(command)).rejects.toMatchObject({
+    let failure: unknown
+    try {
+      await store.create(command)
+    } catch (error) {
+      failure = error
+    }
+    expect(failure).toBeInstanceOf(ModerationReportWriteStoreError)
+    expect(failure).toMatchObject({
       code: 'REPORT_WRITE_FAILED',
       status: 500,
       message: 'REPORT_WRITE_FAILED',
