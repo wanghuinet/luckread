@@ -479,7 +479,7 @@ describe('W07 scheduled renewal batch', () => {
     expect(f.syncPending).toHaveBeenCalledTimes(2);
     expect(f.syncPending).toHaveBeenNthCalledWith(1, f.env, { limit: 10 }, { getFinancePostgresPool: expect.any(Function), getMembershipPostgresPool: expect.any(Function) });
     expect(f.syncPending).toHaveBeenNthCalledWith(2, f.env, { limit: 10 }, { getFinancePostgresPool: expect.any(Function), getMembershipPostgresPool: expect.any(Function) });
-    expect(f.scanDue).toHaveBeenCalledWith(f.env, { limit: 5 }, { getFinancePostgresPool: expect.any(Function), getMembershipPostgresPool: expect.any(Function) });
+    expect(f.scanDue).toHaveBeenCalledWith(f.env, { limit: 5 }, { getDatabase: expect.any(Function), getMembershipPostgresPool: expect.any(Function) });
     expect(f.processCycle).toHaveBeenCalledTimes(2);
   });
 
