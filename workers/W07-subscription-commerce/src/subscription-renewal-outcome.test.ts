@@ -125,7 +125,7 @@ class MemoryStore {
   async all<T>(sql: string, values: unknown[] = []): Promise<{ results: T[] }> {
     if (sql.includes('FROM subscription_renewal_cycles')) {
       this.pendingScanLimit = Number(values[0]);
-      if (this.failPendingScan) throw new Error('temporary Neon Neon finance pending-cycle scan failure');
+      if (this.failPendingScan) throw new Error('temporary Neon finance pending-cycle scan failure');
       if (this.cycle && this.cycle.subscription_sync_state === 'PENDING' &&
           ['SUCCEEDED', 'FAILED'].includes(this.cycle.state)) {
         return { results: [{ cycle_id: this.cycle.cycle_id } as T] };
@@ -227,7 +227,21 @@ function syncDependencies(e: ReturnType<typeof env>) {
 }
 
 
-describe('Neon finance renewal outcome to Neon Neon membership Subscription synchronization', () => {
+describe('Neon finance renewal outcome to Neon membership Subscription synchronization', () => {
+  it('fails closed when the finance Neon pool is unavailable', async () => {
+    const e = env();
+    await expect(
+      syncTerminalRenewalCycleToSubscription(e.value, CYCLE_ID, {
+        ...syncDependencies(e),
+        getFinancePostgresPool: () => undefined,
+      }),
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
+    expect(e.membershipStore.subscription).toMatchObject({
+      status: 'ACTIVE', current_period_start: START, current_period_end: CYCLE_START, version: 3,
+    });
+    expect(e.financeStore.cycle?.subscription_sync_state).toBe('PENDING');
+  });
+
   it('fails closed on a malformed Neon finance cycle timestamp before changing Neon membership', async () => {
     const e = env(makeCycle({ updated_at: '2026-02-31T12:00:00.000Z' }));
     await expect(syncTerminalRenewalCycleToSubscription(e.value, CYCLE_ID, syncDependencies(e)))
