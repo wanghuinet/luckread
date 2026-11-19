@@ -45,7 +45,7 @@ export interface AccountStateChangedAuditInput {
  * AUTH-013 account-state transition.
  *
  * Persistence/publication remains outside this pure constructor; the admitted
- * W06 runtime boundary invokes this constructor before D1-03 persistence.
+ * W06 runtime boundaries invoke this constructor before append-only AuditEvent persistence through the existing D1-03 adapter or native Neon Store.
  */
 export function buildAccountStateChangedAuditEvent(
   input: AccountStateChangedAuditInput,
