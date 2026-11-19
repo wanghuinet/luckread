@@ -193,6 +193,27 @@ describe('paid membership order fulfillment', () => {
     expect(f.state.subscriptions.get(subscriptionId)?.status).toBe('CANCELED');
   });
 
+  it('fails closed when either Neon finance or membership pool is unavailable', async () => {
+    const f = fixture();
+    const missingFinance = {
+      ...f.dependencies,
+      getFinancePostgresPool: () => undefined,
+    };
+    await expect(
+      fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1', missingFinance),
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
+    expect(f.state.insertCount).toBe(0);
+
+    const missingMembership = {
+      ...f.dependencies,
+      getMembershipPostgresPool: () => undefined,
+    };
+    await expect(
+      fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1', missingMembership),
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
+    expect(f.state.insertCount).toBe(0);
+  });
+
   it('fails closed for an unpaid or amount-mismatched order before touching D1-01', async () => {
     for (const order of [
       { payment_status: 'processing' },
