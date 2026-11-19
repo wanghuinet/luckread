@@ -28,7 +28,7 @@ export type RevenueCatSubscriberReconciliationRuntimeDependencies = Readonly<{
   fetchSubscriber?: typeof fetchRevenueCatSubscriber;
   buildCandidates?: typeof buildRevenueCatSubscriberReconciliationCandidates;
   nowMs?: () => number;
-  getMembershipPostgresPool?: (env: RevenueCatSubscriberReconciliationRuntimeEnv) => W07WebhookPostgresPool | undefined;
+  getMembershipPostgresPool?: (env: RevenueCatSubscriberReconciliationRuntimeEnv) => W07WebhookPostgresPool;
 }>;
 
 class InvalidRequestError extends Error {
