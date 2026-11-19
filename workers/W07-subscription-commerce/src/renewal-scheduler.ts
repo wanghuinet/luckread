@@ -27,7 +27,7 @@ const REQUIRED_MEMBERSHIP_TABLES = [
   'membership_subscription_scheduled_plan_changes',
 ] as const;
 
-const REQUIRED_D1_04_TABLES = [
+const REQUIRED_FINANCE_TABLES = [
   'orders',
   'order_lines',
   'payments',
@@ -128,7 +128,7 @@ export async function runRenewalScheduledBatch(
     membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
     [membershipTables, financeTables] = await Promise.all([
       (dependencies.readMembershipTableNames ?? readMembershipTableNames)(membershipPool, REQUIRED_MEMBERSHIP_TABLES),
-      getFinanceTableNames(selectedFinancePool, REQUIRED_D1_04_TABLES),
+      getFinanceTableNames(selectedFinancePool, REQUIRED_FINANCE_TABLES),
     ]);
   } catch {
     return { status: 'SCHEMA_NOT_READY', reason: 'SCHEMA_PROBE_FAILED', missingTables: [] };
@@ -136,7 +136,7 @@ export async function runRenewalScheduledBatch(
 
   const missingTables = [
     ...REQUIRED_MEMBERSHIP_TABLES.filter((name) => !membershipTables.has(name)).map((name) => 'D1-01.' + name),
-    ...REQUIRED_D1_04_TABLES.filter((name) => !financeTables.has(name)).map((name) => 'D1-04.' + name),
+    ...REQUIRED_FINANCE_TABLES.filter((name) => !financeTables.has(name)).map((name) => 'D1-04.' + name),
   ];
   if (missingTables.length > 0) {
     return { status: 'SCHEMA_NOT_READY', reason: 'REQUIRED_TABLES_MISSING', missingTables };
