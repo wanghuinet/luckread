@@ -301,7 +301,7 @@ export async function handleCommerceRefundRequest(
       reason: reservation.refund.reason,
     });
 
-    const record = dependencies.recordAcknowledgement ?? recordHyperswitchRefundAcknowledgement;
+    const record = dependencies.recordAcknowledgement ?? recordHyperswitchRefundAcknowledgementPostgres;
     const persisted = await record(pool, createdRefund);
     return refundResponse(persisted, reservation.replayed);
   } catch (error) {
