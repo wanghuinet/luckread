@@ -367,8 +367,10 @@ export async function createRefundReservationPostgres(
     );
   } catch (error) {
     const mapped = mapRefundInsertError(error);
-    if (errorCode(error) === '23505') {
+    if (errorCode(error) === '23505' || errorCode(error) === '23514') {
       try {
+        // The BEFORE INSERT source guard can reject an identical concurrent
+        // replay on remaining balance before the unique key is checked.
         const raced = await readRefundByCustomerAndKey(db, input.customerId, input.idempotencyKey);
         if (raced) return replayOrConflict(raced, requestHash);
       } catch (recoveryError) {
