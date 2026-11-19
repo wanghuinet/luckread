@@ -44,7 +44,9 @@ function getRenewalOutcomeMembershipStore(
   dependencies: Pick<RenewalOutcomeSyncDependencies, 'getMembershipPostgresPool'> = {},
 ): RenewalOutcomeMembershipStore {
   try {
-    return (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
+    const pool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
+    if (!pool) throw new Error('membership pool unavailable');
+    return pool;
   } catch {
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
   }
