@@ -149,7 +149,7 @@ describe('failed recurring payment recovery', () => {
 
   it('waits for backoff instead of immediately repeating a failed off-session charge', async () => {
     const f = setup({ cycle: { updated_at: '2026-10-28T11:59:00.000Z' } });
-    const result = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW) });
+    const result = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => f.membershipPool });
     expect(result).toMatchObject({ state: 'FAILED', action: 'AWAITING_RETRY' });
     expect(f.d1_04.cycle?.state).toBe('FAILED');
   });
@@ -177,7 +177,7 @@ describe('failed recurring payment recovery', () => {
       { cancel_at: CYCLE_START },
     ]) {
       const f = setup({ subscription });
-      const retry = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW) });
+      const retry = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => f.membershipPool });
       expect(retry.action).toBe('TERMINAL');
       expect(f.d1_04.cycle?.state).toBe('FAILED');
     }
