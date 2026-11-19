@@ -2,7 +2,6 @@
 
 import { readBoundedProviderWebhookBody } from './provider-webhook-body.js'
 import {
-  receiveHyperswitchWebhook,
   PaymentPersistenceError,
   type WebhookReceiptResult,
 } from './payment-persistence.js';
@@ -15,13 +14,11 @@ import {
   fulfillPaidMembershipOrder,
   type PaidMembershipPurchaseFulfillmentResult,
 } from './paid-membership-order-fulfillment.js';
-import { issueReceiptForPaidPayment } from './billing-persistence.js';
 import {
   getW07MembershipPostgresPool,
   type W07MembershipDatabaseRuntimeEnv,
 } from './neon/membership-database-runtime.js';
 import {
-  getW07PaymentWebhookDatabase,
   getW07PaymentWebhookPostgresPool,
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
@@ -32,12 +29,14 @@ import { receiveHyperswitchMandateWebhookPostgres } from './mandate-webhook-post
 import { issueReceiptForPaidPaymentPostgres } from './billing-document-postgres-persistence.js';
 import { expirePendingSubscriptionPlanUpgradeForPaymentPostgres } from './subscription-plan-upgrade-expiry-postgres.js';
 
-type HyperswitchWebhookRuntimeEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{
-  D1_04: D1Database;
-  W06_GOVERNANCE?: Fetcher;
-  HYPERSWITCH_WEBHOOK_SECRET?: string | null;
-  HYPERSWITCH_MERCHANT_ID?: string | null;
-}>;
+type HyperswitchWebhookRuntimeEnv =
+  Pick<W07PaymentMethodReadRuntimeEnv, 'W07_DATABASE_DRIVER' | 'HYPERDRIVE_D1_04'> &
+  W07MembershipDatabaseRuntimeEnv &
+  Readonly<{
+    W06_GOVERNANCE?: Fetcher;
+    HYPERSWITCH_WEBHOOK_SECRET?: string | null;
+    HYPERSWITCH_MERCHANT_ID?: string | null;
+  }>;
 
 type RenewalPendingRecoveryResult = Readonly<{
   scanned: number;
@@ -47,25 +46,15 @@ type RenewalPendingRecoveryResult = Readonly<{
 }>;
 
 type HyperswitchWebhookRuntimeDependencies = Readonly<{
-  receive?: typeof receiveHyperswitchWebhook;
-  getWebhookDatabase?: (env: HyperswitchWebhookRuntimeEnv) => D1Database | undefined;
   getWebhookPostgresPool?: (env: HyperswitchWebhookRuntimeEnv) => W07WebhookPostgresPool | undefined;
   getMembershipPostgresPool?: (env: HyperswitchWebhookRuntimeEnv) => W07WebhookPostgresPool | undefined;
   receiveRefundWebhookPostgres?: typeof receiveHyperswitchRefundWebhookPostgres;
   receivePaymentWebhookPostgres?: typeof receiveHyperswitchPaymentWebhookPostgres;
   receiveMandateWebhookPostgres?: typeof receiveHyperswitchMandateWebhookPostgres;
   issueReceiptPostgres?: typeof issueReceiptForPaidPaymentPostgres;
-  syncRenewalOutcome?: (
-    env: Readonly<{ D1_04: D1Database }>,
-    paymentId: string,
-    merchantId: string,
-  ) => Promise<RenewalOutcomeSyncResult>;
-  syncPendingOutcomes?: (
-    env: Readonly<{ D1_04: D1Database }>,
-    options?: Readonly<{ limit?: number }>,
-  ) => Promise<RenewalPendingRecoveryResult>;
+  syncRenewalOutcome?: typeof syncRenewalCycleOutcomeForPayment;
+  syncPendingOutcomes?: typeof syncPendingRenewalOutcomes;
   fulfillPaidOrder?: typeof fulfillPaidMembershipOrder;
-  issueReceipt?: typeof issueReceiptForPaidPayment;
   expirePendingPlanUpgradePostgres?: typeof expirePendingSubscriptionPlanUpgradeForPaymentPostgres;
 }>;
 
@@ -194,6 +183,7 @@ export async function handleHyperswitchWebhookRequest(
   }
 
   if (
+    env.W07_DATABASE_DRIVER?.trim().toLowerCase() !== 'neon' ||
     !nonBlank(env.HYPERSWITCH_WEBHOOK_SECRET, 4096) ||
     !nonBlank(env.HYPERSWITCH_MERCHANT_ID, 256)
   ) {
@@ -210,50 +200,39 @@ export async function handleHyperswitchWebhookRequest(
       webhookSecret: env.HYPERSWITCH_WEBHOOK_SECRET,
       expectedMerchantId: env.HYPERSWITCH_MERCHANT_ID,
     };
-    let webhookDatabase: D1Database | undefined;
-    const useNeon = env.W07_DATABASE_DRIVER?.trim().toLowerCase() === 'neon';
-    const postgresPool = useNeon
-      ? (dependencies.getWebhookPostgresPool ?? getW07PaymentWebhookPostgresPool)(env)
-      : undefined;
-    const nativeRefund = postgresPool
-      ? await (dependencies.receiveRefundWebhookPostgres ?? receiveHyperswitchRefundWebhookPostgres)(
-        postgresPool, webhookInput,
-      )
-      : null;
-    const nativeMandate = postgresPool && !nativeRefund
-      ? await (dependencies.receiveMandateWebhookPostgres ?? receiveHyperswitchMandateWebhookPostgres)(
-        postgresPool, webhookInput,
-      )
-      : null;
-    const nativePayment = postgresPool && !nativeRefund && !nativeMandate
-      ? await (dependencies.receivePaymentWebhookPostgres ?? receiveHyperswitchPaymentWebhookPostgres)(
-        postgresPool, webhookInput,
-      )
-      : null;
+    const postgresPool = (dependencies.getWebhookPostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+    if (!postgresPool) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+
+    const nativeRefund = await (dependencies.receiveRefundWebhookPostgres ?? receiveHyperswitchRefundWebhookPostgres)(
+      postgresPool,
+      webhookInput,
+    );
+    const nativeMandate = nativeRefund
+      ? null
+      : await (dependencies.receiveMandateWebhookPostgres ?? receiveHyperswitchMandateWebhookPostgres)(
+        postgresPool,
+        webhookInput,
+      );
+    const nativePayment = nativeRefund || nativeMandate
+      ? null
+      : await (dependencies.receivePaymentWebhookPostgres ?? receiveHyperswitchPaymentWebhookPostgres)(
+        postgresPool,
+        webhookInput,
+      );
+
     let result: WebhookReceiptResult;
     if (nativeRefund) {
       result = nativeRefund;
     } else if (nativeMandate) {
       result = nativeMandate;
     } else if (nativePayment) {
-      // Keep the existing read/sync saga on the selected D1-04 Neon facade;
-      // payment_details state, order and renewal-cycle writes are committed natively above.
-      const neonDatabase = (dependencies.getWebhookDatabase ?? getW07PaymentWebhookDatabase)(env);
-      if (!neonDatabase) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
-      webhookDatabase = neonDatabase;
       result = nativePayment;
     } else {
-      const receive = dependencies.receive ?? receiveHyperswitchWebhook;
-      const neonDatabase = (dependencies.getWebhookDatabase ?? getW07PaymentWebhookDatabase)(env);
-      webhookDatabase = neonDatabase ?? env.D1_04;
-      result = await receive(webhookDatabase, webhookInput, {
-        databaseDialect: neonDatabase ? 'postgres' : 'd1',
-      });
+      throw new PaymentPersistenceError('WEBHOOK_REJECTED', 400);
     }
 
-    // The selected native PostgreSQL Store or D1-compatible bridge has verified
-    // the exact raw-body signature and committed its provider receipt before any
-    // payment-only post-commit saga is allowed to run.
+    // The native PostgreSQL Store has verified the exact raw-body signature and
+    // committed its provider receipt before any payment-only post-commit saga runs.
     let subscriptionSync: RenewalOutcomeSyncResult | undefined;
     let pendingRecovery: RenewalPendingRecoveryResult | undefined;
     let purchaseFulfillment: PaidMembershipPurchaseFulfillmentResult | undefined;
@@ -261,32 +240,24 @@ export async function handleHyperswitchWebhookRequest(
       ? paymentIdFromSignedPayload(rawBody)
       : null;
     if (paymentId) {
-      const selectedWebhookDatabase = webhookDatabase;
-      if (!selectedWebhookDatabase) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
       if (isSignedPaymentSucceededEvent(rawBody)) {
-        // A receipt is created only after the selected provider Store has verified
+        // A receipt is created only after the native PostgreSQL Store has verified
         // the raw HMAC signature and durably committed the successful Payment state.
         // Duplicate signed events safely retry a previously interrupted receipt.
-        if (postgresPool) {
-          const issueReceipt = dependencies.issueReceiptPostgres ?? issueReceiptForPaidPaymentPostgres;
-          await issueReceipt(postgresPool, paymentId, env.HYPERSWITCH_MERCHANT_ID);
-        } else {
-          const issueReceipt = dependencies.issueReceipt ?? issueReceiptForPaidPayment;
-          await issueReceipt(selectedWebhookDatabase, paymentId, env.HYPERSWITCH_MERCHANT_ID);
-        }
+        const issueReceipt = dependencies.issueReceiptPostgres ?? issueReceiptForPaidPaymentPostgres;
+        await issueReceipt(postgresPool, paymentId, env.HYPERSWITCH_MERCHANT_ID);
       }
       const sync = dependencies.syncRenewalOutcome ?? syncRenewalCycleOutcomeForPayment;
-      const renewalEnv = { ...env, D1_04: selectedWebhookDatabase, W06_GOVERNANCE: env.W06_GOVERNANCE };
+      const renewalEnv = { ...env, W06_GOVERNANCE: env.W06_GOVERNANCE };
       subscriptionSync = await sync(
         renewalEnv,
         paymentId,
         env.HYPERSWITCH_MERCHANT_ID,
       );
 
-      // Signed provider outcomes are already durable in D1-04. Expire only a
+      // Signed provider outcomes are durable in the Neon finance store. Expire only a
       // matching unpaid plan-upgrade reservation when the stored Payment is terminally failed.
-      const financePool = postgresPool ??
-        (dependencies.getWebhookPostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+      const financePool = postgresPool;
       const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
       if (!financePool || !membershipPool) {
         throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
@@ -297,17 +268,17 @@ export async function handleHyperswitchWebhookRequest(
 
       // Initial creator-membership purchases have no renewal-cycle row. Only a
       // verified payment_succeeded event may fulfill one, and fulfillment reads
-      // the durable D1-04 Payment + Order + immutable OrderLine snapshot before
-      // performing an idempotent scoped transition in D1-01.
+      // the durable Neon finance Payment + Order + immutable OrderLine snapshot
+      // before performing an idempotent scoped transition in the Neon membership store.
       if (subscriptionSync.outcome === 'NO_RENEWAL_CYCLE' && isSignedPaymentSucceededEvent(rawBody)) {
         const fulfill = dependencies.fulfillPaidOrder ?? fulfillPaidMembershipOrder;
         purchaseFulfillment = await fulfill(renewalEnv, paymentId, env.HYPERSWITCH_MERCHANT_ID);
       }
 
       // A verified terminal renewal payment is an existing, trusted execution
-      // opportunity to drain a small bounded batch of older D1-04 -> D1-01
-      // outcome-sync work. This is recovery only: it does not schedule new
-      // charges, and it is skipped for ordinary payments before migration 0004.
+      // opportunity to drain a small bounded batch of older Neon finance ->
+      // Neon membership outcome-sync work. This is recovery only: it does not
+      // schedule new charges and does not create a new provider charge.
       if (subscriptionSync.outcome === 'APPLIED' || subscriptionSync.outcome === 'ALREADY_APPLIED') {
         const recover = dependencies.syncPendingOutcomes ?? syncPendingRenewalOutcomes;
         pendingRecovery = await recover(renewalEnv, { limit: 10 });
