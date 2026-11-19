@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { ModerationRuntimeError, decideModerationCase, listModerationQueue } from './moderation-runtime'
+import { ModerationRuntimeError, decideModerationCase, getModerationCase, listModerationQueue } from './moderation-runtime'
 import { createPostgresModerationQueueReadStore } from './moderation-queue-read-store-postgres'
 import type { ModerationQueuePostgresQueryExecutor } from './moderation-queue-read-store-postgres'
+import {
+  createPostgresModerationCaseDetailReadStore,
+  type ModerationCaseDetailPostgresQueryExecutor,
+  type ModerationCaseDetailReadRow,
+} from './moderation-case-detail-read-store-postgres'
 
 const baseInput = {
   reviewerId: 'reviewer_1',
@@ -278,4 +283,90 @@ describe('moderation runtime admission guards', () => {
     })
   })
 
+})
+
+
+describe('W06 native PostgreSQL moderation case detail runtime', () => {
+  it('returns the same case and decision projection through the PostgreSQL store', async () => {
+    const calls: Array<{ sql: string; values: unknown[] }> = []
+    const row: ModerationCaseDetailReadRow = {
+      case_id: 'case_1',
+      target_type: 'content',
+      target_id: 'content_1',
+      target_version: 4,
+      policy_version: 'moderation-v1',
+      state: 'ACTION_TAKEN',
+      priority: 80,
+      assigned_reviewer_id: 'reviewer_1',
+      current_decision_id: 'decision_1',
+      evidence_bundle_ref: 'evidence/case_1',
+      version: 3,
+      created_at: '2026-11-19T03:00:00.123456Z',
+      updated_at: '2026-11-19T03:02:00.654321Z',
+      decision_id: 'decision_1',
+      case_version: 3,
+      outcome: 'APPROVED',
+      decision_policy_version: 'moderation-v1',
+      decision_effective_at: '2026-11-19T03:02:00.654321Z',
+      reason_code: 'POLICY_MATCH',
+      severity: 'medium',
+      scope: 'content',
+      expires_at: null,
+      source_kind: 'HUMAN_REVIEW',
+      reviewer_id: 'reviewer_1',
+      reviewer_layer: 'L6',
+      request_id: 'req_case_1',
+      decision_created_at: '2026-11-19T03:02:00.654321Z',
+      decision_target_type: 'content',
+      decision_target_id: 'content_1',
+      decision_target_version: 4,
+    }
+    const db: ModerationCaseDetailPostgresQueryExecutor = {
+      async query<Row extends Record<string, unknown>>(sql: string, values: unknown[] = []) {
+        calls.push({ sql, values })
+        return { rows: [row] as unknown as Row[] }
+      },
+    }
+
+    const result = await getModerationCase(
+      createPostgresModerationCaseDetailReadStore(db),
+      'reviewer_1',
+      'case_1',
+    )
+
+    expect(result).toMatchObject({
+      caseId: 'case_1',
+      target: { targetType: 'content', targetId: 'content_1' },
+      currentDecision: {
+        decisionId: 'decision_1',
+        outcome: 'APPROVED',
+        policyVersion: 'moderation-v1',
+        effectiveAt: '2026-11-19T03:02:00.654321Z',
+      },
+      status: 'ACTION_TAKEN',
+      version: 3,
+    })
+    expect(result.createdAt).toBe('2026-11-19T03:00:00.123456Z')
+    expect(result.updatedAt).toBe('2026-11-19T03:02:00.654321Z')
+    expect(calls[0]?.values).toEqual(['case_1', 'reviewer_1'])
+  })
+
+  it('maps a native PostgreSQL read failure to the moderation service error', async () => {
+    const db: ModerationCaseDetailPostgresQueryExecutor = {
+      async query<Row extends Record<string, unknown>>() {
+        throw new Error('private PostgreSQL connection detail')
+      },
+    }
+
+    await expect(
+      getModerationCase(
+        createPostgresModerationCaseDetailReadStore(db),
+        'reviewer_1',
+        'case_1',
+      ),
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+    })
+  })
 })
