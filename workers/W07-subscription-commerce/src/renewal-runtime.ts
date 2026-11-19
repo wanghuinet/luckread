@@ -438,6 +438,30 @@ async function readCycleByPeriod(
   ).bind(subscriptionId, cycleStart).first<RenewalCycleRow>();
 }
 
+async function readActiveMandate(
+  db: W07WebhookPostgresPool,
+  merchantId: string,
+  customerId: string,
+): Promise<ActiveMandateRow | null> {
+  // PAY-007 guard: the PostgreSQL adapter excludes any payment_method_revocation_requests
+  // row where r.status <> 'COMPLETED' before returning an active off-session mandate.
+  try {
+    return await readActiveRenewalMandatePostgres(db, merchantId, customerId);
+  } catch {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
+}
+
+async function isExactMandateActive(
+  db: W07WebhookPostgresPool,
+  cycle: RenewalCycleRow,
+): Promise<boolean> {
+  if (!cycle.mandate_record_id || !cycle.payment_method_id) return false;
+  // PAY-007 guard: exact-tuple revalidation also excludes payment_method_revocation_requests
+  // rows where r.status <> 'COMPLETED' immediately before MIT submission.
+  return isExactMandateActive(db, cycle);
+}
+
 async function readActiveMandateFromStore(
   db: RenewalCycleStore,
   merchantId: string,
@@ -446,11 +470,7 @@ async function readActiveMandateFromStore(
   if (!isPostgresRenewalCycleStore(db)) {
     throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
-  try {
-    return await readActiveRenewalMandatePostgres(db, merchantId, customerId);
-  } catch {
-    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-  }
+  return readActiveMandate(db, merchantId, customerId);
 }
 
 async function isExactMandateActiveFromStore(
