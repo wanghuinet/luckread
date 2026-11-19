@@ -5,6 +5,7 @@ import {
   getW06ModerationDatabase,
   getW06ModerationPostgresPool,
   getW06ModerationQueueReadStore,
+  getW06ModerationReportWriteStore,
   getW06ModerationCaseDetailReadStore,
   resolveW06ModerationDatabaseDriver,
 } from './moderation-database-runtime.js'
@@ -44,6 +45,7 @@ describe('W06 moderation database runtime admission', () => {
     expect(resolveW06ModerationDatabaseDriver(env)).toBe('d1')
     expect(getW06ModerationDatabase(env)).toBe(d1)
     expect(() => getW06ModerationQueueReadStore(env)).toThrow('W06_POSTGRES_POOL_REQUIRES_NEON_DRIVER')
+    expect(() => getW06ModerationReportWriteStore(env)).toThrow('W06_POSTGRES_POOL_REQUIRES_NEON_DRIVER')
     expect(getW06ModerationCaseDetailReadStore(env)).toBeUndefined()
   })
 
@@ -57,6 +59,7 @@ describe('W06 moderation database runtime admission', () => {
     expect(resolveW06ModerationDatabaseDriver(env)).toBe('neon')
     expect(getW06ModerationDatabase(env)).not.toBe(d1)
     expect(getW06ModerationQueueReadStore(env)).toBeDefined()
+    expect(getW06ModerationReportWriteStore(env)).toBeDefined()
     expect(getW06ModerationCaseDetailReadStore(env)).toBeDefined()
   })
 
@@ -98,6 +101,7 @@ describe('W06 moderation database runtime admission', () => {
     expect(getW06ModerationPostgresPool(env)).toBe(poolAdapter)
     expect(getW06ModerationDatabase(env)).toBe(getW06ModerationDatabase(env))
     expect(getW06ModerationQueueReadStore(env)).toBe(getW06ModerationQueueReadStore(env))
+    expect(getW06ModerationReportWriteStore(env)).toBe(getW06ModerationReportWriteStore(env))
     expect(getW06ModerationCaseDetailReadStore(env)).toBe(getW06ModerationCaseDetailReadStore(env))
     expect(getW06ModerationQueueReadStore(env)).toBeDefined()
   })
