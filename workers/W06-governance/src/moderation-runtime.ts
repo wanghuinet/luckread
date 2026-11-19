@@ -1,5 +1,9 @@
 import type { AuditActor, AuditEvent } from './audit-event'
 import {
+  ModerationDecisionWriteStoreError,
+  type ModerationDecisionWriteStore,
+} from './moderation-decision-write-store-postgres.js'
+import {
   ModerationQueueReadStoreError,
   type ModerationQueueReadCursor,
   type ModerationQueueReadStore,
@@ -348,8 +352,13 @@ export async function getModerationCase(
   return responseForCase(row, decision)
 }
 
+const isModerationDecisionWriteStore = (
+  source: D1Database | ModerationDecisionWriteStore,
+): source is ModerationDecisionWriteStore =>
+  typeof (source as ModerationDecisionWriteStore).commit === 'function'
+
 export async function deliverModerationOutbox(
-  db: D1Database,
+  db: D1Database | ModerationDecisionWriteStore,
   w03: Fetcher,
   outbox: {
     outboxId: string
@@ -409,14 +418,18 @@ export async function deliverModerationOutbox(
       Number.isInteger(result.version) &&
       typeof result.etag === 'string'
     ) {
-      await db
-        .prepare(
-          `UPDATE moderation_enforcement_outbox
-              SET status='DELIVERED', attempts=attempts+1, delivered_at=?, last_error=NULL
-            WHERE outbox_id=? AND status IN ('PENDING','RETRY')`,
-        )
-        .bind(now, outbox.outboxId)
-        .run()
+      if (isModerationDecisionWriteStore(db)) {
+        await db.markOutboxDelivered(outbox.outboxId, now)
+      } else {
+        await db
+          .prepare(
+            `UPDATE moderation_enforcement_outbox
+                SET status='DELIVERED', attempts=attempts+1, delivered_at=?, last_error=NULL
+              WHERE outbox_id=? AND status IN ('PENDING','RETRY')`,
+          )
+          .bind(now, outbox.outboxId)
+          .run()
+      }
       return 'DELIVERED'
     }
   }
@@ -425,14 +438,18 @@ export async function deliverModerationOutbox(
   const attempts = (outbox.attempts ?? 0) + 1
   const backoffSeconds = Math.min(3600, Math.max(5, 2 ** Math.min(attempts, 10)))
   const nextAttemptAt = new Date(Date.now() + backoffSeconds * 1000).toISOString()
-  await db
-    .prepare(
-      `UPDATE moderation_enforcement_outbox
-          SET status='RETRY', attempts=?, next_attempt_at=?, last_error=?
-        WHERE outbox_id=? AND status IN ('PENDING','RETRY')`,
-    )
-    .bind(attempts, nextAttemptAt, errorCode, outbox.outboxId)
-    .run()
+  if (isModerationDecisionWriteStore(db)) {
+    await db.markOutboxRetry(outbox.outboxId, attempts, nextAttemptAt, errorCode)
+  } else {
+    await db
+      .prepare(
+        `UPDATE moderation_enforcement_outbox
+            SET status='RETRY', attempts=?, next_attempt_at=?, last_error=?
+          WHERE outbox_id=? AND status IN ('PENDING','RETRY')`,
+      )
+      .bind(attempts, nextAttemptAt, errorCode, outbox.outboxId)
+      .run()
+  }
   return 'RETRY'
 }
 
@@ -512,7 +529,7 @@ export async function drainModerationOutbox(
 }
 
 export async function decideModerationCase(
-  db: D1Database,
+  db: D1Database | ModerationDecisionWriteStore,
   w03: Fetcher,
   input: {
     reviewerId: string
@@ -554,6 +571,60 @@ export async function decideModerationCase(
   if (!Number.isFinite(Date.parse(input.effectiveAt))) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
   if (input.expiresAt !== null && !Number.isFinite(Date.parse(input.expiresAt))) {
     throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
+  }
+
+  if (isModerationDecisionWriteStore(db)) {
+    const hash = await requestHash('decideModerationCase', {
+      caseId: input.caseId,
+      expectedVersion: input.expectedVersion,
+      decision: input.decision,
+      policyVersion: input.policyVersion,
+      reasonCode: input.reasonCode,
+      severity: input.severity,
+      scope: input.scope,
+      effectiveAt: input.effectiveAt,
+      expiresAt: input.expiresAt,
+    })
+    const now = new Date().toISOString()
+    let committed: Awaited<ReturnType<ModerationDecisionWriteStore['commit']>>
+    try {
+      committed = await db.commit({
+        reviewerId: input.reviewerId,
+        reviewerLayer: input.reviewerLayer,
+        caseId: input.caseId,
+        ifMatch: input.ifMatch,
+        idempotencyKey: input.idempotencyKey,
+        expectedVersion: input.expectedVersion,
+        requestHash: hash,
+        decisionId: decisionIdFor(hash),
+        outboxId: crypto.randomUUID(),
+        requestId: input.requestId,
+        correlationId: input.correlationId,
+        outcome: input.decision,
+        policyVersion: input.policyVersion,
+        reasonCode: input.reasonCode,
+        severity: input.severity,
+        scope: input.scope,
+        effectiveAt: input.effectiveAt,
+        expiresAt: input.expiresAt,
+        now,
+        idempotencyExpiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS).toISOString(),
+      })
+    } catch (error) {
+      if (error instanceof ModerationDecisionWriteStoreError) {
+        throw new ModerationRuntimeError(error.code, error.status)
+      }
+      throw error
+    }
+
+    if (!committed.replayed && committed.outbox) {
+      try {
+        await deliverModerationOutbox(db, w03, committed.outbox)
+      } catch {
+        // The committed outbox remains durable; scheduled drain is the recovery path.
+      }
+    }
+    return committed.response
   }
 
   const row = await db
