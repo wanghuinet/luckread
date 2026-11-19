@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { W07WebhookPostgresClient, W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import { prepareFailedRenewalCycleRetry, type RenewalRuntimeEnv } from './renewal-runtime.js';
 
 const NOW = '2026-10-28T12:00:00.000Z';
@@ -95,38 +96,60 @@ class MemoryD1 {
   }
 }
 
+function membershipPoolFor(store: MemoryD1): W07WebhookPostgresPool {
+  const query = async <Row extends Record<string, unknown> = Record<string, unknown>>(
+    sql: string,
+    values: unknown[] = [],
+  ) => {
+    if (sql.includes('FROM membership_subscription_scheduled_plan_changes')) {
+      return { rows: [] as Row[], rowCount: 0 };
+    }
+    if (sql.includes('FROM membership_subscriptions')) {
+      const row = await store.first<Row>(sql, values);
+      return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+    }
+    if (sql.includes('FROM payment_mandates')) {
+      const row = await store.first<Row>(sql, values);
+      return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+    }
+    throw new Error('Unexpected Neon membership query: ' + sql);
+  };
+  const client: W07WebhookPostgresClient = { query, release() {} };
+  return { query, async connect() { return client; } };
+}
+
 function setup(options: {
   cycle?: Partial<Cycle>;
   subscription?: Partial<Subscription>;
   activeMandate?: boolean;
 } = {}) {
   const d1_04 = new MemoryD1(baseCycle(options.cycle), null, options.activeMandate);
-  const d1_01 = new MemoryD1(null, baseSubscription(options.subscription));
+  const membershipState = new MemoryD1(null, baseSubscription(options.subscription));
+  const membershipPool = membershipPoolFor(membershipState);
   const env: RenewalRuntimeEnv = {
     W07_DATABASE_DRIVER: 'd1',
-    W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
-    D1_01: d1_01 as unknown as D1Database,
+    W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
     D1_04: d1_04 as unknown as D1Database,
   };
-  return { env, d1_04, d1_01 };
+  return { env, d1_04, d1_01: membershipState, membershipPool };
 }
 
 describe('failed recurring payment recovery', () => {
   it('prepares one retry only after backoff and applied PAST_DUE synchronization', async () => {
     const f = setup();
-    const first = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW) });
+    const first = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => f.membershipPool });
     expect(first).toMatchObject({ state: 'PREPARED', action: 'PREPARED', cycleId: CYCLE_ID });
     expect(f.d1_04.cycle).toMatchObject({
       state: 'PREPARED', payment_id: null, provider_response_status: null, outcome_code: 'RETRY_PREPARED',
       subscription_sync_state: 'PENDING', subscription_sync_updated_at: null, version: 9,
     });
-    const replay = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW) });
+    const replay = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => f.membershipPool });
     expect(replay).toMatchObject({ state: 'PREPARED', action: 'TERMINAL' });
   });
 
   it('waits for backoff instead of immediately repeating a failed off-session charge', async () => {
     const f = setup({ cycle: { updated_at: '2026-10-28T11:59:00.000Z' } });
-    const result = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW) });
+    const result = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => f.membershipPool });
     expect(result).toMatchObject({ state: 'FAILED', action: 'AWAITING_RETRY' });
     expect(f.d1_04.cycle?.state).toBe('FAILED');
   });
@@ -136,12 +159,12 @@ describe('failed recurring payment recovery', () => {
       subscription_sync_state: 'PENDING',
       subscription_sync_updated_at: null,
     } });
-    expect(await prepareFailedRenewalCycleRetry(pendingSync.env, CYCLE_ID, { now: () => new Date(NOW) }))
+    expect(await prepareFailedRenewalCycleRetry(pendingSync.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => pendingSync.membershipPool }))
       .toMatchObject({ action: 'AWAITING_OUTCOME_SYNC' });
     expect(pendingSync.d1_04.cycle?.state).toBe('FAILED');
 
     const revokedMandate = setup({ activeMandate: false });
-    expect(await prepareFailedRenewalCycleRetry(revokedMandate.env, CYCLE_ID, { now: () => new Date(NOW) }))
+    expect(await prepareFailedRenewalCycleRetry(revokedMandate.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => revokedMandate.membershipPool }))
       .toMatchObject({ action: 'TERMINAL', state: 'FAILED' });
     expect(revokedMandate.d1_04.cycle?.state).toBe('FAILED');
   });
@@ -154,7 +177,7 @@ describe('failed recurring payment recovery', () => {
       { cancel_at: CYCLE_START },
     ]) {
       const f = setup({ subscription });
-      const retry = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW) });
+      const retry = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => f.membershipPool });
       expect(retry.action).toBe('TERMINAL');
       expect(f.d1_04.cycle?.state).toBe('FAILED');
     }

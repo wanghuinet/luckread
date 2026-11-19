@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
 import { resolveRevenueCatMembershipProduct } from './membership-store-product-binding.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 type FakeDbResult = {
   row?: {
@@ -15,23 +16,21 @@ type FakeDbResult = {
 function fakeDb(result: FakeDbResult) {
   let sql = '';
   let bindings: unknown[] = [];
-  const db = {
-    prepare(statement: string) {
+  const db: W07WebhookPostgresPool = {
+    async query<Row extends Record<string, unknown> = Record<string, unknown>>(
+      statement: string,
+      values: unknown[] = [],
+    ) {
       sql = statement;
+      bindings = values;
+      if (result.failure) throw result.failure;
       return {
-        bind(...values: unknown[]) {
-          bindings = values;
-          return {
-            async first<T>() {
-              if (result.failure) throw result.failure;
-              return (result.row ?? null) as T | null;
-            },
-          };
-        },
+        rows: (result.row ? [result.row] : []) as Row[],
+        rowCount: result.row ? 1 : 0,
       };
     },
-  } as unknown as D1Database;
-
+    async connect() { throw new Error('RevenueCat product binding lookup is read-only'); },
+  };
   return { db, getSql: () => sql, getBindings: () => bindings };
 }
 
@@ -72,7 +71,7 @@ describe('RevenueCat membership product binding', () => {
     expect(getSql()).toContain("p.owner_type = 'CREATOR'");
   });
 
-  it('normalizes the lowercase Subscriber API store identifiers to the D1 binding enum', async () => {
+  it('normalizes the lowercase Subscriber API store identifiers to the canonical PostgreSQL enum', async () => {
     const appStore = fakeDb({ row: validRow });
     await expect(resolveRevenueCatMembershipProduct(appStore.db, {
       ...input,
@@ -116,7 +115,7 @@ describe('RevenueCat membership product binding', () => {
     });
   });
 
-  it('fails closed when D1 cannot be read', async () => {
+  it('fails closed when Neon cannot be read', async () => {
     const { db } = fakeDb({ failure: new Error('database detail') });
 
     await expect(resolveRevenueCatMembershipProduct(db, input)).rejects.toMatchObject({

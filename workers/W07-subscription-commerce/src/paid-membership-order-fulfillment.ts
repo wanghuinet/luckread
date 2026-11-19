@@ -78,7 +78,7 @@ export class PaidMembershipPurchaseFulfillmentError extends Error {
   }
 }
 
-type FulfillmentEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{ D1_01: D1Database; D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>;
+type FulfillmentEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{ D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>;
 type SubscriptionPlanUpgradeSnapshot = Readonly<{
   kind: 'PLAN_UPGRADE';
   attemptId: string;
@@ -122,12 +122,13 @@ type FulfillmentDependencies = Readonly<{
 function selectedFulfillmentDatabases(
   env: FulfillmentEnv,
   dependencies: FulfillmentDependencies = {},
-): Readonly<{ finance: FulfillmentDatabase; membership: FulfillmentDatabase }> {
+): Readonly<{ finance: FulfillmentDatabase; membership: W07WebhookPostgresPool }> {
   const financePool = (dependencies.getFinancePostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
   const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
+  if (!membershipPool) throw new PaidMembershipPurchaseFulfillmentError('SERVICE_UNAVAILABLE', 503);
   return {
     finance: financePool ?? getW07SelectedD104Database(env),
-    membership: membershipPool ?? env.D1_01,
+    membership: membershipPool,
   };
 }
 
@@ -307,33 +308,23 @@ async function readOrderLines(db: FulfillmentDatabase, orderId: string): Promise
 }
 
 async function readPlanVersion(
-  db: FulfillmentDatabase,
+  db: W07WebhookPostgresPool,
   snapshot: MembershipOfferSnapshot,
 ): Promise<MembershipPlanVersionRow> {
   let row: MembershipPlanVersionRow | null;
   try {
-    if (isPostgresFulfillmentDatabase(db)) {
-      const result = await db.query<MembershipPlanVersionRow & Record<string, unknown>>(
-        'SELECT p.plan_id, p.owner_type, p.owner_id, v.plan_version, v.name, v.tier, ' +
-        'v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
-        'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id ' +
-        'WHERE p.plan_id = $1 AND v.plan_version = $2 LIMIT 1',
-        [snapshot.planId, snapshot.planVersion],
-      )
-      row = result.rows[0] ?? null
-    } else {
-      row = await db.prepare(
-        'SELECT p.plan_id, p.owner_type, p.owner_id, v.plan_version, v.name, v.tier, ' +
-        'v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
-        'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id ' +
-        'WHERE p.plan_id = ? AND v.plan_version = ? LIMIT 1',
-      ).bind(snapshot.planId, snapshot.planVersion).first<MembershipPlanVersionRow>();
-    }
+    const result = await db.query<MembershipPlanVersionRow & Record<string, unknown>>(
+      'SELECT p.plan_id, p.owner_type, p.owner_id, v.plan_version, v.name, v.tier, ' +
+      'v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id ' +
+      'WHERE p.plan_id = $1 AND v.plan_version = $2 LIMIT 1',
+      [snapshot.planId, snapshot.planVersion],
+    );
+    row = result.rows[0] ?? null;
   } catch {
     return failClosed();
   }
   if (!row) return failClosed();
-
   let benefits: unknown;
   try {
     benefits = JSON.parse(row.benefits_json) as unknown;
@@ -391,92 +382,52 @@ function matchesExistingSubscription(
 }
 
 async function readExistingSubscription(
-  db: FulfillmentDatabase,
+  db: W07WebhookPostgresPool,
   subscriptionId: string,
 ): Promise<ExistingSubscriptionRow | null> {
   try {
-    if (isPostgresFulfillmentDatabase(db)) {
-      const result = await db.query<ExistingSubscriptionRow & Record<string, unknown>>(
-        'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, ' +
-        'to_char(started_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS started_at, ' +
-        'to_char(current_period_start AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS current_period_start, ' +
-        'to_char(current_period_end AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS current_period_end, ' +
-        'entitlement_snapshot_ref FROM membership_subscriptions WHERE subscription_id = $1 LIMIT 1',
-        [subscriptionId],
-      )
-      return result.rows[0] ?? null
-    }
-    return await db.prepare(
-      'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, ' +
-      'current_period_start, current_period_end, entitlement_snapshot_ref ' +
-      'FROM membership_subscriptions WHERE subscription_id = ? LIMIT 1',
-    ).bind(subscriptionId).first<ExistingSubscriptionRow>();
-  } catch {
-    return failClosed();
-  }
+    const result = await db.query<ExistingSubscriptionRow & Record<string, unknown>>(
+      'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, ' +
+      'to_char(started_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS started_at, ' +
+      'to_char(current_period_start AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS current_period_start, ' +
+      'to_char(current_period_end AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS current_period_end, ' +
+      'entitlement_snapshot_ref FROM membership_subscriptions WHERE subscription_id = $1 LIMIT 1',
+      [subscriptionId],
+    );
+    return result.rows[0] ?? null;
+  } catch { return failClosed(); }
 }
+
 async function createOrReplayPaidSubscription(
-  db: FulfillmentDatabase,
-  input: {
-    subscriptionId: string;
-    subscriberId: string;
-    orderId: string;
-    lineId: string;
-    snapshot: MembershipOfferSnapshot;
-    periodStart: string;
-    periodEnd: string;
-  },
+  db: W07WebhookPostgresPool,
+  input: { subscriptionId: string; subscriberId: string; orderId: string; lineId: string; snapshot: MembershipOfferSnapshot; periodStart: string; periodEnd: string },
 ): Promise<'APPLIED' | 'ALREADY_APPLIED'> {
   const existing = await readExistingSubscription(db, input.subscriptionId);
   if (existing) {
     if (!matchesExistingSubscription(existing, input)) return failClosed();
-    // Replays never reactivate a subscription that the subscriber has since cancelled,
-    // paused or otherwise transitioned. The paid order was already fulfilled once.
     return 'ALREADY_APPLIED';
   }
-
   const entitlementSnapshotRef = 'commerce-order:' + input.orderId + ':line:' + input.lineId;
   try {
-    if (isPostgresFulfillmentDatabase(db)) {
-      const result = await db.query<{ subscription_id: string } & Record<string, unknown>>(
-        'INSERT INTO membership_subscriptions ' +
-        '(subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, ' +
-        'current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at, version) ' +
-        "VALUES ($1, $2, $3, $4, $5, 'ACTIVE', $6::timestamptz, $7::timestamptz, $8::timestamptz, NULL, $9, $10::timestamptz, $11::timestamptz, 1) " +
-        'ON CONFLICT (subscription_id) DO NOTHING RETURNING subscription_id',
-        [
-          input.subscriptionId, input.subscriberId, input.snapshot.planId, input.snapshot.planVersion,
-          input.snapshot.creatorId, input.periodStart, input.periodStart, input.periodEnd,
-          entitlementSnapshotRef, input.periodStart, input.periodStart,
-        ],
-      )
-      if (result.rows.length === 0) {
-        const raced = await readExistingSubscription(db, input.subscriptionId)
-        if (raced && matchesExistingSubscription(raced, input)) return 'ALREADY_APPLIED'
-        return failClosed()
-      }
-    } else {
-      await db.prepare(
-        'INSERT INTO membership_subscriptions ' +
-        '(subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, ' +
-        'current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at, version) ' +
-        "VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?, NULL, ?, ?, ?, 1)",
-      ).bind(
-        input.subscriptionId, input.subscriberId, input.snapshot.planId, input.snapshot.planVersion,
-        input.snapshot.creatorId, input.periodStart, input.periodStart, input.periodEnd,
-        entitlementSnapshotRef, input.periodStart, input.periodStart,
-      ).run();
+    const result = await db.query<{ subscription_id: string } & Record<string, unknown>>(
+      'INSERT INTO membership_subscriptions ' +
+      '(subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at, version) ' +
+      "VALUES ($1, $2, $3, $4, $5, 'ACTIVE', $6::timestamptz, $7::timestamptz, $8::timestamptz, NULL, $9, $10::timestamptz, $11::timestamptz, 1) " +
+      'ON CONFLICT (subscription_id) DO NOTHING RETURNING subscription_id',
+      [input.subscriptionId, input.subscriberId, input.snapshot.planId, input.snapshot.planVersion, input.snapshot.creatorId, input.periodStart, input.periodStart, input.periodEnd, entitlementSnapshotRef, input.periodStart, input.periodStart],
+    );
+    if (!result.rows.length) {
+      const raced = await readExistingSubscription(db, input.subscriptionId);
+      if (raced && matchesExistingSubscription(raced, input)) return 'ALREADY_APPLIED';
+      return failClosed();
     }
   } catch {
     const raced = await readExistingSubscription(db, input.subscriptionId).catch(() => null);
     if (raced && matchesExistingSubscription(raced, input)) return 'ALREADY_APPLIED';
     throw new PaidMembershipPurchaseFulfillmentError('SERVICE_UNAVAILABLE', 503);
   }
-
   const inserted = await readExistingSubscription(db, input.subscriptionId);
-  if (!inserted || !matchesExistingSubscription(inserted, input) || inserted.status !== 'ACTIVE') {
-    return failClosed();
-  }
+  if (!inserted || !matchesExistingSubscription(inserted, input) || inserted.status !== 'ACTIVE') return failClosed();
   return 'APPLIED';
 }
 
@@ -522,86 +473,50 @@ type UpgradeSubscriptionRow = Readonly<{
   version: number;
 }>;
 
-async function readUpgradeAttempt(
-  db: FulfillmentDatabase,
-  attemptId: string,
-): Promise<UpgradeAttemptRow | null> {
+async function readUpgradeAttempt(db: W07WebhookPostgresPool, attemptId: string): Promise<UpgradeAttemptRow | null> {
   try {
-    if (isPostgresFulfillmentDatabase(db)) {
-      const result = await db.query<UpgradeAttemptRow & Record<string, unknown>>(
-        'SELECT attempt_id, subscriber_id, subscription_id, expected_subscription_version, ' +
-        'expected_plan_id, expected_plan_version, target_plan_id, target_plan_version, ' +
-        'to_char(current_period_start AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS current_period_start, ' +
-        'to_char(current_period_end AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS current_period_end, ' +
-        'order_id, status, to_char(expires_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS expires_at, ' +
-        'to_char(updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS updated_at ' +
-        'FROM membership_subscription_plan_change_attempts WHERE attempt_id = $1 LIMIT 1',
-        [attemptId],
-      )
-      return result.rows[0] ?? null
-    }
-    return await db.prepare(
-      'SELECT attempt_id, subscriber_id, subscription_id, expected_subscription_version, ' +
-      'expected_plan_id, expected_plan_version, target_plan_id, target_plan_version, ' +
-      'current_period_start, current_period_end, order_id, status, expires_at, updated_at ' +
-      'FROM membership_subscription_plan_change_attempts WHERE attempt_id = ? LIMIT 1',
-    ).bind(attemptId).first<UpgradeAttemptRow>();
-  } catch {
-    return failClosed();
-  }
+    const result = await db.query<UpgradeAttemptRow & Record<string, unknown>>(
+      'SELECT attempt_id, subscriber_id, subscription_id, expected_subscription_version, expected_plan_id, expected_plan_version, target_plan_id, target_plan_version, ' +
+      'to_char(current_period_start AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS current_period_start, ' +
+      'to_char(current_period_end AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS current_period_end, ' +
+      'order_id, status, to_char(expires_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS expires_at, ' +
+      'to_char(updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS updated_at ' +
+      'FROM membership_subscription_plan_change_attempts WHERE attempt_id = $1 LIMIT 1',
+      [attemptId],
+    );
+    return result.rows[0] ?? null;
+  } catch { return failClosed(); }
 }
 
 async function readUpgradeSubscription(
-  db: FulfillmentDatabase,
-  subscriptionId: string,
-  subscriberId: string,
+  db: W07WebhookPostgresPool, subscriptionId: string, subscriberId: string,
 ): Promise<UpgradeSubscriptionRow | null> {
   try {
-    if (isPostgresFulfillmentDatabase(db)) {
-      const result = await db.query<UpgradeSubscriptionRow & Record<string, unknown>>(
-        'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, ' +
-        'to_char(current_period_start AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS current_period_start, ' +
-        'to_char(current_period_end AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS current_period_end, ' +
-        'CASE WHEN cancel_at IS NULL THEN NULL ELSE to_char(cancel_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') END AS cancel_at, ' +
-        'entitlement_snapshot_ref, to_char(updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS updated_at, version ' +
-        'FROM membership_subscriptions WHERE subscription_id = $1 AND subscriber_id = $2 LIMIT 1',
-        [subscriptionId, subscriberId],
-      )
-      return result.rows[0] ?? null
-    }
-    return await db.prepare(
+    const result = await db.query<UpgradeSubscriptionRow & Record<string, unknown>>(
       'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, ' +
-      'current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, updated_at, version ' +
-      'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
-    ).bind(subscriptionId, subscriberId).first<UpgradeSubscriptionRow>();
-  } catch {
-    return failClosed();
-  }
+      'to_char(current_period_start AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS current_period_start, ' +
+      'to_char(current_period_end AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS current_period_end, ' +
+      'CASE WHEN cancel_at IS NULL THEN NULL ELSE to_char(cancel_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') END AS cancel_at, ' +
+      'entitlement_snapshot_ref, to_char(updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS updated_at, version ' +
+      'FROM membership_subscriptions WHERE subscription_id = $1 AND subscriber_id = $2 LIMIT 1',
+      [subscriptionId, subscriberId],
+    );
+    return result.rows[0] ?? null;
+  } catch { return failClosed(); }
 }
 
 async function markUpgradeReconciliation(
-  db: FulfillmentDatabase,
-  attempt: UpgradeAttemptRow,
-  now: string,
+  db: W07WebhookPostgresPool, attempt: UpgradeAttemptRow, now: string,
 ): Promise<void> {
   if (attempt.status !== 'PENDING_PAYMENT') return;
   const updatedAt = new Date(Math.max(Date.parse(attempt.updated_at) + 1, Date.parse(now))).toISOString();
   try {
-    if (isPostgresFulfillmentDatabase(db)) {
-      await db.query(
-        "UPDATE membership_subscription_plan_change_attempts SET status = 'RECONCILIATION_REQUIRED', " +
-        'updated_at = $1::timestamptz, version = version + 1 WHERE attempt_id = $2 AND subscriber_id = $3 AND subscription_id = $4 AND status = $5',
-        [updatedAt, attempt.attempt_id, attempt.subscriber_id, attempt.subscription_id, 'PENDING_PAYMENT'],
-      )
-    } else {
-      await db.prepare(
-        "UPDATE membership_subscription_plan_change_attempts SET status = 'RECONCILIATION_REQUIRED', " +
-        'updated_at = ?, version = version + 1 WHERE attempt_id = ? AND subscriber_id = ? AND subscription_id = ? AND status = ?',
-      ).bind(updatedAt, attempt.attempt_id, attempt.subscriber_id, attempt.subscription_id, 'PENDING_PAYMENT').run();
-    }
-  } catch {
-    return failClosed();
-  }
+    await db.query(
+      "UPDATE membership_subscription_plan_change_attempts SET status = 'RECONCILIATION_REQUIRED', updated_at = $1::timestamptz, version = version + 1 " +
+      'WHERE attempt_id = $2 AND subscriber_id = $3 AND subscription_id = $4 AND status = $5',
+      [updatedAt, attempt.attempt_id, attempt.subscriber_id, attempt.subscription_id, 'PENDING_PAYMENT'],
+    );
+  } catch { return failClosed(); }
 }
 
 async function auditAppliedSubscriptionPlanUpgrade(
@@ -669,7 +584,7 @@ function isAppliedUpgradeSubscription(
 }
 
 async function markUpgradeApplied(
-  db: FulfillmentDatabase,
+  db: W07WebhookPostgresPool,
   attempt: UpgradeAttemptRow,
   change: SubscriptionPlanUpgradeSnapshot,
   orderId: string,
@@ -679,49 +594,25 @@ async function markUpgradeApplied(
 ): Promise<boolean> {
   const entitlementRef = 'commerce-plan-upgrade:' + orderId + ':line:' + lineId;
   try {
-    if (isPostgresFulfillmentDatabase(db)) {
-      const result = await db.query<{ attempt_id: string } & Record<string, unknown>>(
-        "UPDATE membership_subscription_plan_change_attempts SET status = 'APPLIED', applied_at = $1::timestamptz, " +
-        'applied_subscription_version = $2, updated_at = $3::timestamptz, version = version + 1 ' +
-        "WHERE attempt_id = $4 AND subscriber_id = $5 AND subscription_id = $6 AND order_id = $7 AND status = 'PENDING_PAYMENT' " +
-        'AND expected_subscription_version = $8 AND expected_plan_id = $9 AND expected_plan_version = $10 ' +
-        'AND target_plan_id = $11 AND target_plan_version = $12 AND current_period_start = $13::timestamptz ' +
-        'AND current_period_end = $14::timestamptz AND expires_at >= $15::timestamptz ' +
-        'AND EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = $16 AND s.subscriber_id = $17 ' +
-        'AND s.plan_id = $18 AND s.plan_version = $19 AND s.version = $20 AND s.entitlement_snapshot_ref = $21) ' +
-        'RETURNING attempt_id',
-        [
-          appliedAt, change.expectedSubscriptionVersion + 1, updatedAt,
-          attempt.attempt_id, change.subscriberId, change.subscriptionId, orderId,
-          change.expectedSubscriptionVersion, change.expectedPlanId, change.expectedPlanVersion,
-          change.targetPlanId, change.targetPlanVersion, change.currentPeriodStart, change.currentPeriodEnd, appliedAt,
-          change.subscriptionId, change.subscriberId, change.targetPlanId, change.targetPlanVersion,
-          change.expectedSubscriptionVersion + 1, entitlementRef,
-        ],
-      )
-      return result.rows.length === 1
-    }
-    const result = await db.prepare(
-      "UPDATE membership_subscription_plan_change_attempts SET status = 'APPLIED', applied_at = ?, " +
-      'applied_subscription_version = ?, updated_at = ?, version = version + 1 ' +
-      "WHERE attempt_id = ? AND subscriber_id = ? AND subscription_id = ? AND order_id = ? AND status = 'PENDING_PAYMENT' " +
-      'AND expected_subscription_version = ? AND expected_plan_id = ? AND expected_plan_version = ? ' +
-      'AND target_plan_id = ? AND target_plan_version = ? AND current_period_start = ? AND current_period_end = ? AND expires_at >= ? ' +
-      'AND EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = ? AND s.subscriber_id = ? ' +
-      'AND s.plan_id = ? AND s.plan_version = ? AND s.version = ? AND s.entitlement_snapshot_ref = ?)',
-    ).bind(
-      appliedAt, change.expectedSubscriptionVersion + 1, updatedAt,
-      attempt.attempt_id, change.subscriberId, change.subscriptionId, orderId,
-      change.expectedSubscriptionVersion, change.expectedPlanId, change.expectedPlanVersion,
-      change.targetPlanId, change.targetPlanVersion, change.currentPeriodStart, change.currentPeriodEnd, appliedAt,
-      change.subscriptionId, change.subscriberId, change.targetPlanId, change.targetPlanVersion,
-      change.expectedSubscriptionVersion + 1, entitlementRef,
-    ).run();
-    return Number(result.meta?.changes ?? 0) === 1;
-  } catch {
-    return failClosed();
-  }
+    const result = await db.query<{ attempt_id: string } & Record<string, unknown>>(
+      "UPDATE membership_subscription_plan_change_attempts SET status = 'APPLIED', applied_at = $1::timestamptz, " +
+      'applied_subscription_version = $2, updated_at = $3::timestamptz, version = version + 1 ' +
+      "WHERE attempt_id = $4 AND subscriber_id = $5 AND subscription_id = $6 AND order_id = $7 AND status = 'PENDING_PAYMENT' " +
+      'AND expected_subscription_version = $8 AND expected_plan_id = $9 AND expected_plan_version = $10 ' +
+      'AND target_plan_id = $11 AND target_plan_version = $12 AND current_period_start = $13::timestamptz ' +
+      'AND current_period_end = $14::timestamptz AND expires_at >= $15::timestamptz ' +
+      'AND EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = $16 AND s.subscriber_id = $17 ' +
+      'AND s.plan_id = $18 AND s.plan_version = $19 AND s.version = $20 AND s.entitlement_snapshot_ref = $21) ' +
+      'RETURNING attempt_id',
+      [appliedAt, change.expectedSubscriptionVersion + 1, updatedAt, attempt.attempt_id, change.subscriberId, change.subscriptionId, orderId,
+       change.expectedSubscriptionVersion, change.expectedPlanId, change.expectedPlanVersion, change.targetPlanId, change.targetPlanVersion,
+       change.currentPeriodStart, change.currentPeriodEnd, appliedAt, change.subscriptionId, change.subscriberId, change.targetPlanId,
+       change.targetPlanVersion, change.expectedSubscriptionVersion + 1, entitlementRef],
+    );
+    return result.rows.length === 1;
+  } catch { return failClosed(); }
 }
+
 /**
  * Applies an already-paid upgrade against the existing subscription. Order and
  * Payment remain in D1-04; only plan identity, opaque order reference and CAS
@@ -797,7 +688,7 @@ async function applyPaidSubscriptionPlanUpgradePostgres(
 
 async function applyPaidSubscriptionPlanUpgrade(
   env: FulfillmentEnv,
-  membershipDb: FulfillmentDatabase,
+  membershipDb: W07WebhookPostgresPool,
   order: PaidOrderRow,
   line: PaidOrderLineRow,
   snapshot: MembershipOfferSnapshot,
@@ -890,43 +781,9 @@ async function applyPaidSubscriptionPlanUpgrade(
     Date.parse(attempt.updated_at) + 1,
   )).toISOString();
   try {
-    let applied = false;
-    if (isPostgresFulfillmentDatabase(membershipDb)) {
-      applied = await applyPaidSubscriptionPlanUpgradePostgres(
-        membershipDb, attempt, change, order, snapshot.creatorId, entitlementRef, updatedAt,
-      );
-    } else {
-      const results = await membershipDb.batch([
-        membershipDb.prepare(
-          'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, entitlement_snapshot_ref = ?, ' +
-          'updated_at = ?, version = version + 1 WHERE subscription_id = ? AND subscriber_id = ? AND creator_id = ? ' +
-          "AND plan_id = ? AND plan_version = ? AND status = 'ACTIVE' AND cancel_at IS NULL AND version = ? " +
-          'AND current_period_start = ? AND current_period_end = ?',
-        ).bind(
-          change.targetPlanId, change.targetPlanVersion, entitlementRef, updatedAt,
-          change.subscriptionId, change.subscriberId, snapshot.creatorId,
-          change.expectedPlanId, change.expectedPlanVersion, change.expectedSubscriptionVersion,
-          change.currentPeriodStart, change.currentPeriodEnd,
-        ),
-        membershipDb.prepare(
-          "UPDATE membership_subscription_plan_change_attempts SET status = 'APPLIED', applied_at = ?, " +
-          'applied_subscription_version = ?, updated_at = ?, version = version + 1 ' +
-          "WHERE attempt_id = ? AND subscriber_id = ? AND subscription_id = ? AND order_id = ? AND status = 'PENDING_PAYMENT' " +
-          'AND expected_subscription_version = ? AND expected_plan_id = ? AND expected_plan_version = ? ' +
-          'AND target_plan_id = ? AND target_plan_version = ? AND current_period_start = ? AND current_period_end = ? AND expires_at >= ? ' +
-          'AND EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = ? AND s.subscriber_id = ? ' +
-          'AND s.plan_id = ? AND s.plan_version = ? AND s.version = ? AND s.entitlement_snapshot_ref = ?)',
-        ).bind(
-          order.confirmed_at!, change.expectedSubscriptionVersion + 1, updatedAt,
-          attempt.attempt_id, change.subscriberId, change.subscriptionId, order.order_id,
-          change.expectedSubscriptionVersion, change.expectedPlanId, change.expectedPlanVersion,
-          change.targetPlanId, change.targetPlanVersion, change.currentPeriodStart, change.currentPeriodEnd, order.confirmed_at!,
-          change.subscriptionId, change.subscriberId, change.targetPlanId, change.targetPlanVersion,
-          change.expectedSubscriptionVersion + 1, entitlementRef,
-        ),
-      ]);
-      applied = Number(results[0]?.meta?.changes ?? 0) === 1 && Number(results[1]?.meta?.changes ?? 0) === 1;
-    }
+    const applied = await applyPaidSubscriptionPlanUpgradePostgres(
+      membershipDb, attempt, change, order, snapshot.creatorId, entitlementRef, updatedAt,
+    );
     if (applied) {
       return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
         ? { outcome: 'APPLIED' }

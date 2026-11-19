@@ -20,7 +20,6 @@ const MAX_BODY_BYTES = 2_048;
 const W02_USER_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 export type RevenueCatSubscriberReconciliationRuntimeEnv = Readonly<{
-  D1_01: D1Database;
   REVENUECAT_SECRET_API_KEY?: string | null;
   REVENUECAT_ALLOWED_APP_IDS?: string | null;
 }> & W07MembershipDatabaseRuntimeEnv;
@@ -29,7 +28,7 @@ export type RevenueCatSubscriberReconciliationRuntimeDependencies = Readonly<{
   fetchSubscriber?: typeof fetchRevenueCatSubscriber;
   buildCandidates?: typeof buildRevenueCatSubscriberReconciliationCandidates;
   nowMs?: () => number;
-  getMembershipPostgresPool?: (env: RevenueCatSubscriberReconciliationRuntimeEnv) => W07WebhookPostgresPool | undefined;
+  getMembershipPostgresPool?: (env: RevenueCatSubscriberReconciliationRuntimeEnv) => W07WebhookPostgresPool;
 }>;
 
 class InvalidRequestError extends Error {
@@ -185,7 +184,7 @@ export async function handleRevenueCatSubscriberReconciliationRequest(
       appUserId: principalId,
       secretApiKey: env.REVENUECAT_SECRET_API_KEY,
     });
-    const membershipStore = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env) ?? env.D1_01;
+    const membershipStore = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
     const result = await buildCandidates(
       membershipStore,
       {

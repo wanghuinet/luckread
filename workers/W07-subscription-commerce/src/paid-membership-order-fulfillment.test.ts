@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import {
   fulfillPaidMembershipOrder,
   PaidMembershipPurchaseFulfillmentError,
@@ -12,64 +13,68 @@ type FakeState = {
   insertCount: number;
 };
 
-function fakeDb(kind: 'D1_01' | 'D1_04', state: FakeState): D1Database {
+function fakeFinanceDb(state: FakeState): D1Database {
   return {
     prepare(sql: string) {
       let values: unknown[] = [];
       const statement = {
         bind(...args: unknown[]) { values = args; return statement; },
         async first<T>() {
-          if (kind === 'D1_04' && sql.includes('FROM payments AS p')) {
-            return (state.order ? { ...state.order } : null) as T | null;
-          }
-          if (kind === 'D1_04') return null;
-          if (sql.includes('FROM membership_plans AS p')) {
-            return (state.plan ? { ...state.plan } : null) as T | null;
-          }
-          if (sql.includes('FROM membership_subscriptions WHERE subscription_id = ?')) {
-            const row = state.subscriptions.get(String(values[0]));
-            return (row ? { ...row } : null) as T | null;
-          }
+          if (sql.includes('FROM payments AS p')) return (state.order ? { ...state.order } : null) as T | null;
           return null;
         },
         async all<T>() {
-          if (kind === 'D1_04' && sql.includes('FROM order_lines WHERE order_id = ?')) {
+          if (sql.includes('FROM order_lines WHERE order_id = ?')) {
             return { results: state.lines.map((line) => ({ ...line })) as T[] };
           }
           return { results: [] as T[] };
-        },
-        async run() {
-          if (kind === 'D1_01' && sql.includes('INSERT INTO membership_subscriptions')) {
-            const [
-              subscriptionId, subscriberId, planId, planVersion, creatorId,
-              periodStart, currentPeriodStart, periodEnd, entitlementSnapshotRef, createdAt, updatedAt,
-            ] = values as [string, string, string, number, string, string, string, string, string, string, string];
-            if (state.subscriptions.has(subscriptionId)) throw new Error('UNIQUE constraint failed');
-            state.subscriptions.set(subscriptionId, {
-              subscription_id: subscriptionId,
-              subscriber_id: subscriberId,
-              plan_id: planId,
-              plan_version: planVersion,
-              creator_id: creatorId,
-              status: 'ACTIVE',
-              started_at: periodStart,
-              current_period_start: currentPeriodStart,
-              current_period_end: periodEnd,
-              cancel_at: null,
-              entitlement_snapshot_ref: entitlementSnapshotRef,
-              created_at: createdAt,
-              updated_at: updatedAt,
-            });
-            state.insertCount += 1;
-            return { meta: { changes: 1 } };
-          }
-          return { meta: { changes: 0 } };
         },
       };
       return statement as unknown as D1PreparedStatement;
     },
     async batch() { return []; },
   } as unknown as D1Database;
+}
+
+function fakeMembershipPool(state: FakeState): W07WebhookPostgresPool {
+  return {
+    async query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string, values: unknown[] = []) {
+      if (sql.includes('FROM membership_plans AS p')) {
+        return { rows: state.plan ? [{ ...state.plan }] as Row[] : [], rowCount: state.plan ? 1 : 0 };
+      }
+      if (sql.includes('FROM membership_subscriptions WHERE subscription_id = $1 LIMIT 1')) {
+        const row = state.subscriptions.get(String(values[0]));
+        return { rows: row ? [{ ...row }] as Row[] : [], rowCount: row ? 1 : 0 };
+      }
+      if (sql.includes('INSERT INTO membership_subscriptions')) {
+        const [subscriptionId, subscriberId, planIdValue, planVersion, creatorId,
+          periodStart, currentPeriodStart, periodEnd, entitlementSnapshotRef, createdAt, updatedAt] =
+          values as [string, string, string, number, string, string, string, string, string, string, string];
+        if (state.subscriptions.has(subscriptionId)) {
+          return { rows: [] as Row[], rowCount: 0 };
+        }
+        state.subscriptions.set(subscriptionId, {
+          subscription_id: subscriptionId,
+          subscriber_id: subscriberId,
+          plan_id: planIdValue,
+          plan_version: planVersion,
+          creator_id: creatorId,
+          status: 'ACTIVE',
+          started_at: periodStart,
+          current_period_start: currentPeriodStart,
+          current_period_end: periodEnd,
+          cancel_at: null,
+          entitlement_snapshot_ref: entitlementSnapshotRef,
+          created_at: createdAt,
+          updated_at: updatedAt,
+        });
+        state.insertCount += 1;
+        return { rows: [{ subscription_id: subscriptionId }] as Row[], rowCount: 1 };
+      }
+      throw new Error('Unexpected W07 membership PostgreSQL query: ' + sql);
+    },
+    async connect() { throw new Error('membership insert path does not open a transaction'); },
+  };
 }
 
 const planId = 'plan_' + 'a'.repeat(64);
@@ -137,19 +142,23 @@ function fixture(overrides: {
     subscriptions: new Map(),
     insertCount: 0,
   };
+  const membershipPool = fakeMembershipPool(state);
   const env = {
     W07_DATABASE_DRIVER: 'd1',
-    W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
-    D1_01: fakeDb('D1_01', state),
-    D1_04: fakeDb('D1_04', state),
+    W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+    D1_04: fakeFinanceDb(state),
   };
-  return { env, state };
+  return {
+    env,
+    state,
+    dependencies: { getMembershipPostgresPool: () => membershipPool },
+  };
 }
 
 describe('paid membership order fulfillment', () => {
   it('activates only the subscription tied to a confirmed, successful order and immutable plan snapshot', async () => {
     const f = fixture();
-    const result = await fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1');
+    const result = await fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1', f.dependencies);
 
     expect(result).toEqual({ outcome: 'APPLIED', fulfilledCount: 1 });
     expect(f.state.insertCount).toBe(1);
@@ -170,7 +179,7 @@ describe('paid membership order fulfillment', () => {
   it('replays the same paid order without duplicate subscriptions or reactivating a later cancellation', async () => {
     const f = fixture();
     const paymentId = 'pay_' + 'b'.repeat(26);
-    await fulfillPaidMembershipOrder(f.env, paymentId, 'merchant_1');
+    await fulfillPaidMembershipOrder(f.env, paymentId, 'merchant_1', f.dependencies);
     const [subscriptionId, row] = [...f.state.subscriptions.entries()][0]!;
     row.status = 'CANCELED';
     // Later renewal, cancellation, or plan change may have altered mutable
@@ -181,7 +190,7 @@ describe('paid membership order fulfillment', () => {
     row.current_period_start = '2026-11-29T10:00:00.000Z';
     row.current_period_end = '2026-12-29T10:00:00.000Z';
 
-    const replay = await fulfillPaidMembershipOrder(f.env, paymentId, 'merchant_1');
+    const replay = await fulfillPaidMembershipOrder(f.env, paymentId, 'merchant_1', f.dependencies);
     expect(replay).toEqual({ outcome: 'ALREADY_APPLIED', fulfilledCount: 1 });
     expect(f.state.insertCount).toBe(1);
     expect(f.state.subscriptions.get(subscriptionId)?.status).toBe('CANCELED');
@@ -198,7 +207,7 @@ describe('paid membership order fulfillment', () => {
     ]) {
       const f = fixture({ order });
       await expect(
-        fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1'),
+        fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1', f.dependencies),
       ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
       expect(f.state.insertCount).toBe(0);
     }
@@ -216,7 +225,7 @@ describe('paid membership order fulfillment', () => {
     ];
     for (const f of cases) {
       await expect(
-        fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1'),
+        fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1', f.dependencies),
       ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
       expect(f.state.insertCount).toBe(0);
     }
@@ -226,7 +235,7 @@ describe('paid membership order fulfillment', () => {
     const f = fixture({
       line: { item_type: 'DIGITAL_GOOD' },
     });
-    const result = await fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1');
+    const result = await fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1', f.dependencies);
 
     expect(result).toEqual({ outcome: 'NOT_APPLICABLE', fulfilledCount: 0 });
     expect(f.state.insertCount).toBe(0);
@@ -267,7 +276,7 @@ describe('paid membership order fulfillment', () => {
     });
 
     await expect(
-      fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1'),
+      fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1', f.dependencies),
     ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
     expect(f.state.insertCount).toBe(0);
   });
@@ -287,19 +296,19 @@ describe('paid membership order fulfillment', () => {
     ] });
 
     await expect(
-      fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1'),
+      fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1', f.dependencies),
     ).rejects.toBeInstanceOf(PaidMembershipPurchaseFulfillmentError);
     expect(f.state.insertCount).toBe(0);
   });
   it('fails closed when a deterministic subscription lineage has a different creator identity', async () => {
     const f = fixture();
     const paymentId = 'pay_' + 'b'.repeat(26);
-    await fulfillPaidMembershipOrder(f.env, paymentId, 'merchant_1');
+    await fulfillPaidMembershipOrder(f.env, paymentId, 'merchant_1', f.dependencies);
     const [subscriptionId, row] = [...f.state.subscriptions.entries()][0]!;
     row.creator_id = 'creator_attacker';
 
     await expect(
-      fulfillPaidMembershipOrder(f.env, paymentId, 'merchant_1'),
+      fulfillPaidMembershipOrder(f.env, paymentId, 'merchant_1', f.dependencies),
     ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
     expect(f.state.insertCount).toBe(1);
     expect(f.state.subscriptions.get(subscriptionId)?.creator_id).toBe('creator_attacker');

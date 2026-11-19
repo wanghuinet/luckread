@@ -2,6 +2,7 @@
 
 import { resolveCommerceOrderItems } from './order-item-resolution.js';
 import type { AuthoritativelyPricedOrder } from './order-persistence.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import { applyDemoTaxPricing, isDemoPricingEnabled } from './demo-tax-pricing.js';
 import { applyTaxJarSandboxPricing, type TaxJarSandboxAddress } from './taxjar-sandbox-pricing.js';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
@@ -11,7 +12,6 @@ import {
 } from './neon/membership-database-runtime.js';
 
 export type DemoCommercePricingEnv = Readonly<{
-  D1_01: D1Database;
   HYPERSWITCH_ENVIRONMENT?: string | null;
   COMMERCE_PRICING_MODE?: string | null;
   COMMERCE_DEMO_TAX_PROVIDER?: string | null;
@@ -27,6 +27,7 @@ export type DemoCommercePricingEnv = Readonly<{
 }> & W07MembershipDatabaseRuntimeEnv;
 
 type DemoCommercePricingDependencies = Readonly<{
+  getMembershipPostgresPool?: (env: DemoCommercePricingEnv) => W07WebhookPostgresPool;
   resolveItems?: typeof resolveCommerceOrderItems;
   applyTaxJar?: typeof applyTaxJarSandboxPricing;
 }>;
@@ -63,7 +64,7 @@ export async function resolveDemoCommercePricing(
   }
 
   const resolveItems = dependencies.resolveItems ?? resolveCommerceOrderItems;
-  const membershipStore = getW07MembershipPostgresPool(env) ?? env.D1_01;
+  const membershipStore = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
   const resolved = await resolveItems(membershipStore, input);
 
   if (env.COMMERCE_DEMO_TAX_PROVIDER === 'synthetic') {

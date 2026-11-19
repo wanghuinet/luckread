@@ -51,7 +51,7 @@ function toPlanIds(items: readonly CreateCommerceOrderItem[]): string[] {
  * entitlement changes; unsupported item families fail closed.
  */
 export async function resolveCommerceOrderItems(
-  db: D1Database | W07WebhookPostgresPool,
+  db: W07WebhookPostgresPool,
   input: unknown,
 ): Promise<ResolvedCommerceOrderItems> {
   const validated = validateCreateCommerceOrderRequest(input);

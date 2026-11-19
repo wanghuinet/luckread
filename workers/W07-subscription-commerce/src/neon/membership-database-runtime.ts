@@ -1,10 +1,9 @@
 import { Pool, type PoolConfig } from 'pg'
 
-import { createPostgresD1Database, type W07WebhookPostgresPool } from '../payment-webhook-database-postgres.js'
+import type { W07WebhookPostgresPool } from '../payment-webhook-database-postgres.js'
 import { SubscriptionRuntimeError } from '../subscription-runtime.js'
 
 export type W07MembershipDatabaseRuntimeEnv = Readonly<{
-  D1_01?: D1Database
   W07_MEMBERSHIP_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_01?: Readonly<{ connectionString?: string }>
 }>
@@ -12,22 +11,13 @@ export type W07MembershipDatabaseRuntimeEnv = Readonly<{
 type W07MembershipPoolFactory = (config: PoolConfig) => Pool
 
 const pools = new WeakMap<object, Pool>()
-const databases = new WeakMap<object, D1Database>()
 
 export function resolveW07MembershipDatabaseDriver(
   env: W07MembershipDatabaseRuntimeEnv,
-): 'd1' | 'neon' {
+): 'neon' {
   const configured = env.W07_MEMBERSHIP_DATABASE_DRIVER?.trim().toLowerCase() || 'neon'
-  /**
-   * @deprecated-next-version
-   * Reason: The explicit legacy D1 selector remains only for existing D1-backed SQL consumers and isolated tests.
-   * Replacement: The existing D1-01 Neon Hyperdrive bridge and PostgreSQL-native membership Stores.
-   * Removal: Next release.
-   * Condition: All W07 membership consumers and tests use PostgreSQL-native Stores instead of D1Database.
-   */
-  if (configured === 'd1') return 'd1'
-  if (configured === 'neon') return 'neon'
-  throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  if (configured !== 'neon') throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return 'neon'
 }
 
 function validateD101HyperdriveConnectionString(value: unknown): string {
@@ -89,34 +79,7 @@ function getOrCreateW07MembershipPostgresPool(
 export function getW07MembershipPostgresPool(
   env: W07MembershipDatabaseRuntimeEnv,
   poolFactory: W07MembershipPoolFactory = (config) => new Pool(config),
-): W07WebhookPostgresPool | undefined {
-  if (resolveW07MembershipDatabaseDriver(env) === 'd1') return undefined;
-  return getOrCreateW07MembershipPostgresPool(env, poolFactory) as unknown as W07WebhookPostgresPool;
-}
-
-/**
- * Selects the W07 membership store provider. Production uses the Neon D1-01
- * Hyperdrive bridge; the historical D1 adapter is available only to explicit
- * local/test profiles and is not declared by wrangler.neon.jsonc.
- */
-export function getW07SelectedD101Database(
-  env: W07MembershipDatabaseRuntimeEnv,
-  poolFactory: W07MembershipPoolFactory = (config) => new Pool(config),
-): D1Database {
-  if (resolveW07MembershipDatabaseDriver(env) === 'd1') {
-    if (!env.D1_01) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
-    return env.D1_01
-  }
-
-  const binding = env.HYPERDRIVE_D1_01
-  if (!binding || typeof binding !== 'object') {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
-  }
-  const cached = databases.get(binding)
-  if (cached) return cached
-
-  const pool = getOrCreateW07MembershipPostgresPool(env, poolFactory)
-  const database = createPostgresD1Database(pool as unknown as W07WebhookPostgresPool)
-  databases.set(binding, database)
-  return database
+): W07WebhookPostgresPool {
+  resolveW07MembershipDatabaseDriver(env)
+  return getOrCreateW07MembershipPostgresPool(env, poolFactory) as unknown as W07WebhookPostgresPool
 }

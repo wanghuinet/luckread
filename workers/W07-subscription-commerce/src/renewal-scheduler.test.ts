@@ -3,6 +3,7 @@ import {
   runRenewalScheduledBatch,
   type RenewalScheduledDependencies,
 } from './renewal-scheduler.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import type {
   RenewalProcessResult,
   RenewalRuntimeEnv,
@@ -12,10 +13,10 @@ import type {
 const database = {} as D1Database;
 const env = {
   W07_DATABASE_DRIVER: 'd1',
-  W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
-  D1_01: database,
+  W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
   D1_04: database,
 } as RenewalRuntimeEnv;
+const membershipPool = { query: async () => ({ rows: [], rowCount: 0 }), connect: async () => { throw new Error('unused') } } as unknown as W07WebhookPostgresPool;
 
 const cleanRecovery = {
   scanned: 0,
@@ -36,6 +37,8 @@ function dependencies(options: TestOptions = {}): RenewalScheduledDependencies {
 
   return {
     readTableNames: async (_db, expected) => new Set(expected),
+    readMembershipTableNames: async (_db, expected) => new Set(expected),
+    getMembershipPostgresPool: () => membershipPool,
     syncPending: async () => recoveryResults[Math.min(recoveryCall++, recoveryResults.length - 1)],
     scanDue: async (): Promise<RenewalScanResult> => {
       if (options.scanCalls) options.scanCalls.count += 1;
@@ -56,11 +59,14 @@ describe('W07 renewal scheduler completion status', () => {
     const neonDatabase = {} as D1Database;
     let seenDb: D1Database | undefined;
     let seenDialect: 'd1' | 'neon' | undefined;
+    let seenMembershipPool: W07WebhookPostgresPool | undefined;
     const result = await runRenewalScheduledBatch(
       { ...env, W07_DATABASE_DRIVER: 'neon' },
       {
         ...dependencies(),
         getDatabase: () => neonDatabase,
+        getMembershipPostgresPool: () => membershipPool,
+        readMembershipTableNames: async (db, expected) => { seenMembershipPool = db; return new Set(expected); },
         readTableNames: async (db, expected, dialect) => {
           seenDb = db;
           seenDialect = dialect;
@@ -71,6 +77,7 @@ describe('W07 renewal scheduler completion status', () => {
     expect(result.status).toBe('COMPLETED');
     expect(seenDb).toBe(neonDatabase);
     expect(seenDialect).toBe('neon');
+    expect(seenMembershipPool).toBe(membershipPool);
   });
 
   it('reports COMPLETED when processing and both outcome-sync passes are clear', async () => {
@@ -151,6 +158,8 @@ describe('W07 renewal scheduler completion status', () => {
     const cycleB = 'rcy_' + 'b'.repeat(26)
     const deps: RenewalScheduledDependencies = {
       readTableNames: async (_db, expected) => new Set(expected),
+      readMembershipTableNames: async (_pool, expected) => new Set(expected),
+      getMembershipPostgresPool: () => membershipPool,
       syncPending: async () => cleanRecovery,
       scanDue: async (_runtimeEnv, options): Promise<RenewalScanResult> => {
         scanLimit = options?.limit ?? 0

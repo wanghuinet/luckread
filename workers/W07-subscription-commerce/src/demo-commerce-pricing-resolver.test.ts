@@ -4,8 +4,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { resolveDemoCommercePricing, resolveDemoRenewalPricing, type DemoCommercePricingEnv } from './demo-commerce-pricing-resolver.js';
 import type { ResolvedCommerceOrderItems } from './order-item-resolution.js';
 import type { AuthoritativelyPricedOrder } from './order-persistence.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
-const d1 = { marker: 'D1-01' } as unknown as D1Database;
+const membershipPool = {
+  query: vi.fn(async () => ({ rows: [], rowCount: 0 })),
+  connect: vi.fn(async () => { throw new Error('read-only resolver must not open a transaction'); }),
+} as unknown as W07WebhookPostgresPool;
 const input = { items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] };
 const resolved: ResolvedCommerceOrderItems = {
   currency: 'USD',
@@ -31,8 +35,8 @@ const priced: AuthoritativelyPricedOrder = {
 
 function env(overrides: Partial<DemoCommercePricingEnv> = {}): DemoCommercePricingEnv {
   return {
-    D1_01: d1,
-    W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
+    W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+    HYPERDRIVE_D1_01: { connectionString: 'postgresql://test.local/luckread' },
     COMMERCE_PRICING_MODE: 'demo',
     HYPERSWITCH_ENVIRONMENT: 'sandbox',
     COMMERCE_DEMO_TAX_PROVIDER: 'taxjar-sandbox',
@@ -54,10 +58,10 @@ describe('shared Demo commerce pricing resolver', () => {
     const resolveItems = vi.fn(async () => resolved);
     const applyTaxJar = vi.fn(async () => priced);
 
-    const result = await resolveDemoCommercePricing(env(), input, { resolveItems, applyTaxJar });
+    const result = await resolveDemoCommercePricing(env(), input, { getMembershipPostgresPool: () => membershipPool, resolveItems, applyTaxJar });
 
     expect(result).toEqual(priced);
-    expect(resolveItems).toHaveBeenCalledWith(d1, input);
+    expect(resolveItems).toHaveBeenCalledWith(membershipPool, input);
     expect(applyTaxJar).toHaveBeenCalledWith(resolved, {
       apiKey: 'taxjar-sandbox-key',
       fromAddress: { street: '100 Main St', city: 'Austin', state: 'TX', zip: '78701' },
@@ -102,11 +106,11 @@ describe('shared Demo commerce pricing resolver', () => {
       request: input,
     };
 
-    const result = await resolveDemoRenewalPricing(env(), renewalInput, { resolveItems, applyTaxJar });
+    const result = await resolveDemoRenewalPricing(env(), renewalInput, { getMembershipPostgresPool: () => membershipPool, resolveItems, applyTaxJar });
 
     expect(result).toEqual(priced);
     expect(resolveItems).toHaveBeenCalledTimes(1);
-    expect(resolveItems).toHaveBeenCalledWith(d1, input);
-    expect(resolveItems).not.toHaveBeenCalledWith(d1, renewalInput);
+    expect(resolveItems).toHaveBeenCalledWith(membershipPool, input);
+    expect(resolveItems).not.toHaveBeenCalledWith(membershipPool, renewalInput);
   });
 });

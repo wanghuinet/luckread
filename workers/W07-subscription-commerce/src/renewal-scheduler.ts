@@ -13,11 +13,13 @@ import {
   type RenewalOutcomeSyncResult,
 } from './subscription-renewal-outcome.js';
 import { getW07SelectedD104Database, resolveW07DatabaseDriver } from './neon/payment-method-read-runtime.js';
+import { getW07MembershipPostgresPool } from './neon/membership-database-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 const MAX_CYCLES_PER_TICK = 5;
 const MAX_OUTCOMES_PER_TICK = 10;
 
-const REQUIRED_D1_01_TABLES = [
+const REQUIRED_MEMBERSHIP_TABLES = [
   'membership_subscriptions',
   'membership_plans',
   'membership_plan_versions',
@@ -59,6 +61,8 @@ export type RenewalScheduledBatchResult =
 
 export type RenewalScheduledDependencies = Readonly<{
   readTableNames?: (db: D1Database, expected: readonly string[], dialect?: 'd1' | 'neon') => Promise<Set<string>>;
+  readMembershipTableNames?: (db: W07WebhookPostgresPool, expected: readonly string[]) => Promise<Set<string>>;
+  getMembershipPostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool;
   getDatabase?: (env: RenewalRuntimeEnv) => D1Database;
   syncPending?: typeof syncPendingRenewalOutcomes;
   scanDue?: typeof scanDueSubscriptionRenewals;
@@ -78,6 +82,18 @@ async function readTableNames(db: D1Database, expected: readonly string[], diale
   return new Set((result.results ?? []).map((row) => row.name));
 }
 
+async function readMembershipTableNames(
+  pool: W07WebhookPostgresPool,
+  expected: readonly string[],
+): Promise<Set<string>> {
+  const result = await pool.query<{ name: string } & Record<string, unknown>>(
+    "SELECT table_name AS name FROM information_schema.tables " +
+    "WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' AND table_name = ANY($1::text[])",
+    [[...expected]],
+  );
+  return new Set(result.rows.map((row) => row.name));
+}
+
 /**
  * Bounded renewal batch for existing W07 state, invoked by the admitted W10 async runtime.
  *
@@ -95,11 +111,14 @@ export async function runRenewalScheduledBatch(
   const selectedD104 = (dependencies.getDatabase ?? getW07SelectedD104Database)(env);
   const selectedEnv: RenewalRuntimeEnv = { ...env, D1_04: selectedD104 };
   const getSelectedDatabase = () => selectedD104;
-  let d1_01: Set<string>;
-  let d1_04: Set<string>;
+  const getSelectedMembershipPool = () => membershipPool;
+  let membershipPool: W07WebhookPostgresPool;
+  let membershipTables: Set<string>;
+  let financeTables: Set<string>;
   try {
-    [d1_01, d1_04] = await Promise.all([
-      getTableNames(env.D1_01, REQUIRED_D1_01_TABLES, env.W07_MEMBERSHIP_DATABASE_DRIVER?.trim().toLowerCase() === 'neon' ? 'neon' : 'd1'),
+    membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
+    [membershipTables, financeTables] = await Promise.all([
+      (dependencies.readMembershipTableNames ?? readMembershipTableNames)(membershipPool, REQUIRED_MEMBERSHIP_TABLES),
       getTableNames(selectedD104, REQUIRED_D1_04_TABLES, databaseDialect),
     ]);
   } catch {
@@ -107,8 +126,8 @@ export async function runRenewalScheduledBatch(
   }
 
   const missingTables = [
-    ...REQUIRED_D1_01_TABLES.filter((name) => !d1_01.has(name)).map((name) => 'D1-01.' + name),
-    ...REQUIRED_D1_04_TABLES.filter((name) => !d1_04.has(name)).map((name) => 'D1-04.' + name),
+    ...REQUIRED_MEMBERSHIP_TABLES.filter((name) => !membershipTables.has(name)).map((name) => 'D1-01.' + name),
+    ...REQUIRED_D1_04_TABLES.filter((name) => !financeTables.has(name)).map((name) => 'D1-04.' + name),
   ];
   if (missingTables.length > 0) {
     return { status: 'SCHEMA_NOT_READY', reason: 'REQUIRED_TABLES_MISSING', missingTables };
@@ -123,7 +142,7 @@ export async function runRenewalScheduledBatch(
 
   let beforeRecovery: OutcomeBatch;
   try {
-    beforeRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getDatabase: getSelectedDatabase });
+    beforeRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool });
   } catch {
     // Do not start new provider-side work when prior cross-D1 outcome recovery
     // is failing. The next Cron tick can retry the bounded reconciliation.
@@ -144,8 +163,8 @@ export async function runRenewalScheduledBatch(
   let dueScan: RenewalScanResult;
   try {
     dueScan = dependencies.resolvePricing
-      ? await scanDue(selectedEnv, { limit: maxCycles }, { resolvePricing: dependencies.resolvePricing, getDatabase: getSelectedDatabase })
-      : await scanDue(selectedEnv, { limit: maxCycles }, { getDatabase: getSelectedDatabase });
+      ? await scanDue(selectedEnv, { limit: maxCycles }, { resolvePricing: dependencies.resolvePricing, getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool })
+      : await scanDue(selectedEnv, { limit: maxCycles }, { getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool });
   } catch {
     return { status: 'PARTIAL', phase: 'DUE_SCAN' };
   }
@@ -155,8 +174,8 @@ export async function runRenewalScheduledBatch(
   for (const cycleId of dueScan.cycleIds.slice(0, maxCycles)) {
     try {
       cycleResults.push(dependencies.resolvePricing
-        ? await processCycle(selectedEnv, cycleId, { resolvePricing: dependencies.resolvePricing, getDatabase: getSelectedDatabase })
-        : await processCycle(selectedEnv, cycleId, { getDatabase: getSelectedDatabase }));
+        ? await processCycle(selectedEnv, cycleId, { resolvePricing: dependencies.resolvePricing, getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool })
+        : await processCycle(selectedEnv, cycleId, { getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool }));
     } catch (error) {
       processFailures += 1;
       console.error(JSON.stringify({
@@ -169,7 +188,7 @@ export async function runRenewalScheduledBatch(
 
   let afterRecovery: OutcomeBatch;
   try {
-    afterRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getDatabase: getSelectedDatabase });
+    afterRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool });
   } catch {
     return { status: 'PARTIAL', phase: 'OUTCOME_SYNC_AFTER' };
   }

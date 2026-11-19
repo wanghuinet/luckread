@@ -41,11 +41,7 @@ import {
   readPlanUpgradeAttemptByIdempotencyPostgres,
 } from './subscription-plan-upgrade-checkout-postgres.js';
 
-type PlanUpgradeAttemptStore = D1Database | W07WebhookPostgresPool;
-
-function isPostgresPlanUpgradeStore(db: PlanUpgradeAttemptStore): db is W07WebhookPostgresPool {
-  return typeof (db as W07WebhookPostgresPool).query === 'function';
-}
+type PlanUpgradeAttemptStore = W07WebhookPostgresPool;
 
 export type PlanChangeAttemptRow = Readonly<{
   attempt_id: string;
@@ -106,7 +102,6 @@ export type SubscriptionPlanUpgradeCheckoutResult = Readonly<{
 }>;
 
 export type SubscriptionPlanUpgradeCheckoutEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{
-  D1_01: D1Database;
   D1_04: D1Database;
 }>;
 
@@ -188,52 +183,15 @@ async function readAttemptByIdempotency(
   subscriberId: string,
   keyHash: string,
 ): Promise<PlanChangeAttemptRow | null> {
-  if (isPostgresPlanUpgradeStore(db)) {
-    return readPlanUpgradeAttemptByIdempotencyPostgres(db, subscriberId, keyHash);
-  }
-  try {
-    return await db.prepare(
-      'SELECT attempt_id, subscriber_id, subscription_id, expected_subscription_version, ' +
-      'expected_plan_id, expected_plan_version, target_plan_id, target_plan_version, ' +
-      'current_period_start, current_period_end, idempotency_key_hash, order_id, status, ' +
-      'expires_at, applied_at, applied_subscription_version, created_at, updated_at, version ' +
-      'FROM membership_subscription_plan_change_attempts ' +
-      'WHERE subscriber_id = ? AND idempotency_key_hash = ? LIMIT 1',
-    ).bind(subscriberId, keyHash).first<PlanChangeAttemptRow>();
-  } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-  }
+  return readPlanUpgradeAttemptByIdempotencyPostgres(db, subscriberId, keyHash);
 }
 
 async function readAttemptById(db: PlanUpgradeAttemptStore, attemptId: string): Promise<PlanChangeAttemptRow | null> {
-  if (isPostgresPlanUpgradeStore(db)) {
-    return readPlanUpgradeAttemptByIdPostgres(db, attemptId);
-  }
-  try {
-    return await db.prepare(
-      'SELECT attempt_id, subscriber_id, subscription_id, expected_subscription_version, ' +
-      'expected_plan_id, expected_plan_version, target_plan_id, target_plan_version, ' +
-      'current_period_start, current_period_end, idempotency_key_hash, order_id, status, ' +
-      'expires_at, applied_at, applied_subscription_version, created_at, updated_at, version ' +
-      'FROM membership_subscription_plan_change_attempts WHERE attempt_id = ? LIMIT 1',
-    ).bind(attemptId).first<PlanChangeAttemptRow>();
-  } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-  }
+  return readPlanUpgradeAttemptByIdPostgres(db, attemptId);
 }
 
 async function expireAttempt(db: PlanUpgradeAttemptStore, row: PlanChangeAttemptRow, now: string): Promise<void> {
-  if (isPostgresPlanUpgradeStore(db)) {
-    return expirePlanUpgradeAttemptPostgres(db, row, now);
-  }
-  try {
-    await db.prepare(
-      "UPDATE membership_subscription_plan_change_attempts SET status = 'EXPIRED', updated_at = ?, " +
-      'version = version + 1 WHERE attempt_id = ? AND status = ? AND version = ?',
-    ).bind(now, row.attempt_id, row.status, row.version).run();
-  } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-  }
+  return expirePlanUpgradeAttemptPostgres(db, row, now);
 }
 
 async function expireStalePendingAttempts(
@@ -241,17 +199,7 @@ async function expireStalePendingAttempts(
   subscriptionId: string,
   now: string,
 ): Promise<void> {
-  if (isPostgresPlanUpgradeStore(db)) {
-    return expireStalePlanUpgradeAttemptsPostgres(db, subscriptionId, now);
-  }
-  try {
-    await db.prepare(
-      "UPDATE membership_subscription_plan_change_attempts SET status = 'EXPIRED', updated_at = ?, " +
-      "version = version + 1 WHERE subscription_id = ? AND status = 'PENDING_PAYMENT' AND expires_at <= ?",
-    ).bind(now, subscriptionId, now).run();
-  } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-  }
+  return expireStalePlanUpgradeAttemptsPostgres(db, subscriptionId, now);
 }
 
 function assertAttemptMatches(
@@ -338,15 +286,7 @@ async function createOrReadOrder(
       order = created.data;
       const updatedAt = new Date().toISOString();
       try {
-        if (isPostgresPlanUpgradeStore(membershipStore)) {
-          await attachPlanUpgradeOrderPostgres(membershipStore, row.attempt_id, order.orderId, updatedAt);
-        } else {
-          await membershipStore.prepare(
-            'UPDATE membership_subscription_plan_change_attempts SET order_id = ?, updated_at = ?, ' +
-            'version = version + 1 WHERE attempt_id = ? AND status = ? AND ' +
-            '(order_id IS NULL OR order_id = ?)',
-          ).bind(order.orderId, updatedAt, row.attempt_id, 'PENDING_PAYMENT', order.orderId).run();
-        }
+        await attachPlanUpgradeOrderPostgres(membershipStore, row.attempt_id, order.orderId, updatedAt);
         const latest = await readAttemptById(membershipStore, row.attempt_id);
         if (!latest || latest.order_id !== order.orderId) {
           throw new SubscriptionRuntimeError('CONFLICT', 409);
@@ -490,63 +430,22 @@ export async function createSubscriptionPlanUpgradeCheckout(
   if (!attemptRow) {
     await expireStalePendingAttempts(membershipStore, subscriptionId, now);
     try {
-      let inserted = false;
-      if (isPostgresPlanUpgradeStore(membershipStore)) {
-        inserted = await insertPlanUpgradeAttemptPostgres(membershipStore, {
-          attemptId: candidate.attempt_id,
-          subscriberId: candidate.subscriber_id,
-          subscriptionId: candidate.subscription_id,
-          expectedSubscriptionVersion: candidate.expected_subscription_version,
-          expectedPlanId: candidate.expected_plan_id,
-          expectedPlanVersion: candidate.expected_plan_version,
-          targetPlanId: candidate.target_plan_id,
-          targetPlanVersion: candidate.target_plan_version,
-          currentPeriodStart: candidate.current_period_start,
-          currentPeriodEnd: candidate.current_period_end,
-          idempotencyKeyHash: candidate.idempotency_key_hash,
-          expiresAt: candidate.expires_at,
-          createdAt: candidate.created_at,
-          updatedAt: candidate.updated_at,
-        });
-      } else {
-        const insertValues = [
-          candidate.attempt_id, candidate.subscriber_id, candidate.subscription_id,
-          candidate.expected_subscription_version, candidate.expected_plan_id, candidate.expected_plan_version,
-          candidate.target_plan_id, candidate.target_plan_version, candidate.current_period_start,
-          candidate.current_period_end, candidate.idempotency_key_hash, candidate.expires_at,
-          candidate.created_at, candidate.updated_at,
-          candidate.subscription_id, candidate.subscriber_id, candidate.expected_subscription_version,
-          candidate.expected_plan_id, candidate.expected_plan_version, candidate.current_period_start,
-          candidate.current_period_end, candidate.target_plan_id, candidate.subscription_id, candidate.subscriber_id,
-          candidate.target_plan_version,
-        ];
-        const insertSql =
-          'INSERT INTO membership_subscription_plan_change_attempts ' +
-          '(attempt_id, subscriber_id, subscription_id, expected_subscription_version, expected_plan_id, ' +
-          'expected_plan_version, target_plan_id, target_plan_version, current_period_start, current_period_end, ' +
-          'idempotency_key_hash, order_id, status, expires_at, applied_at, applied_subscription_version, ' +
-          'created_at, updated_at, version) ' +
-          "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'PENDING_PAYMENT', ?, NULL, NULL, ?, ?, 1 " +
-          'WHERE EXISTS (SELECT 1 FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? ' +
-          "AND status = 'ACTIVE' AND cancel_at IS NULL AND version = ? AND plan_id = ? AND plan_version = ? " +
-          'AND current_period_start = ? AND current_period_end = ?) ' +
-          'AND EXISTS (SELECT 1 FROM membership_plans WHERE plan_id = ? AND owner_type = \'CREATOR\' ' +
-          'AND owner_id = (SELECT creator_id FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ?) ' +
-          "AND current_version = ? AND status = 'ACTIVE' AND visibility = 'PUBLIC')";
-        const guardedInsertSql = insertSql +
-          " AND NOT EXISTS (SELECT 1 FROM membership_subscription_scheduled_plan_changes " +
-          "WHERE subscription_id = ? AND status IN ('SCHEDULED', 'RECONCILIATION_REQUIRED'))";
-        let result: D1Result;
-        try {
-          result = await membershipStore.prepare(guardedInsertSql).bind(...insertValues, candidate.subscription_id).run();
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          // Before migration 0006 no downgrade record can exist; preserve the #1446 upgrade path.
-          if (!/no such table:\s*membership_subscription_scheduled_plan_changes/i.test(message)) throw error;
-          result = await membershipStore.prepare(insertSql).bind(...insertValues).run();
-        }
-        inserted = Number(result.meta?.changes ?? 0) === 1;
-      }
+      const inserted = await insertPlanUpgradeAttemptPostgres(membershipStore, {
+        attemptId: candidate.attempt_id,
+        subscriberId: candidate.subscriber_id,
+        subscriptionId: candidate.subscription_id,
+        expectedSubscriptionVersion: candidate.expected_subscription_version,
+        expectedPlanId: candidate.expected_plan_id,
+        expectedPlanVersion: candidate.expected_plan_version,
+        targetPlanId: candidate.target_plan_id,
+        targetPlanVersion: candidate.target_plan_version,
+        currentPeriodStart: candidate.current_period_start,
+        currentPeriodEnd: candidate.current_period_end,
+        idempotencyKeyHash: candidate.idempotency_key_hash,
+        expiresAt: candidate.expires_at,
+        createdAt: candidate.created_at,
+        updatedAt: candidate.updated_at,
+      });
       if (!inserted) {
         const raced = await readAttemptByIdempotency(membershipStore, subscriberId, keyDigest);
         if (raced) {
@@ -576,60 +475,4 @@ export async function createSubscriptionPlanUpgradeCheckout(
     ...dependencies,
     resolvePricing: async () => pricing,
   }, replayedAttempt || Boolean(attemptRow.order_id));
-}
-
-/**
- * Signed failed/cancelled Hyperswitch outcomes release only the matching unpaid
- * upgrade reservation. Payment state is read from D1-04 after the webhook write;
- * no caller-supplied status can expire a subscription change.
- */
-export async function expirePendingSubscriptionPlanUpgradeForPayment(
-  env: SubscriptionPlanUpgradeCheckoutEnv,
-  paymentId: string,
-  merchantId: string,
-): Promise<void> {
-  const database = getW07SelectedD104Database(env);
-  if (!/^pay_[A-Za-z0-9]{26}$/.test(paymentId) || !isBoundedText(merchantId)) {
-    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
-  }
-  let payment: { order_id: string; status: string } | null;
-  try {
-    payment = await database.prepare(
-      "SELECT order_id, status FROM payments WHERE provider = 'hyperswitch' AND merchant_id = ? AND payment_id = ? LIMIT 1",
-    ).bind(merchantId, paymentId).first<{ order_id: string; status: string }>();
-  } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-  }
-  if (!payment || !isBoundedText(payment.order_id, 255) ||
-      !['failed', 'cancelled', 'expired'].includes(payment.status)) return;
-  let lines: { item_snapshot_json: string }[]
-  try {
-    const result = await database.prepare(
-      "SELECT item_snapshot_json FROM order_lines WHERE order_id = ? AND item_type = 'MEMBERSHIP_PLAN' LIMIT 2",
-    ).bind(payment.order_id).all<{ item_snapshot_json: string }>()
-    lines = result.results ?? []
-  } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
-  }
-  if (lines.length !== 1) return
-  let snapshot: unknown
-  try {
-    snapshot = JSON.parse(lines[0]!.item_snapshot_json) as unknown
-  } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
-  }
-  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return
-  const change = (snapshot as Record<string, unknown>).subscriptionChange
-  if (!change || typeof change !== 'object' || Array.isArray(change)) return
-  const attemptId = (change as Record<string, unknown>).attemptId
-  if (typeof attemptId !== 'string' || !ATTEMPT_ID_PATTERN.test(attemptId)) return
-  const now = new Date().toISOString()
-  try {
-    await env.D1_01.prepare(
-      "UPDATE membership_subscription_plan_change_attempts SET status = 'EXPIRED', updated_at = ?, " +
-      "version = version + 1 WHERE attempt_id = ? AND order_id = ? AND status = 'PENDING_PAYMENT'",
-    ).bind(now, attemptId, payment.order_id).run()
-  } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
-  }
 }

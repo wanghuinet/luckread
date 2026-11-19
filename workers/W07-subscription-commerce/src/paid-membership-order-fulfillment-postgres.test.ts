@@ -104,7 +104,6 @@ function envFixture() {
     }), { status: 201 })
   })
   const env = {
-    D1_01: {} as D1Database,
     D1_04: {} as D1Database,
     W07_DATABASE_DRIVER: 'neon',
     W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
@@ -114,7 +113,7 @@ function envFixture() {
 }
 
 describe('native PostgreSQL paid membership order fulfillment', () => {
-  it('creates a first paid subscription using D1-04 and D1-01 Neon pools', async () => {
+  it('creates a first paid subscription with separate D1-04 finance and D1-01 Neon pools', async () => {
     const offer = snapshot()
     const line = orderLine(offer, 500)
     const finance = nativePool(async (sql) => {

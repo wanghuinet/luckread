@@ -57,7 +57,7 @@ const requireCanonicalIdentifier = (value: unknown, maxLength: number): string =
  * subscription, entitlement or financial fact.
  */
 export async function resolveRevenueCatMembershipProduct(
-  db: D1Database | W07WebhookPostgresPool,
+  db: W07WebhookPostgresPool,
   input: {
     revenueCatAppId: string;
     store: RevenueCatStoreInput;
@@ -86,17 +86,10 @@ export async function resolveRevenueCatMembershipProduct(
       "WHERE b.revenuecat_app_id = $1 AND b.store = $2 AND b.product_id = $3 AND p.owner_type = 'CREATOR' " +
       sellableOnly +
       'LIMIT 1';
-    if (typeof (db as W07WebhookPostgresPool).query === 'function') {
-      const postgresSql = sql;
-      const result = await (db as W07WebhookPostgresPool).query<
-        RevenueCatMembershipProductBindingRow & Record<string, unknown>
-      >(postgresSql, [appId, store, productId]);
-      row = result.rows[0] ?? null;
-    } else {
-      row = await (db as D1Database).prepare(
-        sql.replace(/\\$[1-3]/g, '?'),
-      ).bind(appId, store, productId).first<RevenueCatMembershipProductBindingRow>();
-    }
+    const result = await db.query<
+      RevenueCatMembershipProductBindingRow & Record<string, unknown>
+    >(sql, [appId, store, productId]);
+    row = result.rows[0] ?? null
   } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }

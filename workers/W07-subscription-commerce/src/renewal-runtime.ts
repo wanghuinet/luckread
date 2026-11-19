@@ -37,7 +37,7 @@ import {
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
 import type { OrderCreatePersistenceStore } from './order-persistence.js';
-import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
+import { getW07MembershipPostgresPool, type W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import { readRenewalPaymentAttemptPostgres, type RenewalPaymentAttemptRow } from './renewal-payment-postgres.js';
 import {
@@ -68,12 +68,18 @@ import {
   type RenewalChargeSubscriptionRow,
 } from './renewal-membership-postgres.js';
 
-type RenewalMembershipStore = D1Database | W07WebhookPostgresPool;
+type RenewalMembershipStore = W07WebhookPostgresPool;
 
-function isPostgresRenewalMembershipStore(store: RenewalMembershipStore): store is W07WebhookPostgresPool {
-  return typeof (store as W07WebhookPostgresPool).query === 'function';
+function getRenewalMembershipStore(
+  env: RenewalRuntimeEnv,
+  dependencies: Pick<RenewalRuntimeDependencies, 'getMembershipPostgresPool'> = {},
+): RenewalMembershipStore {
+  try {
+    return (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
+  } catch {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
 }
-
 export class RenewalRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) {
     super(code);
@@ -82,7 +88,6 @@ export class RenewalRuntimeError extends Error {
 }
 
 export type RenewalRuntimeEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{
-  D1_01: D1Database;
   D1_04: D1Database;
   HYPERSWITCH_ENVIRONMENT?: string | null;
   HYPERSWITCH_API_KEY?: string | null;
@@ -121,6 +126,7 @@ export type RenewalRuntimeDependencies = Readonly<{
   createProviderCharge?: typeof createHyperswitchMerchantInitiatedPayment;
   recordProviderSubmission?: typeof recordHyperswitchMerchantInitiatedSubmission;
   getDatabase?: (env: RenewalRuntimeEnv) => D1Database;
+  getMembershipPostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool;
   getOrderCreateStore?: (env: RenewalRuntimeEnv) => OrderCreatePersistenceStore | undefined;
 }>;
 
@@ -478,6 +484,7 @@ async function updateCycle(
 
 async function insertOrReadCycle(
   env: RenewalRuntimeEnv,
+  membershipStore: RenewalMembershipStore,
   subscription: RenewalSubscriptionRow,
   merchantId: string,
   now: string,
@@ -501,7 +508,7 @@ async function insertOrReadCycle(
   }
   const cycleStart = subscription.current_period_end;
   const scheduledChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
-    getScheduledPlanChangeStore(env), subscription.subscription_id, subscription.subscriber_id, cycleStart, false,
+    membershipStore, subscription.subscription_id, subscription.subscriber_id, cycleStart, false,
   );
   let cyclePlan: {
     planId: string;
@@ -529,7 +536,7 @@ async function insertOrReadCycle(
         scheduledChange.effectiveAt !== cycleStart) {
       throw new RenewalRuntimeError('SCHEDULED_PLAN_CHANGE_MISMATCH', 503);
     }
-    const target = await readScheduledDowngradeTargetPlan(getScheduledPlanChangeStore(env), scheduledChange);
+    const target = await readScheduledDowngradeTargetPlan(membershipStore, scheduledChange);
     const validChangeType = scheduledChange.changeType === 'DOWNGRADE'
       ? target?.billingInterval === subscription.billing_interval &&
         target.priceMinor < subscription.price_minor
@@ -701,59 +708,14 @@ export async function scanDueSubscriptionRenewals(
   const limit = Number.isSafeInteger(options.limit) ? Math.min(Math.max(options.limit!, 1), MAX_PAGE_SIZE) : 20;
   const cycleStore = getW07RenewalCycleStore(env);
   const cursor = await readSchedulerCursor(cycleStore);
-  const membershipStore = getScheduledPlanChangeStore(env);
+  const membershipStore = getRenewalMembershipStore(env, dependencies);
   let rows: RenewalSubscriptionRow[];
-  if (isPostgresRenewalMembershipStore(membershipStore)) {
-    try {
-      rows = await readDueRenewalMembershipsPostgres(
-        membershipStore, now, cursor.cursor_period_end, cursor.cursor_subscription_id, limit,
-      );
-    } catch {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
-  } else {
-    try {
-      rows = (await membershipStore.prepare(
-        'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, s.status, ' +
-        's.current_period_start, s.current_period_end, s.trial_started_at, s.trial_ends_at, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
-        'pv.currency, pv.name, pv.tier, pv.benefits_json ' +
-        'FROM membership_subscriptions s ' +
-        'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
-        "WHERE s.status IN ('TRIALING','ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
-        'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
-        'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +
-        'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?',
-      ).bind(
-        now, cursor.cursor_period_end, cursor.cursor_period_end, cursor.cursor_period_end,
-        cursor.cursor_subscription_id, limit,
-      ).all<RenewalSubscriptionRow>()).results ?? [];
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!/no such column:\s*(?:s\.)?trial_(?:started|ends)_at/i.test(message)) {
-        throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-      }
-      // Before migration 0008, only ACTIVE/PAST_DUE subscriptions exist. Keep
-      // the pre-trial renewal scanner functional for isolated D1 test profiles.
-      try {
-        const legacy = (await membershipStore.prepare(
-          'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, s.status, ' +
-          's.current_period_start, s.current_period_end, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
-          'pv.currency, pv.name, pv.tier, pv.benefits_json ' +
-          'FROM membership_subscriptions s ' +
-          'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
-          "WHERE s.status IN ('ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
-          'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
-          'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +
-          'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?',
-        ).bind(
-          now, cursor.cursor_period_end, cursor.cursor_period_end, cursor.cursor_period_end,
-          cursor.cursor_subscription_id, limit,
-        ).all<Omit<RenewalSubscriptionRow, 'trial_started_at' | 'trial_ends_at'>>()).results ?? [];
-        rows = legacy.map((row) => ({ ...row, trial_started_at: null, trial_ends_at: null }));
-      } catch {
-        throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-      }
-    }
+  try {
+    rows = await readDueRenewalMembershipsPostgres(
+      membershipStore, now, cursor.cursor_period_end, cursor.cursor_subscription_id, limit,
+    );
+  } catch {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
 
   if (rows.length === 0) {
@@ -767,7 +729,7 @@ export async function scanDueSubscriptionRenewals(
   const cycleIds: string[] = [];
   for (const row of rows) {
     try {
-      const cycle = await insertOrReadCycle(env, row, String(config.expectedMerchantId), now);
+      const cycle = await insertOrReadCycle(env, membershipStore, row, String(config.expectedMerchantId), now);
       if (cycle.state === 'AWAITING_PRICING' && dependencies.resolvePricing) {
         cycleIds.push(cycle.cycle_id);
       } else if (cycle.state === 'AWAITING_MANDATE') {
@@ -807,47 +769,23 @@ export async function scanDueSubscriptionRenewals(
 type ChargeSubscriptionRow = RenewalChargeSubscriptionRow;
 
 async function readChargeSubscriptionForRenewal(
-  env: RenewalRuntimeEnv,
+  membershipStore: RenewalMembershipStore,
   cycle: RenewalCycleRow,
 ): Promise<ChargeSubscriptionRow | null> {
-  const membershipStore = getScheduledPlanChangeStore(env);
-  if (isPostgresRenewalMembershipStore(membershipStore)) {
-    try {
-      return await readRenewalChargeSubscriptionPostgres(
-        membershipStore, cycle.subscription_id, cycle.subscriber_id,
-      );
-    } catch {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
-  }
   try {
-    return await membershipStore.prepare(
-      'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, trial_started_at, trial_ends_at, cancel_at ' +
-      'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
-    ).bind(cycle.subscription_id, cycle.subscriber_id).first<ChargeSubscriptionRow>();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/no such column:\s*(?:trial_started_at|trial_ends_at)/i.test(message)) {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
-    try {
-      const legacy = await membershipStore.prepare(
-        'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, cancel_at ' +
-        'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
-      ).bind(cycle.subscription_id, cycle.subscriber_id)
-        .first<Omit<ChargeSubscriptionRow, 'trial_started_at' | 'trial_ends_at'>>();
-      return legacy ? { ...legacy, trial_started_at: null, trial_ends_at: null } : null;
-    } catch {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
+    return await readRenewalChargeSubscriptionPostgres(
+      membershipStore, cycle.subscription_id, cycle.subscriber_id,
+    );
+  } catch {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
 }
 
 async function isSubscriptionChargeableForCycle(
-  env: RenewalRuntimeEnv,
+  membershipStore: RenewalMembershipStore,
   cycle: RenewalCycleRow,
 ): Promise<boolean> {
-  const subscription = await readChargeSubscriptionForRenewal(env, cycle);
+  const subscription = await readChargeSubscriptionForRenewal(membershipStore, cycle);
   const retryingPastDue = cycle.outcome_code === 'RETRY_PREPARED' || cycle.attempt_number > 1;
   if (!subscription ||
       subscription.subscription_id !== cycle.subscription_id ||
@@ -862,14 +800,14 @@ async function isSubscriptionChargeableForCycle(
   if (subscription.plan_id === cycle.plan_id && subscription.plan_version === cycle.plan_version) return true;
 
   const scheduled = await readScheduledSubscriptionPlanDowngradeForPeriod(
-    getScheduledPlanChangeStore(env), cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, false,
+    membershipStore, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, false,
   );
   if (!scheduled || scheduled.status !== 'SCHEDULED' ||
       scheduled.expectedPlanId !== subscription.plan_id ||
       scheduled.expectedPlanVersion !== subscription.plan_version ||
       scheduled.targetPlanId !== cycle.plan_id ||
       scheduled.targetPlanVersion !== cycle.plan_version) return false;
-  const target = await readScheduledDowngradeTargetPlan(getScheduledPlanChangeStore(env), scheduled);
+  const target = await readScheduledDowngradeTargetPlan(membershipStore, scheduled);
   return !!target && target.creatorId === subscription.creator_id &&
     target.billingInterval === cycle.billing_interval && target.currency === cycle.currency;
 }
@@ -1017,6 +955,7 @@ type FailedCycleRetryPreparation = 'PREPARED' | 'AWAITING_RETRY' | 'AWAITING_OUT
 
 async function prepareFailedCycleRetry(
   env: RenewalRuntimeEnv,
+  membershipStore: RenewalMembershipStore,
   cycle: RenewalCycleRow,
   now: string,
 ): Promise<FailedCycleRetryPreparation> {
@@ -1026,7 +965,7 @@ async function prepareFailedCycleRetry(
       cycle.attempt_number >= MAX_ATTEMPTS) return 'TERMINAL';
   if (!renewalRetryDue(cycle, now)) return 'AWAITING_RETRY';
 
-  const subscription = await readChargeSubscriptionForRenewal(env, cycle);
+  const subscription = await readChargeSubscriptionForRenewal(membershipStore, cycle);
   if (!subscription ||
       subscription.subscription_id !== cycle.subscription_id ||
       subscription.subscriber_id !== cycle.subscriber_id ||
@@ -1041,7 +980,7 @@ async function prepareFailedCycleRetry(
     subscription.plan_id === cycle.plan_id && subscription.plan_version === cycle.plan_version;
   if (!originalPlanMatches) {
     const scheduled = await readScheduledSubscriptionPlanDowngradeForPeriod(
-      getScheduledPlanChangeStore(env), cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, false,
+      membershipStore, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, false,
     );
     if (!scheduled || scheduled.status !== 'SCHEDULED' ||
         scheduled.expectedPlanId !== subscription.plan_id ||
@@ -1049,7 +988,7 @@ async function prepareFailedCycleRetry(
         scheduled.targetPlanId !== cycle.plan_id ||
         scheduled.targetPlanVersion !== cycle.plan_version ||
         scheduled.effectiveAt !== cycle.cycle_start) return 'TERMINAL';
-    const target = await readScheduledDowngradeTargetPlan(getScheduledPlanChangeStore(env), scheduled);
+    const target = await readScheduledDowngradeTargetPlan(membershipStore, scheduled);
     if (!target || target.creatorId !== subscription.creator_id ||
         target.billingInterval !== cycle.billing_interval || target.currency !== cycle.currency) {
       return 'TERMINAL';
@@ -1100,7 +1039,7 @@ async function prepareFailedCycleRetry(
 export async function prepareFailedRenewalCycleRetry(
   env: RenewalRuntimeEnv,
   cycleIdInput: string,
-  dependencies: Pick<RenewalRuntimeDependencies, 'now' | 'getDatabase'> = {},
+  dependencies: Pick<RenewalRuntimeDependencies, 'now' | 'getDatabase' | 'getMembershipPostgresPool'> = {},
 ): Promise<RenewalProcessResult> {
   env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
   if (!/^rcy_[A-Za-z0-9]{26}$/.test(cycleIdInput)) {
@@ -1108,7 +1047,8 @@ export async function prepareFailedRenewalCycleRetry(
   }
   const now = nowIso(dependencies.now ?? (() => new Date()));
   const cycle = await readCycleById(getW07RenewalCycleStore(env), cycleIdInput);
-  const preparation = await prepareFailedCycleRetry(env, cycle, now);
+  const membershipStore = getRenewalMembershipStore(env, dependencies);
+  const preparation = await prepareFailedCycleRetry(env, membershipStore, cycle, now);
   const latest = preparation === 'PREPARED'
     ? await readCycleById(getW07RenewalCycleStore(env), cycleIdInput)
     : cycle;
@@ -1139,11 +1079,12 @@ export async function processSubscriptionRenewalCycle(
 ): Promise<RenewalProcessResult> {
   env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
   const orderCreateStore = (dependencies.getOrderCreateStore ?? getW07OrderCreatePersistenceStore)(env);
+  const membershipStore = getRenewalMembershipStore(env, dependencies);
   const nowFn = dependencies.now ?? (() => new Date());
   let now = nowIso(nowFn);
   let cycle = await readCycleById(getW07RenewalCycleStore(env), cycleId);
   if (cycle.state === 'FAILED') {
-    const retry = await prepareFailedCycleRetry(env, cycle, now);
+    const retry = await prepareFailedCycleRetry(env, membershipStore, cycle, now);
     if (retry !== 'PREPARED') {
       const action = retry === 'AWAITING_OUTCOME_SYNC'
         ? 'AWAITING_OUTCOME_SYNC'
@@ -1191,7 +1132,7 @@ export async function processSubscriptionRenewalCycle(
       cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'PREPARED_SNAPSHOT_INCOMPLETE', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }
-    if (!(await isSubscriptionChargeableForCycle(env, cycle))) {
+    if (!(await isSubscriptionChargeableForCycle(membershipStore, cycle))) {
       cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'SUBSCRIPTION_NOT_CHARGEABLE_BEFORE_ORDER', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }
@@ -1302,7 +1243,7 @@ export async function processSubscriptionRenewalCycle(
       return { cycleId, state: cycle.state, action: 'SUBMITTED', ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
     }
 
-    if (!(await isSubscriptionChargeableForCycle(env, cycle))) {
+    if (!(await isSubscriptionChargeableForCycle(membershipStore, cycle))) {
       cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'SUBSCRIPTION_NOT_CHARGEABLE_AT_SUBMISSION', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }

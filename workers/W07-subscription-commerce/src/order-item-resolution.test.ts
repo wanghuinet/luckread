@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { resolveCommerceOrderItems } from './order-item-resolution.js';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 type PlanVersionFixture = {
   plan_version: number;
@@ -65,51 +66,47 @@ function fixture(
 
 function fakeDb(fixtures: PlanFixture[], readError?: Error) {
   const queries: CapturedQuery[] = [];
-  const db = {
-    prepare(sql: string) {
-      const captured: CapturedQuery = { sql, values: [] };
-      queries.push(captured);
-      const statement = {
-        bind(...values: unknown[]) {
-          captured.values = values;
-          return statement;
-        },
-        async all<T>() {
-          if (readError) throw readError;
-          const ids = new Set(captured.values.map(String));
-          const results = fixtures
-            .filter((plan) =>
-              ids.has(plan.plan_id) &&
-              plan.owner_type === 'CREATOR' &&
-              plan.status === 'ACTIVE' &&
-              plan.visibility === 'PUBLIC',
-            )
-            .flatMap((plan) => {
-              const version = plan.versions.find((entry) => entry.plan_version === plan.current_version);
-              if (!version) return [];
-              return [{
-                plan_id: plan.plan_id,
-                owner_id: plan.owner_id,
-                current_version: plan.current_version,
-                status: plan.status,
-                visibility: plan.visibility,
-                version: plan.version,
-                created_at: plan.created_at,
-                updated_at: plan.updated_at,
-                name: version.name,
-                tier: version.tier,
-                billing_interval: version.billing_interval,
-                price_minor: version.price_minor,
-                currency: version.currency,
-                benefits_json: version.benefits_json,
-              }];
-            });
-          return { results: results as T[] };
-        },
-      };
-      return statement;
+  const db: W07WebhookPostgresPool = {
+    async query<Row extends Record<string, unknown> = Record<string, unknown>>(
+      sql: string,
+      values: unknown[] = [],
+    ) {
+      queries.push({ sql, values });
+      if (readError) throw readError;
+      const requestedIds = Array.isArray(values[0]) ? values[0].map(String) : [];
+      const results = fixtures
+        .filter((plan) =>
+          requestedIds.includes(plan.plan_id) &&
+          plan.owner_type === 'CREATOR' &&
+          plan.status === 'ACTIVE' &&
+          plan.visibility === 'PUBLIC',
+        )
+        .flatMap((plan) => {
+          const version = plan.versions.find((entry) => entry.plan_version === plan.current_version);
+          if (!version) return [];
+          return [{
+            plan_id: plan.plan_id,
+            owner_id: plan.owner_id,
+            current_version: plan.current_version,
+            status: plan.status,
+            visibility: plan.visibility,
+            version: plan.version,
+            created_at: plan.created_at,
+            updated_at: plan.updated_at,
+            name: version.name,
+            tier: version.tier,
+            billing_interval: version.billing_interval,
+            price_minor: version.price_minor,
+            currency: version.currency,
+            benefits_json: version.benefits_json,
+          }];
+        });
+      return { rows: results as Row[], rowCount: results.length };
     },
-  } as unknown as D1Database;
+    async connect() {
+      throw new Error('read-only offer resolver must not open a transaction');
+    },
+  };
   return { db, queries };
 }
 
@@ -122,7 +119,7 @@ async function expectRuntimeError(
 }
 
 describe('PAY-002 read-only membership offer resolution', () => {
-  it('resolves the authoritative current price/version with one D1 read', async () => {
+  it('resolves the authoritative current price/version with one Neon read', async () => {
     const a = fixture(planA, {
       current_version: 2,
       versions: [
@@ -153,10 +150,10 @@ describe('PAY-002 read-only membership offer resolution', () => {
     expect(queries[0]!.sql).toContain("p.owner_type = 'CREATOR'");
     expect(queries[0]!.sql).toContain("p.status = 'ACTIVE'");
     expect(queries[0]!.sql).toContain("p.visibility = 'PUBLIC'");
-    expect(queries[0]!.values).toEqual([planA]);
+    expect(queries[0]!.values).toEqual([[planA]]);
   });
 
-  it('normalizes D1/schema read failures without exposing database details', async () => {
+  it('normalizes PostgreSQL/schema read failures without exposing database details', async () => {
     const internalError = new Error('no such table: membership_plans; secret SQL fragment');
     const { db } = fakeDb([fixture(planA)], internalError);
 
@@ -185,7 +182,7 @@ describe('PAY-002 read-only membership offer resolution', () => {
     }
   });
 
-  it('fails closed on unsupported item families before reading D1', async () => {
+  it('fails closed on unsupported item families before reading Neon', async () => {
     const { db, queries } = fakeDb([fixture(planA)]);
     await expectRuntimeError(
       () => resolveCommerceOrderItems(db, { items: [{ itemRef: 'content_article_123', quantity: 1 }] }),
@@ -195,7 +192,7 @@ describe('PAY-002 read-only membership offer resolution', () => {
     expect(queries).toHaveLength(0);
   });
 
-  it('rejects membership quantities other than one before reading D1', async () => {
+  it('rejects membership quantities other than one before reading Neon', async () => {
     const { db, queries } = fakeDb([fixture(planA)]);
     await expectRuntimeError(
       () => resolveCommerceOrderItems(db, { items: [{ itemRef: planA, quantity: 2 }] }),
@@ -232,7 +229,7 @@ describe('PAY-002 read-only membership offer resolution', () => {
     expect(queries).toHaveLength(0);
   });
 
-  it('rejects client-supplied price, currency and unknown fields before reading D1', async () => {
+  it('rejects client-supplied price, currency and unknown fields before reading Neon', async () => {
     const { db, queries } = fakeDb([fixture(planA)]);
     await expectRuntimeError(
       () => resolveCommerceOrderItems(db, {

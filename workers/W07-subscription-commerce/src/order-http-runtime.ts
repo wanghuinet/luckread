@@ -22,7 +22,6 @@ import {
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 type OrderRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
-  D1_01: D1Database;
   D1_04: D1Database;
 }>;
 
