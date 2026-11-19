@@ -111,6 +111,7 @@ export async function runRenewalScheduledBatch(
   const selectedD104 = (dependencies.getDatabase ?? getW07SelectedD104Database)(env);
   const selectedEnv: RenewalRuntimeEnv = { ...env, D1_04: selectedD104 };
   const getSelectedDatabase = () => selectedD104;
+  const getSelectedMembershipPool = () => membershipPool;
   let membershipTables: Set<string>;
   let financeTables: Set<string>;
   try {
@@ -140,7 +141,7 @@ export async function runRenewalScheduledBatch(
 
   let beforeRecovery: OutcomeBatch;
   try {
-    beforeRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getDatabase: getSelectedDatabase });
+    beforeRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool });
   } catch {
     // Do not start new provider-side work when prior cross-D1 outcome recovery
     // is failing. The next Cron tick can retry the bounded reconciliation.
@@ -161,8 +162,8 @@ export async function runRenewalScheduledBatch(
   let dueScan: RenewalScanResult;
   try {
     dueScan = dependencies.resolvePricing
-      ? await scanDue(selectedEnv, { limit: maxCycles }, { resolvePricing: dependencies.resolvePricing, getDatabase: getSelectedDatabase })
-      : await scanDue(selectedEnv, { limit: maxCycles }, { getDatabase: getSelectedDatabase });
+      ? await scanDue(selectedEnv, { limit: maxCycles }, { resolvePricing: dependencies.resolvePricing, getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool })
+      : await scanDue(selectedEnv, { limit: maxCycles }, { getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool });
   } catch {
     return { status: 'PARTIAL', phase: 'DUE_SCAN' };
   }
@@ -172,8 +173,8 @@ export async function runRenewalScheduledBatch(
   for (const cycleId of dueScan.cycleIds.slice(0, maxCycles)) {
     try {
       cycleResults.push(dependencies.resolvePricing
-        ? await processCycle(selectedEnv, cycleId, { resolvePricing: dependencies.resolvePricing, getDatabase: getSelectedDatabase })
-        : await processCycle(selectedEnv, cycleId, { getDatabase: getSelectedDatabase }));
+        ? await processCycle(selectedEnv, cycleId, { resolvePricing: dependencies.resolvePricing, getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool })
+        : await processCycle(selectedEnv, cycleId, { getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool }));
     } catch (error) {
       processFailures += 1;
       console.error(JSON.stringify({
