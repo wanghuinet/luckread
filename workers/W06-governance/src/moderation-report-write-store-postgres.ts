@@ -161,7 +161,7 @@ export function createPostgresModerationReportWriteStore(
           const insertedIdempotency = await client.query(
             INSERT_IDEMPOTENCY_SQL,
             [
-              command.auditEventId,
+              command.idempotencyId,
               command.actorUserId,
               command.idempotencyKey,
               command.requestHash,
@@ -240,7 +240,7 @@ export function createPostgresModerationReportWriteStore(
         const insertedIdempotency = await client.query(
           INSERT_IDEMPOTENCY_SQL,
           [
-            command.auditEventId,
+            command.idempotencyId,
             command.actorUserId,
             command.idempotencyKey,
             command.requestHash,
