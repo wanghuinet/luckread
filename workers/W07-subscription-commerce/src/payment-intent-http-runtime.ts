@@ -5,15 +5,17 @@ import {
   HyperswitchClientError,
 } from './hyperswitch-client.js';
 import {
-  createPaymentAttempt,
-  recordUnconfirmedHyperswitchIntent,
   PaymentPersistenceError,
   type PaymentAttemptCreation,
   type PaymentAttemptDto,
 } from './payment-persistence.js';
 import {
-  getW07SelectedD104Database,
-  resolveW07DatabaseDriver,
+  createPaymentAttemptPostgres,
+  recordUnconfirmedHyperswitchIntentPostgres,
+} from './payment-intent-postgres-persistence.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
+import {
+  getW07PaymentWebhookPostgresPool,
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
 
@@ -24,17 +26,16 @@ type ResolvedProviderConfig = Readonly<{
 }>;
 
 type PaymentIntentRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
-  D1_04: D1Database;
   HYPERSWITCH_ENVIRONMENT?: string | null;
   HYPERSWITCH_API_KEY?: string | null;
   HYPERSWITCH_MERCHANT_ID?: string | null;
 }>;
 
 type PaymentIntentRuntimeDependencies = Readonly<{
-  createAttempt?: typeof createPaymentAttempt;
+  createAttempt?: typeof createPaymentAttemptPostgres;
   createProviderIntent?: typeof createHyperswitchCustomerInitiatedSetupIntent;
-  recordIntent?: typeof recordUnconfirmedHyperswitchIntent;
-  getDatabase?: (env: PaymentIntentRuntimeEnv) => D1Database;
+  recordIntent?: typeof recordUnconfirmedHyperswitchIntentPostgres;
+  getPostgresPool?: (env: PaymentIntentRuntimeEnv) => W07WebhookPostgresPool | undefined;
 }>;
 
 const ORDER_ID_MAX_LENGTH = 255;
@@ -151,15 +152,16 @@ export async function handleCommercePaymentIntentRequest(
   }
 
   try {
-    const database = (dependencies.getDatabase ?? getW07SelectedD104Database)(env);
-    const createAttempt = dependencies.createAttempt ?? createPaymentAttempt;
+    const pool = (dependencies.getPostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+    if (!pool) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+    const createAttempt = dependencies.createAttempt ?? createPaymentAttemptPostgres;
     const attempt: PaymentAttemptCreation = await createAttempt(
-      database,
+      pool,
       customerId,
       route.orderId,
       request.headers.get('Idempotency-Key'),
       providerConfig.expectedMerchantId,
-      { paymentEnvironment: providerConfig.environment, databaseDialect: resolveW07DatabaseDriver(env) === 'neon' ? 'postgres' : 'd1' },
+      { paymentEnvironment: providerConfig.environment },
     );
 
     if (!['INITIATING', 'requires_payment_method', 'requires_confirmation'].includes(attempt.payment.status)) {
@@ -179,9 +181,9 @@ export async function handleCommercePaymentIntentRequest(
       customerId,
     });
 
-    const recordIntent = dependencies.recordIntent ?? recordUnconfirmedHyperswitchIntent;
+    const recordIntent = dependencies.recordIntent ?? recordUnconfirmedHyperswitchIntentPostgres;
     const persisted: PaymentAttemptDto = await recordIntent(
-      database,
+      pool,
       customerId,
       attempt.payment.paymentId,
       providerConfig.expectedMerchantId,
