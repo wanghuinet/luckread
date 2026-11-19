@@ -139,7 +139,7 @@ function setup(options: {
   const env: RenewalRuntimeEnv = {
     W07_DATABASE_DRIVER: 'neon',
     W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-    HYPERDRIVE_D1_04: { connectionString: 'postgresql://test.invalid/luckread' },
+    HYPERDRIVE_FINANCE_DB: { connectionString: 'postgresql://test.invalid/luckread' },
   };
   const dependencies = {
     now: () => new Date(NOW),
