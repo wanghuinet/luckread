@@ -13,27 +13,21 @@ type FakeState = {
   insertCount: number;
 };
 
-function fakeFinanceDb(state: FakeState): D1Database {
+function fakeFinancePool(state: FakeState): W07WebhookPostgresPool {
   return {
-    prepare(sql: string) {
-      let values: unknown[] = [];
-      const statement = {
-        bind(...args: unknown[]) { values = args; return statement; },
-        async first<T>() {
-          if (sql.includes('FROM payments AS p')) return (state.order ? { ...state.order } : null) as T | null;
-          return null;
-        },
-        async all<T>() {
-          if (sql.includes('FROM order_lines WHERE order_id = ?')) {
-            return { results: state.lines.map((line) => ({ ...line })) as T[] };
-          }
-          return { results: [] as T[] };
-        },
-      };
-      return statement as unknown as D1PreparedStatement;
+    async query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string) {
+      if (sql.includes('FROM payments AS p')) {
+        const rows = state.order ? [{ ...state.order }] as Row[] : [];
+        return { rows, rowCount: rows.length };
+      }
+      if (sql.includes('FROM order_lines WHERE order_id = $1')) {
+        const rows = state.lines.map((line) => ({ ...line })) as Row[];
+        return { rows, rowCount: rows.length };
+      }
+      throw new Error('Unexpected W07 finance PostgreSQL query: ' + sql);
     },
-    async batch() { return []; },
-  } as unknown as D1Database;
+    async connect() { throw new Error('finance read path does not open a transaction'); },
+  };
 }
 
 function fakeMembershipPool(state: FakeState): W07WebhookPostgresPool {
@@ -142,16 +136,19 @@ function fixture(overrides: {
     subscriptions: new Map(),
     insertCount: 0,
   };
+  const financePool = fakeFinancePool(state);
   const membershipPool = fakeMembershipPool(state);
   const env = {
-    W07_DATABASE_DRIVER: 'd1',
+    W07_DATABASE_DRIVER: 'neon',
     W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-    D1_04: fakeFinanceDb(state),
   };
   return {
     env,
     state,
-    dependencies: { getMembershipPostgresPool: () => membershipPool },
+    dependencies: {
+      getFinancePostgresPool: () => financePool,
+      getMembershipPostgresPool: () => membershipPool,
+    },
   };
 }
 
