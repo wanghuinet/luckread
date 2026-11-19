@@ -437,49 +437,19 @@ async function readCycleByPeriod(
   ).bind(subscriptionId, cycleStart).first<RenewalCycleRow>();
 }
 
-async function readActiveMandate(
-  db: D1Database,
-  merchantId: string,
-  customerId: string,
-): Promise<ActiveMandateRow | null> {
-  return db.prepare(
-    'SELECT m.mandate_record_id, m.payment_method_id FROM payment_mandates m ' +
-    'JOIN saved_payment_methods s ON s.provider = m.provider AND s.merchant_id = m.merchant_id ' +
-    'AND s.customer_id = m.customer_id AND s.payment_method_id = m.payment_method_id ' +
-    "WHERE m.provider = 'hyperswitch' AND m.merchant_id = ? AND m.customer_id = ? " +
-    "AND m.status = 'ACTIVE' AND m.provider_mandate_id IS NOT NULL " +
-    "AND NOT EXISTS (SELECT 1 FROM payment_method_revocation_requests r JOIN saved_payment_methods rs ON rs.saved_payment_method_id = r.saved_payment_method_id WHERE rs.provider = m.provider AND rs.merchant_id = m.merchant_id AND rs.customer_id = m.customer_id AND rs.payment_method_id = m.payment_method_id AND r.status <> 'COMPLETED') " +
-    'ORDER BY m.updated_at DESC, m.mandate_record_id DESC LIMIT 1',
-  ).bind(merchantId, customerId).first<ActiveMandateRow>();
-}
-
-async function isExactMandateActive(db: D1Database, cycle: RenewalCycleRow): Promise<boolean> {
-  if (!cycle.mandate_record_id || !cycle.payment_method_id) return false;
-  const row = await db.prepare(
-    'SELECT 1 AS active FROM payment_mandates m ' +
-    'JOIN saved_payment_methods s ON s.provider = m.provider AND s.merchant_id = m.merchant_id ' +
-    'AND s.customer_id = m.customer_id AND s.payment_method_id = m.payment_method_id ' +
-    "WHERE m.mandate_record_id = ? AND m.provider = 'hyperswitch' AND m.merchant_id = ? " +
-    "AND m.customer_id = ? AND m.payment_method_id = ? AND m.status = 'ACTIVE' " +
-    'AND m.provider_mandate_id IS NOT NULL ' +
-    "AND NOT EXISTS (SELECT 1 FROM payment_method_revocation_requests r JOIN saved_payment_methods rs ON rs.saved_payment_method_id = r.saved_payment_method_id WHERE rs.provider = m.provider AND rs.merchant_id = m.merchant_id AND rs.customer_id = m.customer_id AND rs.payment_method_id = m.payment_method_id AND r.status <> 'COMPLETED') LIMIT 1",
-  ).bind(cycle.mandate_record_id, cycle.merchant_id, cycle.subscriber_id, cycle.payment_method_id).first<{ active: number }>();
-  return row?.active === 1;
-}
-
 async function readActiveMandateFromStore(
   db: RenewalCycleStore,
   merchantId: string,
   customerId: string,
 ): Promise<ActiveMandateRow | null> {
-  if (isPostgresRenewalCycleStore(db)) {
-    try {
-      return await readActiveRenewalMandatePostgres(db, merchantId, customerId);
-    } catch {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
+  if (!isPostgresRenewalCycleStore(db)) {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
-  return readActiveMandate(db, merchantId, customerId);
+  try {
+    return await readActiveRenewalMandatePostgres(db, merchantId, customerId);
+  } catch {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
 }
 
 async function isExactMandateActiveFromStore(
@@ -487,16 +457,16 @@ async function isExactMandateActiveFromStore(
   cycle: RenewalCycleRow,
 ): Promise<boolean> {
   if (!cycle.mandate_record_id || !cycle.payment_method_id) return false;
-  if (isPostgresRenewalCycleStore(db)) {
-    try {
-      return await isExactRenewalMandateActivePostgres(
-        db, cycle.mandate_record_id, cycle.merchant_id, cycle.subscriber_id, cycle.payment_method_id,
-      );
-    } catch {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
+  if (!isPostgresRenewalCycleStore(db)) {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
-  return isExactMandateActive(db, cycle);
+  try {
+    return await isExactRenewalMandateActivePostgres(
+      db, cycle.mandate_record_id, cycle.merchant_id, cycle.subscriber_id, cycle.payment_method_id,
+    );
+  } catch {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
 }
 
 
