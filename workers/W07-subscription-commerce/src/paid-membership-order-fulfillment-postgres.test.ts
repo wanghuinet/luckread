@@ -104,7 +104,6 @@ function envFixture() {
     }), { status: 201 })
   })
   const env = {
-    D1_04: {} as D1Database,
     W07_DATABASE_DRIVER: 'neon',
     W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
     W06_GOVERNANCE: { fetch: auditFetch } as unknown as Fetcher,

@@ -13,27 +13,21 @@ type FakeState = {
   insertCount: number;
 };
 
-function fakeFinanceDb(state: FakeState): D1Database {
+function fakeFinancePool(state: FakeState): W07WebhookPostgresPool {
   return {
-    prepare(sql: string) {
-      let values: unknown[] = [];
-      const statement = {
-        bind(...args: unknown[]) { values = args; return statement; },
-        async first<T>() {
-          if (sql.includes('FROM payments AS p')) return (state.order ? { ...state.order } : null) as T | null;
-          return null;
-        },
-        async all<T>() {
-          if (sql.includes('FROM order_lines WHERE order_id = ?')) {
-            return { results: state.lines.map((line) => ({ ...line })) as T[] };
-          }
-          return { results: [] as T[] };
-        },
-      };
-      return statement as unknown as D1PreparedStatement;
+    async query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string) {
+      if (sql.includes('FROM payments AS p')) {
+        const rows = state.order ? [{ ...state.order }] as Row[] : [];
+        return { rows, rowCount: rows.length };
+      }
+      if (sql.includes('FROM order_lines WHERE order_id = $1')) {
+        const rows = state.lines.map((line) => ({ ...line })) as Row[];
+        return { rows, rowCount: rows.length };
+      }
+      throw new Error('Unexpected W07 finance PostgreSQL query: ' + sql);
     },
-    async batch() { return []; },
-  } as unknown as D1Database;
+    async connect() { throw new Error('finance read path does not open a transaction'); },
+  };
 }
 
 function fakeMembershipPool(state: FakeState): W07WebhookPostgresPool {
@@ -142,16 +136,19 @@ function fixture(overrides: {
     subscriptions: new Map(),
     insertCount: 0,
   };
+  const financePool = fakeFinancePool(state);
   const membershipPool = fakeMembershipPool(state);
   const env = {
-    W07_DATABASE_DRIVER: 'd1',
+    W07_DATABASE_DRIVER: 'neon',
     W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-    D1_04: fakeFinanceDb(state),
   };
   return {
     env,
     state,
-    dependencies: { getMembershipPostgresPool: () => membershipPool },
+    dependencies: {
+      getFinancePostgresPool: () => financePool,
+      getMembershipPostgresPool: () => membershipPool,
+    },
   };
 }
 
@@ -194,6 +191,27 @@ describe('paid membership order fulfillment', () => {
     expect(replay).toEqual({ outcome: 'ALREADY_APPLIED', fulfilledCount: 1 });
     expect(f.state.insertCount).toBe(1);
     expect(f.state.subscriptions.get(subscriptionId)?.status).toBe('CANCELED');
+  });
+
+  it('fails closed when either Neon finance or membership pool is unavailable', async () => {
+    const f = fixture();
+    const missingFinance = {
+      ...f.dependencies,
+      getFinancePostgresPool: () => undefined,
+    };
+    await expect(
+      fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1', missingFinance),
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
+    expect(f.state.insertCount).toBe(0);
+
+    const missingMembership = {
+      ...f.dependencies,
+      getMembershipPostgresPool: () => undefined,
+    };
+    await expect(
+      fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1', missingMembership),
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
+    expect(f.state.insertCount).toBe(0);
   });
 
   it('fails closed for an unpaid or amount-mismatched order before touching D1-01', async () => {

@@ -1,10 +1,7 @@
-/// <reference types="@cloudflare/workers-types" />
-
 import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js';
 import { addBillingPeriod } from './subscription-runtime.js';
 import {
   getW07PaymentWebhookPostgresPool,
-  getW07SelectedD104Database,
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
 import {
@@ -78,7 +75,10 @@ export class PaidMembershipPurchaseFulfillmentError extends Error {
   }
 }
 
-type FulfillmentEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{ D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>;
+type FulfillmentEnv =
+  Pick<W07PaymentMethodReadRuntimeEnv, 'W07_DATABASE_DRIVER' | 'HYPERDRIVE_D1_04'> &
+  W07MembershipDatabaseRuntimeEnv &
+  Readonly<{ W06_GOVERNANCE?: Fetcher }>;
 type SubscriptionPlanUpgradeSnapshot = Readonly<{
   kind: 'PLAN_UPGRADE';
   attemptId: string;
@@ -108,11 +108,6 @@ type MembershipOfferSnapshot = Readonly<{
   subscriptionChange: SubscriptionPlanUpgradeSnapshot | null;
 }>;
 
-type FulfillmentDatabase = D1Database | W07WebhookPostgresPool;
-
-function isPostgresFulfillmentDatabase(value: FulfillmentDatabase): value is W07WebhookPostgresPool {
-  return typeof (value as W07WebhookPostgresPool).query === 'function';
-}
 
 type FulfillmentDependencies = Readonly<{
   getFinancePostgresPool?: (env: FulfillmentEnv) => W07WebhookPostgresPool | undefined;
@@ -122,14 +117,13 @@ type FulfillmentDependencies = Readonly<{
 function selectedFulfillmentDatabases(
   env: FulfillmentEnv,
   dependencies: FulfillmentDependencies = {},
-): Readonly<{ finance: FulfillmentDatabase; membership: W07WebhookPostgresPool }> {
+): Readonly<{ finance: W07WebhookPostgresPool; membership: W07WebhookPostgresPool }> {
   const financePool = (dependencies.getFinancePostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
   const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
-  if (!membershipPool) throw new PaidMembershipPurchaseFulfillmentError('SERVICE_UNAVAILABLE', 503);
-  return {
-    finance: financePool ?? getW07SelectedD104Database(env),
-    membership: membershipPool,
-  };
+  if (!financePool || !membershipPool) {
+    throw new PaidMembershipPurchaseFulfillmentError('SERVICE_UNAVAILABLE', 503);
+  }
+  return { finance: financePool, membership: membershipPool };
 }
 
 const PAYMENT_ID_PATTERN = /^pay_[A-Za-z0-9]{26}$/;
@@ -243,34 +237,24 @@ function parseSnapshot(raw: string, line: PaidOrderLineRow, orderCurrency: strin
 }
 
 async function readPaidOrder(
-  db: FulfillmentDatabase,
+  db: W07WebhookPostgresPool,
   paymentId: string,
   merchantId: string,
 ): Promise<PaidOrderRow> {
   let row: PaidOrderRow | null;
   try {
-    if (isPostgresFulfillmentDatabase(db)) {
-      const result = await db.query<PaidOrderRow & Record<string, unknown>>(
-        'SELECT p.payment_id, p.order_id, p.customer_id, p.provider, p.merchant_id, ' +
-        'p.status AS payment_status, p.amount_minor::double precision AS amount_minor, p.currency AS payment_currency, ' +
-        'o.status AS order_status, o.currency AS order_currency, o.total_minor::double precision AS total_minor, ' +
-        'to_char(o.confirmed_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS confirmed_at ' +
-        'FROM payments AS p INNER JOIN orders AS o ON o.order_id = p.order_id AND o.customer_id = p.customer_id ' +
-        "WHERE p.provider = 'hyperswitch' AND p.payment_id = $1 AND p.merchant_id = $2 LIMIT 1",
-        [paymentId, merchantId],
-      )
-      row = result.rows[0] ?? null
-    } else {
-      row = await db.prepare(
-        'SELECT p.payment_id, p.order_id, p.customer_id, p.provider, p.merchant_id, ' +
-        'p.status AS payment_status, p.amount_minor, p.currency AS payment_currency, ' +
-        'o.status AS order_status, o.currency AS order_currency, o.total_minor, o.confirmed_at ' +
-        'FROM payments AS p INNER JOIN orders AS o ON o.order_id = p.order_id AND o.customer_id = p.customer_id ' +
-        "WHERE p.provider = 'hyperswitch' AND p.payment_id = ? AND p.merchant_id = ? LIMIT 1",
-      ).bind(paymentId, merchantId).first<PaidOrderRow>()
-    }
+    const result = await db.query<PaidOrderRow & Record<string, unknown>>(
+      'SELECT p.payment_id, p.order_id, p.customer_id, p.provider, p.merchant_id, ' +
+      'p.status AS payment_status, p.amount_minor::double precision AS amount_minor, p.currency AS payment_currency, ' +
+      'o.status AS order_status, o.currency AS order_currency, o.total_minor::double precision AS total_minor, ' +
+      'to_char(o.confirmed_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS confirmed_at ' +
+      'FROM payments AS p INNER JOIN orders AS o ON o.order_id = p.order_id AND o.customer_id = p.customer_id ' +
+      "WHERE p.provider = 'hyperswitch' AND p.payment_id = $1 AND p.merchant_id = $2 LIMIT 1",
+      [paymentId, merchantId],
+    );
+    row = result.rows[0] ?? null;
   } catch {
-    return failClosed()
+    return failClosed();
   }
   if (!row) return failClosed();
   if (
@@ -286,22 +270,15 @@ async function readPaidOrder(
   return row;
 }
 
-async function readOrderLines(db: FulfillmentDatabase, orderId: string): Promise<PaidOrderLineRow[]> {
+async function readOrderLines(db: W07WebhookPostgresPool, orderId: string): Promise<PaidOrderLineRow[]> {
   try {
-    if (isPostgresFulfillmentDatabase(db)) {
-      const result = await db.query<PaidOrderLineRow & Record<string, unknown>>(
-        'SELECT order_line_id, item_type, item_ref, item_version, quantity::double precision AS quantity, ' +
-        'unit_amount_minor::double precision AS unit_amount_minor, line_total_minor::double precision AS line_total_minor, ' +
-        'item_snapshot_json FROM order_lines WHERE order_id = $1 ORDER BY order_line_id ASC',
-        [orderId],
-      )
-      return result.rows
-    }
-    const rows = await db.prepare(
-      'SELECT order_line_id, item_type, item_ref, item_version, quantity, unit_amount_minor, ' +
-      'line_total_minor, item_snapshot_json FROM order_lines WHERE order_id = ? ORDER BY order_line_id ASC',
-    ).bind(orderId).all<PaidOrderLineRow>();
-    return rows.results ?? [];
+    const result = await db.query<PaidOrderLineRow & Record<string, unknown>>(
+      'SELECT order_line_id, item_type, item_ref, item_version, quantity::double precision AS quantity, ' +
+      'unit_amount_minor::double precision AS unit_amount_minor, line_total_minor::double precision AS line_total_minor, ' +
+      'item_snapshot_json FROM order_lines WHERE order_id = $1 ORDER BY order_line_id ASC',
+      [orderId],
+    );
+    return result.rows;
   } catch {
     return failClosed();
   }
@@ -433,7 +410,7 @@ async function createOrReplayPaidSubscription(
 
 /**
  * Fulfill only a durable, successfully reconciled Hyperswitch payment against its
- * D1-04 Order and immutable MembershipPlan snapshot. This is intentionally
+ * Neon D1-04 finance Order and immutable MembershipPlan snapshot. This is intentionally
  * separate from the user-facing subscription-create API: clients cannot assert
  * payment success, select the subscription ID, or assign their own entitlement.
  *
