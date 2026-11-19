@@ -19,6 +19,8 @@ export type ModerationReportWriteCommand = Readonly<{
   policyVersion: string
   dedupBucket: string
   requestHash: string
+  idempotencyKey: string
+  idempotencyId: string
   reportId: string
   auditEventId: string
   requestId: string
