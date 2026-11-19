@@ -12,8 +12,9 @@ import type {
 
 const database = {} as D1Database;
 const env = {
-  W07_DATABASE_DRIVER: 'd1',
+  W07_DATABASE_DRIVER: 'neon',
   W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+  HYPERDRIVE_D1_04: { connectionString: 'postgresql://test.invalid/luckread' },
   D1_04: database,
 } as RenewalRuntimeEnv;
 const membershipPool = { query: async () => ({ rows: [], rowCount: 0 }), connect: async () => { throw new Error('unused') } } as unknown as W07WebhookPostgresPool;
@@ -37,7 +38,8 @@ function dependencies(options: TestOptions = {}): RenewalScheduledDependencies {
   let recoveryCall = 0;
 
   return {
-    readTableNames: async (_db, expected) => new Set(expected),
+    readFinanceTableNames: async (_pool, expected) => new Set(expected),
+    getDatabase: () => database,
     readMembershipTableNames: async (_db, expected) => new Set(expected),
     getMembershipPostgresPool: () => membershipPool,
     getFinancePostgresPool: () => financePool,
@@ -57,29 +59,42 @@ function dependencies(options: TestOptions = {}): RenewalScheduledDependencies {
 }
 
 describe('W07 renewal scheduler completion status', () => {
-  it('uses selected Neon D1-04 and PostgreSQL schema catalogue during preflight', async () => {
-    const neonDatabase = {} as D1Database;
-    let seenDb: D1Database | undefined;
-    let seenDialect: 'd1' | 'neon' | undefined;
+  it('uses native Neon finance and membership pools during schema preflight', async () => {
+    let seenFinancePool: W07WebhookPostgresPool | undefined;
     let seenMembershipPool: W07WebhookPostgresPool | undefined;
-    const result = await runRenewalScheduledBatch(
-      { ...env, W07_DATABASE_DRIVER: 'neon' },
-      {
-        ...dependencies(),
-        getDatabase: () => neonDatabase,
-        getMembershipPostgresPool: () => membershipPool,
-        readMembershipTableNames: async (db, expected) => { seenMembershipPool = db; return new Set(expected); },
-        readTableNames: async (db, expected, dialect) => {
-          seenDb = db;
-          seenDialect = dialect;
-          return new Set(expected);
-        },
-      },
-    );
+    const result = await runRenewalScheduledBatch(env, {
+      ...dependencies(),
+      getMembershipPostgresPool: () => membershipPool,
+      readMembershipTableNames: async (pool, expected) => { seenMembershipPool = pool; return new Set(expected); },
+      readFinanceTableNames: async (pool, expected) => { seenFinancePool = pool; return new Set(expected); },
+    });
     expect(result.status).toBe('COMPLETED');
-    expect(seenDb).toBe(neonDatabase);
-    expect(seenDialect).toBe('neon');
+    expect(seenFinancePool).toBe(financePool);
     expect(seenMembershipPool).toBe(membershipPool);
+  });
+
+  it('queries the finance schema catalogue through parameterized PostgreSQL SQL', async () => {
+    const statements: Array<{ sql: string; values: unknown[] }> = [];
+    const pool = {
+      async query(sql: string, values: unknown[] = []) {
+        statements.push({ sql, values });
+        const names = Array.isArray(values[0]) ? values[0] as string[] : [];
+        return { rows: names.map((name) => ({ name })), rowCount: names.length };
+      },
+      async connect() { throw new Error('schema preflight does not open a transaction'); },
+    } as unknown as W07WebhookPostgresPool;
+    const result = await runRenewalScheduledBatch(env, {
+      ...dependencies(),
+      readFinanceTableNames: undefined,
+      getFinancePostgresPool: () => pool,
+    });
+    expect(result.status).toBe('COMPLETED');
+    expect(statements).toHaveLength(1);
+    expect(statements[0].sql).toContain('FROM information_schema.tables');
+    expect(statements[0].sql).toContain('table_name = ANY($1::text[])');
+    expect(statements[0].values[0]).toEqual(expect.arrayContaining([
+      'orders', 'payments', 'subscription_renewal_cycles', 'subscription_renewal_scheduler_state',
+    ]));
   });
 
   it('reports COMPLETED when processing and both outcome-sync passes are clear', async () => {
