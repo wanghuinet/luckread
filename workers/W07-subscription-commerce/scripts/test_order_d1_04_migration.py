@@ -41,7 +41,7 @@ class D104OrderMigrationTests(unittest.TestCase):
             raise AssertionError("D1-01 and D1-04 historical source identities must remain physically separate")
         if not (WORKER / "migrations").is_dir() or not (WORKER / "migrations-d1-04").is_dir():
             raise AssertionError("W07 membership and finance schema-source directories must remain separate")
-        if not source_migrations or any(
+        if len(source_migrations) != 7 or any(
             not source.startswith("workers/W07-subscription-commerce/migrations-d1-04/")
             or not (ROOT / source).is_file()
             for source in source_migrations
