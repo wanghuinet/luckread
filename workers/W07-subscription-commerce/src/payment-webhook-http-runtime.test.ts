@@ -4,7 +4,7 @@ import {
   PaymentPersistenceError,
   type WebhookReceiptResult,
   type ReceiveHyperswitchWebhookInput,
-} from './payment-persistence.js';
+} from './payment-contracts.js';
 import {
   syncRenewalCycleOutcomeForPayment,
   type RenewalOutcomeSyncResult,

@@ -1,5 +1,5 @@
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js'
-import type { PaymentAttemptStatus } from './payment-persistence.js'
+import type { PaymentAttemptStatus } from './payment-contracts.js'
 
 export type RenewalPaymentAttemptRow = Readonly<{
   payment_id: string

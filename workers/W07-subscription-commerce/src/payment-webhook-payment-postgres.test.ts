@@ -3,7 +3,7 @@ import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency
 import {
   PaymentPersistenceError,
   type WebhookReceiptResult,
-} from './payment-persistence.js'
+} from './payment-contracts.js'
 import type {
   W07WebhookPostgresClient,
   W07WebhookPostgresPool,

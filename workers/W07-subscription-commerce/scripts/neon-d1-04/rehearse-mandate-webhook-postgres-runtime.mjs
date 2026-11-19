@@ -4,7 +4,7 @@ import { createRequire } from 'node:module'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
-import { PaymentPersistenceError } from '../../src/payment-persistence.ts'
+import { PaymentPersistenceError } from '../../src/payment-contracts.ts'
 import { receiveHyperswitchPaymentWebhookPostgres } from '../../src/payment-webhook-payment-postgres.ts'
 import { receiveHyperswitchMandateWebhookPostgres } from '../../src/mandate-webhook-postgres-persistence.ts'
 

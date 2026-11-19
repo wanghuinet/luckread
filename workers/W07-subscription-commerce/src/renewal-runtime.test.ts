@@ -11,7 +11,7 @@ import {
   type RenewalProcessResult,
   type RenewalScanResult,
 } from './renewal-runtime.js'
-import type { PaymentAttemptCreation } from './payment-persistence.js'
+import type { PaymentAttemptCreation } from './payment-contracts.js'
 
 const CYCLE_START = '2026-10-28T00:00:00.000Z'
 const CYCLE_END = '2026-11-28T00:00:00.000Z'

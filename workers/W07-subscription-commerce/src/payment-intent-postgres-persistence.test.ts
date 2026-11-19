@@ -4,7 +4,7 @@ import {
   recordHyperswitchMerchantInitiatedSubmissionPostgres,
   recordUnconfirmedHyperswitchIntentPostgres,
 } from './payment-intent-postgres-persistence.js';
-import { PaymentPersistenceError } from './payment-persistence.js';
+import { PaymentPersistenceError } from './payment-contracts.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import type { HyperswitchPayment } from './hyperswitch-client.js';
 

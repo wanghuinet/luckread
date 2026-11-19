@@ -10,9 +10,18 @@ import {
   type PaymentAttemptCreation,
   type PaymentAttemptDto,
   type PaymentAttemptStatus,
-  type PaymentPersistenceDependencies,
-} from './payment-persistence.js';
+} from './payment-contracts.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
+
+type PaymentIntentPostgresDependencies = Readonly<{
+  now?: () => Date;
+  createPaymentId?: () => string;
+  paymentEnvironment?: 'sandbox' | 'production';
+}>;
+
+type PaymentPostgresClockDependencies = Readonly<{
+  now?: () => Date;
+}>;
 
 type PaymentRow = Readonly<{
   payment_id: string;
@@ -168,7 +177,7 @@ export async function createPaymentAttemptPostgres(
   orderIdInput: string,
   idempotencyKeyInput: string | null | undefined,
   expectedMerchantIdInput: string | null | undefined,
-  dependencies: Pick<PaymentPersistenceDependencies, 'now' | 'createPaymentId' | 'paymentEnvironment'> = {},
+  dependencies: PaymentIntentPostgresDependencies = {},
 ): Promise<PaymentAttemptCreation> {
   if (!nonBlank(customerIdInput, 256) || !nonBlank(orderIdInput, 255)) {
     throw new PaymentPersistenceError('VALIDATION_FAILED', 400);
@@ -275,7 +284,7 @@ export async function recordUnconfirmedHyperswitchIntentPostgres(
   paymentIdInput: string,
   expectedMerchantIdInput: string,
   providerPayment: HyperswitchPayment,
-  dependencies: Pick<PaymentPersistenceDependencies, 'now'> = {},
+  dependencies: PaymentPostgresClockDependencies = {},
 ): Promise<PaymentAttemptDto> {
   if (!nonBlank(customerIdInput, 256) || !PAYMENT_ID_PATTERN.test(paymentIdInput)) {
     throw new PaymentPersistenceError('VALIDATION_FAILED', 400);
@@ -355,7 +364,7 @@ export async function recordHyperswitchMerchantInitiatedSubmissionPostgres(
   expectedMerchantIdInput: string,
   expectedPaymentMethodIdInput: string,
   providerPayment: HyperswitchPayment,
-  dependencies: Pick<PaymentPersistenceDependencies, 'now'> = {},
+  dependencies: PaymentPostgresClockDependencies = {},
 ): Promise<PaymentAttemptDto> {
   if (!nonBlank(customerIdInput, 256) ||
       !PAYMENT_ID_PATTERN.test(paymentIdInput) ||

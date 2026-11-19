@@ -4,7 +4,7 @@ import {
   PaymentPersistenceError,
   type PaymentAttemptStatus,
   type WebhookReceiptResult,
-} from './payment-persistence.js'
+} from './payment-contracts.js'
 import {
   parseHyperswitchRfc3339Timestamp,
   parseHyperswitchWebhookEnvelope,

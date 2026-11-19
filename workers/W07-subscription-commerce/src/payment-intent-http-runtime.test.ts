@@ -12,7 +12,7 @@ import {
   PaymentPersistenceError,
   type PaymentAttemptCreation,
   type PaymentAttemptDto,
-} from './payment-persistence.js';
+} from './payment-contracts.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 const CUSTOMER_ID = 'verified-user-001';
