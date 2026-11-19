@@ -15,7 +15,6 @@ import {
 import {
   getW07PaymentWebhookPostgresPool,
   getW07SelectedD104Database,
-  resolveW07DatabaseDriver,
 } from './neon/payment-method-read-runtime.js';
 import { getW07MembershipPostgresPool } from './neon/membership-database-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
@@ -64,7 +63,7 @@ export type RenewalScheduledBatchResult =
     }>;
 
 export type RenewalScheduledDependencies = Readonly<{
-  readTableNames?: (db: D1Database, expected: readonly string[], dialect?: 'd1' | 'neon') => Promise<Set<string>>;
+  readFinanceTableNames?: (pool: W07WebhookPostgresPool, expected: readonly string[]) => Promise<Set<string>>;
   readMembershipTableNames?: (db: W07WebhookPostgresPool, expected: readonly string[]) => Promise<Set<string>>;
   getMembershipPostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool;
   getFinancePostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool | undefined;
@@ -78,13 +77,16 @@ export type RenewalScheduledDependencies = Readonly<{
   maxCyclesPerBatch?: number;
 }>;
 
-async function readTableNames(db: D1Database, expected: readonly string[], dialect: 'd1' | 'neon' = 'd1'): Promise<Set<string>> {
-  const placeholders = expected.map(() => '?').join(', ');
-  const sql = dialect === 'neon'
-    ? "SELECT table_name AS name FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' AND table_name IN (" + placeholders + ')'
-    : "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (" + placeholders + ')';
-  const result = await db.prepare(sql).bind(...expected).all<{ name: string }>();
-  return new Set((result.results ?? []).map((row) => row.name));
+async function readFinanceTableNames(
+  pool: W07WebhookPostgresPool,
+  expected: readonly string[],
+): Promise<Set<string>> {
+  const result = await pool.query<{ name: string } & Record<string, unknown>>(
+    "SELECT table_name AS name FROM information_schema.tables " +
+    "WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' AND table_name = ANY($1::text[])",
+    [[...expected]],
+  );
+  return new Set(result.rows.map((row) => row.name));
 }
 
 async function readMembershipTableNames(
@@ -111,8 +113,7 @@ export async function runRenewalScheduledBatch(
   env: RenewalRuntimeEnv,
   dependencies: RenewalScheduledDependencies = {},
 ): Promise<RenewalScheduledBatchResult> {
-  const getTableNames = dependencies.readTableNames ?? readTableNames;
-  const databaseDialect = resolveW07DatabaseDriver(env);
+  const getFinanceTableNames = dependencies.readFinanceTableNames ?? readFinanceTableNames;
   const selectedD104 = (dependencies.getDatabase ?? getW07SelectedD104Database)(env);
   const selectedEnv: RenewalRuntimeEnv = { ...env, D1_04: selectedD104 };
   const selectedFinancePool = (dependencies.getFinancePostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
@@ -129,7 +130,7 @@ export async function runRenewalScheduledBatch(
     membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
     [membershipTables, financeTables] = await Promise.all([
       (dependencies.readMembershipTableNames ?? readMembershipTableNames)(membershipPool, REQUIRED_MEMBERSHIP_TABLES),
-      getTableNames(selectedD104, REQUIRED_D1_04_TABLES, databaseDialect),
+      getFinanceTableNames(selectedFinancePool, REQUIRED_D1_04_TABLES),
     ]);
   } catch {
     return { status: 'SCHEMA_NOT_READY', reason: 'SCHEMA_PROBE_FAILED', missingTables: [] };
