@@ -19,7 +19,7 @@ describe('W07 Neon membership pool', () => {
     }
     const neonEnv = {
       W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-      HYPERDRIVE_D1_01: binding,
+      HYPERDRIVE_MEMBERSHIP_DB: binding,
     }
 
     expect(resolveW07MembershipDatabaseDriver({})).toBe('neon')
@@ -40,7 +40,7 @@ describe('W07 Neon membership pool', () => {
     })).toThrow('SERVICE_UNAVAILABLE')
     expect(() => getW07MembershipPostgresPool({
       W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-      HYPERDRIVE_D1_01: { connectionString: 'postgresql://user:password@localhost:5432/luckread_finance' },
+      HYPERDRIVE_MEMBERSHIP_DB: { connectionString: 'postgresql://user:password@localhost:5432/luckread_finance' },
     })).toThrow('SERVICE_UNAVAILABLE')
   })
 
@@ -69,7 +69,7 @@ describe('W07 Neon membership pool', () => {
     }
     const env = {
       W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-      HYPERDRIVE_D1_01: binding,
+      HYPERDRIVE_MEMBERSHIP_DB: binding,
     }
 
     const first = getW07MembershipPostgresPool(env, poolFactory)
