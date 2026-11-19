@@ -1018,7 +1018,7 @@ function matchesImmutableAuditEvent(existing: AuditEvent, expected: AuditEvent):
     existing.targetId === expected.targetId &&
     canonicalAuditJson(existing.before) === canonicalAuditJson(expected.before) &&
     canonicalAuditJson(existing.after) === canonicalAuditJson(expected.after) &&
-    sameTimestampAtPostgresPrecision(existing.occurredAt, expected.occurredAt)
+    sameTimestampAtPostgresDriverPrecision(existing.occurredAt, expected.occurredAt)
 }
 
 async function persistImmutableAuditEvent(env: Env, event: AuditEvent): Promise<Response> {
