@@ -1,4 +1,4 @@
-import worker, { type W11Env } from './worker.js'
+import worker, { type W11PostgresEnv } from './worker.js'
 import {
   getW11AnalyticsPostgresPool,
   type W11AnalyticsHyperdriveBinding,
@@ -33,7 +33,7 @@ const entry = {
       const pool = getW11AnalyticsPostgresPool(
         env.HYPERDRIVE_ANALYTICS_PG as W11AnalyticsHyperdriveBinding,
       )
-      return worker.fetch(request, { W11_POSTGRES: pool } satisfies W11Env)
+      return worker.fetch(request, { W11_POSTGRES: pool } satisfies W11PostgresEnv)
     } catch {
       return new Response(JSON.stringify({
         worker: 'W11',
