@@ -128,6 +128,107 @@ describe('W06 direct AuditEvent HTTP persistence', () => {
     expect(fake.append).toHaveBeenCalledOnce()
   })
 
+  it('uses the Store for generic immutable commerce audit writes, replay and conflict responses', async () => {
+    const fake = createStore()
+    getAuditEventStore.mockReturnValue(fake.store)
+    const orderId = 'ord_1234567890'
+    const body = {
+      eventId: 'evt_order_created_' + orderId,
+      orderId,
+      occurredAt: '2026-11-19T00:00:00.000Z',
+      status: 'CREATED',
+      version: 1,
+      currency: 'USD',
+      subtotalMinor: 1200,
+      discountMinor: 100,
+      taxMinor: 88,
+      totalMinor: 1188,
+    }
+    const orderRequest = (payload: unknown, requestId: string) => new Request(
+      'https://w06.internal/internal/audit-events/commerce-order-created',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Principal-User-Id': 'buyer_user_001',
+          'X-LuckRead-Principal-Layer': 'L2',
+          'X-LuckRead-Correlation-Id': 'order-audit-correlation',
+          'X-LuckRead-Request-Id': requestId,
+        },
+        body: JSON.stringify(payload),
+      },
+    )
+
+    const first = await worker.fetch(orderRequest(body, 'req_order_audit_first'), env as never)
+    const replay = await worker.fetch(orderRequest(body, 'req_order_audit_replay'), env as never)
+
+    expect(first.status).toBe(201)
+    expect(replay.status).toBe(200)
+    await expect(replay.json()).resolves.toMatchObject({ eventId: body.eventId, replayed: true })
+    expect(fake.append).toHaveBeenCalledOnce()
+    expect(fake.rows.get(body.eventId)).toMatchObject({
+      actor: { actorId: 'buyer_user_001', actorType: 'user', layer: 'L2' },
+      action: 'commerce.order.created',
+      targetType: 'Order',
+      targetId: orderId,
+      before: {},
+      after: {
+        status: 'CREATED',
+        version: 1,
+        currency: 'USD',
+        subtotalMinor: 1200,
+        discountMinor: 100,
+        taxMinor: 88,
+        totalMinor: 1188,
+      },
+    })
+
+    const conflict = await worker.fetch(
+      orderRequest({ ...body, currency: 'EUR' }, 'req_order_audit_conflict'),
+      env as never,
+    )
+    expect(conflict.status).toBe(409)
+    await expect(conflict.json()).resolves.toEqual({ error: 'AUDIT_EVENT_CONFLICT' })
+    expect(fake.append).toHaveBeenCalledOnce()
+  })
+
+  it('writes the direct AUTH-013 audit endpoint through the native Store', async () => {
+    const fake = createStore()
+    getAuditEventStore.mockReturnValue(fake.store)
+    const response = await worker.fetch(
+      new Request('https://w06.internal/internal/audit-events/account-state-changed', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          eventId: 'evt-auth-013-http',
+          requestId: 'req_auth_013_http',
+          traceId: 'trace-auth-013-http',
+          actor: { actorId: 'admin-1', actorType: 'admin', layer: 'L7' },
+          userId: 'user-001',
+          beforeState: 'PENDING_VERIFICATION',
+          beforeVersion: 1,
+          afterState: 'ACTIVE',
+          afterVersion: 2,
+          occurredAt: '2026-09-24T08:30:00.000Z',
+          reason: 'verification completed',
+        }),
+      }),
+      env as never,
+    )
+
+    expect(response.status).toBe(201)
+    expect(fake.append).toHaveBeenCalledOnce()
+    expect(fake.findByEventId).not.toHaveBeenCalled()
+    expect(fake.rows.get('evt-auth-013-http')).toMatchObject({
+      action: 'identity.account_state_changed',
+      targetType: 'User',
+      targetId: 'user-001',
+      after: { account_state: 'ACTIVE', account_state_version: 2 },
+    })
+  })
+
   it('rejects invalid transport and payload before Store access', async () => {
     const fake = createStore()
     getAuditEventStore.mockReturnValue(fake.store)
@@ -180,7 +281,9 @@ describe('W06 direct AuditEvent HTTP persistence', () => {
       occurredAt: '2026-11-19T00:00:00.000Z',
     }
     const racedStore: AuditEventStore = {
-      async findByEventId() { return winner },
+      findByEventId: vi.fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(winner),
       async append() { throw new Error('unique event_id conflict') },
     }
     getAuditEventStore.mockReturnValue(racedStore)
