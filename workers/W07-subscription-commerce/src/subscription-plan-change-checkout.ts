@@ -1,18 +1,16 @@
-/// <reference types="@cloudflare/workers-types" />
-
 import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js';
 import {
   createCommerceOrder,
-  getCommerceOrder,
   OrderPersistenceError,
   type AuthoritativelyPricedOrder,
   type CommerceOrderData,
   type OrderCreatePersistenceStore,
 } from './order-persistence.js';
-import { issueInvoiceForOrder } from './billing-persistence.js';
+import { issueInvoiceForOrderPostgres } from './billing-document-postgres-persistence.js';
+import { getCommerceOrderPostgres } from './order-read-postgres.js';
 import {
   getW07OrderCreatePersistenceStore,
-  getW07SelectedD104Database,
+  getW07PaymentWebhookPostgresPool,
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
 import {
@@ -101,17 +99,16 @@ export type SubscriptionPlanUpgradeCheckoutResult = Readonly<{
   replayed: boolean;
 }>;
 
-export type SubscriptionPlanUpgradeCheckoutEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{
-  D1_04: D1Database;
-}>;
+export type SubscriptionPlanUpgradeCheckoutEnv =
+  Omit<W07PaymentMethodReadRuntimeEnv, 'D1_04'> & W07MembershipDatabaseRuntimeEnv;
 
 export type SubscriptionPlanUpgradeCheckoutDependencies = Readonly<{
   now?: () => Date;
   resolvePricing: (context: SubscriptionPlanUpgradePricingContext) => Promise<AuthoritativelyPricedOrder>;
   createOrder?: typeof createCommerceOrder;
-  getOrder?: typeof getCommerceOrder;
-  issueInvoice?: typeof issueInvoiceForOrder;
-  getDatabase?: (env: SubscriptionPlanUpgradeCheckoutEnv) => D1Database;
+  getFinancePool?: (env: SubscriptionPlanUpgradeCheckoutEnv) => W07WebhookPostgresPool | undefined;
+  getOrder?: typeof getCommerceOrderPostgres;
+  issueInvoice?: typeof issueInvoiceForOrderPostgres;
   getOrderCreateStore?: (env: SubscriptionPlanUpgradeCheckoutEnv) => OrderCreatePersistenceStore | undefined;
 }>;
 
@@ -260,6 +257,7 @@ function toCheckoutResult(
 
 async function createOrReadOrder(
   env: SubscriptionPlanUpgradeCheckoutEnv,
+  financePool: PlanUpgradeAttemptStore,
   membershipStore: PlanUpgradeAttemptStore,
   subscriberId: string,
   row: PlanChangeAttemptRow,
@@ -268,16 +266,16 @@ async function createOrReadOrder(
   replayed: boolean,
 ): Promise<SubscriptionPlanUpgradeCheckoutResult> {
   const attempt = toAttempt(row);
-  const database = (dependencies.getDatabase ?? getW07SelectedD104Database)(env);
   const orderCreateStore = (dependencies.getOrderCreateStore ?? getW07OrderCreatePersistenceStore)(env);
+  if (!orderCreateStore) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   let order: CommerceOrderData;
   try {
     if (row.order_id) {
-      order = await (dependencies.getOrder ?? getCommerceOrder)(database, subscriberId, row.order_id);
+      order = await (dependencies.getOrder ?? getCommerceOrderPostgres)(financePool, subscriberId, row.order_id);
     } else {
       const orderKey = 'plan-upgrade-' + row.attempt_id;
       const created = await (dependencies.createOrder ?? createCommerceOrder)(
-        orderCreateStore ?? database,
+        orderCreateStore,
         subscriberId,
         orderKey,
         { items: [{ itemRef: row.target_plan_id, quantity: 1 }] },
@@ -298,8 +296,8 @@ async function createOrReadOrder(
       }
     }
 
-    const issueInvoice = dependencies.issueInvoice ?? issueInvoiceForOrder;
-    await issueInvoice(database, subscriberId, order.orderId);
+    const issueInvoice = dependencies.issueInvoice ?? issueInvoiceForOrderPostgres;
+    await issueInvoice(financePool, subscriberId, order.orderId);
   } catch (error) {
     if (error instanceof SubscriptionRuntimeError) throw error;
     if (error instanceof OrderPersistenceError) {
@@ -319,8 +317,8 @@ async function createOrReadOrder(
 /**
  * Creates an authoritative, prorated upgrade Order without mutating the Subscription.
  * Access changes only from the signed Hyperswitch success-webhook fulfillment path.
- * Financial facts remain in D1-04; D1-01 stores only the lifecycle reservation and
- * an opaque D1-04 order reference.
+ * Financial facts remain in the separate D1-04 Neon finance database; D1-01
+ * stores only the lifecycle reservation and an opaque D1-04 order reference.
  */
 export async function createSubscriptionPlanUpgradeCheckout(
   env: SubscriptionPlanUpgradeCheckoutEnv,
@@ -331,7 +329,8 @@ export async function createSubscriptionPlanUpgradeCheckout(
   ifMatchInput: string | null,
   dependencies: SubscriptionPlanUpgradeCheckoutDependencies,
 ): Promise<SubscriptionPlanUpgradeCheckoutResult> {
-  env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
+  const financePool = (dependencies.getFinancePool ?? getW07PaymentWebhookPostgresPool)(env);
+  if (!financePool) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   const membershipStore = getScheduledPlanChangeStore(env);
   const subscriberId = validatePrincipal(subscriberIdInput);
   const subscriptionId = subscriptionIdInput.trim();
@@ -368,21 +367,19 @@ export async function createSubscriptionPlanUpgradeCheckout(
       throw new SubscriptionRuntimeError('CONFLICT', 409);
     }
     if (attemptRow.order_id) {
+      const order = await (dependencies.getOrder ?? getCommerceOrderPostgres)(financePool, subscriberId, attemptRow.order_id)
+        .catch(() => { throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503); });
+      if (attemptRow.status === 'PENDING_PAYMENT' &&
+          (order.status === 'FAILED' || order.status === 'CANCELLED')) {
+        await expireAttempt(membershipStore, attemptRow, now);
+        throw new SubscriptionRuntimeError('CONFLICT', 409);
+      }
       if (attemptRow.status === 'PENDING_PAYMENT') {
-        const order = await (dependencies.getOrder ?? getCommerceOrder)(env.D1_04, subscriberId, attemptRow.order_id)
-          .catch(() => { throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503); });
-        if (order.status === 'FAILED' || order.status === 'CANCELLED') {
-          await expireAttempt(membershipStore, attemptRow, now);
-          throw new SubscriptionRuntimeError('CONFLICT', 409);
-        }
-        const invoice = dependencies.issueInvoice ?? issueInvoiceForOrder;
-        await invoice(env.D1_04, subscriberId, order.orderId).catch(() => {
+        const invoice = dependencies.issueInvoice ?? issueInvoiceForOrderPostgres;
+        await invoice(financePool, subscriberId, order.orderId).catch(() => {
           throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
         });
-        return toCheckoutResult(attemptRow, order, true);
       }
-      const order = await (dependencies.getOrder ?? getCommerceOrder)(env.D1_04, subscriberId, attemptRow.order_id)
-        .catch(() => { throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503); });
       return toCheckoutResult(attemptRow, order, true);
     }
   }
@@ -471,7 +468,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
     }
   }
 
-  return createOrReadOrder(env, membershipStore, subscriberId, attemptRow, preview, {
+  return createOrReadOrder(env, financePool, membershipStore, subscriberId, attemptRow, preview, {
     ...dependencies,
     resolvePricing: async () => pricing,
   }, replayedAttempt || Boolean(attemptRow.order_id));

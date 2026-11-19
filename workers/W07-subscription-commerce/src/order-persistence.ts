@@ -250,7 +250,7 @@ const orderRequestHash = async (request: CreateCommerceOrderRequest): Promise<st
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-function readSnapshotPricingMode(raw: string): 'live' | 'demo' {
+export function readSnapshotPricingMode(raw: string): 'live' | 'demo' {
   let parsed: unknown
   try {
     parsed = JSON.parse(raw) as unknown
@@ -279,7 +279,7 @@ const isValidOrderStatus = (value: unknown): value is CommerceOrderStatus =>
   value === 'CREATED' || value === 'PENDING_PAYMENT' || value === 'CONFIRMED' ||
   value === 'PROCESSING' || value === 'COMPLETED' || value === 'CANCELLED' || value === 'FAILED';
 
-const parseStoredOrderData = (raw: string): CommerceOrderData => {
+export const parseStoredOrderData = (raw: string): CommerceOrderData => {
   let value: unknown;
   try {
     value = JSON.parse(raw) as unknown;
