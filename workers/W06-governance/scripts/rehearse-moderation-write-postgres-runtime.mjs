@@ -7,6 +7,7 @@ import { dirname } from 'node:path'
 import { decideModerationCase, getModerationCase } from '../src/moderation-runtime.ts'
 import { createReport } from '../src/report-runtime.ts'
 import { createPostgresModerationD1Database } from '../src/neon-postgres-d1-database.ts'
+import { createPostgresModerationDecisionWriteStore } from '../src/moderation-decision-write-store-postgres.ts'
 import { createPostgresModerationReportWriteStore } from '../src/moderation-report-write-store-postgres.ts'
 import { consumeAccountStateChanged } from '../src/auth-013-queue-consumer.ts'
 import { consumeMfaAuditEvent } from '../src/mfa-audit-queue-consumer.ts'
@@ -36,6 +37,7 @@ const client = await pool.connect()
 let runtimePassed = false
 const checks = {
   usesSharedD1_03PostgresPool: false,
+  usesNativeModerationDecisionWriteStore: false,
   decisionBatchCommittedAtomically: false,
   moderationTransactionGuardAcceptedSuccessfulCas: false,
   auditEventWrittenWithDecision: false,
@@ -79,7 +81,9 @@ try {
     },
   }
   const db = createPostgresModerationD1Database(executor)
+  const decisionStore = createPostgresModerationDecisionWriteStore(executor)
   checks.usesSharedD1_03PostgresPool = true
+  checks.usesNativeModerationDecisionWriteStore = true
   const reportStore = createPostgresModerationReportWriteStore(executor)
   const auditEventStore = createPostgresAuditEventStore(executor)
 
@@ -133,7 +137,7 @@ try {
     expiresAt: null,
   }
 
-  const first = await decideModerationCase(db, w03, successfulInput)
+  const first = await decideModerationCase(decisionStore, w03, successfulInput)
   assert.equal(first.caseId, successfulCaseId)
   assert.equal(first.version, 2)
   checks.decisionBatchCommittedAtomically = true
@@ -157,7 +161,7 @@ try {
   checks.auditEventWrittenWithDecision = true
   checks.enforcementOutboxDelivered = true
 
-  const replay = await decideModerationCase(db, w03, successfulInput)
+  const replay = await decideModerationCase(decisionStore, w03, successfulInput)
   assert.deepEqual(replay, first)
   const decisionCount = await db.prepare(
     'SELECT count(*) AS count FROM moderation_decisions WHERE case_id = ?',
@@ -329,7 +333,7 @@ try {
     requestId: 'req_' + randomUUID().replaceAll('-', ''),
   }
   await assert.rejects(
-    decideModerationCase(db, w03, staleInput),
+    decideModerationCase(decisionStore, w03, staleInput),
     (error) => error?.code === 'SERVICE_UNAVAILABLE' && error?.status === 503,
   )
   const staleCase = await db.prepare(
