@@ -26,7 +26,7 @@ import { runRenewalScheduledBatch } from './renewal-scheduler.js'
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
   W07_DATABASE_DRIVER?: string
-  HYPERDRIVE_D1_04?: { connectionString?: string }
+  HYPERDRIVE_FINANCE_DB?: { connectionString?: string }
   W07_MEMBERSHIP_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_01?: { connectionString?: string }
   W06_GOVERNANCE?: Fetcher
