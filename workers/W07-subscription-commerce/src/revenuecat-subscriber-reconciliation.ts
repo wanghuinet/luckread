@@ -211,7 +211,7 @@ function validateSnapshot(snapshot: RevenueCatSubscriberSnapshot): void {
  * binding; otherwise the entire reconciliation candidate build fails closed.
  */
 export async function buildRevenueCatSubscriberReconciliationCandidates(
-  db: D1Database | W07WebhookPostgresPool,
+  db: W07WebhookPostgresPool,
   input: Readonly<{
     snapshot: RevenueCatSubscriberSnapshot;
     expectedAppUserId: string;
