@@ -51,8 +51,8 @@ describe('public customer payment refund adapter', () => {
   })
 
   it('makes W07 re-check payment ownership and captured amount before reserving a refund', () => {
-    const selectedPool = w07Runtime.indexOf('getW07PaymentWebhookPostgresPool')
-    const ownership = w07Runtime.indexOf('resolveRefundPaymentReferencePostgres')
+    const selectedPool = w07Runtime.indexOf('(dependencies.getPostgresPool ?? getW07PaymentWebhookPostgresPool)(env)')
+    const ownership = w07Runtime.indexOf('resolvePayment(\n      pool,')
     const providerRead = w07Runtime.indexOf('retrievePayment(config, input.paymentId)')
     const reservationRead = w07Runtime.indexOf('findExisting(pool,')
     const reserve = w07Runtime.indexOf('reserve(pool,')
