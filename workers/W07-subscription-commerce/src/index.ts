@@ -28,7 +28,7 @@ interface Env {
   W07_DATABASE_DRIVER?: string
   HYPERDRIVE_FINANCE_DB?: { connectionString?: string }
   W07_MEMBERSHIP_DATABASE_DRIVER?: string
-  HYPERDRIVE_D1_01?: { connectionString?: string }
+  HYPERDRIVE_MEMBERSHIP_DB?: { connectionString?: string }
   W06_GOVERNANCE?: Fetcher
   MEMBERSHIP_RENEWAL_ENABLED?: string
   HYPERSWITCH_ENVIRONMENT?: string
