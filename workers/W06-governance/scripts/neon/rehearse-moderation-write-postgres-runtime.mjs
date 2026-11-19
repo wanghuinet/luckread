@@ -7,6 +7,7 @@ import { dirname } from 'node:path'
 import { decideModerationCase, getModerationCase } from '../../src/moderation-runtime.ts'
 import { createReport } from '../../src/report-runtime.ts'
 import { createPostgresModerationD1Database } from '../../src/neon-postgres-d1-database.ts'
+import { createPostgresModerationReportWriteStore } from '../../src/moderation-report-write-store-postgres.ts'
 
 const requireFromW02 = createRequire(new URL('../../../W02-identity/package.json', import.meta.url))
 const { Pool } = requireFromW02('pg')
@@ -36,6 +37,7 @@ const checks = {
   auditEventWrittenWithDecision: false,
   enforcementOutboxDelivered: false,
   sameKeyReplayReturnedStoredDecision: false,
+  moderationReportUsesNativePostgresStore: false,
   moderationReportWrittenWithAudit: false,
   moderationReportReplayReturnedStoredResponse: false,
   staleVersionGuardRolledBackAllWrites: false,
@@ -72,6 +74,7 @@ try {
   }
   const db = createPostgresModerationD1Database(executor)
   checks.usesSharedD1_03PostgresPool = true
+  const reportStore = createPostgresModerationReportWriteStore(executor)
 
   const reviewerId = marker + '-reviewer'
   const successfulCaseId = marker + '-success'
@@ -166,7 +169,8 @@ try {
     requestId: 'req_' + randomUUID().replaceAll('-', ''),
     correlationId: marker + '-report-correlation',
   }
-  const report = await createReport(db, reportInput)
+  const report = await createReport(reportStore, reportInput)
+  checks.moderationReportUsesNativePostgresStore = true
   assert.equal(report.status, 'CREATED')
   const storedReport = await db.prepare(
     'SELECT report_id,target_type,target_id,reason_code FROM moderation_reports WHERE report_id = ?',
