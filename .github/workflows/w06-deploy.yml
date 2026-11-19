@@ -126,8 +126,8 @@ jobs:
           if (config.name !== 'luckread-w06' || config.main !== 'src/index.ts') {
             throw new Error('W06 worker identity or entrypoint changed')
           }
-          if (config.vars?.W06_MODERATION_DATABASE_DRIVER !== 'neon') {
-            throw new Error('W06 must explicitly select Neon for its admitted D1-03 tables')
+          if (config.vars?.W06_MODERATION_DATABASE_DRIVER !== undefined) {
+            throw new Error('W06 must not expose a legacy database driver switch')
           }
           if (!hyperdrive || hyperdrive.id !== '7c8831416c18494faee04b96aa551cb9') {
             throw new Error('W06 must reuse the existing D1-03 Hyperdrive resource')
