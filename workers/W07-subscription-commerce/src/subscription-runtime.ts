@@ -34,6 +34,57 @@ export class SubscriptionRuntimeError extends Error {
 const MAX_ID = 256
 const MAX_IDEMPOTENCY_KEY = 256
 
+export type ActiveMembershipPlanRow = {
+  trial_period_days: number
+  plan_id: string
+  owner_id: string
+  current_version: number
+  created_at: string
+  updated_at: string
+  name: string
+  tier: string
+  billing_interval: string
+  price_minor: number
+  currency: string
+  benefits_json: string
+}
+
+type PlanListCursor = { createdAt: string; planId: string }
+
+const encodePlanListCursor = (cursor: PlanListCursor): string => {
+  const bytes = new TextEncoder().encode(JSON.stringify(cursor))
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '')
+}
+
+const decodePlanListCursor = (value: string | null): PlanListCursor | null => {
+  if (value === null) return null
+  const normalized = value.trim()
+  if (!normalized || normalized.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(normalized)) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+  try {
+    const base64 = normalized.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - normalized.length % 4) % 4)
+    const binary = atob(base64)
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+    const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid cursor shape')
+    const candidate = parsed as Record<string, unknown>
+    if (
+      typeof candidate.createdAt !== 'string' ||
+      candidate.createdAt.length > 64 ||
+      !Number.isFinite(Date.parse(candidate.createdAt)) ||
+      typeof candidate.planId !== 'string' ||
+      candidate.planId.trim().length === 0 ||
+      candidate.planId.length > MAX_ID
+    ) throw new Error('invalid cursor fields')
+    return { createdAt: candidate.createdAt, planId: candidate.planId }
+  } catch {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+}
+
 const ensureId = (value: string, code = 'VALIDATION_FAILED'): string => {
   const normalized = value.trim()
   if (!normalized || normalized.length > MAX_ID) {
