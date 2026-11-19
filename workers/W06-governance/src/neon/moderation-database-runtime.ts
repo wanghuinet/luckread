@@ -15,13 +15,15 @@ import {
   createPostgresModerationCaseDetailReadStore,
   type ModerationCaseDetailReadStore,
 } from '../moderation-case-detail-read-store-postgres.js'
+import { createPostgresModerationDecisionWriteStore } from '../moderation-decision-write-store-postgres.js'
+import type { ModerationDecisionWriteStore } from '../moderation-decision-write-store-postgres.js'
 
 /**
  * @deprecated-next-version
- * Reason: W06 Neon runtime still exposes a D1-shaped persistence facade and an explicit legacy D1 test/compatibility branch.
+ * Reason: W06 Neon runtime still exposes a D1-shaped facade for scheduled moderation outbox draining and an explicit legacy D1 compatibility branch.
  * Replacement: Native PostgreSQL moderation stores and explicit PostgreSQL transaction/query contracts.
  * Removal: Next release.
- * Condition: Direct audit HTTP ingestion and moderation decision/outbox consumers also accept native PostgreSQL stores without D1Database signatures or SQL translation; then remove the explicitly selected legacy D1 compatibility branch.
+ * Condition: The scheduled moderation outbox consumer also accepts the native PostgreSQL store; then remove the remaining D1 compatibility facade and explicit legacy D1 branch.
  */
 export type W06ModerationDatabaseDriver = 'd1' | 'neon'
 
@@ -38,6 +40,7 @@ const queueStores = new WeakMap<object, ModerationQueueReadStore>()
 const reportStores = new WeakMap<object, ModerationReportWriteStore>()
 const auditEventStores = new WeakMap<object, AuditEventStore>()
 const caseDetailStores = new WeakMap<object, ModerationCaseDetailReadStore>()
+const decisionWriteStores = new WeakMap<object, ModerationDecisionWriteStore>()
 
 export function resolveW06ModerationDatabaseDriver(
   env: W06ModerationDatabaseRuntimeEnv,
@@ -199,6 +202,23 @@ export function getW06AuditEventStore(env: W06ModerationDatabaseRuntimeEnv): Aud
   return store
 }
 
+/** Native PostgreSQL transaction for moderation Decision, Case, idempotency, W09 AuditEvent and Outbox. */
+export function getW06ModerationDecisionWriteStore(
+  env: W06ModerationDatabaseRuntimeEnv,
+): ModerationDecisionWriteStore {
+  const pool = getW06ModerationPostgresPool(env)
+  const binding = env.HYPERDRIVE_D1_03
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+  }
+  const cached = decisionWriteStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresModerationDecisionWriteStore(pool)
+  decisionWriteStores.set(binding, store)
+  return store
+}
+
 /** Dedicated PostgreSQL projection preserves native keyset timestamp precision. */
 export function getW06ModerationQueueReadStore(
   env: W06ModerationDatabaseRuntimeEnv,
@@ -248,6 +268,7 @@ export async function closeW06ModerationPostgresRuntimeForTest(
   reportStores.delete(binding)
   auditEventStores.delete(binding)
   caseDetailStores.delete(binding)
+  decisionWriteStores.delete(binding)
 
   const pool = await pending
   await pool.end()
