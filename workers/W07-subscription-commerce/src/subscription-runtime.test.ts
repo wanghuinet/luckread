@@ -16,11 +16,15 @@ describe('W07 Neon-only membership runtime contract', () => {
     const runtime = readFileSync(new URL('./subscription-runtime.ts', import.meta.url), 'utf8');
     const worker = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
     const membershipRuntime = readFileSync(new URL('./neon/membership-database-runtime.ts', import.meta.url), 'utf8');
+    const postgresPoolContract = readFileSync(new URL('./payment-webhook-database-postgres.ts', import.meta.url), 'utf8');
 
     expect(runtime).not.toMatch(/D1Database|D1PreparedStatement|D1Result|\.prepare\(|\.batch\(|D1_01/);
     expect(worker).not.toMatch(/D1_01\s*:/);
     expect(worker).not.toContain('getW07SelectedD101Database');
     expect(membershipRuntime).not.toMatch(/D1Database|createPostgresD1Database/);
+    expect(postgresPoolContract).not.toMatch(/D1Database|D1PreparedStatement|D1Result|createPostgresD1Database|toPostgresWebhookSql|prepare\(|batch\(/);
+    expect(postgresPoolContract).toContain('W07WebhookPostgresPool');
+    expect(postgresPoolContract).toContain('W07WebhookPostgresClient');
     expect(membershipRuntime).toContain("configured !== 'neon'");
     expect(membershipRuntime).toContain('HYPERDRIVE_D1_01');
   });
