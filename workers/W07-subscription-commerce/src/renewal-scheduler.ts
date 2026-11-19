@@ -188,7 +188,7 @@ export async function runRenewalScheduledBatch(
 
   let afterRecovery: OutcomeBatch;
   try {
-    afterRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getDatabase: getSelectedDatabase });
+    afterRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool });
   } catch {
     return { status: 'PARTIAL', phase: 'OUTCOME_SYNC_AFTER' };
   }
