@@ -142,7 +142,7 @@ jobs:
           if (!w01m || w01m.service !== 'luckread-w06') throw new Error('W01 W06_MODERATION binding mismatch');
           if (!w06m || w06m.service !== 'luckread-w03') throw new Error('W06 W03_CONTENT_MODERATION binding mismatch');
           if (!sourceD1 || sourceD1.database_id !== 'bda1d247-a371-4244-91ae-aef96034db7f') throw new Error('W06 historical D1-03 schema source mapping mismatch');
-          if ((w06.d1_databases || []).length !== 0 || w06.vars?.W06_MODERATION_DATABASE_DRIVER !== 'neon') throw new Error('W06 production must be Neon-only');
+          if ((w06.d1_databases || []).length !== 0 || w06.vars?.W06_MODERATION_DATABASE_DRIVER !== undefined) throw new Error('W06 production must be Neon-only with no legacy driver switch');
           if (!hyperdrive || hyperdrive.id !== '7c8831416c18494faee04b96aa551cb9') throw new Error('W06 D1-03 Hyperdrive binding mismatch');
           if ((w03.d1_databases || []).length !== 0 || w03.vars?.W03_CONTENT_READ_DRIVER !== 'neon' ||
               !w03.hyperdrive?.some(x => x.binding === 'HYPERDRIVE_CONTENT_PG' && x.id === 'c55183e1cc3446409c9c1075832c6615')) {
