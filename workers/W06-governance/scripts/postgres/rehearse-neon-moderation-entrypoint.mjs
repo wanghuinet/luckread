@@ -194,7 +194,7 @@ try {
     effectiveAt: detail.currentDecision.effectiveAt,
   })
   assert.equal(typeof detail.currentDecision.effectiveAt, 'string')
-  assert.match(detail.currentDecision.effectiveAt, /\\.\\d{6}Z$/)
+  assert.match(detail.currentDecision.effectiveAt, /\.\d{6}Z$/)
   checks.caseDetailReadUsesNativePostgresStore = true
 
   const caseRows = await pool.query(
