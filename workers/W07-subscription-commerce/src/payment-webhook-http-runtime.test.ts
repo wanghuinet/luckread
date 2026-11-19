@@ -1,21 +1,33 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  handleHyperswitchWebhookRequest,
-} from './payment-webhook-http-runtime.js';
+import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js';
 import {
   PaymentPersistenceError,
   type WebhookReceiptResult,
+  type ReceiveHyperswitchWebhookInput,
 } from './payment-persistence.js';
-import type { ReceiveHyperswitchWebhookInput } from './payment-persistence.js';
-import type { RenewalOutcomeSyncResult } from './subscription-renewal-outcome.js';
-import type { PaidMembershipPurchaseFulfillmentResult } from './paid-membership-order-fulfillment.js';
-import { type BillingDocumentDto } from './billing-persistence.js';
+import {
+  syncRenewalCycleOutcomeForPayment,
+  type RenewalOutcomeSyncResult,
+} from './subscription-renewal-outcome.js';
+import {
+  fulfillPaidMembershipOrder,
+  type PaidMembershipPurchaseFulfillmentResult,
+} from './paid-membership-order-fulfillment.js';
+import type { BillingDocumentDto } from './billing-persistence.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 const SECRET = 'hyperswitch-webhook-test-secret';
 const MERCHANT = 'merchant_test';
 const CORRELATION_ID = 'corr_test_001';
-const BODY = '{"event_id":"evt_test_001","merchant_id":"merchant_test"}';
+const BODY = JSON.stringify({
+  event_id: 'evt_test_001',
+  merchant_id: 'merchant_test',
+  event_type: 'mandate_active',
+  content: {
+    type: 'mandate_details',
+    object: { mandate_id: 'provider_mandate_001', payment_method_id: 'pm_test_001', status: 'active' },
+  },
+});
 
 const receipt = (
   outcome: WebhookReceiptResult['outcome'] = 'APPLIED',
@@ -28,7 +40,23 @@ const receipt = (
   ...(outcome === 'PAYLOAD_CONFLICT' ? { conflictId: 'evtconf_test_001' } : {}),
 });
 
-type Receiver = NonNullable<Parameters<typeof handleHyperswitchWebhookRequest>[2]>['receive'];
+type OutcomeEnv = Parameters<typeof syncRenewalCycleOutcomeForPayment>[0];
+type FulfillmentEnv = Parameters<typeof fulfillPaidMembershipOrder>[0];
+
+function eventContentType(input: ReceiveHyperswitchWebhookInput): string | null {
+  try {
+    const envelope: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(input.rawBody));
+    if (typeof envelope !== 'object' || envelope === null || Array.isArray(envelope)) return null;
+    const row = envelope as Record<string, unknown>;
+    const content = typeof row.content === 'object' && row.content !== null && !Array.isArray(row.content)
+      ? row.content as Record<string, unknown>
+      : null;
+    const value = row.content_type ?? content?.type;
+    return typeof value === 'string' ? value : null;
+  } catch {
+    return null;
+  }
+}
 
 function fixture(options: {
   result?: WebhookReceiptResult;
@@ -36,31 +64,24 @@ function fixture(options: {
   syncResult?: RenewalOutcomeSyncResult;
   pendingRecoveryResult?: Readonly<{ scanned: number; applied: number; reconciliationRequired: number; pendingRetry: number }>;
   purchaseFulfillmentResult?: PaidMembershipPurchaseFulfillmentResult;
-  webhookDatabase?: D1Database;
+  poolAvailable?: boolean;
   nativeRefundResult?: WebhookReceiptResult;
   nativePaymentResult?: WebhookReceiptResult;
   nativeMandateResult?: WebhookReceiptResult;
 } = {}) {
-  const calls: Array<{ db: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
-  const syncCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
-  const pendingRecoveryCalls: Array<{ env: unknown; options?: Readonly<{ limit?: number }> }> = [];
-  const purchaseFulfillmentCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
-  const receiptCalls: Array<{ db: unknown; paymentId: string; merchantId: string }> = [];
+  const syncCalls: Array<{ env: OutcomeEnv; paymentId: string; merchantId: string }> = [];
+  const pendingRecoveryCalls: Array<{ env: OutcomeEnv; options?: Readonly<{ limit?: number }> }> = [];
+  const purchaseFulfillmentCalls: Array<{ env: FulfillmentEnv; paymentId: string; merchantId: string }> = [];
   const postgresCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const postgresPaymentCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const postgresMandateCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const postgresReceiptCalls: Array<{ pool: unknown; paymentId: string; merchantId: string }> = [];
   const postgresPool = {} as W07WebhookPostgresPool;
-  const membershipPostgresPool = { marker: 'neon-d1-01-pool' } as unknown as W07WebhookPostgresPool;
+  const membershipPostgresPool = { marker: 'neon-membership-pool' } as unknown as W07WebhookPostgresPool;
   const nativeUpgradeExpiryCalls: Array<{ financePool: unknown; membershipPool: unknown; paymentId: string; merchantId: string }> = [];
-  const legacyUpgradeExpiryCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
-  const receive: Receiver = async (db, input) => {
-    calls.push({ db, input });
-    if (options.error) throw options.error;
-    return options.result ?? receipt();
-  };
+
   const syncRenewalOutcome = async (
-    env: { D1_01: D1Database; D1_04: D1Database },
+    env: OutcomeEnv,
     paymentId: string,
     merchantId: string,
   ): Promise<RenewalOutcomeSyncResult> => {
@@ -68,79 +89,93 @@ function fixture(options: {
     return options.syncResult ?? { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' };
   };
   const syncPendingOutcomes = async (
-    env: { D1_01: D1Database; D1_04: D1Database },
+    env: OutcomeEnv,
     recoveryOptions?: Readonly<{ limit?: number }>,
   ) => {
     pendingRecoveryCalls.push({ env, options: recoveryOptions });
     return options.pendingRecoveryResult ?? { scanned: 0, applied: 0, reconciliationRequired: 0, pendingRetry: 0 };
   };
   const fulfillPaidOrder = async (
-    env: { D1_01: D1Database; D1_04: D1Database },
+    env: FulfillmentEnv,
     paymentId: string,
     merchantId: string,
   ): Promise<PaidMembershipPurchaseFulfillmentResult> => {
     purchaseFulfillmentCalls.push({ env, paymentId, merchantId });
     return options.purchaseFulfillmentResult ?? { outcome: 'NOT_APPLICABLE', fulfilledCount: 0 };
   };
-  const issueReceipt = async (
-    db: D1Database,
-    paymentId: string,
-    merchantId: string,
-  ): Promise<BillingDocumentDto> => {
-    receiptCalls.push({ db, paymentId, merchantId });
-    return {} as BillingDocumentDto;
-  };
+
   const env = {
-    D1_01: { marker: 'd1-01' } as unknown as D1Database,
-    D1_04: { marker: 'd1-04' } as unknown as D1Database,
+    W07_DATABASE_DRIVER: 'neon',
+    W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
     HYPERSWITCH_WEBHOOK_SECRET: SECRET,
     HYPERSWITCH_MERCHANT_ID: MERCHANT,
-    W07_DATABASE_DRIVER: undefined as string | undefined,
+  };
+  const getWebhookPostgresPool = vi.fn(() =>
+    options.poolAvailable === false ? undefined : postgresPool,
+  );
+  const dependencies = {
+    getWebhookPostgresPool,
+    getMembershipPostgresPool: () => membershipPostgresPool,
+    receiveRefundWebhookPostgres: async (
+      pool: W07WebhookPostgresPool,
+      input: ReceiveHyperswitchWebhookInput,
+    ) => {
+      if (eventContentType(input) !== 'refund_details') return null;
+      postgresCalls.push({ pool, input });
+      if (options.error) throw options.error;
+      return options.nativeRefundResult ?? options.result ?? receipt();
+    },
+    receivePaymentWebhookPostgres: async (
+      pool: W07WebhookPostgresPool,
+      input: ReceiveHyperswitchWebhookInput,
+    ) => {
+      if (eventContentType(input) !== 'payment_details') return null;
+      postgresPaymentCalls.push({ pool, input });
+      if (options.error) throw options.error;
+      return options.nativePaymentResult ?? options.result ?? receipt();
+    },
+    receiveMandateWebhookPostgres: async (
+      pool: W07WebhookPostgresPool,
+      input: ReceiveHyperswitchWebhookInput,
+    ) => {
+      if (eventContentType(input) !== 'mandate_details') return null;
+      postgresMandateCalls.push({ pool, input });
+      if (options.error) throw options.error;
+      return options.nativeMandateResult ?? options.result ?? receipt();
+    },
+    issueReceiptPostgres: async (
+      pool: W07WebhookPostgresPool,
+      paymentId: string,
+      merchantId: string,
+    ) => {
+      postgresReceiptCalls.push({ pool, paymentId, merchantId });
+      return {} as BillingDocumentDto;
+    },
+    syncRenewalOutcome,
+    syncPendingOutcomes,
+    fulfillPaidOrder,
+    expirePendingPlanUpgradePostgres: async (
+      financePool: W07WebhookPostgresPool,
+      membershipPool: W07WebhookPostgresPool,
+      paymentId: string,
+      merchantId: string,
+    ) => {
+      nativeUpgradeExpiryCalls.push({ financePool, membershipPool, paymentId, merchantId });
+    },
   };
   return {
-    env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, postgresCalls, postgresPaymentCalls, postgresMandateCalls, postgresReceiptCalls, nativeUpgradeExpiryCalls, legacyUpgradeExpiryCalls, membershipPostgresPool,
-    dependencies: {
-      receive,
-      getWebhookDatabase: vi.fn(() => options.webhookDatabase),
-      getWebhookPostgresPool: () => postgresPool,
-      getMembershipPostgresPool: () => membershipPostgresPool,
-      receiveRefundWebhookPostgres: async (
-        pool: W07WebhookPostgresPool,
-        input: ReceiveHyperswitchWebhookInput,
-      ) => {
-        postgresCalls.push({ pool, input });
-        return options.nativeRefundResult ?? null;
-      },
-      receivePaymentWebhookPostgres: async (
-        pool: W07WebhookPostgresPool,
-        input: ReceiveHyperswitchWebhookInput,
-      ) => {
-        postgresPaymentCalls.push({ pool, input });
-        return options.nativePaymentResult ?? null;
-      },
-      receiveMandateWebhookPostgres: async (
-        pool: W07WebhookPostgresPool,
-        input: ReceiveHyperswitchWebhookInput,
-      ) => {
-        postgresMandateCalls.push({ pool, input });
-        return options.nativeMandateResult ?? null;
-      },
-      issueReceiptPostgres: async (
-        pool: W07WebhookPostgresPool,
-        paymentId: string,
-        merchantId: string,
-      ) => {
-        postgresReceiptCalls.push({ pool, paymentId, merchantId });
-        return {} as BillingDocumentDto;
-      },
-      syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder, issueReceipt,
-      expirePendingPlanUpgradePostgres: async (financePool: W07WebhookPostgresPool, membershipPool: W07WebhookPostgresPool, paymentId: string, merchantId: string) => {
-        nativeUpgradeExpiryCalls.push({ financePool, membershipPool, paymentId, merchantId });
-      },
-      expirePendingPlanUpgrade: async (env: unknown, paymentId: string, merchantId: string) => {
-        legacyUpgradeExpiryCalls.push({ env, paymentId, merchantId });
-      },
-    },
+    env,
+    dependencies,
+    postgresPool,
+    membershipPostgresPool,
+    syncCalls,
+    pendingRecoveryCalls,
+    purchaseFulfillmentCalls,
+    postgresCalls,
+    postgresPaymentCalls,
+    postgresMandateCalls,
+    postgresReceiptCalls,
+    nativeUpgradeExpiryCalls,
   };
 }
 
