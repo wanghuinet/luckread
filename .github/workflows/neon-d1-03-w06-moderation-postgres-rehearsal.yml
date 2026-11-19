@@ -17,6 +17,7 @@ on:
       - 'workers/W06-governance/README.md'
       - 'workers/W06-governance/migrations/**'
       - 'workers/W06-governance/scripts/neon/**'
+      - 'workers/W06-governance/scripts/rehearse-moderation-write-postgres-runtime.mjs'
       - 'workers/W06-governance/src/neon-postgres-migrations/**'
       - 'workers/W06-governance/src/moderation-runtime.ts'
       - 'workers/W06-governance/src/moderation-runtime.test.ts'
@@ -31,7 +32,6 @@ on:
       - 'workers/W06-governance/src/moderation-queue-read-store*.ts'
       - 'workers/W06-governance/src/neon-postgres-d1-database.ts'
       - 'workers/W06-governance/src/neon-postgres-d1-database.test.ts'
-      - 'workers/W06-governance/scripts/neon/rehearse-moderation-write-postgres-runtime.mjs'
       - 'workers/W09-platform/src/neon-postgres-migrations/**'
       - 'workers/W06-governance/scripts/neon/rehearse-moderation-queue-postgres-runtime.mjs'
   push:
@@ -50,6 +50,7 @@ on:
       - 'workers/W06-governance/README.md'
       - 'workers/W06-governance/migrations/**'
       - 'workers/W06-governance/scripts/neon/**'
+      - 'workers/W06-governance/scripts/rehearse-moderation-write-postgres-runtime.mjs'
       - 'workers/W06-governance/src/neon-postgres-migrations/**'
       - 'workers/W06-governance/src/moderation-runtime.ts'
       - 'workers/W06-governance/src/moderation-runtime.test.ts'
@@ -105,7 +106,7 @@ jobs:
           set -euo pipefail
           node --check workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.mjs
           node --check workers/W06-governance/scripts/neon/rehearse-moderation-queue-postgres-runtime.mjs
-          node --check workers/W06-governance/scripts/neon/rehearse-moderation-write-postgres-runtime.mjs
+          node --check workers/W06-governance/scripts/rehearse-moderation-write-postgres-runtime.mjs
           node --test workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.test.mjs
           node workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.mjs
           git diff --exit-code -- workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql
@@ -155,7 +156,7 @@ jobs:
         env:
           D1_03_W06_LOCAL_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_03_w06_rehearsal
           D1_03_W06_WRITE_POSTGRES_REPORT: ../../artifacts/neon/d1-03-w06-moderation-write-postgres-runtime-postflight.json
-        run: node --import=tsx/esm ../../workers/W06-governance/scripts/neon/rehearse-moderation-write-postgres-runtime.mjs
+        run: node --import=tsx/esm ../../workers/W06-governance/scripts/rehearse-moderation-write-postgres-runtime.mjs
 
       - name: Upload W06 D1-03 PostgreSQL 18 rehearsal evidence
         if: always()
