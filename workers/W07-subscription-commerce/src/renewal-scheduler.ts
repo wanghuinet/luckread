@@ -62,6 +62,7 @@ export type RenewalScheduledBatchResult =
 export type RenewalScheduledDependencies = Readonly<{
   readTableNames?: (db: D1Database, expected: readonly string[], dialect?: 'd1' | 'neon') => Promise<Set<string>>;
   readMembershipTableNames?: (db: W07WebhookPostgresPool, expected: readonly string[]) => Promise<Set<string>>;
+  getMembershipPostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool;
   getDatabase?: (env: RenewalRuntimeEnv) => D1Database;
   syncPending?: typeof syncPendingRenewalOutcomes;
   scanDue?: typeof scanDueSubscriptionRenewals;
@@ -113,7 +114,7 @@ export async function runRenewalScheduledBatch(
   let membershipTables: Set<string>;
   let financeTables: Set<string>;
   try {
-    const membershipPool = getW07MembershipPostgresPool(env);
+    const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
     [membershipTables, financeTables] = await Promise.all([
       (dependencies.readMembershipTableNames ?? readMembershipTableNames)(membershipPool, REQUIRED_MEMBERSHIP_TABLES),
       getTableNames(selectedD104, REQUIRED_D1_04_TABLES, databaseDialect),
