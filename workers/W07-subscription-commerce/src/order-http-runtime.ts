@@ -1,38 +1,30 @@
-/// <reference types="@cloudflare/workers-types" />
-
 import {
   createCommerceOrder,
-  getCommerceOrder,
   OrderPersistenceError,
   type CreateOrderResult,
   type CommerceOrderData,
   type AuthoritativelyPricedOrder,
+  type OrderCreatePersistenceStore,
 } from './order-persistence.js';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
 import { validateCreateCommerceOrderRequest, validateOrderCreateIdempotencyKey } from './order-request-validation.js';
-import { issueInvoiceForOrder } from './billing-persistence.js';
 import { issueInvoiceForOrderPostgres } from './billing-document-postgres-persistence.js';
+import { getCommerceOrderPostgres } from './order-read-postgres.js';
 import {
   getW07OrderCreatePersistenceStore,
-  getW07SelectedD104Database,
   getW07PaymentWebhookPostgresPool,
-  resolveW07DatabaseDriver,
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
-type OrderRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
-  D1_04: D1Database;
-}>;
+type OrderRuntimeEnv = Omit<W07PaymentMethodReadRuntimeEnv, 'D1_04'>;
 
 type OrderRuntimeDependencies = Readonly<{
   createOrder?: typeof createCommerceOrder;
-  getOrder?: typeof getCommerceOrder;
-  issueInvoice?: typeof issueInvoiceForOrder;
-  issueInvoicePostgres?: typeof issueInvoiceForOrderPostgres;
+  getOrder?: typeof getCommerceOrderPostgres;
+  issueInvoice?: typeof issueInvoiceForOrderPostgres;
   getPostgresPool?: (env: OrderRuntimeEnv) => W07WebhookPostgresPool | undefined;
-  getReadDatabase?: (env: OrderRuntimeEnv) => D1Database;
-  getOrderCreateStore?: (env: OrderRuntimeEnv) => import('./order-persistence.js').OrderCreatePersistenceStore | undefined;
+  getOrderCreateStore?: (env: OrderRuntimeEnv) => OrderCreatePersistenceStore | undefined;
   /** Must be an admitted pricing authority that returns immutable offer versions, discounts, and tax decisions. */
   resolvePricing?: (request: unknown) => Promise<AuthoritativelyPricedOrder>;
 }>;
@@ -141,8 +133,9 @@ function mapOrderError(error: OrderPersistenceError | SubscriptionRuntimeError):
 /**
  * Internal W01 -> W07 order handler. W01 must authenticate, authorize order.create /
  * order.read, and derive the customer principal before calling this handler. W07
- * binds ownership again in D1-04 queries and never accepts customer/provider fields
- * from the body. The route is private to the existing W07_SUBSCRIPTION service binding.
+ * binds ownership again in native PostgreSQL queries against the separate D1-04
+ * finance domain and never accepts customer/provider fields from the body. The
+ * route is private to the existing W07_SUBSCRIPTION service binding.
  */
 export async function handleCommerceOrderRequest(
   request: Request,
@@ -183,40 +176,34 @@ export async function handleCommerceOrderRequest(
       }
 
       const orderCreateStore = (dependencies.getOrderCreateStore ?? getW07OrderCreatePersistenceStore)(env);
+      const pool = (dependencies.getPostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+      if (!orderCreateStore || !pool) {
+        throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+      }
       const createOrder = dependencies.createOrder ?? createCommerceOrder;
-      const useNeon = resolveW07DatabaseDriver(env) === 'neon';
-      const database = useNeon
-        ? undefined
-        : (dependencies.getReadDatabase ?? getW07SelectedD104Database)(env);
       const result: CreateOrderResult = await createOrder(
-        orderCreateStore ?? database!,
+        orderCreateStore,
         customerId,
         request.headers.get('Idempotency-Key'),
         body,
         (validatedRequest) => dependencies.resolvePricing!(validatedRequest),
       );
-      // Invoice issuance is replay-safe on (INVOICE, order_id). Neon uses the
-      // native PostgreSQL Store; explicit D1 mode retains its compatibility path.
-      if (useNeon) {
-        const pool = (dependencies.getPostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
-        if (!pool) throw new Error('W07 PostgreSQL invoice pool is unavailable');
-        const issueInvoice = dependencies.issueInvoicePostgres ?? issueInvoiceForOrderPostgres;
-        await issueInvoice(pool, customerId, result.data.orderId);
-      } else {
-        const issueInvoice = dependencies.issueInvoice ?? issueInvoiceForOrder;
-        await issueInvoice(database!, customerId, result.data.orderId);
-      }
+      // Invoice issuance is replay-safe on (INVOICE, order_id) and runs in the
+      // same D1-04 Neon finance domain as the Order, never through a D1 facade.
+      const issueInvoice = dependencies.issueInvoice ?? issueInvoiceForOrderPostgres;
+      await issueInvoice(pool, customerId, result.data.orderId);
       return Response.json(
         { data: result.data, requestId: 'req_' + crypto.randomUUID() },
         { status: result.status, headers: { 'cache-control': 'no-store' } },
       );
     }
 
-    // Order detail is read-only and follows the selected D1-04 authority.
-    // Order creation and invoice issuance intentionally remain on the existing D1 path.
-    const database = (dependencies.getReadDatabase ?? getW07SelectedD104Database)(env);
-    const getOrder = dependencies.getOrder ?? getCommerceOrder;
-    const order: CommerceOrderData = await getOrder(database, customerId, route.orderId);
+    // Order detail is read-only and is owner-scoped within the D1-04 Neon
+    // finance database. The native reader uses a repeatable-read snapshot.
+    const pool = (dependencies.getPostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+    if (!pool) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+    const getOrder = dependencies.getOrder ?? getCommerceOrderPostgres;
+    const order: CommerceOrderData = await getOrder(pool, customerId, route.orderId);
     return Response.json(
       { data: order, requestId: 'req_' + crypto.randomUUID() },
       { status: 200, headers: { 'cache-control': 'no-store' } },
@@ -225,8 +212,8 @@ export async function handleCommerceOrderRequest(
     if (error instanceof OrderPersistenceError || error instanceof SubscriptionRuntimeError) {
       return mapOrderError(error);
     }
-    // Remote D1 may not have the candidate migration yet. Never expose SQL
-    // details, and do not turn a missing table into a successful order response.
+    // Never expose database details or turn missing Neon schema into a successful
+    // order response.
     console.error('W07 internal order operation failed', error);
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Order service unavailable');
   }
