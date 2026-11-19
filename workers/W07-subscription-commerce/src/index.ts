@@ -14,21 +14,17 @@ import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-su
 import { previewSubscriptionPlanChange } from './subscription-plan-change-preview.js'
 import { createSubscriptionPlanUpgradeCheckout } from './subscription-plan-change-checkout.js'
 import { getScheduledPlanChangeStore, scheduleSubscriptionPlanDowngrade, scheduleSubscriptionBillingIntervalChange } from './subscription-plan-change-schedule.js'
-import { startSubscriptionTrial } from './subscription-trial-runtime.js'
 import { startSubscriptionTrialPostgres } from './subscription-trial-postgres.js'
 import { listOwnedSavedPaymentMethods, revokeOwnedSavedPaymentMethod, PaymentMethodRuntimeError } from './payment-method-runtime.js'
 import { getW07PaymentMethodReadStore, getW07SelectedD104Database } from './neon/payment-method-read-runtime.js'
 import {
   getW07MembershipPostgresPool,
-  getW07SelectedD101Database,
-  resolveW07MembershipDatabaseDriver,
 } from './neon/membership-database-runtime.js'
 import { resolveDemoCommercePricing, resolveDemoRenewalPricing } from './demo-commerce-pricing-resolver.js'
 import { runRenewalScheduledBatch } from './renewal-scheduler.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
-  D1_01?: D1Database
   D1_04?: D1Database
   W07_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_04?: { connectionString?: string }
@@ -60,8 +56,7 @@ interface Env {
   SUBSCRIPTION_WRITE_LIMITER?: RateLimitBinding
 }
 
-type W07SelectedRuntimeEnv = Omit<Env, 'D1_01' | 'D1_04'> & Readonly<{
-  D1_01: D1Database
+type W07SelectedRuntimeEnv = Omit<Env, 'D1_04'> & Readonly<{
   D1_04: D1Database
 }>
 
@@ -196,9 +191,6 @@ export default {
     try {
       const runtimeEnv: W07SelectedRuntimeEnv = {
         ...env,
-        get D1_01() {
-          return getW07SelectedD101Database(env)
-        },
         get D1_04() {
           return getW07SelectedD104Database(env)
         },
@@ -284,7 +276,7 @@ export default {
           throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         }
         const creatorId = validatePrincipal((input as { creatorId: string }).creatorId)
-        const membershipStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+        const membershipStore = getW07MembershipPostgresPool(runtimeEnv)
         const allowed = await hasActiveCreatorMembership(membershipStore, subscriberId, creatorId)
         return json({
           data: { allowed, reason: allowed ? 'ACTIVE_CREATOR_MEMBERSHIP' : 'MEMBERSHIP_REQUIRED' },
@@ -333,16 +325,9 @@ export default {
         requireLayer(request)
         const input = await readJsonBody(request)
         const idempotencyKey = request.headers.get('Idempotency-Key')
-        let result
-        if (resolveW07MembershipDatabaseDriver(runtimeEnv) === 'neon') {
-          const membershipPool = getW07MembershipPostgresPool(runtimeEnv)
-          if (!membershipPool) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
-          result = await startSubscriptionTrialPostgres(
-            runtimeEnv, membershipPool, principal, input, idempotencyKey,
-          )
-        } else {
-          result = await startSubscriptionTrial(runtimeEnv, principal, input, idempotencyKey)
-        }
+        const result = await startSubscriptionTrialPostgres(
+          runtimeEnv, getW07MembershipPostgresPool(runtimeEnv), principal, input, idempotencyKey,
+        )
         return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 201, result.etag)
       }
       if (operation?.operation === 'planChangePreview') {
@@ -388,7 +373,7 @@ export default {
           request.headers.get('If-Match'),
           {
             resolvePricing: async ({ preview, attempt }) => {
-              const resolved = await resolveCommerceOrderItems(getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01, {
+              const resolved = await resolveCommerceOrderItems(getW07MembershipPostgresPool(runtimeEnv), {
                 items: [{ itemRef: preview.targetPlan.planId, quantity: 1 }],
               })
               const item = resolved.items[0]
@@ -485,7 +470,7 @@ export default {
         }
         requireCreatorLayer(request)
         const creatorId = requireVerifiedCreatorId(request)
-        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv)
         const result = await publishMembershipPlan(membershipWriteStore, creatorId, segments[2]!, request.headers.get('If-Match'))
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
@@ -498,7 +483,7 @@ export default {
         requireCreatorLayer(request)
         const creatorId = requireVerifiedCreatorId(request)
         const input = await readJsonBody(request)
-        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv)
         const result = await reviseMembershipPlan(
           membershipWriteStore, creatorId, segments[2]!, request.headers.get('If-Match'), input,
         )
@@ -519,7 +504,7 @@ export default {
             !['pause', 'resume', 'retire'].includes(String((value as Record<string, unknown>).action))) {
           throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         }
-        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv)
         const result = await transitionMembershipPlanLifecycle(
           membershipWriteStore, creatorId, segments[2]!, request.headers.get('If-Match'),
           (value as { action: 'pause' | 'resume' | 'retire' }).action,
@@ -540,7 +525,7 @@ export default {
       if (operation.operation === 'createPlan') {
         requireCreatorLayer(request)
         const creatorId = requireVerifiedCreatorId(request)
-        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv)
         const result = await createMembershipPlanDraft(
           membershipWriteStore,
           principal,
@@ -555,7 +540,7 @@ export default {
         const creatorId = requireVerifiedCreatorId(request)
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
-        const planCatalogStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+        const planCatalogStore = getW07MembershipPostgresPool(runtimeEnv)
         const result = await listCreatorMembershipPlans(planCatalogStore, creatorId, requestedLimit, url.searchParams.get('cursor'))
         return json({ data: result, requestId: crypto.randomUUID() })
       }
@@ -563,7 +548,7 @@ export default {
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
         const creatorId = url.searchParams.get('creatorId')
-        const planCatalogStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+        const planCatalogStore = getW07MembershipPostgresPool(runtimeEnv)
         const result = await listActiveMembershipPlans(
           planCatalogStore,
           requestedLimit,
@@ -576,11 +561,11 @@ export default {
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
         const requestedPage = parseBoundedPositiveInt(url.searchParams.get('page'), 1, 10000)
-        const membershipReadStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+        const membershipReadStore = getW07MembershipPostgresPool(runtimeEnv)
         const result = await listSubscriptions(membershipReadStore, principal, requestedLimit, requestedPage)
         return json({ data: result, requestId: crypto.randomUUID() })
       }
-      const membershipReadStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+      const membershipReadStore = getW07MembershipPostgresPool(runtimeEnv)
       const result = await getSubscription(membershipReadStore, principal, operation.subscriptionId)
       return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
     } catch (error) {
