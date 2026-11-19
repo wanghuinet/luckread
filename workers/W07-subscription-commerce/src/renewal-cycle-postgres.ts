@@ -265,15 +265,13 @@ export async function retryFailedRenewalCyclePostgres(
 
 export async function readRenewalSchedulerCursorPostgres(
   pool: W07WebhookPostgresPool,
-): Promise<RenewalCursorRow> {
+): Promise<RenewalCursorRow | null> {
   try {
     const result = await pool.query<RenewalCursorRow & Record<string, unknown>>(
       `SELECT ${SCHEDULER_CURSOR_COLUMNS} FROM subscription_renewal_scheduler_state WHERE state_id = 'subscription-renewals' LIMIT 1`,
       [],
     )
-    const row = result.rows[0]
-    if (!row) return failUnavailable()
-    return row
+    return result.rows[0] ?? null
   } catch {
     return failUnavailable()
   }
