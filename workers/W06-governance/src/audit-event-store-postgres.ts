@@ -35,8 +35,8 @@ const FIND_AUDIT_EVENT_SQL = `
     action,
     target_type AS "targetType",
     target_id AS "targetId",
-    before_json AS before,
-    after_json AS after,
+    before_json AS "before",
+    after_json AS "after",
     reason,
     ip,
     user_agent AS "userAgent",
@@ -104,17 +104,17 @@ function mapAuditEvent(row: AuditEventRow): AuditEvent {
   const after = decodeObject(row.after)
   const result: AuditEvent = {
     eventId: row.eventId,
-    ...(row.requestId ? { requestId: row.requestId } : {}),
-    ...(row.traceId ? { traceId: row.traceId } : {}),
+    ...(row.requestId !== null ? { requestId: row.requestId } : {}),
+    ...(row.traceId !== null ? { traceId: row.traceId } : {}),
     actor: actor as unknown as AuditActor,
     action: row.action,
     targetType: row.targetType,
     targetId: row.targetId,
     before,
     after,
-    ...(row.reason ? { reason: row.reason } : {}),
-    ...(row.ip ? { ip: row.ip } : {}),
-    ...(row.userAgent ? { userAgent: row.userAgent } : {}),
+    ...(row.reason !== null ? { reason: row.reason } : {}),
+    ...(row.ip !== null ? { ip: row.ip } : {}),
+    ...(row.userAgent !== null ? { userAgent: row.userAgent } : {}),
     occurredAt: toIsoTimestamp(row.occurredAt),
   }
   return result
