@@ -410,7 +410,7 @@ async function createOrReplayPaidSubscription(
 
 /**
  * Fulfill only a durable, successfully reconciled Hyperswitch payment against its
- * Neon D1-04 finance Order and immutable MembershipPlan snapshot. This is intentionally
+ * Neon finance Order and immutable membership-plan snapshot. This is intentionally
  * separate from the user-facing subscription-create API: clients cannot assert
  * payment success, select the subscription ID, or assign their own entitlement.
  *
