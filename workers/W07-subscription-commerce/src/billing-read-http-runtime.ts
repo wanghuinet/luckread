@@ -3,7 +3,7 @@
 import {
   BillingPersistenceError,
   type BillingList,
-} from './billing-persistence.js';
+} from './billing-contracts.js';
 import {
   listBillingDocumentsForCustomerPostgres,
   listPaymentHistoryForCustomerPostgres,

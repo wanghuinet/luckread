@@ -2,7 +2,7 @@ import type { W07WebhookPostgresClient, W07WebhookPostgresPool } from './payment
 import {
   BillingPersistenceError,
   type BillingDocumentDto,
-} from './billing-persistence.js'
+} from './billing-contracts.js'
 
 type PaymentRow = Readonly<{
   payment_id: string

@@ -10,7 +10,7 @@ import {
   type BillingList,
   type CustomerPaymentHistoryItem,
   type CustomerRefundHistoryItem,
-} from './billing-persistence.js'
+} from './billing-contracts.js'
 
 type PostgresRows<Row extends Record<string, unknown>> = Readonly<{ rows: Row[] }>
 

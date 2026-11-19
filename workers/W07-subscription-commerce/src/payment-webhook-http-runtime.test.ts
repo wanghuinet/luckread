@@ -13,7 +13,7 @@ import {
   fulfillPaidMembershipOrder,
   type PaidMembershipPurchaseFulfillmentResult,
 } from './paid-membership-order-fulfillment.js';
-import type { BillingDocumentDto } from './billing-persistence.js';
+import type { BillingDocumentDto } from './billing-contracts.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 const SECRET = 'hyperswitch-webhook-test-secret';
