@@ -5,8 +5,6 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 import { PaymentPersistenceError } from '../../src/payment-contracts.ts'
-import { receiveHyperswitchWebhook } from '../../src/payment-persistence.ts'
-import { createPostgresWebhookD1Database } from '../../src/payment-webhook-database-postgres.ts'
 import { receiveHyperswitchPaymentWebhookPostgres } from '../../src/payment-webhook-payment-postgres.ts'
 
 if (!globalThis.crypto) {
@@ -27,7 +25,6 @@ if (!['127.0.0.1', 'localhost', 'postgres'].includes(target.hostname) ||
 const reportPath = process.env.W07_PAYMENT_WEBHOOK_POSTGRES_REPORT ||
   'artifacts/neon/w07-payment-webhook-postgres-runtime-postflight.json'
 const pool = new Pool({ connectionString, max: 6, connectionTimeoutMillis: 5_000 })
-const database = createPostgresWebhookD1Database(pool)
 const marker = 'w07-payment-webhook-pg18-' + randomUUID().replaceAll('-', '')
 const merchantId = marker + '-merchant'
 const secret = 'postgres18-local-webhook-secret-' + randomUUID()
@@ -36,10 +33,6 @@ const nowIso = now.toISOString()
 const priorIso = new Date(now.getTime() - 5 * 60_000).toISOString()
 const providerUpdatedAt = new Date(now.getTime() - 2_000).toISOString()
 const checks = {
-  signedSuccessReceiptApplied: false,
-  paymentAndOrderCommittedTogether: false,
-  samePayloadReplayReturnsDuplicate: false,
-  payloadConflictPreservesFirstReceipt: false,
   midBatchFailureRollsBackPaymentOrderAndReceipt: false,
   nativePaymentAndOrderCommittedTogether: false,
   nativeSamePayloadReplayReturnsDuplicate: false,
@@ -138,15 +131,6 @@ function signedWebhook({ eventId, paymentId, amount = 2_500, updated = providerU
   }
 }
 
-async function receive(input, eventRowId, conflictId) {
-  return receiveHyperswitchWebhook(database, input, {
-    now: () => new Date(now),
-    createEventRowId: () => eventRowId,
-    createConflictId: () => conflictId,
-    databaseDialect: 'postgres',
-  })
-}
-
 async function receiveNative(input, eventRowId, conflictId) {
   return receiveHyperswitchPaymentWebhookPostgres(pool, input, {
     now: () => new Date(now),
@@ -168,107 +152,8 @@ let failure
 let rollbackTriggerInstalled = false
 
 try {
-  // Successful signed webhook: a single PostgreSQL transaction must insert
-  // the immutable provider receipt, update the Payment and confirm the Order.
-  const success = await createPaymentFixture('success')
-  const successEventId = marker + '-event-success'
-  const successReceiptId = marker + '-receipt-success'
-  const firstInput = signedWebhook({
-    eventId: successEventId,
-    paymentId: success.paymentId,
-  })
-
-  const first = await receive(
-    firstInput,
-    successReceiptId,
-    marker + '-conflict-unused',
-  )
-  assert.equal(first.outcome, 'APPLIED')
-  assert.equal(first.state, 'APPLIED')
-  assert.equal(first.eventId, successEventId)
-  checks.signedSuccessReceiptApplied = true
-
-  const payment = await pool.query(
-    'SELECT status, version::int AS version, provider_updated_at FROM payments WHERE payment_id = $1',
-    [success.paymentId],
-  )
-  assert.deepEqual(payment.rows, [{
-    status: 'succeeded',
-    version: 2,
-    provider_updated_at: new Date(providerUpdatedAt),
-  }])
-
-  const order = await pool.query(
-    'SELECT status, version::int AS version, confirmed_at FROM orders WHERE order_id = $1',
-    [success.orderId],
-  )
-  assert.equal(order.rows[0]?.status, 'CONFIRMED')
-  assert.equal(order.rows[0]?.version, 2)
-  assert.ok(order.rows[0]?.confirmed_at instanceof Date)
-
-  const event = await pool.query(
-    'SELECT event_row_id, payload_sha256, state, outcome_code FROM payment_provider_events WHERE provider = $1 AND merchant_id = $2 AND event_id = $3',
-    ['hyperswitch', merchantId, successEventId],
-  )
-  assert.equal(event.rows.length, 1)
-  assert.equal(event.rows[0]?.event_row_id, successReceiptId)
-  assert.equal(event.rows[0]?.state, 'APPLIED')
-  assert.equal(event.rows[0]?.outcome_code, 'PAYMENT_STATUS_APPLIED_AND_ORDER_CONFIRMED')
-  checks.paymentAndOrderCommittedTogether = true
-
-  // Re-delivery of the exact signed bytes is a DUPLICATE and must not advance
-  // the payment version or create another receipt.
-  const replay = await receive(
-    firstInput,
-    marker + '-receipt-replay-unused',
-    marker + '-conflict-replay-unused',
-  )
-  assert.equal(replay.outcome, 'DUPLICATE')
-  assert.equal(await count('payment_provider_events', 'event_id', successEventId), 1)
-  const paymentAfterReplay = await pool.query(
-    'SELECT status, version::int AS version FROM payments WHERE payment_id = $1',
-    [success.paymentId],
-  )
-  assert.deepEqual(paymentAfterReplay.rows, [{ status: 'succeeded', version: 2 }])
-  checks.samePayloadReplayReturnsDuplicate = true
-
-  // Reusing the same event identity with different signed bytes records a
-  // conflict row while preserving the first receipt and its payload hash.
-  const conflicting = signedWebhook({
-    eventId: successEventId,
-    paymentId: success.paymentId,
-    amount: 2_499,
-  })
-  const conflict = await receive(
-    conflicting,
-    marker + '-receipt-conflict-unused',
-    marker + '-conflict-success',
-  )
-  assert.equal(conflict.outcome, 'PAYLOAD_CONFLICT')
-  assert.equal(conflict.conflictId, marker + '-conflict-success')
-
-  const preservedReceipt = await pool.query(
-    'SELECT event_row_id, payload_sha256, state FROM payment_provider_events WHERE provider = $1 AND merchant_id = $2 AND event_id = $3',
-    ['hyperswitch', merchantId, successEventId],
-  )
-  assert.deepEqual(preservedReceipt.rows, [{
-    event_row_id: successReceiptId,
-    payload_sha256: first.payloadSha256,
-    state: 'APPLIED',
-  }])
-  const conflicts = await pool.query(
-    'SELECT conflict_id, existing_payload_sha256, incoming_payload_sha256, state, occurrence_count::int AS occurrence_count FROM payment_provider_event_conflicts WHERE conflict_id = $1',
-    [marker + '-conflict-success'],
-  )
-  assert.equal(conflicts.rows.length, 1)
-  assert.equal(conflicts.rows[0]?.state, 'OPEN')
-  assert.equal(conflicts.rows[0]?.occurrence_count, 1)
-  assert.equal(conflicts.rows[0]?.existing_payload_sha256, first.payloadSha256)
-  assert.equal(conflicts.rows[0]?.incoming_payload_sha256, conflict.payloadSha256)
-  checks.payloadConflictPreservesFirstReceipt = true
-
-  // The production Neon runtime uses this native Store rather than the
-  // D1-shaped compatibility facade for payment_details events.
+  // Exercise signed payment webhook receipt, replay, conflict, and rollback
+  // semantics through the native PostgreSQL store used by the Neon runtime.
   const native = await createPaymentFixture('native')
   const nativeEventId = marker + '-native-event-success'
   const nativeReceiptId = marker + '-native-receipt-success'
@@ -375,7 +260,7 @@ try {
   rollbackTriggerInstalled = true
 
   await assert.rejects(
-    receive(
+    receiveNative(
       signedWebhook({ eventId: rollbackEventId, paymentId: rollback.paymentId }),
       marker + '-receipt-rollback',
       marker + '-conflict-rollback',
