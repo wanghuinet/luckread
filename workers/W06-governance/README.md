@@ -23,6 +23,12 @@ Current source slice:
 - AUTH-013 `identity.account_state_changed` audit record construction;
 - strict version-increment validation.
 
+## Moderation queue and case-detail reads
+
+- The moderation queue and single-case detail endpoints use dedicated native PostgreSQL read Stores composed from the existing Neon Hyperdrive pool.
+- The queue route no longer constructs a D1 query adapter or falls back to the D1-shaped database facade; missing/invalid Neon composition fails closed.
+- This does not claim the remaining moderation decision writes, report writes, audit persistence, or outbox consumers are D1-free.
+
 No remote D1 mutation or production deployment is implied by this source directory.
 
 
