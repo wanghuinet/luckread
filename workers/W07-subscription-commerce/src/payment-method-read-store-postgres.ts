@@ -4,7 +4,7 @@ import {
   type PaymentMethodRevocationRequest,
   type SavedPaymentMethodMandate,
   type SavedPaymentMethodRecord,
-} from './payment-method-persistence.js'
+} from './payment-method-contracts.js'
 import type { PaymentMethodReadStore } from './payment-method-read-store.js'
 
 type QueryResult<Row> = Readonly<{ rows: Row[] }>
