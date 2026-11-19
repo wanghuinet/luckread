@@ -50,6 +50,7 @@ const checks = {
   postgresDecisionAndAuditCommitted: false,
   enforcementOutboxDelivered: false,
   sameKeyReplayReturnsStoredDecision: false,
+  scheduledOutboxDrainUsesNativePostgresStore: false,
   staleVersionFailureRollsBackAllWrites: false,
   disposableDatabaseDropped: false,
 }
@@ -323,6 +324,20 @@ try {
   assert.equal(await count('moderation_enforcement_outbox', 'decision_id = $1', [first.decisionId]), 1)
   assert.equal(await count('audit_events', 'target_id = $1 AND action = $2', [successfulCaseId, 'moderation.decide']), 1)
   checks.sameKeyReplayReturnsStoredDecision = true
+
+  // Re-arm the already committed Outbox row to prove the actual Worker scheduled entrypoint
+  // scans and delivers due records through the native PostgreSQL store.
+  await pool.query(
+    "UPDATE moderation_enforcement_outbox SET status = 'PENDING', attempts = 0, next_attempt_at = NOW() - INTERVAL '1 second', delivered_at = NULL WHERE decision_id = $1",
+    [first.decisionId],
+  )
+  await worker.scheduled({ scheduledTime: Date.now(), cron: '* * * * *' }, env)
+  const scheduledOutbox = await pool.query(
+    'SELECT status, attempts::int AS attempts FROM moderation_enforcement_outbox WHERE decision_id = $1',
+    [first.decisionId],
+  )
+  assert.deepEqual(scheduledOutbox.rows, [{ status: 'DELIVERED', attempts: 1 }])
+  checks.scheduledOutboxDrainUsesNativePostgresStore = true
 
   // Simulate the stale CAS update returning zero rows. The transaction guard
   // must abort the whole decision batch before W03 is called.

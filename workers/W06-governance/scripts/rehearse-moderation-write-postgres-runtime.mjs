@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
-import { decideModerationCase, getModerationCase } from '../src/moderation-runtime.ts'
+import { decideModerationCase, drainModerationOutbox, getModerationCase } from '../src/moderation-runtime.ts'
 import { createReport } from '../src/report-runtime.ts'
 import { createPostgresModerationD1Database } from '../src/neon-postgres-d1-database.ts'
 import { createPostgresModerationDecisionWriteStore } from '../src/moderation-decision-write-store-postgres.ts'
@@ -44,6 +44,8 @@ const checks = {
   enforcementOutboxDelivered: false,
   sameKeyReplayReturnedStoredDecision: false,
   sameKeyDifferentPayloadReturns422: false,
+  nativeOutboxDrainHandlesMissingActorRetry: false,
+  nativeOutboxDrainDeliversDueRetry: false,
   moderationReportUsesNativePostgresStore: false,
   moderationReportWrittenWithAudit: false,
   moderationReportReplayReturnedStoredResponse: false,
@@ -175,6 +177,38 @@ try {
     (error) => error?.code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' && error?.status === 422,
   )
   checks.sameKeyDifferentPayloadReturns422 = true
+
+  await db.prepare(
+    "UPDATE moderation_enforcement_outbox SET status='PENDING', attempts=0, next_attempt_at=?, delivered_at=NULL WHERE decision_id=?",
+  ).bind(now, first.decisionId).run()
+  await db.prepare(
+    'UPDATE moderation_decisions SET reviewer_id=NULL, reviewer_layer=NULL WHERE decision_id=?',
+  ).bind(first.decisionId).run()
+  const missingActorDrain = await drainModerationOutbox(decisionStore, w03, 10)
+  assert.deepEqual(missingActorDrain, { attempted: 1, delivered: 0, retry: 1 })
+  const missingActorOutbox = await db.prepare(
+    'SELECT status, attempts, last_error FROM moderation_enforcement_outbox WHERE decision_id=?',
+  ).bind(first.decisionId).first()
+  assert.equal(missingActorOutbox.status, 'RETRY')
+  assert.equal(missingActorOutbox.attempts, 1)
+  assert.equal(missingActorOutbox.last_error, 'MISSING_DECISION_ACTOR')
+  checks.nativeOutboxDrainHandlesMissingActorRetry = true
+
+  await db.prepare(
+    'UPDATE moderation_decisions SET reviewer_id=?, reviewer_layer=? WHERE decision_id=?',
+  ).bind(reviewerId, 'L6', first.decisionId).run()
+  await db.prepare(
+    "UPDATE moderation_enforcement_outbox SET next_attempt_at=? WHERE decision_id=?",
+  ).bind(now, first.decisionId).run()
+  const deliveredRetryDrain = await drainModerationOutbox(decisionStore, w03, 10)
+  assert.deepEqual(deliveredRetryDrain, { attempted: 1, delivered: 1, retry: 0 })
+  const redeliveredOutbox = await db.prepare(
+    'SELECT status, attempts, last_error FROM moderation_enforcement_outbox WHERE decision_id=?',
+  ).bind(first.decisionId).first()
+  assert.equal(redeliveredOutbox.status, 'DELIVERED')
+  assert.equal(redeliveredOutbox.attempts, 2)
+  assert.equal(redeliveredOutbox.last_error, null)
+  checks.nativeOutboxDrainDeliversDueRetry = true
 
   const reportInput = {
     actorUserId: reviewerId,
