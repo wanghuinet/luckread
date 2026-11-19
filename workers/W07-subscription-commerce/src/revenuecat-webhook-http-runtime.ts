@@ -2,7 +2,6 @@
 
 import { readBoundedProviderWebhookBody } from './provider-webhook-body.js'
 import {
-  getW07PaymentWebhookDatabase,
   getW07RevenueCatWebhookReceiptStore,
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js'
@@ -13,22 +12,18 @@ import {
   verifyRevenueCatWebhookSignature,
 } from './revenuecat-webhook-signature.js';
 import {
-  recordRevenueCatWebhookEvent,
   RevenueCatWebhookPersistenceError,
   type RevenueCatWebhookReceiptResult,
   type RevenueCatWebhookReceiptStore,
 } from './revenuecat-webhook-persistence.js';
 
-type RevenueCatWebhookRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
-  D1_04: D1Database;
+type RevenueCatWebhookRuntimeEnv = Omit<W07PaymentMethodReadRuntimeEnv, 'D1_04'> & Readonly<{
   REVENUECAT_WEBHOOK_AUTHORIZATION?: string | null;
   REVENUECAT_WEBHOOK_SIGNING_SECRET?: string | null;
   REVENUECAT_ALLOWED_APP_IDS?: string | null;
 }>;
 
 type RevenueCatWebhookRuntimeDependencies = Readonly<{
-  receive?: typeof recordRevenueCatWebhookEvent;
-  getWebhookDatabase?: (env: RevenueCatWebhookRuntimeEnv) => D1Database | undefined;
   getWebhookStore?: (env: RevenueCatWebhookRuntimeEnv) => RevenueCatWebhookReceiptStore | undefined;
   nowMs?: () => number;
 }>;
@@ -75,7 +70,7 @@ function receiptResponse(result: RevenueCatWebhookReceiptResult): Response {
 
 /**
  * W01-only private receiver. Store-backed events are acknowledged with 200
- * only after a sanitized receipt is durable in the selected D1-04 database. Non-store experiment and
+ * only after a sanitized receipt is durable in the Neon finance store. Non-store experiment and
  * promotional events are acknowledged as ignored without creating a purchase
  * receipt. This endpoint never activates a subscription or grants entitlement.
  */
@@ -161,13 +156,8 @@ export async function handleRevenueCatWebhookRequest(
       );
     }
     const receiptStore = (dependencies.getWebhookStore ?? getW07RevenueCatWebhookReceiptStore)(env);
-    const result = receiptStore
-      ? await receiptStore.record(event, rawBody)
-      : await (dependencies.receive ?? recordRevenueCatWebhookEvent)(
-        (dependencies.getWebhookDatabase ?? getW07PaymentWebhookDatabase)(env) ?? env.D1_04,
-        event,
-        rawBody,
-      );
+    if (!receiptStore) throw new RevenueCatWebhookPersistenceError('SERVICE_UNAVAILABLE');
+    const result = await receiptStore.record(event, rawBody);
     return receiptResponse(result);
   } catch (error) {
     if (error instanceof RevenueCatWebhookValidationError) {
