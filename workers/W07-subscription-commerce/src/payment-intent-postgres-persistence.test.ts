@@ -59,6 +59,8 @@ function fixture() {
       } else if (sql.includes('FROM payments') && sql.includes('order_id = $2')) {
         if (payment?.customer_id === values[0] && payment.order_id === values[1] &&
             !['failed', 'cancelled', 'cancelled_post_capture', 'expired'].includes(payment.status)) rows = [payment];
+      } else if (sql.includes('FROM payments') && sql.includes('payment_id = $1')) {
+        if (payment?.payment_id === values[0] && payment.customer_id === values[1]) rows = [payment];
       } else if (sql.startsWith('INSERT INTO payments')) {
         const [paymentId, orderId, customerId, merchantId, amount, currency, key, requestHash, createdAt] = values;
         payment = {
@@ -132,8 +134,8 @@ describe('W07 native PostgreSQL payment-intent persistence', () => {
       payment: { paymentId: PAYMENT, amountMinor: 1299, currency: 'USD', status: 'INITIATING', version: 1 },
     });
     expect(f.statements[0]?.sql).toContain("item_snapshot_json::jsonb #>> '{luckreadPricing,mode}'");
-    expect(f.statements[1]?.sql).toContain('INSERT INTO payments');
-    expect(f.statements[1]?.sql).toContain('RETURNING payment_id');
+    expect(f.statements[2]?.sql).toContain('INSERT INTO payments');
+    expect(f.statements[2]?.sql).toContain('RETURNING payment_id');
     expect(f.statements.every((entry) => !entry.sql.includes('?'))).toBe(true);
 
     const replay = await createPaymentAttemptPostgres(
