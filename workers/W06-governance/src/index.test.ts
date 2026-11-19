@@ -483,9 +483,9 @@ describe('W06 runtime', () => {
     )
     expect(response.status).toBe(201)
     expect(rows.get(planAuditInput.eventId)).toMatchObject({
-      actor_json: JSON.stringify({ actorId: 'creator_user_001', actorType: 'user', layer: 'L7' }),
+      actor: { actorId: 'creator_user_001', actorType: 'user', layer: 'L7' },
       action: 'membership.plan.created',
-      target_id: planId,
+      targetId: planId,
     })
   })
 
@@ -504,12 +504,12 @@ describe('W06 runtime', () => {
     expect(append).toHaveBeenCalledTimes(1)
     const row = rows.get(planAuditInput.eventId)
     expect(row).toMatchObject({
-      actor_json: JSON.stringify({ actorId: 'creator_user_001', actorType: 'user', layer: 'L3' }),
+      actor: { actorId: 'creator_user_001', actorType: 'user', layer: 'L3' },
       action: 'membership.plan.created',
-      target_type: 'MembershipPlan',
-      target_id: planId,
-      before_json: '{}',
-      after_json: JSON.stringify({
+      targetType: 'MembershipPlan',
+      targetId: planId,
+      before: {},
+      after: {
         creatorId: 'creator_001',
         planVersion: 1,
         status: 'DRAFT',
@@ -519,8 +519,8 @@ describe('W06 runtime', () => {
         billingInterval: 'MONTHLY',
         priceMinor: 500,
         currency: 'USD',
-      }),
-      occurred_at: planAuditInput.occurredAt,
+      },
+      occurredAt: planAuditInput.occurredAt,
     })
   })
 
@@ -598,23 +598,20 @@ describe('W06 runtime', () => {
     expect(append).toHaveBeenCalledTimes(1)
     const row = rows.get(publishRequestAuditInput.eventId)
     expect(row).toMatchObject({
-      actor_json: JSON.stringify({ actorId: 'creator_user_001', actorType: 'user', layer: 'L3' }),
+      actor: { actorId: 'creator_user_001', actorType: 'user', layer: 'L3' },
       action: 'membership.plan.publish_requested',
-      target_type: 'MembershipPlan',
-      target_id: planId,
-      before_json: JSON.stringify({
-        creatorId: 'creator_001',
-        expectedVersion: 1,
-      }),
-      after_json: JSON.stringify({
+      targetType: 'MembershipPlan',
+      targetId: planId,
+      before: { creatorId: 'creator_001', expectedVersion: 1 },
+      after: {
         creatorId: 'creator_001',
         expectedVersion: 1,
         requestedStatus: 'ACTIVE',
         requestedVisibility: 'PUBLIC',
-      }),
+      },
     })
-    expect(typeof row?.occurred_at).toBe('string')
-    expect(Number.isNaN(Date.parse(String(row?.occurred_at)))).toBe(false)
+    expect(typeof row?.occurredAt).toBe('string')
+    expect(Number.isNaN(Date.parse(String(row?.occurredAt)))).toBe(false)
   })
 
   it('confirms an exact semantic intent replay despite a new request timestamp and rejects conflicting facts', async () => {
@@ -740,9 +737,9 @@ describe('W06 runtime', () => {
     expect(response.status).toBe(201)
     expect(await response.json()).toMatchObject({ eventId: planLifecycleAuditInput.eventId, action: 'membership.plan.paused', targetId: planId, replayed: false })
     expect(rows.get(planLifecycleAuditInput.eventId)).toMatchObject({
-      action: 'membership.plan.paused', target_type: 'MembershipPlan', target_id: planId,
-      before_json: JSON.stringify({ creatorId: 'creator_001', planVersion: 2, status: 'ACTIVE', visibility: 'PUBLIC', version: 2 }),
-      after_json: JSON.stringify({ creatorId: 'creator_001', planVersion: 2, status: 'PAUSED', visibility: 'PRIVATE', version: 3 }),
+      action: 'membership.plan.paused', targetType: 'MembershipPlan', targetId: planId,
+      before: { creatorId: 'creator_001', planVersion: 2, status: 'ACTIVE', visibility: 'PUBLIC', version: 2 },
+      after: { creatorId: 'creator_001', planVersion: 2, status: 'PAUSED', visibility: 'PRIVATE', version: 3 },
     })
   })
 
@@ -760,10 +757,10 @@ describe('W06 runtime', () => {
     })
     expect(rows.get(planLifecycleRetireAuditInput.eventId)).toMatchObject({
       action: 'membership.plan.retired',
-      target_type: 'MembershipPlan',
-      target_id: planId,
-      before_json: JSON.stringify({ creatorId: 'creator_001', planVersion: 2, status: 'PAUSED', visibility: 'PRIVATE', version: 3 }),
-      after_json: JSON.stringify({ creatorId: 'creator_001', planVersion: 2, status: 'RETIRED', visibility: 'PRIVATE', version: 4 }),
+      targetType: 'MembershipPlan',
+      targetId: planId,
+      before: { creatorId: 'creator_001', planVersion: 2, status: 'PAUSED', visibility: 'PRIVATE', version: 3 },
+      after: { creatorId: 'creator_001', planVersion: 2, status: 'RETIRED', visibility: 'PRIVATE', version: 4 },
     })
   })
 
@@ -780,13 +777,13 @@ describe('W06 runtime', () => {
     })
     expect(rows.get(planUpdatedAuditInput.eventId)).toMatchObject({
       action: 'membership.plan.updated',
-      target_type: 'MembershipPlan',
-      target_id: planId,
-      before_json: JSON.stringify({ creatorId: 'creator_001', expectedVersion: 2, planVersion: 1 }),
-      after_json: JSON.stringify({
+      targetType: 'MembershipPlan',
+      targetId: planId,
+      before: { creatorId: 'creator_001', expectedVersion: 2, planVersion: 1 },
+      after: {
         creatorId: 'creator_001', expectedVersion: 2, planVersion: 2, version: 3,
         status: 'ACTIVE', visibility: 'PUBLIC', ...updateAuditTerms,
-      }),
+      },
     })
   })
 
@@ -804,18 +801,18 @@ describe('W06 runtime', () => {
     })
     expect(append).toHaveBeenCalledTimes(1)
     expect(rows.get(publishAuditInput.eventId)).toMatchObject({
-      actor_json: JSON.stringify({ actorId: 'creator_user_001', actorType: 'user', layer: 'L3' }),
+      actor: { actorId: 'creator_user_001', actorType: 'user', layer: 'L3' },
       action: 'membership.plan.published',
-      target_type: 'MembershipPlan',
-      target_id: planId,
-      before_json: JSON.stringify({
+      targetType: 'MembershipPlan',
+      targetId: planId,
+      before: {
         creatorId: 'creator_001',
         planVersion: 1,
         status: 'DRAFT',
         visibility: 'PRIVATE',
         version: 1,
-      }),
-      after_json: JSON.stringify({
+      },
+      after: {
         creatorId: 'creator_001',
         planVersion: 1,
         status: 'ACTIVE',
@@ -826,8 +823,8 @@ describe('W06 runtime', () => {
         billingInterval: 'MONTHLY',
         priceMinor: 500,
         currency: 'USD',
-      }),
-      occurred_at: publishAuditInput.occurredAt,
+      },
+      occurredAt: publishAuditInput.occurredAt,
     })
   })
 
@@ -902,12 +899,12 @@ describe('W06 runtime', () => {
     })
     expect(append).toHaveBeenCalledTimes(1)
     expect(rows.get(orderAuditInput.eventId)).toMatchObject({
-      actor_json: JSON.stringify({ actorId: 'buyer_user_001', actorType: 'user', layer: 'L2' }),
+      actor: { actorId: 'buyer_user_001', actorType: 'user', layer: 'L2' },
       action: 'commerce.order.created',
-      target_type: 'Order',
-      target_id: orderId,
-      before_json: '{}',
-      after_json: JSON.stringify({
+      targetType: 'Order',
+      targetId: orderId,
+      before: {},
+      after: {
         status: 'CREATED',
         version: 1,
         currency: 'USD',
@@ -915,8 +912,8 @@ describe('W06 runtime', () => {
         discountMinor: 100,
         taxMinor: 88,
         totalMinor: 1188,
-      }),
-      occurred_at: orderAuditInput.occurredAt,
+      },
+      occurredAt: orderAuditInput.occurredAt,
     })
   })
 
@@ -998,7 +995,7 @@ describe('W06 runtime', () => {
   })
 
   it('rejects malformed runtime input without touching persistence', async () => {
-    const { db, prepare } = createDb(true)
+    const { db, append } = createDb(true)
     const runtime = await import('./index')
 
     const response = await runtime.default.fetch(
@@ -1018,7 +1015,7 @@ describe('W06 runtime', () => {
   })
 
   it('rejects non-canonical resource and correlation identifiers', async () => {
-    const { db, prepare } = createDb(true)
+    const { db, append } = createDb(true)
     const runtime = await import('./index')
 
     const response = await runtime.default.fetch(
