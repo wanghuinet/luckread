@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { W06ModerationPostgresPool } from './neon-postgres-d1-database'
+import type { W06ModerationPostgresPool } from './moderation-postgres-pool'
 import {
   createPostgresModerationDecisionWriteStore,
   ModerationDecisionWriteStoreError,
