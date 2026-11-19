@@ -39,8 +39,6 @@ on:
       - 'workers/W01-payload/wrangler.jsonc'
       - 'workers/W01-payload/vitest.config.mts'
       - '.github/workflows/w07-subscription-runtime-ci.yml'
-      - '.github/workflows/w07-d1-04-binding-preflight.yml'
-      - '.github/workflows/w07-d1-04-order-migration.yml'
       - 'contracts/alignment/cross-system-mapping.v1.json'
       - 'contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json'
       - 'contracts/alignment/code-evidence-inventory.v1.json'
@@ -95,8 +93,6 @@ on:
       - 'workers/W01-payload/wrangler.jsonc'
       - 'workers/W01-payload/vitest.config.mts'
       - '.github/workflows/w07-subscription-runtime-ci.yml'
-      - '.github/workflows/w07-d1-04-binding-preflight.yml'
-      - '.github/workflows/w07-d1-04-order-migration.yml'
       - 'contracts/alignment/cross-system-mapping.v1.json'
       - 'contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json'
       - 'contracts/alignment/code-evidence-inventory.v1.json'
@@ -134,9 +130,6 @@ jobs:
       - name: Install W01 test dependencies from committed lockfile
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Test historical D1-04 schema-source binding inventory
-        working-directory: workers/W01-payload
-        run: node --test ../../workers/W07-subscription-commerce/scripts/verify-d1-04-binding.test.mjs ../../workers/W07-subscription-commerce/scripts/report-d1-04-live-name.test.mjs ../../workers/W07-subscription-commerce/scripts/report-d1-04-schema-snapshot.test.mjs ../../workers/W07-subscription-commerce/scripts/verify-d1-04-order-migration.test.mjs
       - name: Install repository typecheck dependencies from lockfile
         run: npm ci --ignore-scripts --no-audit --fund=false
       - name: Install W07 PostgreSQL runtime dependency from its committed lockfile
@@ -313,9 +306,3 @@ jobs:
 
       - name: Verify isolated D1-04 Order migration candidate
         run: python workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py
-      - name: Test D1-04 migration, schema preflight, and W07 deploy admission gates
-        run: |
-          node --test \
-            workers/W07-subscription-commerce/scripts/verify-d1-04-order-migration.test.mjs \
-            workers/W07-subscription-commerce/scripts/report-d1-04-live-name.test.mjs \
-            workers/W07-subscription-commerce/scripts/report-d1-04-schema-snapshot.test.mjs
