@@ -2,7 +2,7 @@
 
 import { strictlyAfterCanonicalUtcTimestamp } from './canonical-utc-timestamp.js';
 import { getW07SelectedD104Database, type W07PaymentMethodReadRuntimeEnv } from './neon/payment-method-read-runtime.js';
-import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
+import { getW07MembershipPostgresPool, type W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import {
   getW07RenewalCycleStore,
@@ -15,7 +15,6 @@ import {
   type RenewalCycleStore,
 } from './renewal-cycle-postgres.js';
 import {
-  getScheduledPlanChangeStore,
   readScheduledSubscriptionPlanDowngradeForPeriod,
   readScheduledDowngradeTargetPlan,
   type ScheduledSubscriptionPlanDowngrade,
@@ -25,12 +24,17 @@ import {
   readSubscriptionOutcomePostgres,
 } from './subscription-renewal-outcome-postgres.js';
 
-type RenewalOutcomeMembershipStore = D1Database | W07WebhookPostgresPool;
+type RenewalOutcomeMembershipStore = W07WebhookPostgresPool;
 
-function isPostgresRenewalOutcomeStore(
-  store: RenewalOutcomeMembershipStore,
-): store is W07WebhookPostgresPool {
-  return typeof (store as W07WebhookPostgresPool).query === 'function';
+function getRenewalOutcomeMembershipStore(
+  env: OutcomeSyncEnv,
+  dependencies: Pick<RenewalOutcomeSyncDependencies, 'getMembershipPostgresPool'> = {},
+): RenewalOutcomeMembershipStore {
+  try {
+    return (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
+  } catch {
+    throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
+  }
 }
 
 export type RenewalSubscriptionSyncOutcome =
@@ -70,8 +74,9 @@ export type RenewalOutcomeSyncResult = Readonly<{
 export type RenewalOutcomeSyncDependencies = Readonly<{
   now?: () => Date;
   getDatabase?: (env: OutcomeSyncEnv) => D1Database;
+  getMembershipPostgresPool?: (env: OutcomeSyncEnv) => W07WebhookPostgresPool;
 }>;
-type OutcomeSyncEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{ D1_01: D1Database; D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>; 
+type OutcomeSyncEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{ D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>; 
 
 const PROVIDER = 'hyperswitch';
 const MAX_PAGE_SIZE = 50;
@@ -127,54 +132,16 @@ async function readSubscription(
   subscriptionId: string,
   subscriberId: string,
 ): Promise<SubscriptionOutcomeRow | null> {
-  if (isPostgresRenewalOutcomeStore(db)) {
-    try {
-      const row = await readSubscriptionOutcomePostgres(db, subscriptionId, subscriberId);
-      return row ? {
-        ...row,
-        trial_started_at: row.trial_started_at ?? null,
-        trial_ends_at: row.trial_ends_at ?? null,
-        trial_converted_at: row.trial_converted_at ?? null,
-      } : null;
-    } catch {
-      throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
-    }
-  }
   try {
-    const row = await db.prepare(
-      'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, v.billing_interval, ' +
-      'v.tier, v.price_minor, v.currency, s.status, s.current_period_start, s.current_period_end, ' +
-      's.trial_started_at, s.trial_ends_at, s.trial_converted_at, s.cancel_at, s.updated_at, s.version ' +
-      'FROM membership_subscriptions s INNER JOIN membership_plan_versions v ' +
-      'ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
-      'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
-    ).bind(subscriptionId, subscriberId).first<SubscriptionOutcomeRow>();
+    const row = await readSubscriptionOutcomePostgres(db, subscriptionId, subscriberId);
     return row ? {
       ...row,
       trial_started_at: row.trial_started_at ?? null,
       trial_ends_at: row.trial_ends_at ?? null,
       trial_converted_at: row.trial_converted_at ?? null,
     } : null;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/no such column:\s*(?:s\.)?trial_(?:started|ends|converted)_at/i.test(message)) {
-      throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
-    }
-    // Explicit D1 test profiles preserve the legacy pre-migration read.
-    try {
-      const legacy = await db.prepare(
-        'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, v.billing_interval, ' +
-        'v.tier, v.price_minor, v.currency, s.status, s.current_period_start, s.current_period_end, ' +
-        's.cancel_at, s.updated_at, s.version ' +
-        'FROM membership_subscriptions s INNER JOIN membership_plan_versions v ' +
-        'ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
-        'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
-      ).bind(subscriptionId, subscriberId)
-        .first<Omit<SubscriptionOutcomeRow, 'trial_started_at' | 'trial_ends_at' | 'trial_converted_at'>>();
-      return legacy ? { ...legacy, trial_started_at: null, trial_ends_at: null, trial_converted_at: null } : null;
-    } catch {
-      throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
-    }
+  } catch {
+    throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
   }
 }
 
@@ -363,78 +330,21 @@ async function applySubscriptionUpdate(
     ? scheduledChange.targetPlanVersion
     : subscription.plan_version;
   try {
-    if (isPostgresRenewalOutcomeStore(membershipStore)) {
-      const result = await applyRenewalSubscriptionUpdatePostgres(membershipStore, {
-        cycle: {
-          subscription_id: cycle.subscription_id,
-          subscriber_id: cycle.subscriber_id,
-          cycle_start: cycle.cycle_start,
-        },
-        subscription,
-        nextStatus,
-        nextPeriodStart,
-        nextPeriodEnd,
-        updatedAt,
-        convertedAt,
-        scheduledChange,
-      });
-      if (result === 'APPLIED') return 'APPLIED';
-    } else if (scheduledChange && nextStatus === 'ACTIVE') {
-      const results = await membershipStore.batch([
-        membershipStore.prepare(
-          'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, status = ?, ' +
-          'current_period_start = ?, current_period_end = ?, trial_converted_at = ?, updated_at = ?, version = version + 1 ' +
-          'WHERE subscription_id = ? AND subscriber_id = ? AND plan_id = ? AND plan_version = ? ' +
-          'AND status = ? AND version = ? AND current_period_start = ? AND current_period_end = ? ' +
-          'AND (cancel_at IS NULL OR cancel_at > ?) ' +
-          "AND EXISTS (SELECT 1 FROM membership_subscription_scheduled_plan_changes c WHERE c.change_id = ? " +
-          "AND c.status = 'SCHEDULED' AND c.subscription_id = ? AND c.subscriber_id = ? " +
-          'AND c.expected_plan_id = ? AND c.expected_plan_version = ? AND c.target_plan_id = ? ' +
-          'AND c.target_plan_version = ? AND c.effective_at = ?)',
-        ).bind(
-          nextPlanId, nextPlanVersion, nextStatus, nextPeriodStart, nextPeriodEnd, convertedAt, updatedAt,
-          cycle.subscription_id, cycle.subscriber_id, subscription.plan_id, subscription.plan_version,
-          subscription.status, subscription.version, subscription.current_period_start,
-          subscription.current_period_end, cycle.cycle_start,
-          scheduledChange.changeId, scheduledChange.subscriptionId, scheduledChange.subscriberId,
-          scheduledChange.expectedPlanId, scheduledChange.expectedPlanVersion,
-          scheduledChange.targetPlanId, scheduledChange.targetPlanVersion, scheduledChange.effectiveAt,
-        ),
-        membershipStore.prepare(
-          "UPDATE membership_subscription_scheduled_plan_changes SET status = 'APPLIED', " +
-          'applied_at = ?, applied_subscription_version = ?, updated_at = ?, version = version + 1 ' +
-          "WHERE change_id = ? AND status = 'SCHEDULED' AND subscription_id = ? AND subscriber_id = ? " +
-          'AND expected_plan_id = ? AND expected_plan_version = ? AND target_plan_id = ? ' +
-          'AND target_plan_version = ? AND effective_at = ? ' +
-          'AND EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = ? ' +
-          'AND s.subscriber_id = ? AND s.plan_id = ? AND s.plan_version = ? ' +
-          'AND s.version = ? AND s.current_period_start = ? AND s.current_period_end = ?)',
-        ).bind(
-          cycle.cycle_start, subscription.version + 1, updatedAt,
-          scheduledChange.changeId, scheduledChange.subscriptionId, scheduledChange.subscriberId,
-          scheduledChange.expectedPlanId, scheduledChange.expectedPlanVersion,
-          scheduledChange.targetPlanId, scheduledChange.targetPlanVersion, scheduledChange.effectiveAt,
-          cycle.subscription_id, cycle.subscriber_id, nextPlanId, nextPlanVersion,
-          subscription.version + 1, nextPeriodStart, nextPeriodEnd,
-        ),
-      ]);
-      if (Number(results[0]?.meta?.changes ?? 0) === 1 &&
-          Number(results[1]?.meta?.changes ?? 0) === 1) return 'APPLIED';
-    } else {
-      const result = await membershipStore.prepare(
-        'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, status = ?, ' +
-        'current_period_start = ?, current_period_end = ?, trial_converted_at = ?, updated_at = ?, version = version + 1 ' +
-        'WHERE subscription_id = ? AND subscriber_id = ? AND plan_id = ? AND plan_version = ? ' +
-        'AND status = ? AND version = ? AND current_period_start = ? AND current_period_end = ? ' +
-        'AND (cancel_at IS NULL OR cancel_at > ?)',
-      ).bind(
-        nextPlanId, nextPlanVersion, nextStatus, nextPeriodStart, nextPeriodEnd, convertedAt, updatedAt,
-        cycle.subscription_id, cycle.subscriber_id, subscription.plan_id, subscription.plan_version,
-        subscription.status, subscription.version, subscription.current_period_start,
-        subscription.current_period_end, cycle.cycle_start,
-      ).run();
-      if (Number(result.meta?.changes ?? 0) === 1) return 'APPLIED';
-    }
+    const result = await applyRenewalSubscriptionUpdatePostgres(membershipStore, {
+      cycle: {
+        subscription_id: cycle.subscription_id,
+        subscriber_id: cycle.subscriber_id,
+        cycle_start: cycle.cycle_start,
+      },
+      subscription,
+      nextStatus,
+      nextPeriodStart,
+      nextPeriodEnd,
+      updatedAt,
+      convertedAt,
+      scheduledChange,
+    });
+    if (result === 'APPLIED') return 'APPLIED';
   } catch {
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
   }
@@ -485,7 +395,7 @@ export async function syncTerminalRenewalCycleToSubscription(
   }
   if (!validTerminalCycle(cycle)) return reconcile(env, cycle, 'TERMINAL_CYCLE_SNAPSHOT_INVALID', now);
 
-  const membershipStore = getScheduledPlanChangeStore(env);
+  const membershipStore = getRenewalOutcomeMembershipStore(env, dependencies);
   const subscription = await readSubscription(membershipStore, cycle.subscription_id, cycle.subscriber_id);
   if (!subscription) return reconcile(env, cycle, 'SUBSCRIPTION_NOT_FOUND', now);
   if (subscription.subscription_id !== cycle.subscription_id || subscription.subscriber_id !== cycle.subscriber_id) {
@@ -510,7 +420,7 @@ export async function syncTerminalRenewalCycleToSubscription(
   }
 
   const scheduledChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
-    getScheduledPlanChangeStore(env), cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
+    membershipStore, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
   );
   const currentPlanMatchesCycle =
     subscription.plan_id === cycle.plan_id && subscription.plan_version === cycle.plan_version;
@@ -528,7 +438,7 @@ export async function syncTerminalRenewalCycleToSubscription(
         scheduledChange.subscriptionId !== cycle.subscription_id) {
       return reconcile(env, cycle, 'SCHEDULED_PLAN_CHANGE_IDENTITY_MISMATCH', now);
     }
-    const target = await readScheduledDowngradeTargetPlan(getScheduledPlanChangeStore(env), scheduledChange);
+    const target = await readScheduledDowngradeTargetPlan(membershipStore, scheduledChange);
     const validScheduledChange = scheduledChange.status === 'APPLIED'
       ? target?.billingInterval === subscription.billing_interval &&
         target.tier === subscription.tier && target.currency === subscription.currency
@@ -602,7 +512,7 @@ export async function syncTerminalRenewalCycleToSubscription(
     }
     if (scheduledChange?.status === 'SCHEDULED') {
       const appliedChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
-        getScheduledPlanChangeStore(env), cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
+        membershipStore, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
       );
       if (!appliedChange || appliedChange.status !== 'APPLIED' ||
           !(await auditAppliedSubscriptionPlanChange(env, cycle, appliedChange))) {
