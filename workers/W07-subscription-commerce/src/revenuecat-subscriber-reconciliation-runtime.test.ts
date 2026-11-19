@@ -54,8 +54,8 @@ const request = (overrides: {
 };
 
 const env = (): RevenueCatSubscriberReconciliationRuntimeEnv => ({
-  D1_01: {} as D1Database,
-  W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
+  W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+  HYPERDRIVE_D1_01: { connectionString: 'postgresql://test.local/luckread' },
   REVENUECAT_SECRET_API_KEY: 'sk_server_only_secret',
   REVENUECAT_ALLOWED_APP_IDS: APP_ID + ',luckread-android-production',
 });
@@ -228,10 +228,10 @@ describe('W07 RevenueCat subscriber reconciliation runtime', () => {
 });
 
 describe('W07 RevenueCat reconciliation Neon routing', () => {
-  it('uses the existing native D1-01 pool for product-binding candidate reads in Neon mode', async () => {
+  it('uses the existing native Neon D1-01 pool for product-binding candidate reads', async () => {
     const pool = { query: vi.fn(), connect: vi.fn() } as unknown as W07WebhookPostgresPool
     let selectedStore: unknown
-    const buildCandidates = vi.fn(async (store: D1Database | W07WebhookPostgresPool) => {
+    const buildCandidates = vi.fn(async (store: W07WebhookPostgresPool) => {
       selectedStore = store
       return {
         appUserId: USER_ID,
