@@ -1778,7 +1778,7 @@ export default {
 
   async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
     try {
-      await drainModerationOutbox(getW06ModerationDatabase(env), env.W03_CONTENT_MODERATION, 10)
+      await drainModerationOutbox(getW06ModerationDecisionWriteStore(env), env.W03_CONTENT_MODERATION, 10)
     } catch {
       // The next scheduled run retries durable outbox records.
     }
