@@ -89,12 +89,6 @@ export function getScheduledPlanChangeStore(
   }
 }
 
-function isPostgresScheduledPlanStore(
-  value: D1Database | W07WebhookPostgresPool,
-): value is W07WebhookPostgresPool {
-  return typeof (value as W07WebhookPostgresPool).query === 'function';
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value) &&
     Object.getPrototypeOf(value) === Object.prototype;
@@ -154,101 +148,23 @@ function toScheduledChange(row: ScheduledPlanChangeRow): ScheduledSubscriptionPl
 }
 
 async function readScheduledChangeByIdempotency(
-  db: D1Database | W07WebhookPostgresPool,
+  db: W07WebhookPostgresPool,
   subscriberId: string,
   keyHash: string,
 ): Promise<ScheduledPlanChangeRow | null> {
-  if (isPostgresScheduledPlanStore(db)) {
-    return readScheduledChangeByIdempotencyPostgres(db, subscriberId, keyHash);
-  }
-  try {
-    return await db.prepare(
-      'SELECT change_id, subscriber_id, subscription_id, change_type, expected_subscription_version, expected_plan_id, ' +
-      'expected_plan_version, target_plan_id, target_plan_version, effective_at, idempotency_key_hash, status, ' +
-      'applied_at, applied_subscription_version, created_at, updated_at, version ' +
-      'FROM membership_subscription_scheduled_plan_changes WHERE subscriber_id = ? AND idempotency_key_hash = ? LIMIT 1',
-    ).bind(subscriberId, keyHash).first<ScheduledPlanChangeRow>();
-  } catch (error) {
-    // Migration 0007 adds change_type after the 0006 schedule table. During
-    // that controlled transition window, legacy rows are necessarily
-    // DOWNGRADE records; preserve their idempotent replay semantics.
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/no such column:\s*change_type/i.test(message)) {
-      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
-    try {
-      const legacy = await db.prepare(
-        'SELECT change_id, subscriber_id, subscription_id, expected_subscription_version, expected_plan_id, ' +
-        'expected_plan_version, target_plan_id, target_plan_version, effective_at, idempotency_key_hash, status, ' +
-        'applied_at, applied_subscription_version, created_at, updated_at, version ' +
-        'FROM membership_subscription_scheduled_plan_changes WHERE subscriber_id = ? AND idempotency_key_hash = ? LIMIT 1',
-      ).bind(subscriberId, keyHash).first<Omit<ScheduledPlanChangeRow, 'change_type'>>();
-      return legacy ? { ...legacy, change_type: 'DOWNGRADE' } : null;
-    } catch {
-      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
-  }
+  return readScheduledChangeByIdempotencyPostgres(db, subscriberId, keyHash);
 }
 
 export async function readScheduledSubscriptionPlanDowngradeForPeriod(
-  db: D1Database | W07WebhookPostgresPool,
+  db: W07WebhookPostgresPool,
   subscriptionId: string,
   subscriberId: string,
   effectiveAt: string,
   includeApplied = true,
 ): Promise<ScheduledSubscriptionPlanDowngrade | null> {
-  if (isPostgresScheduledPlanStore(db)) {
-    const postgresRow = await readScheduledSubscriptionPlanDowngradeForPeriodPostgres(
-      db, subscriptionId, subscriberId, effectiveAt, includeApplied,
-    );
-    if (!postgresRow) return null;
-    const change = toScheduledChange(postgresRow);
-    if (change.subscriberId !== subscriberId || change.subscriptionId !== subscriptionId) {
-      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
-    }
-    return change;
-  }
-  let row: ScheduledPlanChangeRow | null;
-  try {
-    row = await db.prepare(
-      'SELECT change_id, subscriber_id, subscription_id, change_type, expected_subscription_version, expected_plan_id, ' +
-      'expected_plan_version, target_plan_id, target_plan_version, effective_at, idempotency_key_hash, status, ' +
-      'applied_at, applied_subscription_version, created_at, updated_at, version ' +
-      'FROM membership_subscription_scheduled_plan_changes WHERE subscription_id = ? AND effective_at = ? ' +
-      (includeApplied ? "AND status IN ('SCHEDULED', 'APPLIED')" : "AND status = 'SCHEDULED'") +
-      ' LIMIT 1',
-    ).bind(subscriptionId, effectiveAt).first<ScheduledPlanChangeRow>();
-  } catch (error) {
-    // Migrations 0006 and 0007 are additive. Before 0006, no scheduled change
-    // can exist. Between 0006 and 0007, the only supported legacy schedule is a
-    // same-interval downgrade; map that legacy row to DOWNGRADE so existing
-    // renewals continue to work. All other D1 errors remain fail-closed.
-    const message = error instanceof Error ? error.message : String(error);
-    if (/no such table:\s*membership_subscription_scheduled_plan_changes/i.test(message)) {
-      return null;
-    }
-    if (/no such column:\s*change_type/i.test(message)) {
-      try {
-        const legacy = await db.prepare(
-          'SELECT change_id, subscriber_id, subscription_id, expected_subscription_version, expected_plan_id, ' +
-          'expected_plan_version, target_plan_id, target_plan_version, effective_at, idempotency_key_hash, status, ' +
-          'applied_at, applied_subscription_version, created_at, updated_at, version ' +
-          'FROM membership_subscription_scheduled_plan_changes WHERE subscription_id = ? AND effective_at = ? ' +
-          (includeApplied ? "AND status IN ('SCHEDULED', 'APPLIED')" : "AND status = 'SCHEDULED'") +
-          ' LIMIT 1',
-        ).bind(subscriptionId, effectiveAt).first<Omit<ScheduledPlanChangeRow, 'change_type'>>();
-        row = legacy ? { ...legacy, change_type: 'DOWNGRADE' } : null;
-      } catch (legacyError) {
-        const legacyMessage = legacyError instanceof Error ? legacyError.message : String(legacyError);
-        if (/no such table:\s*membership_subscription_scheduled_plan_changes/i.test(legacyMessage)) {
-          return null;
-        }
-        throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-      }
-    } else {
-      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
-  }
+  const row = await readScheduledSubscriptionPlanDowngradeForPeriodPostgres(
+    db, subscriptionId, subscriberId, effectiveAt, includeApplied,
+  );
   if (!row) return null;
   const change = toScheduledChange(row);
   if (change.subscriberId !== subscriberId || change.subscriptionId !== subscriptionId) {
@@ -257,30 +173,15 @@ export async function readScheduledSubscriptionPlanDowngradeForPeriod(
   return change;
 }
 
-
 /** Returns true while a period-end downgrade is scheduled and not yet applied. */
 export async function hasPendingScheduledPlanDowngrade(
-  db: D1Database | W07WebhookPostgresPool,
+  db: W07WebhookPostgresPool,
   subscriptionId: string,
 ): Promise<boolean> {
-  if (isPostgresScheduledPlanStore(db)) {
-    return hasPendingScheduledPlanDowngradePostgres(db, subscriptionId);
-  }
-  try {
-    const row = await db.prepare(
-      "SELECT change_id FROM membership_subscription_scheduled_plan_changes WHERE subscription_id = ? " +
-      "AND status IN ('SCHEDULED', 'RECONCILIATION_REQUIRED') LIMIT 1",
-    ).bind(subscriptionId).first<{ change_id: string }>();
-    return row !== null;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    // Migration 0006 is additive. Before it is applied, no scheduled downgrade can exist.
-    if (/no such table:\s*membership_subscription_scheduled_plan_changes/i.test(message)) return false;
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-  }
+  return hasPendingScheduledPlanDowngradePostgres(db, subscriptionId);
 }
 export async function readScheduledDowngradeTargetPlan(
-  db: D1Database | W07WebhookPostgresPool,
+  db: W07WebhookPostgresPool,
   change: ScheduledSubscriptionPlanDowngrade,
 ): Promise<Readonly<{
   planId: string;
@@ -293,56 +194,7 @@ export async function readScheduledDowngradeTargetPlan(
   benefits: string[];
   creatorId: string;
 }> | null> {
-  if (isPostgresScheduledPlanStore(db)) {
-    return readScheduledDowngradeTargetPlanPostgres(db, change);
-  }
-  let row: {
-    plan_id: string; plan_version: number; owner_type: string; owner_id: string;
-    name: string; tier: string; billing_interval: string; price_minor: number;
-    currency: string; benefits_json: string;
-  } | null;
-  try {
-    row = await db.prepare(
-      'SELECT p.plan_id, v.plan_version, p.owner_type, p.owner_id, v.name, v.tier, ' +
-      'v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
-      'FROM membership_plans p INNER JOIN membership_plan_versions v ' +
-      'ON v.plan_id = p.plan_id AND v.plan_version = ? ' +
-      'WHERE p.plan_id = ? LIMIT 1',
-    ).bind(change.targetPlanVersion, change.targetPlanId).first();
-  } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-  }
-  if (!row || row.plan_id !== change.targetPlanId || row.plan_version !== change.targetPlanVersion ||
-      row.owner_type !== 'CREATOR' || !isBoundedText(row.owner_id) ||
-      !PLAN_ID_PATTERN.test(row.plan_id) || !isBoundedText(row.name, 120) ||
-      !/^[a-z][a-z0-9_-]{0,63}$/.test(row.tier) ||
-      (row.billing_interval !== 'MONTHLY' && row.billing_interval !== 'YEARLY') ||
-      !Number.isSafeInteger(row.price_minor) || row.price_minor < 0 ||
-      !/^[A-Z]{3}$/.test(row.currency)) {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-  }
-  let benefits: unknown;
-  try {
-    benefits = JSON.parse(row.benefits_json) as unknown;
-  } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-  }
-  if (!Array.isArray(benefits) || benefits.length > 20 ||
-      benefits.some((item) => typeof item !== 'string' || item.length < 1 || item.length > 180) ||
-      new Set(benefits).size !== benefits.length) {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-  }
-  return {
-    planId: row.plan_id,
-    planVersion: row.plan_version,
-    name: row.name,
-    tier: row.tier,
-    billingInterval: row.billing_interval,
-    priceMinor: row.price_minor,
-    currency: row.currency,
-    benefits: benefits as string[],
-    creatorId: row.owner_id,
-  };
+  return readScheduledDowngradeTargetPlanPostgres(db, change);
 }
 
 /**
@@ -430,51 +282,22 @@ async function scheduleSubscriptionPlanChange(
   }
 
   try {
-    let inserted: boolean;
-    if (isPostgresScheduledPlanStore(membershipStore)) {
-      inserted = await insertScheduledPlanChangePostgres(membershipStore, {
-        changeId,
-        subscriberId,
-        subscriptionId,
-        changeType: expectedChangeType,
-        expectedVersion,
-        currentPlanId: preview.currentPlan.planId,
-        currentPlanVersion: preview.currentPlan.planVersion,
-        targetPlanId: preview.targetPlan.planId,
-        targetPlanVersion: preview.targetPlan.planVersion,
-        effectiveAt: preview.currentPeriodEnd,
-        idempotencyKeyHash: keyDigest,
-        now,
-        currentPeriodStart: preview.currentPeriodStart,
-        currentPeriodEnd: preview.currentPeriodEnd,
-      });
-    } else {
-      const result = await membershipStore.prepare(
-        'INSERT INTO membership_subscription_scheduled_plan_changes ' +
-        '(change_id, subscriber_id, subscription_id, change_type, expected_subscription_version, expected_plan_id, ' +
-        'expected_plan_version, target_plan_id, target_plan_version, effective_at, idempotency_key_hash, ' +
-        'status, applied_at, applied_subscription_version, created_at, updated_at, version) ' +
-        "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED', NULL, NULL, ?, ?, 1 " +
-        'WHERE EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = ? AND s.subscriber_id = ? ' +
-        "AND s.status = 'ACTIVE' AND s.cancel_at IS NULL AND s.version = ? AND s.plan_id = ? AND s.plan_version = ? " +
-        'AND s.current_period_start = ? AND s.current_period_end = ?) ' +
-        'AND EXISTS (SELECT 1 FROM membership_plans p WHERE p.plan_id = ? AND p.owner_type = \'CREATOR\' ' +
-        'AND p.owner_id = (SELECT creator_id FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ?) ' +
-        "AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC') " +
-        "AND NOT EXISTS (SELECT 1 FROM membership_subscription_plan_change_attempts a " +
-        "WHERE a.subscription_id = ? AND a.status IN ('PENDING_PAYMENT', 'RECONCILIATION_REQUIRED')) " +
-        "AND NOT EXISTS (SELECT 1 FROM membership_subscription_scheduled_plan_changes c " +
-        "WHERE c.subscription_id = ? AND c.status IN ('SCHEDULED', 'RECONCILIATION_REQUIRED'))",
-      ).bind(
-        changeId, subscriberId, subscriptionId, expectedChangeType, expectedVersion, preview.currentPlan.planId,
-        preview.currentPlan.planVersion, preview.targetPlan.planId, preview.targetPlan.planVersion,
-        preview.currentPeriodEnd, keyDigest, now, now,
-        subscriptionId, subscriberId, expectedVersion, preview.currentPlan.planId,
-        preview.currentPlan.planVersion, preview.currentPeriodStart, preview.currentPeriodEnd,
-        preview.targetPlan.planId, subscriptionId, subscriberId, subscriptionId, subscriptionId,
-      ).run();
-      inserted = Number(result.meta?.changes ?? 0) === 1;
-    }
+    const inserted = await insertScheduledPlanChangePostgres(membershipStore, {
+      changeId,
+      subscriberId,
+      subscriptionId,
+      changeType: expectedChangeType,
+      expectedVersion,
+      currentPlanId: preview.currentPlan.planId,
+      currentPlanVersion: preview.currentPlan.planVersion,
+      targetPlanId: preview.targetPlan.planId,
+      targetPlanVersion: preview.targetPlan.planVersion,
+      effectiveAt: preview.currentPeriodEnd,
+      idempotencyKeyHash: keyDigest,
+      now,
+      currentPeriodStart: preview.currentPeriodStart,
+      currentPeriodEnd: preview.currentPeriodEnd,
+    });
     if (!inserted) {
       const raced = await readScheduledChangeByIdempotency(membershipStore, subscriberId, keyDigest);
       if (raced) {
