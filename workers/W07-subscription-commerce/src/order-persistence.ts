@@ -475,6 +475,10 @@ const validatePricing = (
   return { currency: pricing.currency, pricingMode, lines, subtotalMinor, discountMinor, taxMinor, totalMinor };
 };
 
+/**
+ * Create an order through the injected durable store. Production callers must
+ * provide the Neon PostgreSQL Store; this orchestration layer has no D1 fallback.
+ */
 export async function createCommerceOrder(
   store: OrderCreatePersistenceStore,
   customerIdInput: string,
