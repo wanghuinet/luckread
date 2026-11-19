@@ -10,7 +10,7 @@ import {
   type RefundPersistenceDependencies,
   type RefundReservation,
   type RefundStatus,
-} from './refund-persistence.js';
+} from './refund-contracts.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 type RefundLookupInput = Readonly<{
