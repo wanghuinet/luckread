@@ -18,7 +18,10 @@ import {
   type PaymentAttemptDto,
   type PaymentAttemptCreation,
 } from './payment-persistence.js';
-import { createPaymentAttemptPostgres } from './payment-intent-postgres-persistence.js';
+import {
+  createPaymentAttemptPostgres,
+  recordHyperswitchMerchantInitiatedSubmissionPostgres,
+} from './payment-intent-postgres-persistence.js';
 import {
   getScheduledPlanChangeStore,
   readScheduledSubscriptionPlanDowngradeForPeriod,
@@ -129,6 +132,7 @@ export type RenewalRuntimeDependencies = Readonly<{
   createPaymentAttemptPostgres?: typeof createPaymentAttemptPostgres;
   createProviderCharge?: typeof createHyperswitchMerchantInitiatedPayment;
   recordProviderSubmission?: typeof recordHyperswitchMerchantInitiatedSubmission;
+  recordProviderSubmissionPostgres?: typeof recordHyperswitchMerchantInitiatedSubmissionPostgres;
   getDatabase?: (env: RenewalRuntimeEnv) => D1Database;
   getFinancePostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool | undefined;
   getMembershipPostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool;
@@ -1306,17 +1310,32 @@ export async function processSubscriptionRenewalCycle(
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED', ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
     }
 
-    const recordSubmission = dependencies.recordProviderSubmission ?? recordHyperswitchMerchantInitiatedSubmission;
     try {
-      await recordSubmission(
-        env.D1_04,
-        cycle.subscriber_id,
-        cycle.payment_id!,
-        cycle.merchant_id,
-        cycle.payment_method_id!,
-        providerPayment,
-        { now: nowFn },
-      );
+      if (isPostgresRenewalCycleStore(paymentStore)) {
+        const recordSubmission = dependencies.recordProviderSubmissionPostgres ??
+          recordHyperswitchMerchantInitiatedSubmissionPostgres;
+        await recordSubmission(
+          paymentStore,
+          cycle.subscriber_id,
+          cycle.payment_id!,
+          cycle.merchant_id,
+          cycle.payment_method_id!,
+          providerPayment,
+          { now: nowFn },
+        );
+      } else {
+        const recordSubmission = dependencies.recordProviderSubmission ??
+          recordHyperswitchMerchantInitiatedSubmission;
+        await recordSubmission(
+          paymentStore,
+          cycle.subscriber_id,
+          cycle.payment_id!,
+          cycle.merchant_id,
+          cycle.payment_method_id!,
+          providerPayment,
+          { now: nowFn },
+        );
+      }
     } catch {
       now = nowIso(nowFn);
       cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'PROVIDER_RESPONSE_NOT_DURABLY_RECORDED', now);

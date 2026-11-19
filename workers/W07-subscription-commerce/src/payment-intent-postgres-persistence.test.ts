@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createPaymentAttemptPostgres,
+  recordHyperswitchMerchantInitiatedSubmissionPostgres,
   recordUnconfirmedHyperswitchIntentPostgres,
 } from './payment-intent-postgres-persistence.js';
 import { PaymentPersistenceError } from './payment-persistence.js';
@@ -103,6 +104,10 @@ function fixture() {
     pool,
     statements,
     readPayment: () => payment,
+    setPayment: (next: Partial<StoredPayment>) => {
+      if (!payment) throw new Error('payment fixture has not been created');
+      payment = { ...payment, ...next };
+    },
   };
 }
 
@@ -164,6 +169,76 @@ describe('W07 native PostgreSQL payment-intent persistence', () => {
     expect(f.readPayment()).not.toHaveProperty('client_secret');
     expect(f.readPayment()).not.toHaveProperty('sdk_authorization');
     expect(f.statements.at(-1)?.sql).toContain('RETURNING payment_id');
+  });
+
+  it('records a merchant-initiated provider response through Neon without treating it as settlement evidence', async () => {
+    const f = fixture();
+    await createPaymentAttemptPostgres(f.pool, CUSTOMER, ORDER, IDEMPOTENCY, MERCHANT, {
+      now: () => new Date(NOW),
+      createPaymentId: () => PAYMENT,
+    });
+
+    const persisted = await recordHyperswitchMerchantInitiatedSubmissionPostgres(
+      f.pool,
+      CUSTOMER,
+      PAYMENT,
+      MERCHANT,
+      'pm_saved_1',
+      {
+        ...providerPayment,
+        status: 'processing',
+        customerId: CUSTOMER,
+        paymentMethodId: 'pm_saved_1',
+      },
+      { now: () => new Date(LATER) },
+    );
+
+    expect(persisted).toMatchObject({
+      paymentId: PAYMENT,
+      status: 'processing',
+      version: 2,
+      updatedAt: LATER,
+    });
+    expect(f.readPayment()).not.toHaveProperty('client_secret');
+    expect(f.readPayment()).not.toHaveProperty('sdk_authorization');
+    expect(f.statements.at(-2)?.sql).toContain("provider = 'hyperswitch'");
+    expect(f.statements.at(-2)?.sql).toContain("status = 'INITIATING' AND version = 1");
+    expect(f.statements.every((entry) => !entry.sql.includes('?'))).toBe(true);
+  });
+
+  it('does not regress a payment already advanced by a signed webhook', async () => {
+    const f = fixture();
+    await createPaymentAttemptPostgres(f.pool, CUSTOMER, ORDER, IDEMPOTENCY, MERCHANT, {
+      now: () => new Date(NOW),
+      createPaymentId: () => PAYMENT,
+    });
+    f.setPayment({ status: 'succeeded', version: 2, updated_at: LATER });
+
+    const persisted = await recordHyperswitchMerchantInitiatedSubmissionPostgres(
+      f.pool,
+      CUSTOMER,
+      PAYMENT,
+      MERCHANT,
+      'pm_saved_1',
+      { ...providerPayment, status: 'processing', customerId: CUSTOMER, paymentMethodId: 'pm_saved_1' },
+      { now: () => new Date(LATER) },
+    );
+
+    expect(persisted).toMatchObject({ status: 'succeeded', version: 2, updatedAt: LATER });
+    expect(f.statements.some((entry) => entry.sql.startsWith('UPDATE payments SET status'))).toBe(false);
+  });
+
+  it('rejects a mismatched MIT payment method before querying PostgreSQL', async () => {
+    const f = fixture();
+    await expect(recordHyperswitchMerchantInitiatedSubmissionPostgres(
+      f.pool,
+      CUSTOMER,
+      PAYMENT,
+      MERCHANT,
+      'pm_saved_expected',
+      { ...providerPayment, paymentMethodId: 'pm_saved_other' },
+    )).rejects.toMatchObject({ code: 'WEBHOOK_REJECTED', status: 400 });
+    expect(f.statements).toHaveLength(0);
   });
 
   it('rejects mismatched provider identity without changing payment state', async () => {
