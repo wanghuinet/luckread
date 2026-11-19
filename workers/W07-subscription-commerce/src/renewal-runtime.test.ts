@@ -21,7 +21,7 @@ const CYCLE_ID = 'rcy_' + 'a'.repeat(26)
 const testEnv: RenewalRuntimeEnv = {
   W07_DATABASE_DRIVER: 'neon',
   W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-  HYPERDRIVE_D1_04: { connectionString: 'postgresql://test.invalid/luckread' },
+  HYPERDRIVE_FINANCE_DB: { connectionString: 'postgresql://test.invalid/luckread' },
   HYPERSWITCH_ENVIRONMENT: 'sandbox',
   HYPERSWITCH_API_KEY: 'test-api-key',
   HYPERSWITCH_MERCHANT_ID: 'merchant_test',
