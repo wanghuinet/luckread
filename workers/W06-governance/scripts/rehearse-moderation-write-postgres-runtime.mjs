@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
@@ -8,6 +8,10 @@ import { decideModerationCase, getModerationCase } from '../src/moderation-runti
 import { createReport } from '../src/report-runtime.ts'
 import { createPostgresModerationD1Database } from '../src/neon-postgres-d1-database.ts'
 import { createPostgresModerationReportWriteStore } from '../src/moderation-report-write-store-postgres.ts'
+import { consumeAccountStateChanged } from '../src/auth-013-queue-consumer.ts'
+import { consumeMfaAuditEvent } from '../src/mfa-audit-queue-consumer.ts'
+import { consumeSessionRevokedAuditEvent } from '../src/session-revocation-audit-queue-consumer.ts'
+import { createPostgresAuditEventStore } from '../src/audit-event-store-postgres.ts'
 
 const requireFromW02 = createRequire(new URL('../../W02-identity/package.json', import.meta.url))
 const { Pool } = requireFromW02('pg')
@@ -40,6 +44,8 @@ const checks = {
   moderationReportUsesNativePostgresStore: false,
   moderationReportWrittenWithAudit: false,
   moderationReportReplayReturnedStoredResponse: false,
+  nativeAuthAuditQueuesPersisted: false,
+  nativeAuthAuditQueueReplaysDeduplicated: false,
   staleVersionGuardRolledBackAllWrites: false,
   cleanupVerified: false,
 }
@@ -75,6 +81,7 @@ try {
   const db = createPostgresModerationD1Database(executor)
   checks.usesSharedD1_03PostgresPool = true
   const reportStore = createPostgresModerationReportWriteStore(executor)
+  const auditEventStore = createPostgresAuditEventStore(executor)
 
   const reviewerId = marker + '-reviewer'
   const successfulCaseId = marker + '-success'
@@ -195,6 +202,109 @@ try {
   assert.equal(Number(reportRows?.count), 1)
   assert.equal(Number(reportAuditRows?.count), 1)
   checks.moderationReportReplayReturnedStoredResponse = true
+
+  const authUserId = marker + '-auth-user'
+  const authEventId = 'evt_' + randomUUID().replaceAll('-', '')
+  const authEvent = {
+    eventId: authEventId,
+    eventType: 'identity.account_state_changed',
+    schemaVersion: '1.0',
+    producer: 'W02',
+    resourceType: 'User',
+    resourceId: authUserId,
+    occurredAt: now,
+    publishedAt: now,
+    correlationId: 'corr-' + randomUUID(),
+    causationId: 'cause-' + randomUUID(),
+    idempotencyKey: 'auth013-' + randomUUID(),
+    attempt: 1,
+    sourceVersion: 2,
+    actor: {
+      actorId: marker + '-operator',
+      actorType: 'user',
+      operationalRole: 'PLATFORM_OPERATOR',
+    },
+    before: { accountState: 'ACTIVE', accountStateVersion: 1 },
+    after: { accountState: 'RESTRICTED', accountStateVersion: 2 },
+    reason: 'native PostgreSQL rehearsal',
+  }
+
+  assert.equal(await consumeAccountStateChanged(auditEventStore, authEvent), 'persisted')
+  const storedAuthEvent = await auditEventStore.findByEventId(authEventId)
+  assert.ok(storedAuthEvent)
+  assert.equal(storedAuthEvent.action, 'identity.account_state_changed')
+  assert.equal(storedAuthEvent.targetId, authUserId)
+  assert.equal(storedAuthEvent.actor.operationalRole, 'PLATFORM_OPERATOR')
+  assert.equal(await consumeAccountStateChanged(auditEventStore, authEvent), 'duplicate')
+
+  const mfaEventId = 'evt_' + randomUUID().replaceAll('-', '')
+  const mfaEvent = {
+    eventId: mfaEventId,
+    eventType: 'auth.mfa.enrollment_started',
+    schemaVersion: '1.0',
+    producer: 'W02',
+    resourceType: 'User',
+    resourceId: marker + '-mfa-user',
+    occurredAt: now,
+    publishedAt: now,
+    correlationId: 'req_' + randomUUID().replaceAll('-', ''),
+    causationId: 'trace-' + randomUUID(),
+    idempotencyKey: 'mfa-' + mfaEventId,
+    attempt: 1,
+    sourceVersion: 1,
+    actor: { actorId: marker + '-mfa-user', actorType: 'user' },
+    payload: {
+      operationId: 'authMfaEnrollmentStart',
+      result: 'started',
+      factorState: 'PENDING_VERIFICATION',
+    },
+  }
+
+  assert.equal(await consumeMfaAuditEvent(auditEventStore, mfaEvent), 'persisted')
+  const storedMfaEvent = await auditEventStore.findByEventId(mfaEventId)
+  assert.ok(storedMfaEvent)
+  assert.equal(storedMfaEvent.action, 'auth.mfa.enrollment_started')
+  assert.equal(storedMfaEvent.targetType, 'User')
+  assert.equal(await consumeMfaAuditEvent(auditEventStore, mfaEvent), 'duplicate')
+
+  const sessionActorId = marker + '-session-user'
+  const sessionId = marker + '-session'
+  const sessionEventId = 'evt_' + createHash('sha256')
+    .update('AUTH010_SESSION_REVOKE:' + sessionActorId + ':' + sessionId)
+    .digest('hex')
+    .slice(0, 32)
+  const sessionEvent = {
+    eventId: sessionEventId,
+    eventType: 'user.session.revoked',
+    schemaVersion: '1.0',
+    producer: 'W02',
+    resourceType: 'Session',
+    resourceId: sessionId,
+    occurredAt: now,
+    publishedAt: now,
+    correlationId: 'req_' + randomUUID().replaceAll('-', ''),
+    causationId: 'trace-' + randomUUID(),
+    idempotencyKey: 'AUTH010_SESSION_REVOKE_' + sessionEventId.slice(4),
+    attempt: 1,
+    sourceVersion: 1,
+    actor: { actorId: sessionActorId, actorType: 'user' },
+    payload: {
+      operationId: 'authSessionRevoke',
+      result: 'succeeded',
+      reasonCode: 'USER_INITIATED',
+    },
+  }
+
+  assert.equal(await consumeSessionRevokedAuditEvent(auditEventStore, sessionEvent), 'persisted')
+  const storedSessionEvent = await auditEventStore.findByEventId(sessionEventId)
+  assert.ok(storedSessionEvent)
+  assert.equal(storedSessionEvent.action, 'user.session.revoked')
+  assert.equal(storedSessionEvent.targetType, 'Session')
+  assert.equal(storedSessionEvent.targetId, sessionId)
+  assert.equal(await consumeSessionRevokedAuditEvent(auditEventStore, sessionEvent), 'duplicate')
+
+  checks.nativeAuthAuditQueuesPersisted = true
+  checks.nativeAuthAuditQueueReplaysDeduplicated = true
 
   // Simulate a concurrent version change that causes the CAS UPDATE to affect 0 rows.
   await client.query(`

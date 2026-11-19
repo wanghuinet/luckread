@@ -9,6 +9,8 @@ import { createPostgresModerationQueueReadStore } from '../moderation-queue-read
 import type { ModerationQueueReadStore } from '../moderation-queue-read-store.js'
 import { createPostgresModerationReportWriteStore } from '../moderation-report-write-store-postgres.js'
 import type { ModerationReportWriteStore } from '../moderation-report-write-store.js'
+import { createPostgresAuditEventStore } from '../audit-event-store-postgres.js'
+import type { AuditEventStore } from '../audit-event-store.js'
 import {
   createPostgresModerationCaseDetailReadStore,
   type ModerationCaseDetailReadStore,
@@ -19,7 +21,7 @@ import {
  * Reason: W06 Neon runtime still exposes a D1-shaped persistence facade and an explicit legacy D1 test/compatibility branch.
  * Replacement: Native PostgreSQL moderation stores and explicit PostgreSQL transaction/query contracts.
  * Removal: Next release.
- * Condition: Report, moderation, audit, and queue consumers accept native PostgreSQL stores without D1Database signatures or SQL translation; then remove the explicitly selected legacy D1 compatibility branch.
+ * Condition: Direct audit HTTP ingestion and moderation decision/outbox consumers also accept native PostgreSQL stores without D1Database signatures or SQL translation; then remove the explicitly selected legacy D1 compatibility branch.
  */
 export type W06ModerationDatabaseDriver = 'd1' | 'neon'
 
@@ -34,6 +36,7 @@ const poolAdapters = new WeakMap<object, W06ModerationPostgresPool>()
 const databases = new WeakMap<object, D1Database>()
 const queueStores = new WeakMap<object, ModerationQueueReadStore>()
 const reportStores = new WeakMap<object, ModerationReportWriteStore>()
+const auditEventStores = new WeakMap<object, AuditEventStore>()
 const caseDetailStores = new WeakMap<object, ModerationCaseDetailReadStore>()
 
 export function resolveW06ModerationDatabaseDriver(
@@ -181,6 +184,21 @@ export function getW06ModerationReportWriteStore(
   return store
 }
 
+/** Native W06 consumer Store reuses W09's append-only SELECT/INSERT SQL policy. */
+export function getW06AuditEventStore(env: W06ModerationDatabaseRuntimeEnv): AuditEventStore {
+  const pool = getW06ModerationPostgresPool(env)
+  const binding = env.HYPERDRIVE_D1_03
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+  }
+  const cached = auditEventStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresAuditEventStore(pool)
+  auditEventStores.set(binding, store)
+  return store
+}
+
 /** Dedicated PostgreSQL projection preserves native keyset timestamp precision. */
 export function getW06ModerationQueueReadStore(
   env: W06ModerationDatabaseRuntimeEnv,
@@ -228,6 +246,7 @@ export async function closeW06ModerationPostgresRuntimeForTest(
   databases.delete(binding)
   queueStores.delete(binding)
   reportStores.delete(binding)
+  auditEventStores.delete(binding)
   caseDetailStores.delete(binding)
 
   const pool = await pending
