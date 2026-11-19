@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createPostgresAuditEventStore } from './audit-event-store-postgres.js'
 import type { AuditEvent } from './audit-event.js'
-import type { W06ModerationPostgresPool } from './neon-postgres-d1-database.js'
+import type { W06ModerationPostgresPool } from './moderation-postgres-pool.js'
 
 type ScriptedResponse = {
   match: string
