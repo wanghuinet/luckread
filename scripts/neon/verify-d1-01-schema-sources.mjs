@@ -233,8 +233,8 @@ for (const owner of contract.owners.slice(1)) {
           sourceConfig.d1_databases?.length > 0 ||
           sourceConfig.vars?.W07_DATABASE_DRIVER !== 'neon' ||
           sourceConfig.vars?.W07_MEMBERSHIP_DATABASE_DRIVER !== 'neon' ||
-          !hyperdrive.some((binding) => binding.binding === 'HYPERDRIVE_D1_01' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b') ||
-          !hyperdrive.some((binding) => binding.binding === 'HYPERDRIVE_D1_04' && binding.id === '3ae15e6dfb5e4b44979eee30e1d5ede4') ||
+          !hyperdrive.some((binding) => binding.binding === 'HYPERDRIVE_MEMBERSHIP_DB' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b') ||
+          !hyperdrive.some((binding) => binding.binding === 'HYPERDRIVE_FINANCE_DB' && binding.id === '3ae15e6dfb5e4b44979eee30e1d5ede4') ||
           sourceMigrations.length !== 7 ||
           sourceMigrations.some((source) => !statSafe(path.join(root, source)))) {
         failures.push('W07 historical D1-01/D1-04 source identities must remain pinned to their migration contracts and runtime config must remain Neon-only')
@@ -271,9 +271,9 @@ function validateNeonProductionConfig(worker, relativePath, expected) {
     validTopology =
       config.vars?.W07_MEMBERSHIP_DATABASE_DRIVER === 'neon' &&
       (config.hyperdrive ?? []).some((binding) =>
-        binding.binding === 'HYPERDRIVE_D1_01' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b') &&
+        binding.binding === 'HYPERDRIVE_MEMBERSHIP_DB' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b') &&
       (config.hyperdrive ?? []).some((binding) =>
-        binding.binding === 'HYPERDRIVE_D1_04' && binding.id === '3ae15e6dfb5e4b44979eee30e1d5ede4') &&
+        binding.binding === 'HYPERDRIVE_FINANCE_DB' && binding.id === '3ae15e6dfb5e4b44979eee30e1d5ede4') &&
       (config.services ?? []).some((binding) =>
         binding.binding === 'W06_GOVERNANCE' && binding.service === 'luckread-w06')
   }
@@ -301,7 +301,7 @@ validateNeonProductionConfig('W02', 'workers/W02-identity/wrangler.neon.jsonc', 
 validateNeonProductionConfig('W07', 'workers/W07-subscription-commerce/wrangler.neon.jsonc', {
   name: 'luckread-w07',
   driver: 'W07_DATABASE_DRIVER',
-  binding: 'HYPERDRIVE_D1_01',
+  binding: 'HYPERDRIVE_MEMBERSHIP_DB',
   hyperdriveId: '0c53a1bb9bc0484bac146e8ae2d3158b',
 })
 validateNeonProductionConfig('W08', 'workers/W08-creator/wrangler.jsonc', {
