@@ -17,6 +17,7 @@ import {
 import { createReport, ReportRuntimeError } from './report-runtime'
 import {
   getW06ModerationDatabase,
+  getW06AuditEventStore,
   getW06ModerationQueueReadStore,
   getW06ModerationReportWriteStore,
   getW06ModerationCaseDetailReadStore,
@@ -1807,12 +1808,13 @@ export default {
         const body = raw && typeof raw === 'object'
           ? raw as Record<string, unknown>
           : null
+        const auditEventStore = getW06AuditEventStore(env)
         if (body?.eventType === 'user.session.revoked') {
-          await consumeSessionRevokedAuditEvent(getW06ModerationDatabase(env), raw)
+          await consumeSessionRevokedAuditEvent(auditEventStore, raw)
         } else if (typeof body?.eventType === 'string' && body.eventType.startsWith('auth.mfa.')) {
-          await consumeMfaAuditEvent(getW06ModerationDatabase(env), raw)
+          await consumeMfaAuditEvent(auditEventStore, raw)
         } else {
-          await consumeAccountStateChanged(getW06ModerationDatabase(env), raw)
+          await consumeAccountStateChanged(auditEventStore, raw)
         }
       } catch (error) {
         if (error instanceof Error &&
