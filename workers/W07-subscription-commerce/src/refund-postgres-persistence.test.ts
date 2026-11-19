@@ -196,6 +196,8 @@ describe('W07 native PostgreSQL refund persistence', () => {
     expect(f.statements.at(-2)?.sql).toContain('UPDATE refunds SET status = $1');
     expect(f.statements.at(-2)?.sql).toContain('version = version + 1');
     expect(f.statements.at(-2)?.sql).toContain('RETURNING refund_id');
+    expect(f.statements.at(-2)?.sql).not.toContain('provider_updated_at');
+    expect(f.readRefund()?.provider_updated_at).toBeNull();
   });
 
   it('rejects provider acknowledgement identity mismatches without mutating the reservation', async () => {
