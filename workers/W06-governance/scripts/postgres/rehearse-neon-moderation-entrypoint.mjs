@@ -328,7 +328,7 @@ try {
   // Re-arm the already committed Outbox row to prove the actual Worker scheduled entrypoint
   // scans and delivers due records through the native PostgreSQL store.
   await pool.query(
-    \"UPDATE moderation_enforcement_outbox SET status = 'PENDING', attempts = 0, next_attempt_at = NOW() - INTERVAL '1 second', delivered_at = NULL WHERE decision_id = $1\",
+    "UPDATE moderation_enforcement_outbox SET status = 'PENDING', attempts = 0, next_attempt_at = NOW() - INTERVAL '1 second', delivered_at = NULL WHERE decision_id = $1",
     [first.decisionId],
   )
   await worker.scheduled({ scheduledTime: Date.now(), cron: '* * * * *' }, env)
