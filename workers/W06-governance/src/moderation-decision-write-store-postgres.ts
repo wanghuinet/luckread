@@ -125,7 +125,7 @@ function affectedRows<Row extends Record<string, unknown>>(result: QueryResult<R
 }
 
 function normalizeEtag(value: string): number {
-  const match = /^(?:W\\/)?"?v?(\\d+)"?$/.exec(value.trim())
+  const match = /^(?:W\/)?"?v?(\d+)"?$/.exec(value.trim())
   if (!match) throw new ModerationDecisionWriteStoreError('PRECONDITION_FAILED', 412)
   return Number(match[1])
 }
