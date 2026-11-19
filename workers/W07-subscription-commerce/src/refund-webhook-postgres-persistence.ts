@@ -3,7 +3,7 @@ import type { W07WebhookPostgresClient, W07WebhookPostgresPool } from './payment
 import {
   PaymentPersistenceError,
   type WebhookReceiptResult,
-} from './payment-persistence.js'
+} from './payment-contracts.js'
 import {
   parseHyperswitchRfc3339Timestamp,
   parseHyperswitchWebhookEnvelope,

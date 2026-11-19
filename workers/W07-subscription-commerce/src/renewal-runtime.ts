@@ -14,7 +14,7 @@ import {
 import {
   type PaymentAttemptDto,
   type PaymentAttemptCreation,
-} from './payment-persistence.js';
+} from './payment-contracts.js';
 import {
   createPaymentAttemptPostgres,
   recordHyperswitchMerchantInitiatedSubmissionPostgres,

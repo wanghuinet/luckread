@@ -2,7 +2,7 @@ import { createHmac } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
 import {
   PaymentPersistenceError,
-} from './payment-persistence.js'
+} from './payment-contracts.js'
 import type {
   W07WebhookPostgresClient,
   W07WebhookPostgresPool,

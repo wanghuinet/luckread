@@ -8,7 +8,7 @@ import {
   PaymentPersistenceError,
   type PaymentAttemptCreation,
   type PaymentAttemptDto,
-} from './payment-persistence.js';
+} from './payment-contracts.js';
 import {
   createPaymentAttemptPostgres,
   recordUnconfirmedHyperswitchIntentPostgres,

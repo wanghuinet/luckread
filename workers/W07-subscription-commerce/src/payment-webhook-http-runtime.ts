@@ -4,7 +4,7 @@ import { readBoundedProviderWebhookBody } from './provider-webhook-body.js'
 import {
   PaymentPersistenceError,
   type WebhookReceiptResult,
-} from './payment-persistence.js';
+} from './payment-contracts.js';
 import {
   syncRenewalCycleOutcomeForPayment,
   syncPendingRenewalOutcomes,
