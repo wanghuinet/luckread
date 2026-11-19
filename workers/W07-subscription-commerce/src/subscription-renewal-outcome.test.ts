@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { W07WebhookPostgresClient, W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import {
   syncRenewalCycleOutcomeForPayment,
   syncTerminalRenewalCycleToSubscription,
@@ -141,16 +142,69 @@ class MemoryD1 {
   }
 }
 
-function env(cycle: Cycle | null = makeCycle(), subscription: Subscription | null = makeSubscription(), failRead = false) {
-  const d1_01 = new MemoryD1(null, subscription, failRead) as unknown as D1Database;
-  const d1_04 = new MemoryD1(cycle, null) as unknown as D1Database;
-  return { value: { W07_DATABASE_DRIVER: 'd1', W07_MEMBERSHIP_DATABASE_DRIVER: 'd1', D1_01: d1_01, D1_04: d1_04 }, d1_01: d1_01 as unknown as MemoryD1, d1_04: d1_04 as unknown as MemoryD1 };
+function membershipPoolFor(store: MemoryD1): W07WebhookPostgresPool {
+  const query = async <Row extends Record<string, unknown> = Record<string, unknown>>(
+    sql: string,
+    values: unknown[] = [],
+  ) => {
+    if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
+      return { rows: [] as Row[], rowCount: 0 };
+    }
+    if (sql.includes('FROM membership_subscription_scheduled_plan_changes')) {
+      return { rows: [] as Row[], rowCount: 0 };
+    }
+    if (sql.includes('FROM membership_subscriptions')) {
+      const row = await store.first<Row>(sql, values);
+      return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+    }
+    if (sql.includes('UPDATE membership_subscriptions SET')) {
+      const result = await store.run(sql, values);
+      return {
+        rows: Number(result.meta?.changes ?? 0) === 1
+          ? [{ subscription_id: store.subscription?.subscription_id } as Row]
+          : [],
+        rowCount: Number(result.meta?.changes ?? 0),
+      };
+    }
+    throw new Error('Unexpected Neon membership query: ' + sql);
+  };
+  const client: W07WebhookPostgresClient = {
+    query,
+    release() {},
+  };
+  return {
+    query,
+    async connect() { return client; },
+  };
 }
 
-describe('D1-04 renewal outcome to D1-01 Subscription synchronization', () => {
+function env(cycle: Cycle | null = makeCycle(), subscription: Subscription | null = makeSubscription(), failRead = false) {
+  const membershipStore = new MemoryD1(null, subscription, failRead);
+  const d1_04 = new MemoryD1(cycle, null);
+  const membershipPool = membershipPoolFor(membershipStore);
+  return {
+    value: {
+      W07_DATABASE_DRIVER: 'd1',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+      D1_04: d1_04 as unknown as D1Database,
+    },
+    d1_01: membershipStore,
+    membershipPool,
+    d1_04,
+  };
+}
+
+function syncDependencies(e: ReturnType<typeof env>) {
+  return {
+    now: () => new Date(NOW),
+    getMembershipPostgresPool: () => e.membershipPool,
+  };
+}
+
+describe('D1-04 renewal outcome to Neon D1-01 Subscription synchronization', () => {
   it('fails closed on a malformed D1-04 cycle timestamp before changing D1-01', async () => {
     const e = env(makeCycle({ updated_at: '2026-02-31T12:00:00.000Z' }));
-    await expect(syncTerminalRenewalCycleToSubscription(e.value, CYCLE_ID, { now: () => new Date(NOW) }))
+    await expect(syncTerminalRenewalCycleToSubscription(e.value, CYCLE_ID, syncDependencies(e)))
       .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
     expect(e.d1_01.subscription).toMatchObject({
       status: 'ACTIVE', current_period_start: START, current_period_end: CYCLE_START, version: 3,
@@ -160,7 +214,7 @@ describe('D1-04 renewal outcome to D1-01 Subscription synchronization', () => {
 
   it('requires canonical D1-01 updated_at and records reconciliation without changing the Subscription', async () => {
     const e = env(makeCycle(), makeSubscription({ updated_at: '2026-02-31T12:00:00.000Z' }));
-    const result = await syncTerminalRenewalCycleToSubscription(e.value, CYCLE_ID, { now: () => new Date(NOW) });
+    const result = await syncTerminalRenewalCycleToSubscription(e.value, CYCLE_ID, syncDependencies(e));
     expect(result).toMatchObject({ outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'SUBSCRIPTION_UPDATED_AT_INVALID' });
     expect(e.d1_01.subscription).toMatchObject({
       status: 'ACTIVE', current_period_start: START, current_period_end: CYCLE_START, version: 3,
@@ -220,10 +274,10 @@ describe('D1-04 renewal outcome to D1-01 Subscription synchronization', () => {
     const d1_01 = new MemoryD1(null, null) as unknown as D1Database;
     const d1_04 = new MemoryD1(null, null, false, true) as unknown as D1Database;
     const result = await syncRenewalCycleOutcomeForPayment(
-      { W07_DATABASE_DRIVER: 'd1', W07_MEMBERSHIP_DATABASE_DRIVER: 'd1', D1_01: d1_01, D1_04: d1_04 },
+      { W07_DATABASE_DRIVER: 'd1', W07_MEMBERSHIP_DATABASE_DRIVER: 'neon', D1_04: d1_04 },
       PAYMENT_ID,
       'merchant_test',
-      { now: () => new Date(NOW) },
+      { now: () => new Date(NOW), getMembershipPostgresPool: () => ({ query: async () => ({ rows: [], rowCount: 0 }), connect: async () => { throw new Error('unused') } }) as unknown as W07WebhookPostgresPool },
     );
     expect(result).toEqual({ cycleId: '', outcome: 'NO_RENEWAL_CYCLE' });
   });
@@ -231,7 +285,7 @@ describe('D1-04 renewal outcome to D1-01 Subscription synchronization', () => {
   it('bounds the pending outcome reconciliation scan', async () => {
     const e = env();
     const result = await import('./subscription-renewal-outcome.js').then(({ syncPendingRenewalOutcomes }) =>
-      syncPendingRenewalOutcomes(e.value, { limit: 10 }, { now: () => new Date(NOW) }));
+      syncPendingRenewalOutcomes(e.value, { limit: 10 }, syncDependencies(e)));
     expect(result).toEqual({ scanned: 1, applied: 1, reconciliationRequired: 0, pendingRetry: 0 });
     expect(e.d1_04.pendingScanLimit).toBe(10);
   });
