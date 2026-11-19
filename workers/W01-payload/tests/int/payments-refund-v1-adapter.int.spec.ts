@@ -69,7 +69,7 @@ describe('public customer payment refund adapter', () => {
     expect(w07Persistence).toContain('FROM refunds WHERE customer_id = $1 AND idempotency_key = $2')
     expect(w07Persistence).toContain('INSERT INTO refunds')
     expect(w07Persistence).toContain('version = version + 1')
-    expect(w07Persistence).toContain('ON') // Native persistence uses explicit PostgreSQL conflict recovery.
+    expect(w07Persistence).toContain("errorCode(error) === '23505' || errorCode(error) === '23514'")
     expect(migration).toContain('UNIQUE (customer_id, idempotency_key)')
   })
 
