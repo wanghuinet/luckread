@@ -90,9 +90,12 @@ describe('public customer payment and billing history adapters', () => {
 
   it('creates invoice snapshots from D1-04 orders and receipts only after signed successful payment state', () => {
     expect(orderRuntime).toContain('issueInvoiceForOrderPostgres')
-    expect(orderRuntime).toContain("resolveW07DatabaseDriver(env) === 'neon'")
+    expect(orderRuntime).not.toContain('resolveW07DatabaseDriver')
+    expect(orderRuntime).not.toContain('D1Database')
+    expect(orderRuntime).toContain('getW07PaymentWebhookPostgresPool')
+    expect(orderRuntime).toContain('getCommerceOrderPostgres')
     expect(orderRuntime).toContain('await issueInvoice(pool, customerId, result.data.orderId)')
-    expect(orderRuntime).toContain('await issueInvoice(database!, customerId, result.data.orderId)')
+    expect(orderRuntime).not.toContain('issueInvoice(database!')
     expect(webhookRuntime).toContain('isSignedPaymentSucceededEvent(rawBody)')
     expect(webhookRuntime).toContain('issueReceiptForPaidPayment')
     expect(webhookRuntime).toContain('webhookDatabase = neonDatabase ?? env.D1_04')
