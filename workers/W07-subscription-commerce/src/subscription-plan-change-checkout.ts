@@ -1,5 +1,3 @@
-/// <reference types="@cloudflare/workers-types" />
-
 import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js';
 import {
   createCommerceOrder,
@@ -319,8 +317,8 @@ async function createOrReadOrder(
 /**
  * Creates an authoritative, prorated upgrade Order without mutating the Subscription.
  * Access changes only from the signed Hyperswitch success-webhook fulfillment path.
- * Financial facts remain in D1-04; D1-01 stores only the lifecycle reservation and
- * an opaque D1-04 order reference.
+ * Financial facts remain in the separate D1-04 Neon finance database; D1-01
+ * stores only the lifecycle reservation and an opaque D1-04 order reference.
  */
 export async function createSubscriptionPlanUpgradeCheckout(
   env: SubscriptionPlanUpgradeCheckoutEnv,
