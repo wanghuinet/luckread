@@ -119,7 +119,7 @@ async function requestHashes(input: Readonly<{
 const PAYMENT_COLUMNS =
   'payment_id, order_id, customer_id, provider, merchant_id, amount_minor::double precision AS amount_minor, ' +
   'currency, status, version::double precision AS version, idempotency_key, request_hash, ' +
-  "CASE WHEN provider_updated_at IS NULL THEN NULL ELSE to_char(provider_updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\\\"T\\\"HH24:MI:SS.MS\\\"Z\\\"') END AS provider_updated_at, " +
+  "CASE WHEN provider_updated_at IS NULL THEN NULL ELSE to_char(provider_updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') END AS provider_updated_at, " +
   'failure_code, to_char(created_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS created_at, ' +
   'to_char(updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS updated_at';
 
