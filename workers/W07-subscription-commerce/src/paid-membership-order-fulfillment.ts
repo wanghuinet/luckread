@@ -117,7 +117,7 @@ type FulfillmentDependencies = Readonly<{
 function selectedFulfillmentDatabases(
   env: FulfillmentEnv,
   dependencies: FulfillmentDependencies = {},
-): Readonly<{ finance: FulfillmentDatabase; membership: W07WebhookPostgresPool }> {
+): Readonly<{ finance: W07WebhookPostgresPool; membership: W07WebhookPostgresPool }> {
   const financePool = (dependencies.getFinancePostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
   const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
   if (!financePool || !membershipPool) {
