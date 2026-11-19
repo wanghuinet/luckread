@@ -11,7 +11,7 @@ import {
   type TrialEnv,
   type TrialPlanRow,
   type TrialSubscriptionRow,
-} from './subscription-trial-runtime.js'
+} from './subscription-trial-contract.js'
 
 type TrialPlanDbRow = TrialPlanRow & Record<string, unknown>
 type TrialSubscriptionDbRow = TrialSubscriptionRow & Record<string, unknown>
