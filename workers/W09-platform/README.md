@@ -23,7 +23,7 @@ W05/T14 has only the explicit self-service endpoint PUT/DELETE and owner-scoped 
 - Generator/template: `scripts/neon/generate-d1-03-w09-postgres-migration.mjs` and `scripts/neon/templates/d1-03-w09-platform-postgres.sql`.
 - Local PostgreSQL 18 rehearsal: `.github/workflows/neon-d1-03-w09-platform-postgres-rehearsal.yml`.
 
-The W06 `0001_audit_event.sql` file remains the legacy Cloudflare D1 compatibility migration source; it is fingerprinted/reconciled only and is never executed against Neon. The W09-owned `src/audit-event-postgres-adapter.ts` is the runtime SQL boundary used by W06's existing D1-03 PostgreSQL compatibility bridge when Neon is selected. It permits only AuditEvent `SELECT` and `INSERT`, preserves caller-owned batch transactions and D1 `changes()` ordering, and rejects UPDATE/DELETE/TRUNCATE/REPLACE operations. W06 keeps its existing Cloudflare D1 fallback; this adapter adds no Worker, service binding, or independent connection.
+The W06 `0001_audit_event.sql` file remains the legacy Cloudflare D1 compatibility migration source; it is fingerprinted/reconciled only and is never executed against Neon. The W09-owned `src/audit-event-postgres-adapter.ts` is the runtime SQL policy boundary reused by W06's remaining PostgreSQL compatibility bridge and its native Report write Store. It permits only AuditEvent `SELECT` and `INSERT`, preserves caller-owned transactions, and rejects UPDATE/DELETE/TRUNCATE/REPLACE operations. W06's other audit consumers retain their explicit compatibility path until separately migrated; this adapter adds no Worker, service binding, or independent connection.
 
 ## W09 logical-owner / schema-source reconciliation
 
