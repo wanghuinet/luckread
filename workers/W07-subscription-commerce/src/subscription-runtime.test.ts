@@ -26,7 +26,7 @@ describe('W07 Neon-only membership runtime contract', () => {
     expect(postgresPoolContract).toContain('W07WebhookPostgresPool');
     expect(postgresPoolContract).toContain('W07WebhookPostgresClient');
     expect(membershipRuntime).toContain("configured !== 'neon'");
-    expect(membershipRuntime).toContain('HYPERDRIVE_D1_01');
+    expect(membershipRuntime).toContain('HYPERDRIVE_MEMBERSHIP_DB');
   });
 
   it('keeps calendar-accurate monthly and yearly billing periods', () => {
