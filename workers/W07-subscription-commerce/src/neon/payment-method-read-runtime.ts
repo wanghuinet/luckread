@@ -90,6 +90,7 @@ export function getW07PaymentMethodReadStore(
   env: W07PaymentMethodReadRuntimeEnv,
   poolFactory: W07PoolFactory = (config) => new Pool(config),
 ): PaymentMethodReadStore {
+  resolveW07DatabaseDriver(env)
   const binding = env.HYPERDRIVE_D1_04
   if (!binding || typeof binding !== 'object') {
     throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
@@ -115,6 +116,7 @@ export function getW07RevenueCatWebhookReceiptStore(
   env: W07PaymentMethodReadRuntimeEnv,
   poolFactory: W07PoolFactory = (config) => new Pool(config),
 ): RevenueCatWebhookReceiptStore {
+  resolveW07DatabaseDriver(env)
   const binding = env.HYPERDRIVE_D1_04
   if (!binding || typeof binding !== 'object') {
     throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
@@ -153,6 +155,7 @@ export function getW07OrderCreatePersistenceStore(
   env: W07PaymentMethodReadRuntimeEnv,
   poolFactory: W07PoolFactory = (config) => new Pool(config),
 ): OrderCreatePersistenceStore {
+  resolveW07DatabaseDriver(env)
   const binding = env.HYPERDRIVE_D1_04
   if (!binding || typeof binding !== 'object') {
     throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
