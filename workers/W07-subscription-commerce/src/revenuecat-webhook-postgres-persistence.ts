@@ -5,7 +5,7 @@ import {
   type RevenueCatWebhookPersistenceDependencies,
   type RevenueCatWebhookReceiptResult,
   type RevenueCatWebhookReceiptStore,
-} from './revenuecat-webhook-persistence.js'
+} from './revenuecat-webhook-contracts.js'
 import type { RevenueCatWebhookEvent } from './revenuecat-webhook-signature.js'
 
 type ReceiptRow = Readonly<{ event_row_id: string; payload_sha256: string }>

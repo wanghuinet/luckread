@@ -15,7 +15,7 @@ import {
   RevenueCatWebhookPersistenceError,
   type RevenueCatWebhookReceiptResult,
   type RevenueCatWebhookReceiptStore,
-} from './revenuecat-webhook-persistence.js';
+} from './revenuecat-webhook-contracts.js';
 
 type RevenueCatWebhookRuntimeEnv = Omit<W07PaymentMethodReadRuntimeEnv, 'D1_04'> & Readonly<{
   REVENUECAT_WEBHOOK_AUTHORIZATION?: string | null;
