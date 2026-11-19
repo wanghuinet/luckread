@@ -143,7 +143,7 @@ describe('failed recurring payment recovery', () => {
       state: 'PREPARED', payment_id: null, provider_response_status: null, outcome_code: 'RETRY_PREPARED',
       subscription_sync_state: 'PENDING', subscription_sync_updated_at: null, version: 9,
     });
-    const replay = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW) });
+    const replay = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => f.membershipPool });
     expect(replay).toMatchObject({ state: 'PREPARED', action: 'TERMINAL' });
   });
 
@@ -159,12 +159,12 @@ describe('failed recurring payment recovery', () => {
       subscription_sync_state: 'PENDING',
       subscription_sync_updated_at: null,
     } });
-    expect(await prepareFailedRenewalCycleRetry(pendingSync.env, CYCLE_ID, { now: () => new Date(NOW) }))
+    expect(await prepareFailedRenewalCycleRetry(pendingSync.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => pendingSync.membershipPool }))
       .toMatchObject({ action: 'AWAITING_OUTCOME_SYNC' });
     expect(pendingSync.d1_04.cycle?.state).toBe('FAILED');
 
     const revokedMandate = setup({ activeMandate: false });
-    expect(await prepareFailedRenewalCycleRetry(revokedMandate.env, CYCLE_ID, { now: () => new Date(NOW) }))
+    expect(await prepareFailedRenewalCycleRetry(revokedMandate.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => revokedMandate.membershipPool }))
       .toMatchObject({ action: 'TERMINAL', state: 'FAILED' });
     expect(revokedMandate.d1_04.cycle?.state).toBe('FAILED');
   });
