@@ -27,18 +27,18 @@ interface W11AnalyticsDatabase {
 }
 
 /**
- * @deprecated-next-version
- * Reason: Analytics worker still consumes a D1-shaped database API even when entry.ts supplies a Neon-backed facade.
- * Replacement: PostgreSQL-native analytics ingestion and health/read repositories.
- * Removal: Next release.
- * Condition: Analytics health probes, ingestion batches, and schema checks use PostgreSQL-native SQL and transaction APIs.
+ * Legacy environment retained for the existing migration-only deployment profile.
+ * The logical D1-05 contract remains isolated from the separate Neon composition.
  */
 export interface W11Env {
-  /** Legacy binding retained for the existing migration-only deployment profile. */
-  D1_05?: W11AnalyticsDatabase
-  /** Neon production composition; when supplied, all persistence uses native PostgreSQL. */
-  W11_POSTGRES?: AnalyticsPostgresPool
+  D1_05: W11AnalyticsDatabase
 }
+
+export interface W11PostgresEnv {
+  W11_POSTGRES: AnalyticsPostgresPool
+}
+
+type W11RuntimeEnv = W11Env | W11PostgresEnv
 
 const REQUIRED_SCHEMA_OBJECTS = [
   { type: 'table', name: 'analytics_event_dedupe' },
@@ -220,7 +220,7 @@ async function readBoundedBody(request: Request): Promise<string | null> {
   return new TextDecoder('utf-8', { fatal: true }).decode(result)
 }
 
-async function ingestClientTelemetry(request: Request, env: W11Env): Promise<Response> {
+async function ingestClientTelemetry(request: Request, env: W11RuntimeEnv): Promise<Response> {
   const correlationId = request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
   if (
     request.headers.get('X-LuckRead-Caller') !== 'W01' ||
@@ -281,10 +281,12 @@ async function ingestClientTelemetry(request: Request, env: W11Env): Promise<Res
   }))
 
   try {
-    const result = env.W11_POSTGRES
-      ? await ingestAnalyticsBatchPostgres(env.W11_POSTGRES, events, { now })
-      : env.D1_05
-        ? await ingestAnalyticsBatch(env.D1_05, events, { now })
+    const postgres = 'W11_POSTGRES' in env ? env.W11_POSTGRES : undefined
+    const legacy = 'D1_05' in env ? env.D1_05 : undefined
+    const result = postgres
+      ? await ingestAnalyticsBatchPostgres(postgres, events, { now })
+      : legacy
+        ? await ingestAnalyticsBatch(legacy, events, { now })
         : (() => { throw new Error('W11 analytics database is not configured') })()
     return jsonResponse({
       data: {
@@ -307,7 +309,7 @@ async function ingestClientTelemetry(request: Request, env: W11Env): Promise<Res
 }
 
 const worker = {
-  async fetch(request: Request, env: W11Env): Promise<Response> {
+  async fetch(request: Request, env: W11RuntimeEnv): Promise<Response> {
     const url = new URL(request.url)
 
     if (url.pathname === '/internal/analytics/events') {
@@ -324,10 +326,12 @@ const worker = {
 
     if (url.pathname === '/healthz') {
       try {
-        const healthy = env.W11_POSTGRES
-          ? await checkAnalyticsPostgresHealth(env.W11_POSTGRES)
-          : env.D1_05
-            ? (await env.D1_05.prepare('SELECT 1 AS ok').first())?.ok === 1
+        const postgres = 'W11_POSTGRES' in env ? env.W11_POSTGRES : undefined
+        const legacy = 'D1_05' in env ? env.D1_05 : undefined
+        const healthy = postgres
+          ? await checkAnalyticsPostgresHealth(postgres)
+          : legacy
+            ? (await legacy.prepare('SELECT 1 AS ok').first())?.ok === 1
             : false
         if (!healthy) throw new Error('W11 analytics database health probe failed')
         return jsonResponse({ worker: 'W11', status: 'ok', database: 'reachable' })
@@ -337,10 +341,12 @@ const worker = {
     }
 
     try {
-      const schemaRows = env.W11_POSTGRES
-        ? await readAnalyticsPostgresSchemaObjects(env.W11_POSTGRES)
-        : env.D1_05
-          ? (await env.D1_05.prepare(ANALYTICS_SCHEMA_PROBE).all()).results ?? []
+      const postgres = 'W11_POSTGRES' in env ? env.W11_POSTGRES : undefined
+      const legacy = 'D1_05' in env ? env.D1_05 : undefined
+      const schemaRows = postgres
+        ? await readAnalyticsPostgresSchemaObjects(postgres)
+        : legacy
+          ? (await legacy.prepare(ANALYTICS_SCHEMA_PROBE).all()).results ?? []
           : []
       const found = new Set(schemaRows.map(({ type, name }) => `${type}:${name}`))
       const eventLedgerDefinition = schemaRows.find(
