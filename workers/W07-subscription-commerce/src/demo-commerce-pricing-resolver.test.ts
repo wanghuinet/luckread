@@ -36,7 +36,7 @@ const priced: AuthoritativelyPricedOrder = {
 function env(overrides: Partial<DemoCommercePricingEnv> = {}): DemoCommercePricingEnv {
   return {
     W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-    HYPERDRIVE_D1_01: { connectionString: 'postgresql://test.local/luckread' },
+    HYPERDRIVE_MEMBERSHIP_DB: { connectionString: 'postgresql://test.local/luckread' },
     COMMERCE_PRICING_MODE: 'demo',
     HYPERSWITCH_ENVIRONMENT: 'sandbox',
     COMMERCE_DEMO_TAX_PROVIDER: 'taxjar-sandbox',
