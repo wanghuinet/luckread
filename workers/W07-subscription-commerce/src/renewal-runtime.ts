@@ -132,6 +132,7 @@ export type RenewalRuntimeDependencies = Readonly<{
   getDatabase?: (env: RenewalRuntimeEnv) => D1Database;
   getFinancePostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool | undefined;
   getMembershipPostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool;
+  getRenewalCycleStore?: (env: RenewalRuntimeEnv) => RenewalCycleStore;
   getOrderCreateStore?: (env: RenewalRuntimeEnv) => OrderCreatePersistenceStore | undefined;
 }>;
 
@@ -756,7 +757,7 @@ export async function scanDueSubscriptionRenewals(
         cycle.subscription_sync_state === 'APPLIED' &&
         cycle.attempt_number < MAX_ATTEMPTS &&
         renewalRetryDue(cycle, now) &&
-        await isExactMandateActiveFromStore(getW07RenewalCycleStore(env), cycle)) {
+        await isExactMandateActiveFromStore(cycleStore, cycle)) {
         cycleIds.push(cycle.cycle_id);
       } else if (
         cycle.state === 'PREPARED' ||
@@ -972,6 +973,7 @@ async function prepareFailedCycleRetry(
   membershipStore: RenewalMembershipStore,
   cycle: RenewalCycleRow,
   now: string,
+  cycleStore: RenewalCycleStore = getW07RenewalCycleStore(env),
 ): Promise<FailedCycleRetryPreparation> {
   if (cycle.state !== 'FAILED') return 'TERMINAL';
   if (cycle.subscription_sync_state !== 'APPLIED') return 'AWAITING_OUTCOME_SYNC';
@@ -1015,16 +1017,17 @@ async function prepareFailedCycleRetry(
 
   const retryCutoff = new Date(Date.parse(now) - renewalRetryDelayMs(cycle.attempt_number)).toISOString();
   const updatedAt = strictlyAfter(now, cycle.updated_at);
-  const store = getW07RenewalCycleStore(env);
   let updated = false;
-  if (isPostgresRenewalCycleStore(store)) {
+  if (isPostgresRenewalCycleStore(cycleStore)) {
     try {
-      updated = await retryFailedRenewalCyclePostgres(store, cycle, updatedAt, retryCutoff, MAX_ATTEMPTS);
+      updated = await retryFailedRenewalCyclePostgres(cycleStore, cycle, updatedAt, retryCutoff, MAX_ATTEMPTS);
     } catch {
       throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
     }
   } else {
     try {
+      if (isPostgresRenewalCycleStore(cycleStore)) throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+      const store = cycleStore;
       const result = await store.prepare(
         "UPDATE subscription_renewal_cycles SET state = 'PREPARED', payment_id = NULL, " +
         "provider_response_status = NULL, outcome_code = 'RETRY_PREPARED', " +
@@ -1039,7 +1042,7 @@ async function prepareFailedCycleRetry(
     }
   }
   if (updated) return 'PREPARED';
-  const latest = await readCycleById(store, cycle.cycle_id);
+  const latest = await readCycleById(cycleStore, cycle.cycle_id);
   if (latest.state === 'PREPARED') return 'PREPARED';
   if (latest.state === 'FAILED' && latest.subscription_sync_state !== 'APPLIED') return 'AWAITING_OUTCOME_SYNC';
   return 'AWAITING_RETRY';
@@ -1053,18 +1056,19 @@ async function prepareFailedCycleRetry(
 export async function prepareFailedRenewalCycleRetry(
   env: RenewalRuntimeEnv,
   cycleIdInput: string,
-  dependencies: Pick<RenewalRuntimeDependencies, 'now' | 'getDatabase' | 'getMembershipPostgresPool'> = {},
+  dependencies: Pick<RenewalRuntimeDependencies, 'now' | 'getDatabase' | 'getMembershipPostgresPool' | 'getRenewalCycleStore'> = {},
 ): Promise<RenewalProcessResult> {
   env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
   if (!/^rcy_[A-Za-z0-9]{26}$/.test(cycleIdInput)) {
     throw new RenewalRuntimeError('VALIDATION_FAILED', 400);
   }
   const now = nowIso(dependencies.now ?? (() => new Date()));
-  const cycle = await readCycleById(getW07RenewalCycleStore(env), cycleIdInput);
+  const cycleStore = (dependencies.getRenewalCycleStore ?? getW07RenewalCycleStore)(env);
+  const cycle = await readCycleById(cycleStore, cycleIdInput);
   const membershipStore = getRenewalMembershipStore(env, dependencies);
-  const preparation = await prepareFailedCycleRetry(env, membershipStore, cycle, now);
+  const preparation = await prepareFailedCycleRetry(env, membershipStore, cycle, now, cycleStore);
   const latest = preparation === 'PREPARED'
-    ? await readCycleById(getW07RenewalCycleStore(env), cycleIdInput)
+    ? await readCycleById(cycleStore, cycleIdInput)
     : cycle;
   const action = preparation === 'PREPARED'
     ? 'PREPARED'
