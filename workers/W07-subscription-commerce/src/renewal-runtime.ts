@@ -37,7 +37,7 @@ import {
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
 import type { OrderCreatePersistenceStore } from './order-persistence.js';
-import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
+import { getW07MembershipPostgresPool, type W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import { readRenewalPaymentAttemptPostgres, type RenewalPaymentAttemptRow } from './renewal-payment-postgres.js';
 import {
