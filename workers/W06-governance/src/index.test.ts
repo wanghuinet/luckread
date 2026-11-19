@@ -1,5 +1,89 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AuditEvent } from './audit-event'
+import type { AuditEventStore } from './audit-event-store.js'
+
+const { auditEventStoresByDatabase } = vi.hoisted(() => ({
+  auditEventStoresByDatabase: new WeakMap<object, unknown>(),
+}))
+
+vi.mock('./neon/moderation-database-runtime.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./neon/moderation-database-runtime.js')>()
+  return {
+    ...actual,
+    getW06AuditEventStore: (env: { D1_03?: D1Database }) => {
+      const database = env.D1_03 as object | undefined
+      const store = database ? auditEventStoresByDatabase.get(database) : undefined
+      if (!store) throw new Error('AUDIT_EVENT_TEST_STORE_NOT_REGISTERED')
+      return store as AuditEventStore
+    },
+  }
+})
+
+function registerAuditEventStoreTestDouble(database: D1Database): AuditEventStore {
+  const key = database as object
+  const existing = auditEventStoresByDatabase.get(key)
+  if (existing) return existing as AuditEventStore
+
+  const store: AuditEventStore = {
+    async findByEventId(eventId) {
+      const row = await database.prepare(
+        'SELECT event_id, request_id, trace_id, actor_json, action, target_type, target_id, before_json, after_json, reason, ip, user_agent, occurred_at FROM audit_events WHERE event_id = ? LIMIT 1',
+      ).bind(eventId).first<{
+        event_id: string
+        request_id: string | null
+        trace_id: string | null
+        actor_json: string
+        action: string
+        target_type: string
+        target_id: string
+        before_json: string
+        after_json: string
+        reason: string | null
+        ip: string | null
+        user_agent: string | null
+        occurred_at: string
+      }>()
+      if (!row) return null
+      return {
+        eventId: row.event_id,
+        ...(row.request_id !== null ? { requestId: row.request_id } : {}),
+        ...(row.trace_id !== null ? { traceId: row.trace_id } : {}),
+        actor: JSON.parse(row.actor_json),
+        action: row.action,
+        targetType: row.target_type,
+        targetId: row.target_id,
+        before: JSON.parse(row.before_json),
+        after: JSON.parse(row.after_json),
+        ...(row.reason !== null ? { reason: row.reason } : {}),
+        ...(row.ip !== null ? { ip: row.ip } : {}),
+        ...(row.user_agent !== null ? { userAgent: row.user_agent } : {}),
+        occurredAt: row.occurred_at,
+      }
+    },
+    async append(event) {
+      const result = await database.prepare(
+        'INSERT INTO audit_events (event_id, request_id, trace_id, actor_json, action, target_type, target_id, before_json, after_json, reason, ip, user_agent, occurred_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      ).bind(
+        event.eventId,
+        event.requestId ?? null,
+        event.traceId ?? null,
+        JSON.stringify(event.actor),
+        event.action,
+        event.targetType,
+        event.targetId,
+        JSON.stringify(event.before),
+        JSON.stringify(event.after),
+        event.reason ?? null,
+        event.ip ?? null,
+        event.userAgent ?? null,
+        event.occurredAt,
+      ).run()
+      if (!result.success) throw new Error('AUDIT_EVENT_PERSISTENCE_FAILED')
+    },
+  }
+  auditEventStoresByDatabase.set(key, store)
+  return store
+}
 
 const eventInput = {
   eventId: 'evt-runtime-1',
@@ -19,10 +103,13 @@ const eventInput = {
   reason: 'verification completed',
 }
 
-const legacyD1TestEnv = (database: D1Database) => ({
-  D1_03: database,
-  W06_MODERATION_DATABASE_DRIVER: 'd1' as const,
-})
+const legacyD1TestEnv = (database: D1Database) => {
+  registerAuditEventStoreTestDouble(database)
+  return {
+    D1_03: database,
+    W06_MODERATION_DATABASE_DRIVER: 'd1' as const,
+  }
+}
 
 function createDb(success = true) {
   const run = vi.fn().mockResolvedValue({ success })
