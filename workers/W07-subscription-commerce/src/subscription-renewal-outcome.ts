@@ -359,9 +359,9 @@ async function applySubscriptionUpdate(
 }
 
 /**
- * Applies a terminal W07 D1-04 renewal result to the authoritative D1-01
- * Subscription row. No Entitlement copy or payment/order facts are written to
- * D1-01. The D1-04 marker makes cross-database synchronization retryable.
+ * Applies a terminal Neon finance renewal result to the authoritative membership
+ * Subscription row. Payment/order facts stay in the finance database; the finance
+ * sync marker makes cross-database synchronization retryable.
  */
 export async function syncTerminalRenewalCycleToSubscription(
   env: OutcomeSyncEnv, cycleIdInput: string, dependencies: RenewalOutcomeSyncDependencies = {},
