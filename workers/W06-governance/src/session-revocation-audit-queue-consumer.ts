@@ -93,6 +93,12 @@ function sameRecord(actual: Record<string, unknown>, expected: Record<string, un
     actualKeys.every((key, index) => key === expectedKeys[index] && actual[key] === expected[key])
 }
 
+function sameTimestampAtJavaScriptPrecision(left: string, right: string): boolean {
+  const leftMilliseconds = Date.parse(left)
+  const rightMilliseconds = Date.parse(right)
+  return Number.isFinite(leftMilliseconds) && leftMilliseconds === rightMilliseconds
+}
+
 function matchesPersisted(existing: AuditEvent, event: SessionRevokedAuditEvent): boolean {
   return existing.eventId === event.eventId &&
     existing.requestId === event.correlationId &&
@@ -101,7 +107,7 @@ function matchesPersisted(existing: AuditEvent, event: SessionRevokedAuditEvent)
     existing.targetType === 'Session' &&
     existing.targetId === event.resourceId &&
     existing.reason === event.payload.reasonCode &&
-    existing.occurredAt === event.occurredAt &&
+    sameTimestampAtJavaScriptPrecision(existing.occurredAt, event.occurredAt) &&
     sameRecord(existing.actor as unknown as Record<string, unknown>, { actorId: event.actor.actorId, actorType: 'user' }) &&
     sameRecord(existing.before, { status: 'ACTIVE' }) &&
     sameRecord(existing.after, { status: 'REVOKED' })
