@@ -184,7 +184,7 @@ try {
   assert.equal(reportAudit.action, 'moderation.report.created')
   checks.moderationReportWrittenWithAudit = true
 
-  const reportReplay = await createReport(db, reportInput)
+  const reportReplay = await createReport(reportStore, reportInput)
   assert.deepEqual(reportReplay, report)
   const reportRows = await db.prepare(
     'SELECT count(*) AS count FROM moderation_reports WHERE report_id = ?',
