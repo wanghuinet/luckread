@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import { runRenewalScheduledBatch, type RenewalScheduledDependencies } from './renewal-scheduler.js';
 import {
   processSubscriptionRenewalCycle,
@@ -78,11 +79,11 @@ describe('renewal cycle runtime', () => {
     const db = { prepare: () => statement } as unknown as D1Database;
     const env: RenewalRuntimeEnv = {
       W07_DATABASE_DRIVER: 'd1',
-      W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
-      D1_01: db,
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
       D1_04: db,
     };
     const result = await processSubscriptionRenewalCycle(env, cycle.cycle_id, {
+      getMembershipPostgresPool: () => ({ query: async () => ({ rows: [], rowCount: 0 }), connect: async () => { throw new Error('unused') } }) as unknown as W07WebhookPostgresPool,
       createProviderCharge: async () => {
         providerCalled = true;
         throw new Error('must not call provider');
@@ -149,6 +150,35 @@ const makeScanSubscription = (overrides: Partial<ScanSubscription> = {}): ScanSu
 });
 
 const d1Result = (changes: number): D1Result => ({ success: true, meta: { changes } }) as D1Result;
+
+function membershipPoolFor(database: ScanDatabase): W07WebhookPostgresPool {
+  return {
+    async query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string, values: unknown[] = []) {
+      if (sql.includes('FROM membership_subscription_scheduled_plan_changes')) {
+        return { rows: [] as Row[], rowCount: 0 };
+      }
+      if (!sql.includes('FROM membership_subscriptions s')) {
+        throw new Error('Unexpected Neon D1-01 query: ' + sql);
+      }
+      database.allCalls += 1;
+      if (database.failSubscriptionScan) throw new Error('simulated Neon D1-01 scan failure');
+      const [now, cursorPeriod, cursorSubscription, limit] = values as [string, string | null, string | null, number];
+      const results = database.subscriptions
+        .filter((row) => ['TRIALING', 'ACTIVE', 'PAST_DUE'].includes(row.status))
+        .filter((row) => row.current_period_end <= now)
+        .filter((row) => row.cancel_at === null || row.cancel_at > row.current_period_end)
+        .filter((row) => cursorPeriod === null ||
+          row.current_period_end > cursorPeriod ||
+          (row.current_period_end === cursorPeriod && row.subscription_id > String(cursorSubscription)))
+        .sort((a, b) => a.current_period_end.localeCompare(b.current_period_end) ||
+          a.subscription_id.localeCompare(b.subscription_id))
+        .slice(0, Number(limit))
+        .map((row) => ({ ...row, trial_started_at: null, trial_ends_at: null }));
+      return { rows: structuredClone(results) as unknown as Row[], rowCount: results.length };
+    },
+    async connect() { throw new Error('membership scan pool does not use transactions'); },
+  };
+}
 
 class ScanStatement {
   private values: unknown[] = [];
@@ -304,20 +334,21 @@ function scannerSetup(options: {
   if (options.missingCursor) d1_04.cursor = null;
   const env: RenewalRuntimeEnv = {
     W07_DATABASE_DRIVER: 'd1',
-    W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
-    D1_01: d1_01 as unknown as D1Database,
+    W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
     D1_04: d1_04 as unknown as D1Database,
     HYPERSWITCH_ENVIRONMENT: 'sandbox',
     HYPERSWITCH_API_KEY: 'test-api-key',
     HYPERSWITCH_MERCHANT_ID: 'merchant_test',
   };
+  const membershipPool = membershipPoolFor(d1_01);
   const dependencies = {
     now: () => new Date(SCAN_NOW),
+    getMembershipPostgresPool: () => membershipPool,
     // The scan only needs to know that the pricing authority has been admitted.
     // If the scanner tries to price anything directly, the test must fail.
     resolvePricing: async () => { throw new Error('scan must not invoke pricing'); },
   };
-  return { env, d1_01, d1_04, dependencies };
+  return { env, d1_01, d1_04, membershipPool, dependencies };
 }
 
 describe('due subscription renewal scan', () => {
@@ -389,20 +420,20 @@ describe('W07 scheduled renewal batch', () => {
   const syncResult = { scanned: 0, applied: 0, reconciliationRequired: 0, pendingRetry: 0 };
 
   function scheduledSetup(missing: string[] = []) {
-    const d1_01 = { marker: 'D1-01' } as unknown as D1Database;
+    const membershipPool = { query: async () => ({ rows: [], rowCount: 0 }), connect: async () => { throw new Error('unused') } } as unknown as W07WebhookPostgresPool;
     const d1_04 = { marker: 'D1-04' } as unknown as D1Database;
     const env: RenewalRuntimeEnv = {
       W07_DATABASE_DRIVER: 'd1',
-      W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
-      D1_01: d1_01, D1_04: d1_04,
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+      D1_04: d1_04,
       HYPERSWITCH_ENVIRONMENT: 'sandbox',
       HYPERSWITCH_API_KEY: 'test',
       HYPERSWITCH_MERCHANT_ID: 'merchant_test',
     };
     const readTableNames = vi.fn(async (db: D1Database, expected: readonly string[]) =>
-      new Set(expected.filter((name) =>
-        !(db === d1_04 && missing.includes('D1-04.' + name)) &&
-        !(db === d1_01 && missing.includes('D1-01.' + name)))));
+      new Set(expected.filter((name) => !(db === d1_04 && missing.includes('D1-04.' + name)))));
+    const readMembershipTableNames = vi.fn(async (_pool: W07WebhookPostgresPool, expected: readonly string[]) =>
+      new Set(expected.filter((name) => !missing.includes('D1-01.' + name))));
     const syncPending = vi.fn(async () => syncResult);
     const scanDue = vi.fn(async () => ({
       scanned: 2,
@@ -415,8 +446,8 @@ describe('W07 scheduled renewal batch', () => {
       state: 'PREPARED' as const,
       action: 'PREPARED' as const,
     }));
-    const dependencies: RenewalScheduledDependencies = { readTableNames, syncPending, scanDue, processCycle };
-    return { env, dependencies, readTableNames, syncPending, scanDue, processCycle };
+    const dependencies: RenewalScheduledDependencies = { readTableNames, readMembershipTableNames, getMembershipPostgresPool: () => membershipPool, syncPending, scanDue, processCycle };
+    return { env, dependencies, readTableNames, readMembershipTableNames, syncPending, scanDue, processCycle };
   }
 
   it('does not access renewal rows until the D1 schemas are ready', async () => {
