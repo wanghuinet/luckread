@@ -90,6 +90,18 @@ describe('AUTH-007 W06 MFA audit queue consumer', () => {
     expect(append).not.toHaveBeenCalled()
   })
 
+  it('deduplicates timestamps with PostgreSQL microseconds beyond JavaScript Date precision', async () => {
+    const microsecondEvent = {
+      ...event,
+      occurredAt: '2026-10-24T14:00:00.123456Z',
+    }
+    const existing = storedEvent({ occurredAt: '2026-10-24T14:00:00.123Z' })
+    const { store, append } = createStore(existing)
+
+    await expect(consumeMfaAuditEvent(store, microsecondEvent)).resolves.toBe('duplicate')
+    expect(append).not.toHaveBeenCalled()
+  })
+
   it('rejects a reused eventId whose action or target user differs', async () => {
     const wrongAction = createStore(storedEvent({ action: 'auth.mfa.factor_disabled' }))
     await expect(consumeMfaAuditEvent(wrongAction.store, event))
