@@ -12,10 +12,8 @@ import {
   syncPendingRenewalOutcomes,
   type RenewalOutcomeSyncResult,
 } from './subscription-renewal-outcome.js';
-import {
-  getW07PaymentWebhookPostgresPool,
-  getW07SelectedD104Database,
-} from './neon/payment-method-read-runtime.js';
+import { getW07PaymentWebhookPostgresPool } from './neon/payment-method-read-runtime.js';
+import { getW07RenewalCycleStore, type RenewalCycleStore } from './renewal-cycle-postgres.js';
 import { getW07MembershipPostgresPool } from './neon/membership-database-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
@@ -67,7 +65,7 @@ export type RenewalScheduledDependencies = Readonly<{
   readMembershipTableNames?: (db: W07WebhookPostgresPool, expected: readonly string[]) => Promise<Set<string>>;
   getMembershipPostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool;
   getFinancePostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool | undefined;
-  getDatabase?: (env: RenewalRuntimeEnv) => D1Database;
+  getRenewalCycleStore?: (env: RenewalRuntimeEnv) => RenewalCycleStore;
   syncPending?: typeof syncPendingRenewalOutcomes;
   scanDue?: typeof scanDueSubscriptionRenewals;
   processCycle?: typeof processSubscriptionRenewalCycle;
@@ -105,7 +103,7 @@ async function readMembershipTableNames(
  * Bounded renewal batch for existing W07 state, invoked by the admitted W10 async runtime.
  *
  * The schema preflight prevents a newly deployed Cron trigger from repeatedly
- * querying a D1-04 candidate migration that has not been applied. New cycles
+ * querying an incomplete Neon finance schema. New cycles
  * remain AWAITING_PRICING unless a real pricing/tax decision is explicitly
  * wired into the runtime; this scheduler never invents a price or tax result.
  */
@@ -114,13 +112,13 @@ export async function runRenewalScheduledBatch(
   dependencies: RenewalScheduledDependencies = {},
 ): Promise<RenewalScheduledBatchResult> {
   const getFinanceTableNames = dependencies.readFinanceTableNames ?? readFinanceTableNames;
-  const selectedD104 = (dependencies.getDatabase ?? getW07SelectedD104Database)(env);
-  const selectedEnv: RenewalRuntimeEnv = { ...env, D1_04: selectedD104 };
+  const selectedEnv = env;
+  const selectedCycleStore = (dependencies.getRenewalCycleStore ?? getW07RenewalCycleStore)(env);
   const selectedFinancePool = (dependencies.getFinancePostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
   if (!selectedFinancePool) {
     return { status: 'SCHEMA_NOT_READY', reason: 'SCHEMA_PROBE_FAILED', missingTables: [] };
   }
-  const getSelectedDatabase = () => selectedD104;
+  const getSelectedCycleStore = () => selectedCycleStore;
   const getSelectedFinancePool = () => selectedFinancePool;
   const getSelectedMembershipPool = () => membershipPool;
   let membershipPool: W07WebhookPostgresPool;
@@ -155,7 +153,7 @@ export async function runRenewalScheduledBatch(
   try {
     beforeRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getFinancePostgresPool: getSelectedFinancePool, getMembershipPostgresPool: getSelectedMembershipPool });
   } catch {
-    // Do not start new provider-side work when prior cross-D1 outcome recovery
+    // Do not start new provider-side work when prior finance-to-membership outcome recovery
     // is failing. The next Cron tick can retry the bounded reconciliation.
     return { status: 'PARTIAL', phase: 'OUTCOME_SYNC_BEFORE' };
   }
@@ -174,8 +172,8 @@ export async function runRenewalScheduledBatch(
   let dueScan: RenewalScanResult;
   try {
     dueScan = dependencies.resolvePricing
-      ? await scanDue(selectedEnv, { limit: maxCycles }, { resolvePricing: dependencies.resolvePricing, getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool })
-      : await scanDue(selectedEnv, { limit: maxCycles }, { getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool });
+      ? await scanDue(selectedEnv, { limit: maxCycles }, { resolvePricing: dependencies.resolvePricing, getRenewalCycleStore: getSelectedCycleStore, getMembershipPostgresPool: getSelectedMembershipPool })
+      : await scanDue(selectedEnv, { limit: maxCycles }, { getRenewalCycleStore: getSelectedCycleStore, getMembershipPostgresPool: getSelectedMembershipPool });
   } catch {
     return { status: 'PARTIAL', phase: 'DUE_SCAN' };
   }
@@ -185,8 +183,8 @@ export async function runRenewalScheduledBatch(
   for (const cycleId of dueScan.cycleIds.slice(0, maxCycles)) {
     try {
       cycleResults.push(dependencies.resolvePricing
-        ? await processCycle(selectedEnv, cycleId, { resolvePricing: dependencies.resolvePricing, getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool })
-        : await processCycle(selectedEnv, cycleId, { getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool }));
+        ? await processCycle(selectedEnv, cycleId, { resolvePricing: dependencies.resolvePricing, getRenewalCycleStore: getSelectedCycleStore, getMembershipPostgresPool: getSelectedMembershipPool })
+        : await processCycle(selectedEnv, cycleId, { getRenewalCycleStore: getSelectedCycleStore, getMembershipPostgresPool: getSelectedMembershipPool }));
     } catch (error) {
       processFailures += 1;
       console.error(JSON.stringify({
