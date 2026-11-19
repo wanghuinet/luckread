@@ -60,10 +60,7 @@ export type RenewalCycleStore = W07WebhookPostgresPool
 
 export type RenewalCycleRuntimeEnv = W07PaymentMethodReadRuntimeEnv
 
-/**
- * Renewal-cycle state is Neon PostgreSQL-only. Legacy D1 mode is never
- * selected by scheduler or renewal processing.
- */
+/** Renewal-cycle state is stored in the Neon finance PostgreSQL database. */
 export function getW07RenewalCycleStore(env: RenewalCycleRuntimeEnv): RenewalCycleStore {
   try {
     const pool = getW07PaymentWebhookPostgresPool(env)
