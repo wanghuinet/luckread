@@ -110,7 +110,7 @@ describe('shared Demo commerce pricing resolver', () => {
 
     expect(result).toEqual(priced);
     expect(resolveItems).toHaveBeenCalledTimes(1);
-    expect(resolveItems).toHaveBeenCalledWith(d1, input);
+    expect(resolveItems).toHaveBeenCalledWith(membershipPool, input);
     expect(resolveItems).not.toHaveBeenCalledWith(membershipPool, renewalInput);
   });
 });
