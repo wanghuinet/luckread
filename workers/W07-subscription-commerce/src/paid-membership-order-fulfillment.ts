@@ -78,7 +78,7 @@ export class PaidMembershipPurchaseFulfillmentError extends Error {
   }
 }
 
-type FulfillmentEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{ D1_01: D1Database; D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>;
+type FulfillmentEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{ D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>;
 type SubscriptionPlanUpgradeSnapshot = Readonly<{
   kind: 'PLAN_UPGRADE';
   attemptId: string;
@@ -122,12 +122,13 @@ type FulfillmentDependencies = Readonly<{
 function selectedFulfillmentDatabases(
   env: FulfillmentEnv,
   dependencies: FulfillmentDependencies = {},
-): Readonly<{ finance: FulfillmentDatabase; membership: FulfillmentDatabase }> {
+): Readonly<{ finance: FulfillmentDatabase; membership: W07WebhookPostgresPool }> {
   const financePool = (dependencies.getFinancePostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
   const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
+  if (!membershipPool) throw new PaidMembershipPurchaseFulfillmentError('SERVICE_UNAVAILABLE', 503);
   return {
     finance: financePool ?? getW07SelectedD104Database(env),
-    membership: membershipPool ?? env.D1_01,
+    membership: membershipPool,
   };
 }
 
