@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js'
 import { SubscriptionRuntimeError } from './subscription-runtime.js'
 import { startSubscriptionTrialPostgres } from './subscription-trial-postgres.js'
-import { trialSubscriptionId, type TrialSubscriptionRow } from './subscription-trial-runtime.js'
+import { trialSubscriptionId, type TrialSubscriptionRow } from './subscription-trial-contract.js'
 
 const subscriberId = 'user_01'
 const creatorId = 'creator_01'
@@ -78,7 +78,6 @@ function environment(auditStatus = 201) {
   })
   return {
     env: {
-      D1_01: {} as D1Database,
       W06_GOVERNANCE: { fetch } as unknown as Fetcher,
     },
     fetch,
