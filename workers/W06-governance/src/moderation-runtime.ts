@@ -586,7 +586,7 @@ export async function decideModerationCase(
       expiresAt: input.expiresAt,
     })
     const now = new Date().toISOString()
-    let committed
+    let committed: Awaited<ReturnType<ModerationDecisionWriteStore['commit']>>
     try {
       committed = await db.commit({
         reviewerId: input.reviewerId,
