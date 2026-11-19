@@ -4,8 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import entry from './entry.js'
 import {
-  closeW11AnalyticsPostgresDatabaseForTest,
-  getW11AnalyticsPostgresDatabase,
+  closeW11AnalyticsPostgresPoolForTest,
+  getW11AnalyticsPostgresPool,
   type W11AnalyticsHyperdriveBinding,
 } from './analytics-postgres-runtime.js'
 
@@ -37,11 +37,11 @@ postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
     const hyperdriveBinding = { connectionString }
     binding = hyperdriveBinding
     // Resolve through the exact Hyperdrive runtime path used by the Neon entry.
-    getW11AnalyticsPostgresDatabase(hyperdriveBinding)
+    getW11AnalyticsPostgresPool(hyperdriveBinding)
   })
 
   afterAll(async () => {
-    if (binding) await closeW11AnalyticsPostgresDatabaseForTest(binding)
+    if (binding) await closeW11AnalyticsPostgresPoolForTest(binding)
     await pool?.end()
   })
 
@@ -239,15 +239,22 @@ postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
     )
     expect(aggregateAfterDuplicate.rows).toEqual([{ opens: 1 }])
 
-    const database = getW11AnalyticsPostgresDatabase(hyperdriveBinding)
-    await expect(database.batch([
-      database.prepare(
-        'INSERT INTO analytics_rollup_watermark (consumer_name) VALUES (?)',
-      ).bind('w11_pg18_rollback_probe'),
-      database.prepare(
-        'INSERT INTO analytics_rollup_watermark (consumer_name) VALUES (?)',
-      ).bind('w11_pg18_rollback_probe'),
-    ])).rejects.toThrow()
+    const runtimePool = getW11AnalyticsPostgresPool(hyperdriveBinding)
+    const client = await runtimePool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query(
+        'INSERT INTO analytics_rollup_watermark (consumer_name) VALUES ($1)',
+        ['w11_pg18_rollback_probe'],
+      )
+      await expect(client.query(
+        'INSERT INTO analytics_rollup_watermark (consumer_name) VALUES ($1)',
+        ['w11_pg18_rollback_probe'],
+      )).rejects.toThrow()
+      await client.query('ROLLBACK')
+    } finally {
+      client.release()
+    }
 
     const rollbackProbe = await pool.query<{ count: string }>(
       'SELECT count(*)::text AS count FROM analytics_rollup_watermark WHERE consumer_name = $1',
