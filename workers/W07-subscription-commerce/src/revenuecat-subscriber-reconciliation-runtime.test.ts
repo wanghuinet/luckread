@@ -55,7 +55,7 @@ const request = (overrides: {
 
 const env = (): RevenueCatSubscriberReconciliationRuntimeEnv => ({
   W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-  HYPERDRIVE_D1_01: { connectionString: 'postgresql://test.local/luckread' },
+  HYPERDRIVE_MEMBERSHIP_DB: { connectionString: 'postgresql://test.local/luckread' },
   REVENUECAT_SECRET_API_KEY: 'sk_server_only_secret',
   REVENUECAT_ALLOWED_APP_IDS: APP_ID + ',luckread-android-production',
 });

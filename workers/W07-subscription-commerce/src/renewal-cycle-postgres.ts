@@ -58,7 +58,7 @@ export type RenewalCursorRow = {
 
 export type RenewalCycleStore = W07WebhookPostgresPool
 
-export type RenewalCycleRuntimeEnv = Omit<W07PaymentMethodReadRuntimeEnv, 'D1_04'>
+export type RenewalCycleRuntimeEnv = W07PaymentMethodReadRuntimeEnv
 
 /**
  * Renewal-cycle state is Neon PostgreSQL-only. Legacy D1 mode is never

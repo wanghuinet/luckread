@@ -17,7 +17,7 @@ import {
   type RevenueCatWebhookReceiptStore,
 } from './revenuecat-webhook-contracts.js';
 
-type RevenueCatWebhookRuntimeEnv = Omit<W07PaymentMethodReadRuntimeEnv, 'D1_04'> & Readonly<{
+type RevenueCatWebhookRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
   REVENUECAT_WEBHOOK_AUTHORIZATION?: string | null;
   REVENUECAT_WEBHOOK_SIGNING_SECRET?: string | null;
   REVENUECAT_ALLOWED_APP_IDS?: string | null;

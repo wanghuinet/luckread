@@ -5,7 +5,7 @@ import { SubscriptionRuntimeError } from '../subscription-runtime.js'
 
 export type W07MembershipDatabaseRuntimeEnv = Readonly<{
   W07_MEMBERSHIP_DATABASE_DRIVER?: string
-  HYPERDRIVE_D1_01?: Readonly<{ connectionString?: string }>
+  HYPERDRIVE_MEMBERSHIP_DB?: Readonly<{ connectionString?: string }>
 }>
 
 type W07MembershipPoolFactory = (config: PoolConfig) => Pool
@@ -50,7 +50,7 @@ function getOrCreateW07MembershipPostgresPool(
   env: W07MembershipDatabaseRuntimeEnv,
   poolFactory: W07MembershipPoolFactory,
 ): Pool {
-  const binding = env.HYPERDRIVE_D1_01
+  const binding = env.HYPERDRIVE_MEMBERSHIP_DB
   if (!binding || typeof binding !== 'object') {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
   }

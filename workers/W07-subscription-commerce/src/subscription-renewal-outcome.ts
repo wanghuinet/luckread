@@ -92,7 +92,7 @@ export type RenewalOutcomeSyncDependencies = Readonly<{
   getMembershipPostgresPool?: (env: OutcomeSyncEnv) => W07WebhookPostgresPool | undefined;
 }>;
 type OutcomeSyncEnv =
-  Pick<W07PaymentMethodReadRuntimeEnv, 'W07_DATABASE_DRIVER' | 'HYPERDRIVE_D1_04'> &
+  Pick<W07PaymentMethodReadRuntimeEnv, 'W07_DATABASE_DRIVER' | 'HYPERDRIVE_FINANCE_DB'> &
   W07MembershipDatabaseRuntimeEnv &
   Readonly<{ W06_GOVERNANCE?: Fetcher }>;
 

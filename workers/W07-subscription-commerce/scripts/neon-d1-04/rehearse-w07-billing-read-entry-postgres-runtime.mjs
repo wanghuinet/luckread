@@ -243,7 +243,7 @@ try {
   env = {
     W07_DATABASE_DRIVER: 'neon',
     W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-    HYPERDRIVE_D1_04: hyperdriveBinding,
+    HYPERDRIVE_FINANCE_DB: hyperdriveBinding,
     D1_01: d1Sentinel,
     D1_04: d1Sentinel,
     SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowRateLimit,

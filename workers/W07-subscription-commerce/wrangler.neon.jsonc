@@ -46,11 +46,11 @@
   ],
   "hyperdrive": [
     {
-      "binding": "HYPERDRIVE_D1_04",
+      "binding": "HYPERDRIVE_FINANCE_DB",
       "id": "3ae15e6dfb5e4b44979eee30e1d5ede4"
     },
     {
-      "binding": "HYPERDRIVE_D1_01",
+      "binding": "HYPERDRIVE_MEMBERSHIP_DB",
       "id": "0c53a1bb9bc0484bac146e8ae2d3158b"
     }
   ]

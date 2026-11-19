@@ -76,7 +76,7 @@ export class PaidMembershipPurchaseFulfillmentError extends Error {
 }
 
 type FulfillmentEnv =
-  Pick<W07PaymentMethodReadRuntimeEnv, 'W07_DATABASE_DRIVER' | 'HYPERDRIVE_D1_04'> &
+  Pick<W07PaymentMethodReadRuntimeEnv, 'W07_DATABASE_DRIVER' | 'HYPERDRIVE_FINANCE_DB'> &
   W07MembershipDatabaseRuntimeEnv &
   Readonly<{ W06_GOVERNANCE?: Fetcher }>;
 type SubscriptionPlanUpgradeSnapshot = Readonly<{

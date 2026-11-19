@@ -41,8 +41,8 @@ jobs:
           const d101SourceUuid = boundary.physicalD1Registry?.['D1-01']
           const d104SourceUuid = financeSource.target?.cloudflareD1DatabaseUuid
           const financeSources = financeSource.scope?.includedSourceMigrations || []
-          const h101 = (config.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_01')
-          const h104 = (config.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_04')
+          const h101 = (config.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_MEMBERSHIP_DB')
+          const h104 = (config.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_FINANCE_DB')
           const domain101 = (bootstrap.domains || []).find(x => x.domainId === 'D1-01')
           const domain104 = (bootstrap.domains || []).find(x => x.domainId === 'D1-04')
           const governance = (config.services || []).find(x => x.binding === 'W06_GOVERNANCE')

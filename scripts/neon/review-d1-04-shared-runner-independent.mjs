@@ -63,34 +63,17 @@ const templatePaths = [
   'workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-refunds-billing-documents-postgres.sql',
   'workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-payment-method-revocation-postgres.sql',
 ]
-const reviewedHyperdriveStagingSuffixes = Object.freeze({
-  [paths.wrangler]: ',\n  "hyperdrive": [\n    {\n      "binding": "HYPERDRIVE_D1_04",\n      "id": "3ae15e6dfb5e4b44979eee30e1d5ede4"\n    }\n  ]\n}\n',
-})
-
 function reviewedPinnedSource(pin, source) {
   if (gitBlobSha1(source) === pin.gitBlobSha1) return source
-  let normalized = source
   if (pin.path === paths.wrangler) {
-    normalized = normalized.replace(
-      /  "compatibility_flags":\s*\[\s*"nodejs_compat"\s*\],\r?\n/,
-      '',
-    )
-    normalized = normalized.replace(
-      /    "MEMBERSHIP_RENEWAL_ENABLED": "false",\r?\n    "W07_DATABASE_DRIVER": "(?:d1|neon)",?\r?\n    "W07_MEMBERSHIP_DATABASE_DRIVER": "neon"\r?\n/,
-      '    "MEMBERSHIP_RENEWAL_ENABLED": "false"\n',
-    )
-    normalized = normalized.replace(
-      /,\r?\n    \{\r?\n      "binding": "HYPERDRIVE_D1_01",\r?\n      "id": "0c53a1bb9bc0484bac146e8ae2d3158b"\r?\n    \}(?=\r?\n  \]\r?\n\}\r?\n$)/,
-      '',
-    )
-  }
-  const suffix = reviewedHyperdriveStagingSuffixes[pin.path]
-  if (suffix && normalized.endsWith(suffix)) {
-    return normalized.slice(0, -suffix.length) + '\n}\n'
+    // The only expected difference from the independently reviewed snapshot
+    // is the semantic rename of the two Neon Hyperdrive binding aliases.
+    return source
+      .replaceAll('"binding": "HYPERDRIVE_MEMBERSHIP_DB"', '"binding": "HYPERDRIVE_D1_01"')
+      .replaceAll('"binding": "HYPERDRIVE_FINANCE_DB"', '"binding": "HYPERDRIVE_D1_04"')
   }
   return source
 }
-
 const expectedIds = [
   'd1-04-w07-order-payment-schema-v1',
   'd1-04-w07-saved-methods-mandates-v1',

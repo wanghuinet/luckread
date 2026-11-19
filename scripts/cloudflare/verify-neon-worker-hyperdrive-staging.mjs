@@ -48,7 +48,7 @@ export const STAGED_WORKERS = Object.freeze([
     worker: 'W07',
     script: 'luckread-w07',
     configPath: 'workers/W07-subscription-commerce/wrangler.neon.jsonc',
-    binding: 'HYPERDRIVE_D1_04',
+    binding: 'HYPERDRIVE_FINANCE_DB',
     hyperdriveId: '3ae15e6dfb5e4b44979eee30e1d5ede4',
     d1Bindings: [],
   },

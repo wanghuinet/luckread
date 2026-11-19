@@ -100,7 +100,7 @@ export type SubscriptionPlanUpgradeCheckoutResult = Readonly<{
 }>;
 
 export type SubscriptionPlanUpgradeCheckoutEnv =
-  Omit<W07PaymentMethodReadRuntimeEnv, 'D1_04'> & W07MembershipDatabaseRuntimeEnv;
+  W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv;
 
 export type SubscriptionPlanUpgradeCheckoutDependencies = Readonly<{
   now?: () => Date;

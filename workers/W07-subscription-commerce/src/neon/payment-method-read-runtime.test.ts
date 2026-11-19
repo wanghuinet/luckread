@@ -16,14 +16,14 @@ describe('W07 payment-method Neon read runtime', () => {
     const binding = {
       connectionString: 'postgresql://user:password@localhost:5432/luckread_finance',
     }
-    const neonEnv = { HYPERDRIVE_D1_04: binding }
+    const neonEnv = { HYPERDRIVE_FINANCE_DB: binding }
 
     expect(resolveW07DatabaseDriver({})).toBe('neon')
     expect(resolveW07DatabaseDriver(neonEnv)).toBe('neon')
     expect(getW07PaymentMethodReadStore(neonEnv, poolFactory)).toBeDefined()
     expect(poolFactory).toHaveBeenCalledTimes(1)
 
-    const legacyEnv = { W07_DATABASE_DRIVER: 'd1', HYPERDRIVE_D1_04: binding }
+    const legacyEnv = { W07_DATABASE_DRIVER: 'd1', HYPERDRIVE_FINANCE_DB: binding }
     expect(() => resolveW07DatabaseDriver(legacyEnv)).toThrow('SERVICE_UNAVAILABLE')
     expect(() => getW07PaymentMethodReadStore(legacyEnv, poolFactory)).toThrow('SERVICE_UNAVAILABLE')
     expect(poolFactory).toHaveBeenCalledTimes(1)
@@ -36,7 +36,7 @@ describe('W07 payment-method Neon read runtime', () => {
       .toThrow('SERVICE_UNAVAILABLE')
     expect(() => getW07PaymentMethodReadStore({
       W07_DATABASE_DRIVER: 'neon',
-      HYPERDRIVE_D1_04: { connectionString: 'https://example.test/database' },
+      HYPERDRIVE_FINANCE_DB: { connectionString: 'https://example.test/database' },
     })).toThrow('SERVICE_UNAVAILABLE')
   })
 
@@ -53,7 +53,7 @@ describe('W07 payment-method Neon read runtime', () => {
     const binding = {
       connectionString: 'postgresql://user:password@localhost:5432/luckread',
     }
-    const env = { W07_DATABASE_DRIVER: 'neon', HYPERDRIVE_D1_04: binding }
+    const env = { W07_DATABASE_DRIVER: 'neon', HYPERDRIVE_FINANCE_DB: binding }
 
     const first = getW07PaymentMethodReadStore(env, poolFactory)
     const second = getW07PaymentMethodReadStore(env, poolFactory)

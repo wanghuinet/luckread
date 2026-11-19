@@ -72,8 +72,8 @@ jobs:
           const financeSource = JSON.parse(fs.readFileSync('../../contracts/database/neon-d1-04-w07-order-payment-schema.v1.json', 'utf8'))
           const d101 = (bootstrap.domains || []).find((item) => item.domainId === 'D1-01')
           const d104 = (bootstrap.domains || []).find((item) => item.domainId === 'D1-04')
-          const h101 = (production.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE_D1_01')
-          const h104 = (production.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE_D1_04')
+          const h101 = (production.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE_MEMBERSHIP_DB')
+          const h104 = (production.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE_FINANCE_DB')
           if (production.name !== 'luckread-w07' || production.main !== 'src/index.ts') throw new Error('W07 production Worker identity/entrypoint mismatch')
           if ((production.d1_databases || []).length !== 0) throw new Error('W07 Neon production config must not declare Cloudflare D1 bindings')
           if (production.vars?.W07_DATABASE_DRIVER !== 'neon' || production.vars?.W07_MEMBERSHIP_DATABASE_DRIVER !== 'neon') throw new Error('W07 membership and finance database drivers must both select Neon')
@@ -169,8 +169,8 @@ jobs:
           const bindings = production.hyperdrive || []
           if ((production.d1_databases || []).length !== 0) throw new Error('Refusing a W07 production config with D1 bindings')
           if (production.vars?.W07_DATABASE_DRIVER !== 'neon' || production.vars?.W07_MEMBERSHIP_DATABASE_DRIVER !== 'neon') throw new Error('Both W07 data domains must use Neon')
-          if (!bindings.some((item) => item.binding === 'HYPERDRIVE_D1_01' && item.id === '0c53a1bb9bc0484bac146e8ae2d3158b')) throw new Error('W07 D1-01 Neon Hyperdrive missing')
-          if (!bindings.some((item) => item.binding === 'HYPERDRIVE_D1_04' && item.id === '3ae15e6dfb5e4b44979eee30e1d5ede4')) throw new Error('W07 D1-04 Neon Hyperdrive missing')
+          if (!bindings.some((item) => item.binding === 'HYPERDRIVE_MEMBERSHIP_DB' && item.id === '0c53a1bb9bc0484bac146e8ae2d3158b')) throw new Error('W07 membership Neon Hyperdrive missing')
+          if (!bindings.some((item) => item.binding === 'HYPERDRIVE_FINANCE_DB' && item.id === '3ae15e6dfb5e4b44979eee30e1d5ede4')) throw new Error('W07 finance Neon Hyperdrive missing')
           if (d101?.remoteSchemaApplied !== true || d104?.remoteSchemaApplied !== true) throw new Error('W07 Neon schema applications are not both recorded as complete')
           console.log('W07_NEON_SCHEMA_AND_RUNTIME_PREFLIGHT=PASS')
           NODE

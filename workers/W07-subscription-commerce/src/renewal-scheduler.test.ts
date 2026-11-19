@@ -13,7 +13,7 @@ import type {
 const env = {
   W07_DATABASE_DRIVER: 'neon',
   W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-  HYPERDRIVE_D1_04: { connectionString: 'postgresql://test.invalid/luckread' },
+  HYPERDRIVE_FINANCE_DB: { connectionString: 'postgresql://test.invalid/luckread' },
 } as RenewalRuntimeEnv;
 const membershipPool = { query: async () => ({ rows: [], rowCount: 0 }), connect: async () => { throw new Error('unused') } } as unknown as W07WebhookPostgresPool;
 const financePool = { query: async () => ({ rows: [], rowCount: 0 }), connect: async () => { throw new Error('unused') } } as unknown as W07WebhookPostgresPool;

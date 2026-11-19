@@ -72,7 +72,7 @@ function createFixture(options: {
   };
   const env = {
     W07_DATABASE_DRIVER: 'neon',
-    HYPERDRIVE_D1_04: { connectionString: 'postgresql://test.invalid/luckread_finance' },
+    HYPERDRIVE_FINANCE_DB: { connectionString: 'postgresql://test.invalid/luckread_finance' },
     HYPERSWITCH_ENVIRONMENT: 'sandbox',
     HYPERSWITCH_API_KEY: 'sandbox-api-key',
     HYPERSWITCH_MERCHANT_ID: MERCHANT_ID,

@@ -165,9 +165,9 @@ test('keeps the default W07 runtime D1-free with both existing Neon Hyperdrive d
   assert.equal(wrangler.vars.W07_DATABASE_DRIVER, 'neon')
   assert.equal(wrangler.vars.W07_MEMBERSHIP_DATABASE_DRIVER, 'neon')
   assert.ok(wrangler.hyperdrive.some((binding) =>
-    binding.binding === 'HYPERDRIVE_D1_01' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b'))
+    binding.binding === 'HYPERDRIVE_MEMBERSHIP_DB' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b'))
   assert.ok(wrangler.hyperdrive.some((binding) =>
-    binding.binding === 'HYPERDRIVE_D1_04' && binding.id === '3ae15e6dfb5e4b44979eee30e1d5ede4'))
+    binding.binding === 'HYPERDRIVE_FINANCE_DB' && binding.id === '3ae15e6dfb5e4b44979eee30e1d5ede4'))
   const result = verifyD104SharedRunnerReview({ readSource })
   assert.equal(result.status, 'D1_04_SHARED_RUNNER_INDEPENDENT_LOCAL_REVIEW_PASS')
 })
