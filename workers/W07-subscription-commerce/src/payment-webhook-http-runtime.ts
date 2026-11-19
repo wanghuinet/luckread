@@ -30,7 +30,7 @@ import { issueReceiptForPaidPaymentPostgres } from './billing-document-postgres-
 import { expirePendingSubscriptionPlanUpgradeForPaymentPostgres } from './subscription-plan-upgrade-expiry-postgres.js';
 
 type HyperswitchWebhookRuntimeEnv =
-  Pick<W07PaymentMethodReadRuntimeEnv, 'W07_DATABASE_DRIVER' | 'HYPERDRIVE_D1_04'> &
+  Pick<W07PaymentMethodReadRuntimeEnv, 'W07_DATABASE_DRIVER' | 'HYPERDRIVE_FINANCE_DB'> &
   W07MembershipDatabaseRuntimeEnv &
   Readonly<{
     W06_GOVERNANCE?: Fetcher;
