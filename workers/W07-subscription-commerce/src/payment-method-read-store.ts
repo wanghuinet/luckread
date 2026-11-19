@@ -2,7 +2,7 @@ import {
   type PaymentMethodRevocationRequest,
   type SavedPaymentMethodMandate,
   type SavedPaymentMethodRecord,
-} from './payment-method-persistence.js'
+} from './payment-method-contracts.js'
 
 export type CreatePaymentMethodRevocationResult = Readonly<{
   request: PaymentMethodRevocationRequest
