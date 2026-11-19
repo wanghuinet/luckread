@@ -21,7 +21,7 @@ import {
  * Reason: W06 Neon runtime still exposes a D1-shaped persistence facade and an explicit legacy D1 test/compatibility branch.
  * Replacement: Native PostgreSQL moderation stores and explicit PostgreSQL transaction/query contracts.
  * Removal: Next release.
- * Condition: Report, moderation, audit, and queue consumers accept native PostgreSQL stores without D1Database signatures or SQL translation; then remove the explicitly selected legacy D1 compatibility branch.
+ * Condition: Direct audit HTTP ingestion and moderation decision/outbox consumers also accept native PostgreSQL stores without D1Database signatures or SQL translation; then remove the explicitly selected legacy D1 compatibility branch.
  */
 export type W06ModerationDatabaseDriver = 'd1' | 'neon'
 
