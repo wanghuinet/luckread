@@ -351,10 +351,10 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
   if (wrangler.name !== 'luckread-w07') {
     fail('W07 Wrangler worker name changed')
   }
-  const w07Driver = wrangler.vars?.W07_DATABASE_DRIVER ?? 'd1'
-  if (!['d1', 'neon'].includes(w07Driver) ||
+  const w07Driver = wrangler.vars?.W07_DATABASE_DRIVER
+  if (w07Driver !== 'neon' ||
       !(wrangler.compatibility_flags ?? []).includes('nodejs_compat')) {
-    fail('W07 D1-04 database driver must be explicitly d1 or neon with nodejs_compat')
+    fail('W07 default runtime must use the Neon database driver with nodejs_compat')
   }
   const financeDomain = (fiveDomainBootstrap.domains ?? []).find((domain) => domain.domainId === 'D1-04')
   if (w07Driver === 'neon' && (
@@ -363,12 +363,16 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
       !String(financeDomain?.status ?? '').includes('SCHEMA_ONLY_REMOTE_APPLIED'))) {
     fail('W07 Neon runtime cannot be selected before D1-04 remote schema application is recorded')
   }
-  const d104Bindings = (wrangler.d1_databases ?? []).filter((binding) => binding.binding === 'D1_04')
-  if (d104Bindings.length !== 1 ||
-      d104Bindings[0].database_name !== 'unimportant' ||
-      d104Bindings[0].database_id !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736' ||
-      d104Bindings[0].migrations_dir !== 'migrations-d1-04') {
-    fail('W07 D1_04 binding must preserve the existing exact name, UUID and migrations directory')
+  const financeSource = contracts[0]
+  const financeTarget = financeSource.target ?? {}
+  const financeSourceMigrations = financeSource.scope?.includedSourceMigrations ?? []
+  if ((wrangler.d1_databases ?? []).length !== 0 ||
+      financeTarget.binding !== 'D1_04' ||
+      financeTarget.cloudflareD1DatabaseName !== 'unimportant' ||
+      financeTarget.cloudflareD1DatabaseUuid !== accessBoundary.physicalD1Registry?.['D1-04'] ||
+      financeSourceMigrations.length !== 7 ||
+      financeSourceMigrations.some((source) => !source.startsWith('workers/W07-subscription-commerce/migrations-d1-04/'))) {
+    fail('W07 default runtime must be D1-free while preserving the D1-04 source identity and seven migration files in contracts')
   }
   const workersWithD104 = Object.entries(accessBoundary.workers ?? {})
     .filter(([,value]) => (value.allowedDomains ?? []).includes('D1-04'))
