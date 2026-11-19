@@ -16,7 +16,6 @@ import {
 } from './moderation-runtime'
 import { createReport, ReportRuntimeError } from './report-runtime'
 import {
-  getW06ModerationDatabase,
   getW06AuditEventStore,
   getW06ModerationQueueReadStore,
   getW06ModerationReportWriteStore,
@@ -1098,7 +1097,7 @@ export default {
     const url = new URL(request.url)
 
     if (url.pathname === '/health' && request.method === 'GET') {
-      return json({ service: 'W06', status: 'ok', auditPersistence: 'enabled', d1Binding: Boolean(env.D1_03), moderationRuntime: 'enabled' })
+      return json({ service: 'W06', status: 'ok', auditPersistence: 'enabled', moderationRuntime: 'enabled' })
     }
 
     if (request.method === 'POST' && url.pathname === '/reports') {
@@ -1167,7 +1166,7 @@ export default {
         const principal = requireW01Transport(request)
         requireModerationPermission('getModerationCase', principal, request)
         return json({
-          ...(await getModerationCase(getW06ModerationCaseDetailReadStore(env) ?? getW06ModerationDatabase(env), principal.userId, decodeURIComponent(caseMatch[1]))),
+          ...(await getModerationCase(getW06ModerationCaseDetailReadStore(env), principal.userId, decodeURIComponent(caseMatch[1]))),
           requestId: principal.requestId,
         })
       } catch (error) {
