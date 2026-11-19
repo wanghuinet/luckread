@@ -14,7 +14,8 @@ RENEWAL_MIGRATION = WORKER / "migrations-d1-04" / "0004_subscription_renewal_cyc
 REVENUECAT_WEBHOOK_MIGRATION = WORKER / "migrations-d1-04" / "0005_revenuecat_webhook_inbox.sql"
 REFUNDS_BILLING_MIGRATION = WORKER / "migrations-d1-04" / "0006_refunds_billing_documents.sql"
 PAYMENT_METHOD_REVOCATION_MIGRATION = WORKER / "migrations-d1-04" / "0007_payment_method_revocation_requests.sql"
-CONFIG = WORKER / "wrangler.jsonc"
+BOUNDARY_CONTRACT = ROOT / "contracts" / "transport" / "worker-d1-access-boundary.v1.json"
+FINANCE_SCHEMA_CONTRACT = ROOT / "contracts" / "database" / "neon-d1-04-w07-order-payment-schema.v1.json"
 NOW = "2026-10-28T00:00:00.000Z"
 LATER = "2026-10-28T00:00:01.000Z"
 
@@ -29,14 +30,23 @@ class D104OrderMigrationTests(unittest.TestCase):
         cls.revenuecat_webhook_sql = REVENUECAT_WEBHOOK_MIGRATION.read_text(encoding="utf-8")
         cls.refunds_billing_sql = REFUNDS_BILLING_MIGRATION.read_text(encoding="utf-8")
         cls.payment_method_revocation_sql = PAYMENT_METHOD_REVOCATION_MIGRATION.read_text(encoding="utf-8")
-        config = json.loads(CONFIG.read_text(encoding="utf-8"))
-        bindings = {item["binding"]: item for item in config["d1_databases"]}
-        if bindings["D1_01"]["migrations_dir"] != "migrations":
-            raise AssertionError("D1-01 migration directory changed")
-        if bindings["D1_04"]["migrations_dir"] != "migrations-d1-04":
-            raise AssertionError("D1-04 must have a separate migration directory")
-        if bindings["D1_01"]["database_id"] == bindings["D1_04"]["database_id"]:
-            raise AssertionError("D1-01 and D1-04 must remain physically separate")
+        boundary = json.loads(BOUNDARY_CONTRACT.read_text(encoding="utf-8"))
+        finance = json.loads(FINANCE_SCHEMA_CONTRACT.read_text(encoding="utf-8"))
+        d101_uuid = boundary["physicalD1Registry"]["D1-01"]
+        d104_uuid = finance["target"]["cloudflareD1DatabaseUuid"]
+        source_migrations = finance["scope"]["includedSourceMigrations"]
+        if finance["target"]["binding"] != "D1_04" or d104_uuid != boundary["physicalD1Registry"]["D1-04"]:
+            raise AssertionError("W07 finance schema-source identity must match the canonical D1-04 registry")
+        if d101_uuid == d104_uuid:
+            raise AssertionError("D1-01 and D1-04 historical source identities must remain physically separate")
+        if not (WORKER / "migrations").is_dir() or not (WORKER / "migrations-d1-04").is_dir():
+            raise AssertionError("W07 membership and finance schema-source directories must remain separate")
+        if not source_migrations or any(
+            not source.startswith("workers/W07-subscription-commerce/migrations-d1-04/")
+            or not (ROOT / source).is_file()
+            for source in source_migrations
+        ):
+            raise AssertionError("W07 finance PostgreSQL schema generation must retain all seven historical SQL sources")
 
     def setUp(self):
         self.db = sqlite3.connect(":memory:")
