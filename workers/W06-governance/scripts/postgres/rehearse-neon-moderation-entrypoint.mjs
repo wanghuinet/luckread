@@ -42,6 +42,9 @@ const correlationId = marker + '-correlation'
 const successKey = marker + '-decision-idempotency'
 const checks = {
   selectsNeonWorkerEntryWithNoD1Binding: false,
+  directAuditHttpUsesNativePostgresStore: false,
+  directAuditHttpReplayConfirmed: false,
+  directAuditHttpConflictRejected: false,
   decisionRequestPassesW01AndCASLHeaders: false,
   caseDetailReadUsesNativePostgresStore: false,
   postgresDecisionAndAuditCommitted: false,
@@ -165,6 +168,87 @@ try {
   }
 
   checks.selectsNeonWorkerEntryWithNoD1Binding = true
+
+  const orderId = 'ord_' + marker
+  const orderAuditInput = {
+    eventId: 'evt_order_created_' + orderId,
+    orderId,
+    occurredAt: effectiveAt,
+    status: 'CREATED',
+    version: 1,
+    currency: 'USD',
+    subtotalMinor: 1200,
+    discountMinor: 100,
+    taxMinor: 88,
+    totalMinor: 1188,
+  }
+  const orderAuditRequest = (input, requestIdValue) => new Request(
+    'https://w06.internal/internal/audit-events/commerce-order-created',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Principal-User-Id': reviewerId,
+        'X-LuckRead-Principal-Layer': 'L2',
+        'X-LuckRead-Correlation-Id': correlationId,
+        'X-LuckRead-Request-Id': requestIdValue,
+      },
+      body: JSON.stringify(input),
+    },
+  )
+
+  const auditHttpFirst = await worker.fetch(
+    orderAuditRequest(orderAuditInput, 'req_' + randomUUID().replaceAll('-', '')),
+    env,
+  )
+  assert.equal(auditHttpFirst.status, 201)
+  const auditHttpFirstPayload = await auditHttpFirst.json()
+  assert.equal(auditHttpFirstPayload.eventId, orderAuditInput.eventId)
+  assert.equal(auditHttpFirstPayload.replayed, false)
+
+  const directAuditRow = await pool.query(
+    'SELECT action, target_type, target_id, actor_json, after_json FROM audit_events WHERE event_id = $1',
+    [orderAuditInput.eventId],
+  )
+  assert.equal(directAuditRow.rowCount, 1)
+  assert.equal(directAuditRow.rows[0].action, 'commerce.order.created')
+  assert.equal(directAuditRow.rows[0].target_type, 'Order')
+  assert.equal(directAuditRow.rows[0].target_id, orderId)
+  assert.deepEqual(directAuditRow.rows[0].actor_json, {
+    actorId: reviewerId,
+    actorType: 'user',
+    layer: 'L2',
+  })
+  assert.deepEqual(directAuditRow.rows[0].after_json, {
+    status: 'CREATED',
+    version: 1,
+    currency: 'USD',
+    subtotalMinor: 1200,
+    discountMinor: 100,
+    taxMinor: 88,
+    totalMinor: 1188,
+  })
+  checks.directAuditHttpUsesNativePostgresStore = true
+
+  const auditHttpReplay = await worker.fetch(
+    orderAuditRequest(orderAuditInput, 'req_' + randomUUID().replaceAll('-', '')),
+    env,
+  )
+  assert.equal(auditHttpReplay.status, 200)
+  assert.equal((await auditHttpReplay.json()).replayed, true)
+  assert.equal(await count('audit_events', 'event_id = $1', [orderAuditInput.eventId]), 1)
+  checks.directAuditHttpReplayConfirmed = true
+
+  const auditHttpConflict = await worker.fetch(
+    orderAuditRequest({ ...orderAuditInput, currency: 'EUR' }, 'req_' + randomUUID().replaceAll('-', '')),
+    env,
+  )
+  assert.equal(auditHttpConflict.status, 409)
+  assert.deepEqual(await auditHttpConflict.json(), { error: 'AUDIT_EVENT_CONFLICT' })
+  assert.equal(await count('audit_events', 'event_id = $1', [orderAuditInput.eventId]), 1)
+  checks.directAuditHttpConflictRejected = true
 
   const firstResponse = await worker.fetch(
     decisionRequest(successfulCaseId, successKey, requestId),
