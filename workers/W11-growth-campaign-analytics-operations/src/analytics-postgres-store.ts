@@ -1,9 +1,3 @@
-import type {
-  AnalyticsD1Database,
-  AnalyticsD1PreparedStatement,
-  AnalyticsD1Result,
-} from './analytics-d1-store'
-
 export interface AnalyticsPostgresQueryResult<Row = Record<string, unknown>> {
   rows: Row[]
   rowCount: number | null
@@ -24,14 +18,10 @@ export interface AnalyticsPostgresPool extends AnalyticsPostgresExecutor {
   connect(): Promise<AnalyticsPostgresClient>
 }
 
-export interface AnalyticsPostgresPreparedStatement extends AnalyticsD1PreparedStatement {
-  bind(...values: (string | number | null)[]): AnalyticsPostgresPreparedStatement
-  all<Row = Record<string, unknown>>(): Promise<{ results: Row[] }>
-  first<Row = Record<string, unknown>>(): Promise<Row | null>
-}
-
-export interface AnalyticsPostgresDatabase extends Omit<AnalyticsD1Database, 'prepare'> {
-  prepare(sql: string): AnalyticsPostgresPreparedStatement
+export interface AnalyticsPostgresSchemaObject {
+  type: string
+  name: string
+  sql?: string | null
 }
 
 const POSTGRES_SCHEMA_PROBE = String.raw`
@@ -73,110 +63,16 @@ const POSTGRES_SCHEMA_PROBE = String.raw`
      )
 `
 
-/**
- * Translate only the small SQLite compatibility surface used by the existing
- * analytics store. Business SQL and its parameter ordering remain unchanged.
- */
-export function translateAnalyticsSqlToPostgres(sql: string): string {
-  if (/\bFROM\s+sqlite_master\b/i.test(sql)) return POSTGRES_SCHEMA_PROBE
-
-  const withPostgresClock = sql.replace(
-    /strftime\(\s*'%Y-%m-%dT%H:%M:%fZ'\s*,\s*'now'\s*\)/gi,
-    `to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`,
-  )
-
-  let parameter = 0
-  return withPostgresClock.replace(/\?/g, () => '$' + String(++parameter))
-}
-
-class PostgresPreparedStatement implements AnalyticsPostgresPreparedStatement {
-  private values: (string | number | null)[] = []
-
-  constructor(
-    private readonly pool: AnalyticsPostgresPool,
-    private readonly sql: string,
-  ) {}
-
-  bind(...values: (string | number | null)[]): AnalyticsPostgresPreparedStatement {
-    this.values = values
-    return this
-  }
-
-  async all<Row = Record<string, unknown>>(): Promise<{ results: Row[] }> {
-    const result = await this.pool.query<Row>(
-      translateAnalyticsSqlToPostgres(this.sql),
-      this.values,
-    )
-    return { results: result.rows }
-  }
-
-  async first<Row = Record<string, unknown>>(): Promise<Row | null> {
-    const result = await this.pool.query<Row>(
-      translateAnalyticsSqlToPostgres(this.sql),
-      this.values,
-    )
-    return result.rows[0] ?? null
-  }
-
-  getBatchStatement(): { sql: string; values: (string | number | null)[] } {
-    return {
-      sql: translateAnalyticsSqlToPostgres(this.sql),
-      values: [...this.values],
-    }
-  }
-}
-
-/**
- * Adapts the existing bounded analytics SQL to PostgreSQL. A D1 batch is
- * represented by one PostgreSQL transaction, preserving atomic event,
- * projection and reconciliation writes.
- */
-export function createPostgresAnalyticsDatabase(
+export async function checkAnalyticsPostgresHealth(
   pool: AnalyticsPostgresPool,
-): AnalyticsPostgresDatabase {
-  return {
-    prepare(sql: string): AnalyticsPostgresPreparedStatement {
-      return new PostgresPreparedStatement(pool, sql)
-    },
+): Promise<boolean> {
+  const result = await pool.query<{ ok: number }>('SELECT 1::int AS ok')
+  return result.rows[0]?.ok === 1
+}
 
-    async batch(statements: AnalyticsD1PreparedStatement[]): Promise<AnalyticsD1Result[]> {
-      if (statements.length === 0) return []
-
-      const client = await pool.connect()
-      const results: AnalyticsD1Result[] = []
-      let transactionStarted = false
-
-      try {
-        await client.query('BEGIN')
-        transactionStarted = true
-
-        for (const statement of statements) {
-          if (!(statement instanceof PostgresPreparedStatement)) {
-            throw new TypeError('PostgreSQL analytics batch contains a foreign statement')
-          }
-          const prepared = statement.getBatchStatement()
-          const result = await client.query(prepared.sql, prepared.values)
-          results.push({
-            success: true,
-            meta: { changes: result.rowCount ?? 0 },
-          })
-        }
-
-        await client.query('COMMIT')
-        transactionStarted = false
-        return results
-      } catch (error) {
-        if (transactionStarted) {
-          try {
-            await client.query('ROLLBACK')
-          } catch {
-            // Preserve the original failure; the connection is released below.
-          }
-        }
-        throw error
-      } finally {
-        client.release()
-      }
-    },
-  }
+export async function readAnalyticsPostgresSchemaObjects(
+  pool: AnalyticsPostgresPool,
+): Promise<AnalyticsPostgresSchemaObject[]> {
+  const result = await pool.query<AnalyticsPostgresSchemaObject>(POSTGRES_SCHEMA_PROBE)
+  return result.rows
 }
