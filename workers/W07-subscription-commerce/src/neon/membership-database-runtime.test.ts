@@ -2,50 +2,49 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Pool } from 'pg'
 
 import {
-  getW07SelectedD101Database,
+  getW07MembershipPostgresPool,
   resolveW07MembershipDatabaseDriver,
 } from './membership-database-runtime.js'
 
-describe('W07 D1-01 Neon membership runtime', () => {
-  it('defaults to Neon and uses legacy D1 only when the membership driver is explicitly set to D1', () => {
-    const d1 = {} as D1Database
-    const pool = { on: vi.fn(), query: vi.fn(), connect: vi.fn() } as unknown as Pool
+describe('W07 Neon membership pool', () => {
+  it('defaults to the existing D1-01 Hyperdrive and rejects the legacy D1 selector', () => {
+    const pool = {
+      on: vi.fn(),
+      query: vi.fn(),
+      connect: vi.fn(),
+    } as unknown as Pool
     const poolFactory = vi.fn(() => pool)
     const binding = {
       connectionString: 'postgresql://user:password@localhost:5432/luckread',
     }
-    const neonEnv = { D1_01: d1, HYPERDRIVE_D1_01: binding }
+    const neonEnv = {
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+      HYPERDRIVE_D1_01: binding,
+    }
 
     expect(resolveW07MembershipDatabaseDriver({})).toBe('neon')
     expect(resolveW07MembershipDatabaseDriver(neonEnv)).toBe('neon')
-    expect(getW07SelectedD101Database(neonEnv, poolFactory)).not.toBe(d1)
+    expect(getW07MembershipPostgresPool(neonEnv, poolFactory)).toBe(pool)
     expect(poolFactory).toHaveBeenCalledTimes(1)
-
-    const legacyEnv = { D1_01: d1, W07_MEMBERSHIP_DATABASE_DRIVER: 'd1' }
-    expect(resolveW07MembershipDatabaseDriver(legacyEnv)).toBe('d1')
-    expect(getW07SelectedD101Database(legacyEnv, poolFactory)).toBe(d1)
-    expect(poolFactory).toHaveBeenCalledTimes(1)
+    expect(() => resolveW07MembershipDatabaseDriver({
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
+    })).toThrow('SERVICE_UNAVAILABLE')
   })
 
   it('fails closed for unsupported driver, missing Hyperdrive, and wrong database name', () => {
-    const d1 = {} as D1Database
     expect(() => resolveW07MembershipDatabaseDriver({
-      D1_01: d1,
       W07_MEMBERSHIP_DATABASE_DRIVER: 'postgres',
     })).toThrow('SERVICE_UNAVAILABLE')
-    expect(() => getW07SelectedD101Database({
-      W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
-    })).toThrow('SERVICE_UNAVAILABLE')
-    expect(() => getW07SelectedD101Database({
+    expect(() => getW07MembershipPostgresPool({
       W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
     })).toThrow('SERVICE_UNAVAILABLE')
-    expect(() => getW07SelectedD101Database({
+    expect(() => getW07MembershipPostgresPool({
       W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
       HYPERDRIVE_D1_01: { connectionString: 'postgresql://user:password@localhost:5432/luckread_finance' },
     })).toThrow('SERVICE_UNAVAILABLE')
   })
 
-  it('reuses the existing D1-01 Hyperdrive pool and routes membership reads through PostgreSQL', async () => {
+  it('reuses the existing D1-01 Hyperdrive pool for direct parameterized PostgreSQL membership reads', async () => {
     const calls: Array<{ sql: string; values: unknown[] }> = []
     const pool = {
       on: vi.fn(),
@@ -73,32 +72,24 @@ describe('W07 D1-01 Neon membership runtime', () => {
       HYPERDRIVE_D1_01: binding,
     }
 
-    const first = getW07SelectedD101Database(env, poolFactory)
-    const second = getW07SelectedD101Database(env, poolFactory)
+    const first = getW07MembershipPostgresPool(env, poolFactory)
+    const second = getW07MembershipPostgresPool(env, poolFactory)
     expect(first).toBe(second)
-    expect(first).toBeDefined()
     expect(poolFactory).toHaveBeenCalledTimes(1)
     expect(pool.on).toHaveBeenCalledOnce()
 
-    const row = await first.prepare(
-      'SELECT subscription_id FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
-    ).bind('sub_01', 'user_01').first<{
-      subscription_id: string
-      subscriber_id: string
-      plan_version: number
-      version: number
-      created_at: string
-    }>()
-
+    const row = await first.query<{ subscription_id: string } & Record<string, unknown>>(
+      'SELECT subscription_id FROM membership_subscriptions WHERE subscription_id = $1 AND subscriber_id = $2 LIMIT 1',
+      ['sub_01', 'user_01'],
+    )
     expect(calls).toHaveLength(1)
     expect(calls[0]?.sql).toContain('subscription_id = $1 AND subscriber_id = $2')
     expect(calls[0]?.values).toEqual(['sub_01', 'user_01'])
-    expect(row).toMatchObject({
+    expect(row.rows[0]).toMatchObject({
       subscription_id: 'sub_01',
       subscriber_id: 'user_01',
       plan_version: 3,
       version: 5,
-      created_at: '2026-11-15T12:00:00.000Z',
     })
   })
 })
