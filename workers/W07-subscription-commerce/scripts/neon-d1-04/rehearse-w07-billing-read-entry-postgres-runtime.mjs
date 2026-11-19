@@ -6,8 +6,7 @@ import { dirname } from 'node:path'
 
 import worker from '../../src/index.ts'
 import { issueInvoiceForOrderPostgres, issueReceiptForPaidPaymentPostgres } from '../../src/billing-document-postgres-persistence.ts'
-import { createPostgresWebhookD1Database } from '../../src/payment-webhook-database-postgres.ts'
-import { receiveHyperswitchWebhook } from '../../src/payment-persistence.ts'
+import { receiveHyperswitchPaymentWebhookPostgres } from '../../src/payment-webhook-payment-postgres.ts'
 import { closeW07PostgresRuntimeForTest } from '../../src/neon/payment-method-read-runtime.ts'
 
 if (!globalThis.crypto) {
@@ -28,7 +27,6 @@ if (!['127.0.0.1', 'localhost', 'postgres'].includes(target.hostname) ||
 const reportPath = process.env.W07_BILLING_READ_POSTGRES_REPORT ||
   'artifacts/neon/w07-billing-read-entry-postgres-runtime-postflight.json'
 const adminPool = new Pool({ connectionString, max: 3, connectionTimeoutMillis: 5_000 })
-const database = createPostgresWebhookD1Database(adminPool)
 const marker = 'w07-billing-entry-pg18-' + randomUUID().replaceAll('-', '')
 const merchantId = marker + '-merchant'
 const secret = 'postgres18-local-webhook-secret-' + randomUUID()
@@ -191,14 +189,13 @@ try {
     ],
   )
 
-  const received = await receiveHyperswitchWebhook(
-    database,
+  const received = await receiveHyperswitchPaymentWebhookPostgres(
+    adminPool,
     signedWebhook(),
     {
       now: () => new Date(now),
       createEventRowId: () => marker + '-receipt-row',
       createConflictId: () => marker + '-conflict-row',
-      databaseDialect: 'postgres',
     },
   )
   assert.equal(received.outcome, 'APPLIED')
@@ -303,8 +300,8 @@ try {
   assert.deepEqual(refundHistoryBody.data.items, [])
   checks.refundHistoryReadThroughW07NeonEntry = true
 
-  // All three Neon customer-history routes must execute through the native
-  // PostgreSQL Store; the D1 sentinel below proves no compatibility call occurs.
+  // All three Neon customer-history routes execute through native PostgreSQL
+  // stores; the D1 sentinel below proves no legacy binding is accessed.
   checks.nativePostgresBillingHistoryStoreUsed =
     checks.billingDocumentsReadThroughW07NeonEntry &&
     checks.paymentHistoryReadThroughW07NeonEntry &&

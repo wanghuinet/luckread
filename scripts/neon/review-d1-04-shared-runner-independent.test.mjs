@@ -84,17 +84,16 @@ test('fails closed if any D1-04 ledger entry is attributed to another Worker', (
   )
 })
 
-test('fails closed if W07 D1_04 runtime binding is renamed or retargeted', () => {
-  const wranglerPath = 'workers/W07-subscription-commerce/wrangler.jsonc'
-  const source = overrideSource(wranglerPath, (text) => {
-    const wrangler = JSON.parse(text)
-    const binding = wrangler.d1_databases.find((row) => row.binding === 'D1_04')
-    binding.database_name = 'luckread_finance'
-    return JSON.stringify(wrangler)
+test('fails closed if W07 D1-04 historical source UUID is retargeted in its finance contract', () => {
+  const financeContractPath = 'contracts/database/neon-d1-04-w07-order-payment-schema.v1.json'
+  const source = overrideSource(financeContractPath, (text) => {
+    const finance = JSON.parse(text)
+    finance.target.cloudflareD1DatabaseUuid = '00000000-0000-4000-8000-000000000000'
+    return JSON.stringify(finance)
   })
   assert.throws(
     () => verifyD104SharedRunnerReview({ readSource: source }),
-    /W07 D1_04 binding must preserve/,
+    /schema contract target or safety declaration drifted/,
   )
 })
 
@@ -160,20 +159,16 @@ test('fails closed on a reviewed source Git blob mismatch', () => {
 })
 
 
-test('ignores additive W07 D1-01 membership runtime fields when pinning the D1-04 owner config', () => {
-  const wranglerPath = 'workers/W07-subscription-commerce/wrangler.jsonc'
-  const source = overrideSource(wranglerPath, (text) => {
-    const wrangler = JSON.parse(text)
-    wrangler.vars.W07_MEMBERSHIP_DATABASE_DRIVER = 'neon'
-    const d101 = wrangler.hyperdrive.find((binding) => binding.binding === 'HYPERDRIVE_D1_01')
-    if (d101) d101.id = '0c53a1bb9bc0484bac146e8ae2d3158b'
-    else wrangler.hyperdrive.push({
-      binding: 'HYPERDRIVE_D1_01',
-      id: '0c53a1bb9bc0484bac146e8ae2d3158b',
-    })
-    return JSON.stringify(wrangler, null, 2) + '\n'
-  }, false)
-  const result = verifyD104SharedRunnerReview({ readSource: source })
+test('keeps the default W07 runtime D1-free with both existing Neon Hyperdrive domains', () => {
+  const wrangler = JSON.parse(readSource('workers/W07-subscription-commerce/wrangler.jsonc'))
+  assert.deepEqual(wrangler.d1_databases ?? [], [])
+  assert.equal(wrangler.vars.W07_DATABASE_DRIVER, 'neon')
+  assert.equal(wrangler.vars.W07_MEMBERSHIP_DATABASE_DRIVER, 'neon')
+  assert.ok(wrangler.hyperdrive.some((binding) =>
+    binding.binding === 'HYPERDRIVE_D1_01' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b'))
+  assert.ok(wrangler.hyperdrive.some((binding) =>
+    binding.binding === 'HYPERDRIVE_D1_04' && binding.id === '3ae15e6dfb5e4b44979eee30e1d5ede4'))
+  const result = verifyD104SharedRunnerReview({ readSource })
   assert.equal(result.status, 'D1_04_SHARED_RUNNER_INDEPENDENT_LOCAL_REVIEW_PASS')
 })
 

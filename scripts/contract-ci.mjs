@@ -565,12 +565,12 @@ async function checkOrderContractCandidate() {
       persistence.migration?.appliedRemotely !== false) {
     fail('PAY-002 D1-04 migration must be an isolated source candidate and remain unapplied');
   }
-  const w07Config = await readContract('workers/W07-subscription-commerce/wrangler.jsonc');
-  const configuredD101 = (w07Config?.d1_databases ?? []).find((db) => db.binding === 'D1_01');
-  const configuredD104 = (w07Config?.d1_databases ?? []).find((db) => db.binding === 'D1_04');
-  if (configuredD101?.migrations_dir !== 'migrations' ||
-      configuredD104?.migrations_dir !== 'migrations-d1-04') {
-    fail('PAY-002 must keep D1-01 migrations separate from the D1-04 order migration directory');
+  const w07MembershipSourceMigration = resolve('workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql');
+  const w07FinanceSourceMigration = resolve('workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql');
+  if (w07MembershipSourceMigration === w07FinanceSourceMigration ||
+      !await fileExists(w07MembershipSourceMigration) ||
+      !await fileExists(w07FinanceSourceMigration)) {
+    fail('PAY-002 must retain separate W07 membership and finance schema-source migrations');
   }
   if (!await fileExists(resolve('workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql'))) {
     fail('PAY-002 source candidate migration file is missing');
