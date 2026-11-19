@@ -223,17 +223,25 @@ for (const owner of contract.owners.slice(1)) {
       }
     }
     if (sourceConfig && owner.worker === 'W07') {
-      const sourceMembership = (sourceConfig.d1_databases ?? []).find((binding) =>
-        binding.binding === 'D1_01' && binding.database_id === '2f80471e-3756-49f9-8db1-7707a433ad64')
-      const sourceFinance = (sourceConfig.d1_databases ?? []).find((binding) =>
-        binding.binding === 'D1_04' && binding.database_id === '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736')
-      if (!sourceMembership || !sourceFinance ||
-          boundaryContract.physicalD1Registry?.['D1-01'] !== '2f80471e-3756-49f9-8db1-7707a433ad64' ||
-          financeSourceContract.target?.cloudflareD1DatabaseUuid !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736') {
-        failures.push('W07 historical D1-01/D1-04 source identities must remain pinned to their migration contracts')
+      const sourceMembershipUuid = boundaryContract.physicalD1Registry?.['D1-01']
+      const sourceFinanceUuid = financeSourceContract.target?.cloudflareD1DatabaseUuid
+      const sourceMigrations = financeSourceContract.scope?.includedSourceMigrations ?? []
+      const hyperdrive = sourceConfig.hyperdrive ?? []
+      if (sourceMembershipUuid !== '2f80471e-3756-49f9-8db1-7707a433ad64' ||
+          financeSourceContract.target?.binding !== 'D1_04' ||
+          sourceFinanceUuid !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736' ||
+          sourceConfig.d1_databases?.length > 0 ||
+          sourceConfig.vars?.W07_DATABASE_DRIVER !== 'neon' ||
+          sourceConfig.vars?.W07_MEMBERSHIP_DATABASE_DRIVER !== 'neon' ||
+          !hyperdrive.some((binding) => binding.binding === 'HYPERDRIVE_D1_01' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b') ||
+          !hyperdrive.some((binding) => binding.binding === 'HYPERDRIVE_D1_04' && binding.id === '3ae15e6dfb5e4b44979eee30e1d5ede4') ||
+          sourceMigrations.length !== 7 ||
+          sourceMigrations.some((source) => !statSafe(path.join(root, source)))) {
+        failures.push('W07 historical D1-01/D1-04 source identities must remain pinned to their migration contracts and runtime config must remain Neon-only')
       }
     }
-    addSource(owner.worker, 'wrangler-historical-source-mapping', owner.wrangler, wrangler)
+    const sourceKind = owner.worker === 'W07' ? 'wrangler-neon-runtime-config' : 'wrangler-historical-source-mapping'
+    addSource(owner.worker, sourceKind, owner.wrangler, wrangler)
   }
 }
 
