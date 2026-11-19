@@ -13,6 +13,7 @@ import {
   type RefundDto,
   type RefundReservation,
 } from './refund-persistence.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 const CUSTOMER_ID = 'customer_001';
 const PAYMENT_ID = 'pay_' + 'a'.repeat(26);
@@ -102,9 +103,17 @@ function createFixture(options: {
     providerUpdatedAt: LATER,
     updatedAt: LATER,
   };
+  const pool: W07WebhookPostgresPool = {
+    async query<Row extends Record<string, unknown> = Record<string, unknown>>() {
+      return { rows: [] as Row[], rowCount: 0 };
+    },
+    async connect() {
+      throw new Error('refund command fixture does not open a transaction');
+    },
+  };
   const env = {
-    W07_DATABASE_DRIVER: 'd1',
-    D1_04: {} as D1Database,
+    W07_DATABASE_DRIVER: 'neon',
+    HYPERDRIVE_D1_04: { connectionString: 'postgresql://test.invalid/luckread_finance' },
     HYPERSWITCH_ENVIRONMENT: 'sandbox',
     HYPERSWITCH_API_KEY: 'sandbox-api-key',
     HYPERSWITCH_MERCHANT_ID: MERCHANT_ID,
@@ -112,6 +121,7 @@ function createFixture(options: {
   } as Parameters<typeof handleCommerceRefundRequest>[2];
 
   const dependencies: RuntimeDependencies = {
+    getPostgresPool: () => pool,
     resolvePayment: async (...args) => {
       calls.resolvePayment.push(args);
       return options.reference ?? paymentReference;
@@ -146,7 +156,7 @@ function createFixture(options: {
       return acknowledged;
     },
   };
-  return { env, dependencies, calls };
+  return { env, dependencies, calls, pool };
 }
 
 function request(options: {
@@ -258,19 +268,17 @@ describe('W07 internal customer refund runtime', () => {
     expect(response?.headers.get('cache-control')).toBe('no-store');
   });
 
-  it('uses one selected Neon D1-04 database for ownership, idempotency, reservation and acknowledgement', async () => {
-    const fixture = createFixture({ env: { W07_DATABASE_DRIVER: 'neon' } });
-    const neonDatabase = {} as D1Database;
-    const dependencies = { ...fixture.dependencies, getDatabase: () => neonDatabase };
+  it('uses one native D1-04 Neon pool for ownership, idempotency, reservation and acknowledgement', async () => {
+    const fixture = createFixture();
     const response = await handleCommerceRefundRequest(
       request({ idempotencyKey: IDEMPOTENCY_KEY, body: { paymentId: PAYMENT_ID, amountMinor: 300, currency: 'USD', reason: 'Customer request' } }),
-      CUSTOMER_ID, fixture.env, dependencies,
+      CUSTOMER_ID, fixture.env, fixture.dependencies,
     );
     expect(response?.status).toBe(202);
-    expect(fixture.calls.resolvePayment[0]?.[0]).toBe(neonDatabase);
-    expect(fixture.calls.findExistingReservation[0]?.[0]).toBe(neonDatabase);
-    expect(fixture.calls.reserve[0]?.[0]).toBe(neonDatabase);
-    expect(fixture.calls.recordAcknowledgement[0]?.[0]).toBe(neonDatabase);
+    expect(fixture.calls.resolvePayment[0]?.[0]).toBe(fixture.pool);
+    expect(fixture.calls.findExistingReservation[0]?.[0]).toBe(fixture.pool);
+    expect(fixture.calls.reserve[0]?.[0]).toBe(fixture.pool);
+    expect(fixture.calls.recordAcknowledgement[0]?.[0]).toBe(fixture.pool);
   });
 
   it('does not reserve or call Hyperswitch when captured amount is absent or invalid', async () => {
