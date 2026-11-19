@@ -2,6 +2,7 @@ import type { AuditActor, AuditEvent } from './audit-event'
 import {
   ModerationDecisionWriteStoreError,
   type ModerationDecisionWriteStore,
+  type ModerationReadyOutboxRow,
 } from './moderation-decision-write-store-postgres.js'
 import {
   ModerationQueueReadStoreError,
@@ -454,54 +455,46 @@ export async function deliverModerationOutbox(
 }
 
 export async function drainModerationOutbox(
-  db: D1Database,
+  db: D1Database | ModerationDecisionWriteStore,
   w03: Fetcher,
   limit = 10,
 ): Promise<{ attempted: number; delivered: number; retry: number }> {
   const boundedLimit = Math.min(Math.max(limit, 1), 20)
-  const rows = await db
-    .prepare(
-      `SELECT o.outbox_id,o.decision_id,o.case_id,o.target_type,o.target_id,o.target_version,o.outcome,
-              o.policy_version,o.idempotency_key,o.status,o.attempts,o.next_attempt_at,
-              d.reviewer_id,d.reviewer_layer,d.request_id
-         FROM moderation_enforcement_outbox o
-         JOIN moderation_decisions d ON d.decision_id=o.decision_id
-        WHERE o.status IN ('PENDING','RETRY') AND o.next_attempt_at <= ?
-        ORDER BY o.next_attempt_at ASC, o.created_at ASC
-        LIMIT ?`,
-    )
-    .bind(new Date().toISOString(), boundedLimit)
-    .all<{
-      outbox_id: string
-      decision_id: string
-      case_id: string
-      target_type: string
-      target_id: string
-      target_version: number
-      outcome: ModerationOutcome
-      policy_version: string
-      idempotency_key: string
-      status: 'PENDING' | 'RETRY'
-      attempts: number
-      next_attempt_at: string
-      reviewer_id: string | null
-      reviewer_layer: string | null
-      request_id: string
-    }>()
+  const now = new Date().toISOString()
+  const rows: ModerationReadyOutboxRow[] = isModerationDecisionWriteStore(db)
+    ? await db.listReadyOutbox(now, boundedLimit)
+    : (await db
+        .prepare(
+          `SELECT o.outbox_id,o.decision_id,o.case_id,o.target_type,o.target_id,o.target_version,o.outcome,
+                  o.policy_version,o.idempotency_key,o.status,o.attempts,o.next_attempt_at,
+                  d.reviewer_id,d.reviewer_layer,d.request_id
+             FROM moderation_enforcement_outbox o
+             JOIN moderation_decisions d ON d.decision_id=o.decision_id
+            WHERE o.status IN ('PENDING','RETRY') AND o.next_attempt_at <= ?
+            ORDER BY o.next_attempt_at ASC, o.created_at ASC
+            LIMIT ?`,
+        )
+        .bind(now, boundedLimit)
+        .all<ModerationReadyOutboxRow>()).results
 
   let delivered = 0
   let retry = 0
-  for (const row of rows.results) {
+  for (const row of rows) {
     if (!row.reviewer_id || !row.reviewer_layer) {
-      await db
-        .prepare(
-          `UPDATE moderation_enforcement_outbox
-              SET status='RETRY', attempts=attempts+1,
-                  next_attempt_at=?, last_error='MISSING_DECISION_ACTOR'
-            WHERE outbox_id=?`,
-        )
-        .bind(new Date(Date.now() + 60000).toISOString(), row.outbox_id)
-        .run()
+      const nextAttemptAt = new Date(Date.now() + 60000).toISOString()
+      if (isModerationDecisionWriteStore(db)) {
+        await db.markOutboxMissingActor(row.outbox_id, nextAttemptAt)
+      } else {
+        await db
+          .prepare(
+            `UPDATE moderation_enforcement_outbox
+                SET status='RETRY', attempts=attempts+1,
+                    next_attempt_at=?, last_error='MISSING_DECISION_ACTOR'
+              WHERE outbox_id=?`,
+          )
+          .bind(nextAttemptAt, row.outbox_id)
+          .run()
+      }
       retry++
       continue
     }
@@ -525,7 +518,7 @@ export async function drainModerationOutbox(
     else retry++
   }
 
-  return { attempted: rows.results.length, delivered, retry }
+  return { attempted: rows.length, delivered, retry }
 }
 
 export async function decideModerationCase(
