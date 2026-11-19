@@ -39,7 +39,7 @@ async function sign(body: ArrayBuffer) {
   bytes.set(new Uint8Array(body), prefix.byteLength)
   const signature = await crypto.subtle.sign('HMAC', key, bytes)
   const hex = Array.from(new Uint8Array(signature), (value) => value.toString(16).padStart(2, '0')).join('')
-  return `t=${NOW_SECONDS},v1=${hex}`
+  return 't=' + NOW_SECONDS + ',v1=' + hex
 }
 
 function request(body: ArrayBuffer, headers: Record<string, string> = {}) {
@@ -58,8 +58,7 @@ function request(body: ArrayBuffer, headers: Record<string, string> = {}) {
 }
 
 const envBase = {
-  W07_DATABASE_DRIVER: 'd1',
-  D1_04: {} as D1Database,
+  W07_DATABASE_DRIVER: 'neon',
   REVENUECAT_WEBHOOK_AUTHORIZATION: AUTHORIZATION,
   REVENUECAT_ALLOWED_APP_IDS: 'app_luckread_android',
 }
@@ -71,35 +70,31 @@ const receipt = {
   payloadSha256: 'a'.repeat(64),
 }
 
-describe('RevenueCat private W07 webhook receiver', () => {
-  it('uses the selected Neon D1-04 receipt database and never falls back to D1', async () => {
-    const body = makeBody()
-    const neonDatabase = {} as D1Database
-    const d1Database = {
-      prepare: vi.fn(() => { throw new Error('D1 must not be used in Neon mode') }),
-    } as unknown as D1Database
-    const record = vi.fn(async () => receipt)
-    const getWebhookStore = vi.fn(() => ({ record }))
-    const getWebhookDatabase = vi.fn(() => neonDatabase)
-    const receive = vi.fn(async () => receipt)
+function store(record: ReturnType<typeof vi.fn>) {
+  return { record }
+}
 
+describe('RevenueCat private W07 webhook receiver', () => {
+  it('persists store-backed receipts through the native Neon store', async () => {
+    const body = makeBody()
+    const record = vi.fn(async () => receipt)
+    const getWebhookStore = vi.fn(() => store(record))
     const response = await handleRevenueCatWebhookRequest(
       request(body),
-      { ...envBase, D1_04: d1Database, W07_DATABASE_DRIVER: 'neon' },
-      { receive, getWebhookDatabase, getWebhookStore, nowMs: () => NOW_MS },
+      envBase,
+      { getWebhookStore, nowMs: () => NOW_MS },
     )
 
     expect(response?.status).toBe(200)
     expect(getWebhookStore).toHaveBeenCalledOnce()
     expect(record).toHaveBeenCalledOnce()
-    expect(getWebhookDatabase).not.toHaveBeenCalled()
-    expect(receive).not.toHaveBeenCalled()
-    expect(d1Database.prepare).not.toHaveBeenCalled()
+    expect(record.mock.calls[0]?.[0].eventId).toBe('evt_0000000000000000000001')
+    expect(record.mock.calls[0]?.[1]).toEqual(body)
   })
 
   it('always checks dashboard Authorization and persists before acknowledging', async () => {
     const body = makeBody()
-    const receive = vi.fn(async (_db, event, rawBody) => {
+    const record = vi.fn(async (event, rawBody) => {
       expect(event.eventId).toBe('evt_0000000000000000000001')
       expect(rawBody).toEqual(body)
       return receipt
@@ -107,10 +102,10 @@ describe('RevenueCat private W07 webhook receiver', () => {
     const response = await handleRevenueCatWebhookRequest(
       request(body),
       envBase,
-      { receive, nowMs: () => NOW_MS },
+      { getWebhookStore: () => store(record), nowMs: () => NOW_MS },
     )
     expect(response?.status).toBe(200)
-    expect(receive).toHaveBeenCalledOnce()
+    expect(record).toHaveBeenCalledOnce()
     const json = await response!.json() as { data: { outcome: string; entitlementApplied: boolean } }
     expect(json.data.outcome).toBe('RECEIVED')
     expect(json.data.entitlementApplied).toBe(false)
@@ -118,76 +113,78 @@ describe('RevenueCat private W07 webhook receiver', () => {
 
   it('supports RevenueCat Authorization-only configuration when dashboard HMAC is disabled', async () => {
     const body = makeBody()
-    const receive = vi.fn(async () => receipt)
+    const record = vi.fn(async () => receipt)
     const response = await handleRevenueCatWebhookRequest(
       request(body),
       envBase,
-      { receive },
+      { getWebhookStore: () => store(record) },
     )
     expect(response?.status).toBe(200)
-    expect(receive).toHaveBeenCalledOnce()
+    expect(record).toHaveBeenCalledOnce()
   })
 
   it('requires valid HMAC when a signing secret is configured', async () => {
     const body = makeBody()
+    const record = vi.fn(async () => receipt)
     const response = await handleRevenueCatWebhookRequest(
       request(body, {
         'X-RevenueCat-Webhook-Signature': 't=1793300000,v1=' + '0'.repeat(64),
       }),
       { ...envBase, REVENUECAT_WEBHOOK_SIGNING_SECRET: SIGNING_SECRET },
-      { receive: vi.fn(async () => receipt), nowMs: () => NOW_MS },
+      { getWebhookStore: () => store(record), nowMs: () => NOW_MS },
     )
     expect(response?.status).toBe(401)
+    expect(record).not.toHaveBeenCalled()
   })
 
   it('accepts a valid RevenueCat HMAC signature when signing is enabled', async () => {
     const body = makeBody()
     const signature = await sign(body)
-    const receive = vi.fn(async () => receipt)
+    const record = vi.fn(async () => receipt)
     const response = await handleRevenueCatWebhookRequest(
       request(body, { 'X-RevenueCat-Webhook-Signature': signature }),
       { ...envBase, REVENUECAT_WEBHOOK_SIGNING_SECRET: SIGNING_SECRET },
-      { receive, nowMs: () => NOW_MS },
+      { getWebhookStore: () => store(record), nowMs: () => NOW_MS },
     )
     expect(response?.status).toBe(200)
-    expect(receive).toHaveBeenCalledOnce()
+    expect(record).toHaveBeenCalledOnce()
   })
 
   it('rejects an invalid dashboard Authorization value before reading or persisting', async () => {
     const body = makeBody()
-    const receive = vi.fn(async () => receipt)
+    const getWebhookStore = vi.fn()
     const response = await handleRevenueCatWebhookRequest(
       request(body, { Authorization: 'wrong-secret' }),
       envBase,
-      { receive },
+      { getWebhookStore },
     )
     expect(response?.status).toBe(401)
-    expect(receive).not.toHaveBeenCalled()
+    expect(getWebhookStore).not.toHaveBeenCalled()
   })
 
   it('rejects calls without the trusted W01 Service Binding envelope', async () => {
     const body = makeBody()
-    const receive = vi.fn(async () => receipt)
+    const getWebhookStore = vi.fn()
     const incoming = new Request('https://luckread-w07.internal/internal/webhooks/revenuecat', {
       method: 'POST',
       headers: { Authorization: AUTHORIZATION },
       body,
     })
-    const response = await handleRevenueCatWebhookRequest(incoming, envBase, { receive })
+    const response = await handleRevenueCatWebhookRequest(incoming, envBase, { getWebhookStore })
     expect(response?.status).toBe(403)
-    expect(receive).not.toHaveBeenCalled()
+    expect(getWebhookStore).not.toHaveBeenCalled()
   })
 
   it('returns 200 for provider TEST without inserting a purchase receipt or applying entitlement', async () => {
     const body = makeBody({ type: 'TEST' })
-    const receive = vi.fn(async () => receipt)
+    const getWebhookStore = vi.fn()
     const response = await handleRevenueCatWebhookRequest(
       request(body),
       envBase,
-      { receive },
+      { getWebhookStore },
     )
     expect(response?.status).toBe(200)
-    expect(receive).not.toHaveBeenCalled()
+    expect(getWebhookStore).not.toHaveBeenCalled()
     const json = await response!.json() as { data: { outcome: string; entitlementApplied: boolean } }
     expect(json.data.outcome).toBe('TEST_ACKNOWLEDGED')
     expect(json.data.entitlementApplied).toBe(false)
@@ -200,10 +197,10 @@ describe('RevenueCat private W07 webhook receiver', () => {
       product_id: undefined,
       store: undefined,
     })
-    const receive = vi.fn(async () => receipt)
-    const response = await handleRevenueCatWebhookRequest(request(body), envBase, { receive })
+    const getWebhookStore = vi.fn()
+    const response = await handleRevenueCatWebhookRequest(request(body), envBase, { getWebhookStore })
     expect(response?.status).toBe(200)
-    expect(receive).not.toHaveBeenCalled()
+    expect(getWebhookStore).not.toHaveBeenCalled()
     const json = await response!.json() as { data: { outcome: string; entitlementApplied: boolean } }
     expect(json.data.outcome).toBe('IGNORED_NON_STORE_SOURCE')
     expect(json.data.entitlementApplied).toBe(false)
@@ -215,10 +212,10 @@ describe('RevenueCat private W07 webhook receiver', () => {
       app_id: undefined,
       store: 'PROMOTIONAL',
     })
-    const receive = vi.fn(async () => receipt)
-    const response = await handleRevenueCatWebhookRequest(request(body), envBase, { receive })
+    const getWebhookStore = vi.fn()
+    const response = await handleRevenueCatWebhookRequest(request(body), envBase, { getWebhookStore })
     expect(response?.status).toBe(200)
-    expect(receive).not.toHaveBeenCalled()
+    expect(getWebhookStore).not.toHaveBeenCalled()
     const json = await response!.json() as { data: { outcome: string; entitlementApplied: boolean } }
     expect(json.data.outcome).toBe('IGNORED_NON_STORE_SOURCE')
     expect(json.data.entitlementApplied).toBe(false)
@@ -226,10 +223,10 @@ describe('RevenueCat private W07 webhook receiver', () => {
 
   it('still rejects store purchase events that omit app_id', async () => {
     const body = makeBody({ app_id: undefined })
-    const receive = vi.fn(async () => receipt)
-    const response = await handleRevenueCatWebhookRequest(request(body), envBase, { receive })
+    const getWebhookStore = vi.fn()
+    const response = await handleRevenueCatWebhookRequest(request(body), envBase, { getWebhookStore })
     expect(response?.status).toBe(400)
-    expect(receive).not.toHaveBeenCalled()
+    expect(getWebhookStore).not.toHaveBeenCalled()
   })
 
   it('returns 503 when required configuration is missing and 413 over the body cap', async () => {
@@ -247,10 +244,24 @@ describe('RevenueCat private W07 webhook receiver', () => {
     expect(tooLarge?.status).toBe(413)
   })
 
-  it('returns 503 rather than acknowledging when receipt persistence fails', async () => {
+  it('fails closed when Neon store selection is unavailable', async () => {
     const body = makeBody()
-    const receive = vi.fn(async () => { throw new Error('database unavailable') })
-    const response = await handleRevenueCatWebhookRequest(request(body), envBase, { receive })
+    const response = await handleRevenueCatWebhookRequest(
+      request(body),
+      envBase,
+      { getWebhookStore: () => undefined },
+    )
+    expect(response?.status).toBe(503)
+  })
+
+  it('returns 503 rather than acknowledging when Neon receipt persistence fails', async () => {
+    const body = makeBody()
+    const record = vi.fn(async () => { throw new Error('database unavailable') })
+    const response = await handleRevenueCatWebhookRequest(
+      request(body),
+      envBase,
+      { getWebhookStore: () => store(record) },
+    )
     expect(response?.status).toBe(503)
   })
 })
