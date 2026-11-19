@@ -2,9 +2,6 @@
 
 import {
   BillingPersistenceError,
-  listBillingDocumentsForCustomer,
-  listPaymentHistoryForCustomer,
-  listRefundHistoryForCustomer,
   type BillingList,
 } from './billing-persistence.js';
 import {
@@ -14,20 +11,14 @@ import {
 } from './billing-history-postgres-persistence.js';
 import { parseBoundedPositiveInt } from './subscription-runtime.js';
 import {
-  getW07PaymentWebhookDatabase,
   getW07PaymentWebhookPostgresPool,
-  resolveW07DatabaseDriver,
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
-type BillingReadEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{ D1_04: D1Database }>;
+type BillingReadEnv = Omit<W07PaymentMethodReadRuntimeEnv, 'D1_04'>;
 
 type BillingReadDependencies = Readonly<{
-  listBillingDocuments?: typeof listBillingDocumentsForCustomer;
-  listPaymentHistory?: typeof listPaymentHistoryForCustomer;
-  listRefundHistory?: typeof listRefundHistoryForCustomer;
-  getReadDatabase?: (env: BillingReadEnv) => D1Database | undefined;
   listBillingDocumentsPostgres?: typeof listBillingDocumentsForCustomerPostgres;
   listPaymentHistoryPostgres?: typeof listPaymentHistoryForCustomerPostgres;
   listRefundHistoryPostgres?: typeof listRefundHistoryForCustomerPostgres;
@@ -95,25 +86,13 @@ export async function handleCommerceBillingReadRequest(
   }
 
   try {
-    let result: BillingList<unknown>;
-    if (resolveW07DatabaseDriver(env) === 'neon') {
-      // Neon customer history reads query the existing D1-04 Hyperdrive Pool
-      // natively; they never pass through the D1-compatible webhook facade.
-      const pool = (dependencies.getPostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
-      if (!pool) throw new BillingPersistenceError('SERVICE_UNAVAILABLE', 503);
-      result = kind === 'documents'
-        ? await (dependencies.listBillingDocumentsPostgres ?? listBillingDocumentsForCustomerPostgres)(pool, customerId, limit, cursor)
-        : kind === 'payments'
-          ? await (dependencies.listPaymentHistoryPostgres ?? listPaymentHistoryForCustomerPostgres)(pool, customerId, limit, cursor)
-          : await (dependencies.listRefundHistoryPostgres ?? listRefundHistoryForCustomerPostgres)(pool, customerId, limit, cursor);
-    } else {
-      const database = (dependencies.getReadDatabase ?? getW07PaymentWebhookDatabase)(env) ?? env.D1_04;
-      result = kind === 'documents'
-        ? await (dependencies.listBillingDocuments ?? listBillingDocumentsForCustomer)(database, customerId, limit, cursor)
-        : kind === 'payments'
-          ? await (dependencies.listPaymentHistory ?? listPaymentHistoryForCustomer)(database, customerId, limit, cursor)
-          : await (dependencies.listRefundHistory ?? listRefundHistoryForCustomer)(database, customerId, limit, cursor);
-    }
+    const pool = (dependencies.getPostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+    if (!pool) throw new BillingPersistenceError('SERVICE_UNAVAILABLE', 503);
+    const result: BillingList<unknown> = kind === 'documents'
+      ? await (dependencies.listBillingDocumentsPostgres ?? listBillingDocumentsForCustomerPostgres)(pool, customerId, limit, cursor)
+      : kind === 'payments'
+        ? await (dependencies.listPaymentHistoryPostgres ?? listPaymentHistoryForCustomerPostgres)(pool, customerId, limit, cursor)
+        : await (dependencies.listRefundHistoryPostgres ?? listRefundHistoryForCustomerPostgres)(pool, customerId, limit, cursor);
     return Response.json(
       { data: result, requestId: 'req_' + crypto.randomUUID() },
       { status: 200, headers: { 'cache-control': 'no-store' } },
