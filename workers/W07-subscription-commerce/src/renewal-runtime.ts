@@ -892,6 +892,8 @@ async function acquireSubmissionLease(
   }
 }
 
+type FailedCycleRetryPreparation = 'PREPARED' | 'AWAITING_RETRY' | 'AWAITING_OUTCOME_SYNC' | 'TERMINAL';
+
 async function prepareFailedCycleRetry(
   env: RenewalRuntimeEnv,
   membershipStore: RenewalMembershipStore,
