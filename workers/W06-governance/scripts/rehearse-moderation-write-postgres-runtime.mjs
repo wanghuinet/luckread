@@ -43,6 +43,7 @@ const checks = {
   auditEventWrittenWithDecision: false,
   enforcementOutboxDelivered: false,
   sameKeyReplayReturnedStoredDecision: false,
+  sameKeyDifferentPayloadReturns422: false,
   moderationReportUsesNativePostgresStore: false,
   moderationReportWrittenWithAudit: false,
   moderationReportReplayReturnedStoredResponse: false,
@@ -168,6 +169,12 @@ try {
   ).bind(successfulCaseId).first()
   assert.equal(Number(decisionCount?.count), 1)
   checks.sameKeyReplayReturnedStoredDecision = true
+
+  await assert.rejects(
+    decideModerationCase(decisionStore, w03, { ...successfulInput, reasonCode: 'DIFFERENT_REASON' }),
+    (error) => error?.code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' && error?.status === 422,
+  )
+  checks.sameKeyDifferentPayloadReturns422 = true
 
   const reportInput = {
     actorUserId: reviewerId,
