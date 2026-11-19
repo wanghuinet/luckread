@@ -16,7 +16,7 @@ import {
 } from './neon/payment-method-read-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
-type BillingReadEnv = Omit<W07PaymentMethodReadRuntimeEnv, 'D1_04'>;
+type BillingReadEnv = W07PaymentMethodReadRuntimeEnv;
 
 type BillingReadDependencies = Readonly<{
   listBillingDocumentsPostgres?: typeof listBillingDocumentsForCustomerPostgres;
