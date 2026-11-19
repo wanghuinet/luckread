@@ -12,7 +12,11 @@ import {
   syncPendingRenewalOutcomes,
   type RenewalOutcomeSyncResult,
 } from './subscription-renewal-outcome.js';
-import { getW07SelectedD104Database, resolveW07DatabaseDriver } from './neon/payment-method-read-runtime.js';
+import {
+  getW07PaymentWebhookPostgresPool,
+  getW07SelectedD104Database,
+  resolveW07DatabaseDriver,
+} from './neon/payment-method-read-runtime.js';
 import { getW07MembershipPostgresPool } from './neon/membership-database-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
@@ -63,6 +67,7 @@ export type RenewalScheduledDependencies = Readonly<{
   readTableNames?: (db: D1Database, expected: readonly string[], dialect?: 'd1' | 'neon') => Promise<Set<string>>;
   readMembershipTableNames?: (db: W07WebhookPostgresPool, expected: readonly string[]) => Promise<Set<string>>;
   getMembershipPostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool;
+  getFinancePostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool | undefined;
   getDatabase?: (env: RenewalRuntimeEnv) => D1Database;
   syncPending?: typeof syncPendingRenewalOutcomes;
   scanDue?: typeof scanDueSubscriptionRenewals;
@@ -110,7 +115,12 @@ export async function runRenewalScheduledBatch(
   const databaseDialect = resolveW07DatabaseDriver(env);
   const selectedD104 = (dependencies.getDatabase ?? getW07SelectedD104Database)(env);
   const selectedEnv: RenewalRuntimeEnv = { ...env, D1_04: selectedD104 };
+  const selectedFinancePool = (dependencies.getFinancePostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+  if (!selectedFinancePool) {
+    return { status: 'SCHEMA_NOT_READY', reason: 'SCHEMA_PROBE_FAILED', missingTables: [] };
+  }
   const getSelectedDatabase = () => selectedD104;
+  const getSelectedFinancePool = () => selectedFinancePool;
   const getSelectedMembershipPool = () => membershipPool;
   let membershipPool: W07WebhookPostgresPool;
   let membershipTables: Set<string>;
@@ -142,7 +152,7 @@ export async function runRenewalScheduledBatch(
 
   let beforeRecovery: OutcomeBatch;
   try {
-    beforeRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool });
+    beforeRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getFinancePostgresPool: getSelectedFinancePool, getMembershipPostgresPool: getSelectedMembershipPool });
   } catch {
     // Do not start new provider-side work when prior cross-D1 outcome recovery
     // is failing. The next Cron tick can retry the bounded reconciliation.
@@ -188,7 +198,7 @@ export async function runRenewalScheduledBatch(
 
   let afterRecovery: OutcomeBatch;
   try {
-    afterRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool });
+    afterRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getFinancePostgresPool: getSelectedFinancePool, getMembershipPostgresPool: getSelectedMembershipPool });
   } catch {
     return { status: 'PARTIAL', phase: 'OUTCOME_SYNC_AFTER' };
   }

@@ -17,6 +17,7 @@ const env = {
   D1_04: database,
 } as RenewalRuntimeEnv;
 const membershipPool = { query: async () => ({ rows: [], rowCount: 0 }), connect: async () => { throw new Error('unused') } } as unknown as W07WebhookPostgresPool;
+const financePool = { query: async () => ({ rows: [], rowCount: 0 }), connect: async () => { throw new Error('unused') } } as unknown as W07WebhookPostgresPool;
 
 const cleanRecovery = {
   scanned: 0,
@@ -39,6 +40,7 @@ function dependencies(options: TestOptions = {}): RenewalScheduledDependencies {
     readTableNames: async (_db, expected) => new Set(expected),
     readMembershipTableNames: async (_db, expected) => new Set(expected),
     getMembershipPostgresPool: () => membershipPool,
+    getFinancePostgresPool: () => financePool,
     syncPending: async () => recoveryResults[Math.min(recoveryCall++, recoveryResults.length - 1)],
     scanDue: async (): Promise<RenewalScanResult> => {
       if (options.scanCalls) options.scanCalls.count += 1;
@@ -160,6 +162,7 @@ describe('W07 renewal scheduler completion status', () => {
       readTableNames: async (_db, expected) => new Set(expected),
       readMembershipTableNames: async (_pool, expected) => new Set(expected),
       getMembershipPostgresPool: () => membershipPool,
+      getFinancePostgresPool: () => financePool,
       syncPending: async () => cleanRecovery,
       scanDue: async (_runtimeEnv, options): Promise<RenewalScanResult> => {
         scanLimit = options?.limit ?? 0

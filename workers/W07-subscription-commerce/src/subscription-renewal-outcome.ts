@@ -1,18 +1,18 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { strictlyAfterCanonicalUtcTimestamp } from './canonical-utc-timestamp.js';
-import { getW07SelectedD104Database, type W07PaymentMethodReadRuntimeEnv } from './neon/payment-method-read-runtime.js';
+import {
+  getW07PaymentWebhookPostgresPool,
+  type W07PaymentMethodReadRuntimeEnv,
+} from './neon/payment-method-read-runtime.js';
 import { getW07MembershipPostgresPool, type W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import {
-  getW07RenewalCycleStore,
-  isPostgresRenewalCycleStore,
   readRenewalCycleByIdPostgres,
   readRenewalCycleByPaymentPostgres,
   listPendingRenewalCycleIdsPostgres,
   markRenewalCycleSyncStatePostgres,
   type RenewalCycleRow,
-  type RenewalCycleStore,
 } from './renewal-cycle-postgres.js';
 import {
   readScheduledSubscriptionPlanDowngradeForPeriod,
@@ -26,12 +26,27 @@ import {
 
 type RenewalOutcomeMembershipStore = W07WebhookPostgresPool;
 
+function getRenewalOutcomeFinanceStore(
+  env: OutcomeSyncEnv,
+  dependencies: Pick<RenewalOutcomeSyncDependencies, 'getFinancePostgresPool'> = {},
+): W07WebhookPostgresPool {
+  try {
+    const pool = (dependencies.getFinancePostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+    if (!pool) throw new Error('finance pool unavailable');
+    return pool;
+  } catch {
+    throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
+  }
+}
+
 function getRenewalOutcomeMembershipStore(
   env: OutcomeSyncEnv,
   dependencies: Pick<RenewalOutcomeSyncDependencies, 'getMembershipPostgresPool'> = {},
 ): RenewalOutcomeMembershipStore {
   try {
-    return (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
+    const pool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
+    if (!pool) throw new Error('membership pool unavailable');
+    return pool;
   } catch {
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
   }
@@ -73,10 +88,13 @@ export type RenewalOutcomeSyncResult = Readonly<{
 
 export type RenewalOutcomeSyncDependencies = Readonly<{
   now?: () => Date;
-  getDatabase?: (env: OutcomeSyncEnv) => D1Database;
-  getMembershipPostgresPool?: (env: OutcomeSyncEnv) => W07WebhookPostgresPool;
+  getFinancePostgresPool?: (env: OutcomeSyncEnv) => W07WebhookPostgresPool | undefined;
+  getMembershipPostgresPool?: (env: OutcomeSyncEnv) => W07WebhookPostgresPool | undefined;
 }>;
-type OutcomeSyncEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{ D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>; 
+type OutcomeSyncEnv =
+  Pick<W07PaymentMethodReadRuntimeEnv, 'W07_DATABASE_DRIVER' | 'HYPERDRIVE_D1_04'> &
+  W07MembershipDatabaseRuntimeEnv &
+  Readonly<{ W06_GOVERNANCE?: Fetcher }>;
 
 const PROVIDER = 'hyperswitch';
 const MAX_PAGE_SIZE = 50;
@@ -107,21 +125,9 @@ function strictlyAfter(now: string, previous: string): string {
   return next;
 }
 
-async function readCycleById(db: RenewalCycleStore, cycleId: string): Promise<RenewalOutcomeCycle | null> {
-  if (isPostgresRenewalCycleStore(db)) {
-    try {
-      return await readRenewalCycleByIdPostgres(db, cycleId);
-    } catch {
-      throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
-    }
-  }
+async function readCycleById(db: W07WebhookPostgresPool, cycleId: string): Promise<RenewalOutcomeCycle | null> {
   try {
-    return await db.prepare(
-      'SELECT cycle_id, provider, merchant_id, subscription_id, subscriber_id, plan_id, plan_version, ' +
-      'cycle_start, cycle_end, billing_interval, amount_minor, order_id, payment_id, state, provider_response_status, ' +
-      'pricing_snapshot_json, subscription_sync_state, subscription_sync_updated_at, subscription_sync_error_code, ' +
-      'version, updated_at FROM subscription_renewal_cycles WHERE cycle_id = ? LIMIT 1',
-    ).bind(cycleId).first<RenewalOutcomeCycle>();
+    return await readRenewalCycleByIdPostgres(db, cycleId);
   } catch {
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
   }
@@ -146,29 +152,16 @@ async function readSubscription(
 }
 
 async function markCycleSyncState(
-  db: RenewalCycleStore, cycle: RenewalOutcomeCycle,
+  db: W07WebhookPostgresPool, cycle: RenewalOutcomeCycle,
   nextState: 'APPLIED' | 'RECONCILIATION_REQUIRED', errorCode: string | null, now: string,
 ): Promise<boolean> {
   const updatedAt = strictlyAfter(now, cycle.updated_at);
   const syncUpdatedAt = strictlyAfter(now, cycle.subscription_sync_updated_at ?? cycle.updated_at);
   try {
-    if (isPostgresRenewalCycleStore(db)) {
-      return await markRenewalCycleSyncStatePostgres(
-        db, cycle, nextState, errorCode, syncUpdatedAt, updatedAt,
-      );
-    }
-    const result = await db.prepare(
-      'UPDATE subscription_renewal_cycles SET subscription_sync_state = ?, ' +
-      'subscription_sync_updated_at = ?, subscription_sync_error_code = ?, ' +
-      'version = version + 1, updated_at = ? ' +
-      "WHERE cycle_id = ? AND version = ? AND state = ? AND subscription_sync_state = 'PENDING'",
-    ).bind(nextState, syncUpdatedAt, errorCode, updatedAt, cycle.cycle_id, cycle.version, cycle.state).run();
-    if (Number(result.meta?.changes ?? 0) === 1) return true;
-    const latest = await readCycleById(db, cycle.cycle_id);
-    if (!latest) throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
-    return latest.subscription_sync_state === nextState;
-  } catch (error) {
-    if (error instanceof RenewalOutcomeSyncError) throw error;
+    return await markRenewalCycleSyncStatePostgres(
+      db, cycle, nextState, errorCode, syncUpdatedAt, updatedAt,
+    );
+  } catch {
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
   }
 }
@@ -189,9 +182,13 @@ function validTerminalCycle(cycle: RenewalOutcomeCycle): boolean {
 }
 
 async function reconcile(
-  env: OutcomeSyncEnv, cycle: RenewalOutcomeCycle, reasonCode: string, now: string,
+  env: OutcomeSyncEnv,
+  cycleStore: W07WebhookPostgresPool,
+  cycle: RenewalOutcomeCycle,
+  reasonCode: string,
+  now: string,
 ): Promise<RenewalOutcomeSyncResult> {
-  const marked = await markCycleSyncState(getW07RenewalCycleStore(env), cycle, 'RECONCILIATION_REQUIRED', reasonCode, now);
+  const marked = await markCycleSyncState(cycleStore, cycle, 'RECONCILIATION_REQUIRED', reasonCode, now);
   return marked
     ? { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'RECONCILIATION_REQUIRED', reasonCode }
     : { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
@@ -369,8 +366,7 @@ async function applySubscriptionUpdate(
 export async function syncTerminalRenewalCycleToSubscription(
   env: OutcomeSyncEnv, cycleIdInput: string, dependencies: RenewalOutcomeSyncDependencies = {},
 ): Promise<RenewalOutcomeSyncResult> {
-  env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
-  const cycleStore = getW07RenewalCycleStore(env);
+  const cycleStore = getRenewalOutcomeFinanceStore(env, dependencies);
   if (!CYCLE_ID_PATTERN.test(cycleIdInput)) throw new RenewalOutcomeSyncError('VALIDATION_FAILED', 400);
   const now = nowIso(dependencies.now ?? (() => new Date()));
   const cycle = await readCycleById(cycleStore, cycleIdInput);
@@ -393,16 +389,16 @@ export async function syncTerminalRenewalCycleToSubscription(
       (cycle.subscription_sync_updated_at !== null && !isCanonicalIso(cycle.subscription_sync_updated_at))) {
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
   }
-  if (!validTerminalCycle(cycle)) return reconcile(env, cycle, 'TERMINAL_CYCLE_SNAPSHOT_INVALID', now);
+  if (!validTerminalCycle(cycle)) return reconcile(env, cycleStore, cycle, 'TERMINAL_CYCLE_SNAPSHOT_INVALID', now);
 
   const membershipStore = getRenewalOutcomeMembershipStore(env, dependencies);
   const subscription = await readSubscription(membershipStore, cycle.subscription_id, cycle.subscriber_id);
-  if (!subscription) return reconcile(env, cycle, 'SUBSCRIPTION_NOT_FOUND', now);
+  if (!subscription) return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_NOT_FOUND', now);
   if (subscription.subscription_id !== cycle.subscription_id || subscription.subscriber_id !== cycle.subscriber_id) {
-    return reconcile(env, cycle, 'SUBSCRIPTION_IDENTITY_MISMATCH', now);
+    return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_IDENTITY_MISMATCH', now);
   }
   if (!isCanonicalIso(subscription.updated_at)) {
-    return reconcile(env, cycle, 'SUBSCRIPTION_UPDATED_AT_INVALID', now);
+    return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_UPDATED_AT_INVALID', now);
   }
 
   const trialHasAnyMetadata = subscription.trial_started_at !== null ||
@@ -415,7 +411,7 @@ export async function syncTerminalRenewalCycleToSubscription(
         subscription.current_period_end !== subscription.trial_ends_at ||
         subscription.trial_ends_at !== cycle.cycle_start ||
         subscription.trial_converted_at !== null) {
-      return reconcile(env, cycle, 'TRIAL_PERIOD_BOUNDARY_MISMATCH', now);
+      return reconcile(env, cycleStore, cycle, 'TRIAL_PERIOD_BOUNDARY_MISMATCH', now);
     }
   }
 
@@ -430,13 +426,13 @@ export async function syncTerminalRenewalCycleToSubscription(
     scheduledChange.targetPlanId === cycle.plan_id &&
     scheduledChange.targetPlanVersion === cycle.plan_version;
   if (!currentPlanMatchesCycle && !(scheduledChange?.status === 'SCHEDULED' && cycleMatchesScheduledTarget)) {
-    return reconcile(env, cycle, 'SUBSCRIPTION_IDENTITY_OR_PLAN_MISMATCH', now);
+    return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_IDENTITY_OR_PLAN_MISMATCH', now);
   }
   if (scheduledChange) {
     if (scheduledChange.effectiveAt !== cycle.cycle_start ||
         scheduledChange.subscriberId !== cycle.subscriber_id ||
         scheduledChange.subscriptionId !== cycle.subscription_id) {
-      return reconcile(env, cycle, 'SCHEDULED_PLAN_CHANGE_IDENTITY_MISMATCH', now);
+      return reconcile(env, cycleStore, cycle, 'SCHEDULED_PLAN_CHANGE_IDENTITY_MISMATCH', now);
     }
     const target = await readScheduledDowngradeTargetPlan(membershipStore, scheduledChange);
     const validScheduledChange = scheduledChange.status === 'APPLIED'
@@ -451,13 +447,13 @@ export async function syncTerminalRenewalCycleToSubscription(
           : false;
     if (!target || target.creatorId !== subscription.creator_id ||
         target.billingInterval !== cycle.billing_interval || !validScheduledChange) {
-      return reconcile(env, cycle, 'SCHEDULED_PLAN_TARGET_INVALID', now);
+      return reconcile(env, cycleStore, cycle, 'SCHEDULED_PLAN_TARGET_INVALID', now);
     }
     if (scheduledChange.status === 'APPLIED' &&
         (!currentPlanMatchesCycle ||
          scheduledChange.appliedSubscriptionVersion === null ||
          scheduledChange.appliedSubscriptionVersion !== subscription.version)) {
-      return reconcile(env, cycle, 'SCHEDULED_PLAN_APPLIED_MARKER_MISMATCH', now);
+      return reconcile(env, cycleStore, cycle, 'SCHEDULED_PLAN_APPLIED_MARKER_MISMATCH', now);
     }
   }
 
@@ -474,9 +470,9 @@ export async function syncTerminalRenewalCycleToSubscription(
       return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
     }
     if (scheduledChange?.status === 'SCHEDULED') {
-      return reconcile(env, cycle, 'SCHEDULED_PLAN_CHANGE_NOT_MARKED_APPLIED', now);
+      return reconcile(env, cycleStore, cycle, 'SCHEDULED_PLAN_CHANGE_NOT_MARKED_APPLIED', now);
     }
-    const marked = await markCycleSyncState(getW07RenewalCycleStore(env), cycle, 'APPLIED', null, now);
+    const marked = await markCycleSyncState(cycleStore, cycle, 'APPLIED', null, now);
     return {
       cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id,
       outcome: marked ? 'ALREADY_APPLIED' : 'PENDING_RETRY',
@@ -484,25 +480,25 @@ export async function syncTerminalRenewalCycleToSubscription(
   }
   if (subscription.current_period_end !== cycle.cycle_start ||
       subscription.current_period_start >= cycle.cycle_start) {
-    return reconcile(env, cycle, 'SUBSCRIPTION_PERIOD_CAS_MISMATCH', now);
+    return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_PERIOD_CAS_MISMATCH', now);
   }
   if (subscription.cancel_at !== null &&
       (!isCanonicalIso(subscription.cancel_at) || subscription.cancel_at <= cycle.cycle_start)) {
-    return reconcile(env, cycle, 'SUBSCRIPTION_CANCELLED_BEFORE_RENEWAL_PERIOD', now);
+    return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_CANCELLED_BEFORE_RENEWAL_PERIOD', now);
   }
 
   if (cycle.state === 'SUCCEEDED') {
     if (!['TRIALING', 'ACTIVE', 'PAST_DUE'].includes(subscription.status)) {
-      return reconcile(env, cycle, 'SUBSCRIPTION_STATE_FORBIDS_REACTIVATION', now);
+      return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_STATE_FORBIDS_REACTIVATION', now);
     }
     if (scheduledChange?.status === 'APPLIED') {
-      return reconcile(env, cycle, 'SCHEDULED_PLAN_ALREADY_APPLIED_WITHOUT_PERIOD_ADVANCE', now);
+      return reconcile(env, cycleStore, cycle, 'SCHEDULED_PLAN_ALREADY_APPLIED_WITHOUT_PERIOD_ADVANCE', now);
     }
     const result = await applySubscriptionUpdate(
       membershipStore, cycle, subscription, 'ACTIVE', cycle.cycle_start, cycle.cycle_end, now,
       scheduledChange?.status === 'SCHEDULED' ? scheduledChange : undefined,
     );
-    if (result === 'CAS_LOST') return reconcile(env, cycle, 'SUBSCRIPTION_CAS_LOST', now);
+    if (result === 'CAS_LOST') return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_CAS_LOST', now);
 
     const appliedSubscription = await readSubscription(membershipStore, cycle.subscription_id, cycle.subscriber_id);
     if (appliedSubscription?.trial_started_at && appliedSubscription.trial_ends_at === cycle.cycle_start &&
@@ -537,13 +533,13 @@ export async function syncTerminalRenewalCycleToSubscription(
     };
   }
   if (subscription.status !== 'ACTIVE' && subscription.status !== 'TRIALING') {
-    return reconcile(env, cycle, 'SUBSCRIPTION_STATE_FORBIDS_PAST_DUE_TRANSITION', now);
+    return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_STATE_FORBIDS_PAST_DUE_TRANSITION', now);
   }
   const result = await applySubscriptionUpdate(
     membershipStore, cycle, subscription, 'PAST_DUE',
     subscription.current_period_start, subscription.current_period_end, now,
   );
-  if (result === 'CAS_LOST') return reconcile(env, cycle, 'SUBSCRIPTION_CAS_LOST', now);
+  if (result === 'CAS_LOST') return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_CAS_LOST', now);
   const marked = await markCycleSyncState(cycleStore, cycle, 'APPLIED', null, now);
   return {
     cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id,
@@ -555,28 +551,14 @@ export async function syncRenewalCycleOutcomeForPayment(
   env: OutcomeSyncEnv, paymentIdInput: string, expectedMerchantIdInput: string,
   dependencies: RenewalOutcomeSyncDependencies = {},
 ): Promise<RenewalOutcomeSyncResult> {
-  env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
-  const cycleStore = getW07RenewalCycleStore(env);
+  const cycleStore = getRenewalOutcomeFinanceStore(env, dependencies);
   if (!PAYMENT_ID_PATTERN.test(paymentIdInput) || !isBoundedId(expectedMerchantIdInput)) {
     throw new RenewalOutcomeSyncError('VALIDATION_FAILED', 400);
   }
   let row: { cycle_id: string } | null;
   try {
-    if (isPostgresRenewalCycleStore(cycleStore)) {
-      row = await readRenewalCycleByPaymentPostgres(cycleStore, expectedMerchantIdInput, paymentIdInput);
-    } else {
-      row = await cycleStore.prepare(
-        'SELECT cycle_id FROM subscription_renewal_cycles WHERE provider = ? AND merchant_id = ? AND payment_id = ? LIMIT 1',
-      ).bind(PROVIDER, expectedMerchantIdInput, paymentIdInput).first<{ cycle_id: string }>();
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    // Before candidate migration 0004 is applied there can be no renewal-cycle
-    // rows. Ordinary customer-present payments must still receive a normal
-    // webhook acknowledgement; only non-missing-table D1 failures are retried.
-    if (/no such table:\s*subscription_renewal_cycles/i.test(message) || message.toLowerCase().includes('relation "subscription_renewal_cycles" does not exist')) {
-      return { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' };
-    }
+    row = await readRenewalCycleByPaymentPostgres(cycleStore, expectedMerchantIdInput, paymentIdInput);
+  } catch {
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
   }
   if (!row) return { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' };
@@ -587,17 +569,11 @@ export async function syncPendingRenewalOutcomes(
   env: OutcomeSyncEnv, options: Readonly<{ limit?: number }> = {},
   dependencies: RenewalOutcomeSyncDependencies = {},
 ): Promise<Readonly<{ scanned: number; applied: number; reconciliationRequired: number; pendingRetry: number }>> {
-  env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
-  const cycleStore = getW07RenewalCycleStore(env);
+  const cycleStore = getRenewalOutcomeFinanceStore(env, dependencies);
   const limit = Number.isSafeInteger(options.limit) ? Math.min(Math.max(options.limit ?? 20, 1), MAX_PAGE_SIZE) : 20;
   let cycles: Array<{ cycle_id: string }>;
   try {
-    cycles = isPostgresRenewalCycleStore(cycleStore)
-      ? await listPendingRenewalCycleIdsPostgres(cycleStore, limit)
-      : (await cycleStore.prepare(
-        "SELECT cycle_id FROM subscription_renewal_cycles WHERE state IN ('SUCCEEDED','FAILED') " +
-        "AND subscription_sync_state = 'PENDING' ORDER BY updated_at ASC, cycle_id ASC LIMIT ?",
-      ).bind(limit).all<{ cycle_id: string }>()).results ?? [];
+    cycles = await listPendingRenewalCycleIdsPostgres(cycleStore, limit);
   } catch {
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
   }

@@ -421,6 +421,7 @@ describe('W07 scheduled renewal batch', () => {
 
   function scheduledSetup(missing: string[] = []) {
     const membershipPool = { query: async () => ({ rows: [], rowCount: 0 }), connect: async () => { throw new Error('unused') } } as unknown as W07WebhookPostgresPool;
+    const financePool = { query: async () => ({ rows: [], rowCount: 0 }), connect: async () => { throw new Error('unused') } } as unknown as W07WebhookPostgresPool;
     const d1_04 = { marker: 'D1-04' } as unknown as D1Database;
     const env: RenewalRuntimeEnv = {
       W07_DATABASE_DRIVER: 'd1',
@@ -446,7 +447,15 @@ describe('W07 scheduled renewal batch', () => {
       state: 'PREPARED' as const,
       action: 'PREPARED' as const,
     }));
-    const dependencies: RenewalScheduledDependencies = { readTableNames, readMembershipTableNames, getMembershipPostgresPool: () => membershipPool, syncPending, scanDue, processCycle };
+    const dependencies: RenewalScheduledDependencies = {
+      readTableNames,
+      readMembershipTableNames,
+      getMembershipPostgresPool: () => membershipPool,
+      getFinancePostgresPool: () => financePool,
+      syncPending,
+      scanDue,
+      processCycle,
+    };
     return { env, dependencies, readTableNames, readMembershipTableNames, syncPending, scanDue, processCycle };
   }
 
@@ -468,8 +477,8 @@ describe('W07 scheduled renewal batch', () => {
     const result = await runRenewalScheduledBatch(f.env, f.dependencies);
     expect(result).toMatchObject({ status: 'COMPLETED', processed: 2, processFailures: 0 });
     expect(f.syncPending).toHaveBeenCalledTimes(2);
-    expect(f.syncPending).toHaveBeenNthCalledWith(1, f.env, { limit: 10 }, { getDatabase: expect.any(Function), getMembershipPostgresPool: expect.any(Function) });
-    expect(f.syncPending).toHaveBeenNthCalledWith(2, f.env, { limit: 10 }, { getDatabase: expect.any(Function), getMembershipPostgresPool: expect.any(Function) });
+    expect(f.syncPending).toHaveBeenNthCalledWith(1, f.env, { limit: 10 }, { getFinancePostgresPool: expect.any(Function), getMembershipPostgresPool: expect.any(Function) });
+    expect(f.syncPending).toHaveBeenNthCalledWith(2, f.env, { limit: 10 }, { getFinancePostgresPool: expect.any(Function), getMembershipPostgresPool: expect.any(Function) });
     expect(f.scanDue).toHaveBeenCalledWith(f.env, { limit: 5 }, { getDatabase: expect.any(Function), getMembershipPostgresPool: expect.any(Function) });
     expect(f.processCycle).toHaveBeenCalledTimes(2);
   });
