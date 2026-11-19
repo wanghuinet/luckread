@@ -1,4 +1,4 @@
-import { persistAuditEvent } from './audit-event-persistence'
+import type { AuditEventStore } from './audit-event-store.js'
 import type { AuditActor, AuditEvent } from './audit-event'
 
 const RESOURCE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
@@ -86,40 +86,14 @@ async function assertSessionRevokedEvent(value: unknown): Promise<SessionRevoked
   }
   return event as unknown as SessionRevokedAuditEvent
 }
-type ExistingSessionAuditRow = {
-  eventId: string
-  requestId: string | null
-  traceId: string | null
-  actorJson: string
-  action: string
-  targetType: string
-  targetId: string
-  beforeJson: string
-  afterJson: string
-  reason: string | null
-  occurredAt: string
-}
-
-function parseJsonObject(value: string): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(value)
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null
-  } catch {
-    return null
-  }
-}
-
-function sameRecord(actual: Record<string, unknown> | null, expected: Record<string, unknown>): boolean {
-  if (!actual) return false
+function sameRecord(actual: Record<string, unknown>, expected: Record<string, unknown>): boolean {
   const actualKeys = Object.keys(actual).sort()
   const expectedKeys = Object.keys(expected).sort()
   return actualKeys.length === expectedKeys.length &&
     actualKeys.every((key, index) => key === expectedKeys[index] && actual[key] === expected[key])
 }
 
-function matchesPersisted(existing: ExistingSessionAuditRow, event: SessionRevokedAuditEvent): boolean {
+function matchesPersisted(existing: AuditEvent, event: SessionRevokedAuditEvent): boolean {
   return existing.eventId === event.eventId &&
     existing.requestId === event.correlationId &&
     existing.traceId === event.causationId &&
@@ -128,23 +102,18 @@ function matchesPersisted(existing: ExistingSessionAuditRow, event: SessionRevok
     existing.targetId === event.resourceId &&
     existing.reason === event.payload.reasonCode &&
     existing.occurredAt === event.occurredAt &&
-    sameRecord(parseJsonObject(existing.actorJson), { actorId: event.actor.actorId, actorType: 'user' }) &&
-    sameRecord(parseJsonObject(existing.beforeJson), { status: 'ACTIVE' }) &&
-    sameRecord(parseJsonObject(existing.afterJson), { status: 'REVOKED' })
+    sameRecord(existing.actor as unknown as Record<string, unknown>, { actorId: event.actor.actorId, actorType: 'user' }) &&
+    sameRecord(existing.before, { status: 'ACTIVE' }) &&
+    sameRecord(existing.after, { status: 'REVOKED' })
 }
 
-/** Persist a session revocation into W06's canonical immutable AuditEvent store. */
+/** Persist a session revocation through the native immutable AuditEvent Store. */
 export async function consumeSessionRevokedAuditEvent(
-  db: D1Database,
+  store: AuditEventStore,
   raw: unknown,
 ): Promise<'persisted' | 'duplicate'> {
   const event = await assertSessionRevokedEvent(raw)
-  const existing = await db.prepare(
-    'SELECT event_id AS eventId, request_id AS requestId, trace_id AS traceId, ' +
-    'actor_json AS actorJson, action, target_type AS targetType, target_id AS targetId, ' +
-    'before_json AS beforeJson, after_json AS afterJson, reason, occurred_at AS occurredAt ' +
-    'FROM audit_events WHERE event_id = ? LIMIT 1',
-  ).bind(event.eventId).first<ExistingSessionAuditRow>()
+  const existing = await store.findByEventId(event.eventId)
 
   if (existing) {
     if (!matchesPersisted(existing, event)) throw new Error('SESSION_AUDIT_EVENT_IDENTITY_CONFLICT')
@@ -165,18 +134,13 @@ export async function consumeSessionRevokedAuditEvent(
     occurredAt: event.occurredAt,
   }
   try {
-    await persistAuditEvent(db, auditEvent)
+    await store.append(auditEvent)
     return 'persisted'
   } catch (error) {
     // Two at-least-once deliveries can race after both observe no row. If the
     // unique event_id constraint wins for an identical immutable record, treat
     // the loser as a duplicate; a different record remains a permanent conflict.
-    const raced = await db.prepare(
-      'SELECT event_id AS eventId, request_id AS requestId, trace_id AS traceId, ' +
-      'actor_json AS actorJson, action, target_type AS targetType, target_id AS targetId, ' +
-      'before_json AS beforeJson, after_json AS afterJson, reason, occurred_at AS occurredAt ' +
-      'FROM audit_events WHERE event_id = ? LIMIT 1',
-    ).bind(event.eventId).first<ExistingSessionAuditRow>()
+    const raced = await store.findByEventId(event.eventId)
     if (raced) {
       if (!matchesPersisted(raced, event)) throw new Error('SESSION_AUDIT_EVENT_IDENTITY_CONFLICT')
       return 'duplicate'
