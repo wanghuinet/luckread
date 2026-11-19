@@ -20,10 +20,10 @@ import type { ModerationDecisionWriteStore } from '../moderation-decision-write-
 
 /**
  * @deprecated-next-version
- * Reason: W06 Neon runtime still exposes a D1-shaped facade for scheduled moderation outbox draining and an explicit legacy D1 compatibility branch.
- * Replacement: Native PostgreSQL moderation stores and explicit PostgreSQL transaction/query contracts.
+ * Reason: The remaining D1-shaped facade and explicit legacy D1 branch are retained only for the single-case moderation detail fallback.
+ * Replacement: Native PostgreSQL case-detail reads for every supported runtime profile.
  * Removal: Next release.
- * Condition: The scheduled moderation outbox consumer also accepts the native PostgreSQL store; then remove the remaining D1 compatibility facade and explicit legacy D1 branch.
+ * Condition: Remove the D1 detail fallback and its remaining call sites, then delete the compatibility facade and legacy D1 driver branch.
  */
 export type W06ModerationDatabaseDriver = 'd1' | 'neon'
 
