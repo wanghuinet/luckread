@@ -183,10 +183,13 @@ describe('W06 native PostgreSQL report write store', () => {
       { match: 'INSERT INTO audit_events', error: new Error('database internal detail') },
     ])
 
-    await expect(createPostgresModerationReportWriteStore(fake.pool).create(command))
-      .rejects.toBeInstanceOf(ModerationReportWriteStoreError)
-    await expect(createPostgresModerationReportWriteStore(fake.pool).create(command))
-      .rejects.toMatchObject({ code: 'REPORT_WRITE_FAILED', status: 500, message: 'REPORT_WRITE_FAILED' })
+    const store = createPostgresModerationReportWriteStore(fake.pool)
+    await expect(store.create(command)).rejects.toBeInstanceOf(ModerationReportWriteStoreError)
+    await expect(store.create(command)).rejects.toMatchObject({
+      code: 'REPORT_WRITE_FAILED',
+      status: 500,
+      message: 'REPORT_WRITE_FAILED',
+    })
     expect(fake.calls.at(-1)?.sql).toBe('ROLLBACK')
     expect(fake.client.release).toHaveBeenCalledOnce()
   })
