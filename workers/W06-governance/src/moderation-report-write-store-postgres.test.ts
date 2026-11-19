@@ -10,7 +10,7 @@ import {
 import type {
   W06ModerationPostgresClient,
   W06ModerationPostgresPool,
-} from './neon-postgres-d1-database.js'
+} from './moderation-postgres-pool.js'
 
 const command: ModerationReportWriteCommand = {
   actorUserId: 'user_1',

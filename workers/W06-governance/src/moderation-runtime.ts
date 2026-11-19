@@ -1,8 +1,6 @@
-import type { AuditActor, AuditEvent } from './audit-event'
 import {
   ModerationDecisionWriteStoreError,
   type ModerationDecisionWriteStore,
-  type ModerationReadyOutboxRow,
 } from './moderation-decision-write-store-postgres.js'
 import {
   ModerationQueueReadStoreError,
@@ -188,34 +186,6 @@ const responseForCase = (row: ModerationCaseRow, decision: ModerationDecisionRow
   updatedAt: row.updated_at,
 })
 
-const readCase = async (db: D1Database, caseId: string, reviewerId: string): Promise<ModerationCaseRow | null> => {
-  return db
-    .prepare(
-      `SELECT case_id,target_type,target_id,target_version,policy_version,state,priority,
-              assigned_reviewer_id,current_decision_id,evidence_bundle_ref,version,created_at,updated_at
-         FROM moderation_cases
-        WHERE case_id = ?
-          AND (assigned_reviewer_id IS NULL OR assigned_reviewer_id = ?)
-        LIMIT 1`,
-    )
-    .bind(caseId, reviewerId)
-    .first<ModerationCaseRow>()
-}
-
-const readCurrentDecision = async (db: D1Database, caseId: string): Promise<ModerationDecisionRow | null> =>
-  db
-    .prepare(
-      `SELECT decision_id,case_id,case_version,outcome,target_type,target_id,target_version,
-              policy_version,reason_code,severity,scope,effective_at,expires_at,source_kind,
-              reviewer_id,reviewer_layer,request_id,created_at
-         FROM moderation_decisions
-        WHERE case_id = ?
-        ORDER BY case_version DESC, created_at DESC
-        LIMIT 1`,
-    )
-    .bind(caseId)
-    .first<ModerationDecisionRow>()
-
 export async function listModerationQueue(
   source: ModerationQueueReadStore,
   reviewerId: string,
@@ -311,13 +281,8 @@ export async function getModerationCase(
   return responseForCase(row as ModerationCaseRow, decision)
 }
 
-const isModerationDecisionWriteStore = (
-  source: D1Database | ModerationDecisionWriteStore,
-): source is ModerationDecisionWriteStore =>
-  typeof (source as ModerationDecisionWriteStore).commit === 'function'
-
 export async function deliverModerationOutbox(
-  db: D1Database | ModerationDecisionWriteStore,
+  db: ModerationDecisionWriteStore,
   w03: Fetcher,
   outbox: {
     outboxId: string
@@ -377,18 +342,7 @@ export async function deliverModerationOutbox(
       Number.isInteger(result.version) &&
       typeof result.etag === 'string'
     ) {
-      if (isModerationDecisionWriteStore(db)) {
-        await db.markOutboxDelivered(outbox.outboxId, now)
-      } else {
-        await db
-          .prepare(
-            `UPDATE moderation_enforcement_outbox
-                SET status='DELIVERED', attempts=attempts+1, delivered_at=?, last_error=NULL
-              WHERE outbox_id=? AND status IN ('PENDING','RETRY')`,
-          )
-          .bind(now, outbox.outboxId)
-          .run()
-      }
+      await db.markOutboxDelivered(outbox.outboxId, now)
       return 'DELIVERED'
     }
   }
@@ -397,62 +351,25 @@ export async function deliverModerationOutbox(
   const attempts = (outbox.attempts ?? 0) + 1
   const backoffSeconds = Math.min(3600, Math.max(5, 2 ** Math.min(attempts, 10)))
   const nextAttemptAt = new Date(Date.now() + backoffSeconds * 1000).toISOString()
-  if (isModerationDecisionWriteStore(db)) {
-    await db.markOutboxRetry(outbox.outboxId, attempts, nextAttemptAt, errorCode)
-  } else {
-    await db
-      .prepare(
-        `UPDATE moderation_enforcement_outbox
-            SET status='RETRY', attempts=?, next_attempt_at=?, last_error=?
-          WHERE outbox_id=? AND status IN ('PENDING','RETRY')`,
-      )
-      .bind(attempts, nextAttemptAt, errorCode, outbox.outboxId)
-      .run()
-  }
+  await db.markOutboxRetry(outbox.outboxId, attempts, nextAttemptAt, errorCode)
   return 'RETRY'
 }
 
 export async function drainModerationOutbox(
-  db: D1Database | ModerationDecisionWriteStore,
+  db: ModerationDecisionWriteStore,
   w03: Fetcher,
   limit = 10,
 ): Promise<{ attempted: number; delivered: number; retry: number }> {
   const boundedLimit = Math.min(Math.max(limit, 1), 20)
   const now = new Date().toISOString()
-  const rows: ModerationReadyOutboxRow[] = isModerationDecisionWriteStore(db)
-    ? await db.listReadyOutbox(now, boundedLimit)
-    : (await db
-        .prepare(
-          `SELECT o.outbox_id,o.decision_id,o.case_id,o.target_type,o.target_id,o.target_version,o.outcome,
-                  o.policy_version,o.idempotency_key,o.status,o.attempts,o.next_attempt_at,
-                  d.reviewer_id,d.reviewer_layer,d.request_id
-             FROM moderation_enforcement_outbox o
-             JOIN moderation_decisions d ON d.decision_id=o.decision_id
-            WHERE o.status IN ('PENDING','RETRY') AND o.next_attempt_at <= ?
-            ORDER BY o.next_attempt_at ASC, o.created_at ASC
-            LIMIT ?`,
-        )
-        .bind(now, boundedLimit)
-        .all<ModerationReadyOutboxRow>()).results
+  const rows = await db.listReadyOutbox(now, boundedLimit)
 
   let delivered = 0
   let retry = 0
   for (const row of rows) {
     if (!row.reviewer_id || !row.reviewer_layer) {
       const nextAttemptAt = new Date(Date.now() + 60000).toISOString()
-      if (isModerationDecisionWriteStore(db)) {
-        await db.markOutboxMissingActor(row.outbox_id, nextAttemptAt)
-      } else {
-        await db
-          .prepare(
-            `UPDATE moderation_enforcement_outbox
-                SET status='RETRY', attempts=attempts+1,
-                    next_attempt_at=?, last_error='MISSING_DECISION_ACTOR'
-              WHERE outbox_id=?`,
-          )
-          .bind(nextAttemptAt, row.outbox_id)
-          .run()
-      }
+      await db.markOutboxMissingActor(row.outbox_id, nextAttemptAt)
       retry++
       continue
     }
@@ -480,7 +397,7 @@ export async function drainModerationOutbox(
 }
 
 export async function decideModerationCase(
-  db: D1Database | ModerationDecisionWriteStore,
+  db: ModerationDecisionWriteStore,
   w03: Fetcher,
   input: {
     reviewerId: string
@@ -524,81 +441,6 @@ export async function decideModerationCase(
     throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
   }
 
-  if (isModerationDecisionWriteStore(db)) {
-    const hash = await requestHash('decideModerationCase', {
-      caseId: input.caseId,
-      expectedVersion: input.expectedVersion,
-      decision: input.decision,
-      policyVersion: input.policyVersion,
-      reasonCode: input.reasonCode,
-      severity: input.severity,
-      scope: input.scope,
-      effectiveAt: input.effectiveAt,
-      expiresAt: input.expiresAt,
-    })
-    const now = new Date().toISOString()
-    let committed: Awaited<ReturnType<ModerationDecisionWriteStore['commit']>>
-    try {
-      committed = await db.commit({
-        reviewerId: input.reviewerId,
-        reviewerLayer: input.reviewerLayer,
-        caseId: input.caseId,
-        ifMatch: input.ifMatch,
-        idempotencyKey: input.idempotencyKey,
-        expectedVersion: input.expectedVersion,
-        requestHash: hash,
-        decisionId: decisionIdFor(hash),
-        outboxId: crypto.randomUUID(),
-        requestId: input.requestId,
-        correlationId: input.correlationId,
-        outcome: input.decision,
-        policyVersion: input.policyVersion,
-        reasonCode: input.reasonCode,
-        severity: input.severity,
-        scope: input.scope,
-        effectiveAt: input.effectiveAt,
-        expiresAt: input.expiresAt,
-        now,
-        idempotencyExpiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS).toISOString(),
-      })
-    } catch (error) {
-      if (error instanceof ModerationDecisionWriteStoreError) {
-        throw new ModerationRuntimeError(error.code, error.status)
-      }
-      throw error
-    }
-
-    if (!committed.replayed && committed.outbox) {
-      try {
-        await deliverModerationOutbox(db, w03, committed.outbox)
-      } catch {
-        // The committed outbox remains durable; scheduled drain is the recovery path.
-      }
-    }
-    return committed.response
-  }
-
-  const row = await db
-    .prepare(
-      `SELECT c.case_id,c.target_type,c.target_id,c.target_version,c.policy_version,c.state,c.priority,
-              c.assigned_reviewer_id,c.current_decision_id,c.evidence_bundle_ref,c.version,c.created_at,c.updated_at,
-              i.request_hash AS idem_request_hash,i.response_json AS idem_response_json,i.expires_at AS idem_expires_at
-         FROM moderation_cases c
-         LEFT JOIN moderation_decision_idempotency i
-           ON i.reviewer_id = ? AND i.case_id = c.case_id AND i.idempotency_key = ?
-        WHERE c.case_id = ?
-          AND (c.assigned_reviewer_id IS NULL OR c.assigned_reviewer_id = ?)
-        LIMIT 1`,
-    )
-    .bind(input.reviewerId, input.idempotencyKey, input.caseId, input.reviewerId)
-    .first<ModerationCaseRow & {
-      idem_request_hash: string | null
-      idem_response_json: string | null
-      idem_expires_at: string | null
-    }>()
-  if (!row) throw new ModerationRuntimeError('NOT_FOUND', 404)
-
-  const headerExpectedVersion = Number(normalizeEtag(input.ifMatch))
   const hash = await requestHash('decideModerationCase', {
     caseId: input.caseId,
     expectedVersion: input.expectedVersion,
@@ -610,154 +452,45 @@ export async function decideModerationCase(
     effectiveAt: input.effectiveAt,
     expiresAt: input.expiresAt,
   })
-  const decisionId = decisionIdFor(hash)
-
-  const existing = row.idem_request_hash
-    ? {
-        request_hash: row.idem_request_hash,
-        response_json: row.idem_response_json ?? '',
-        expires_at: row.idem_expires_at ?? '',
-      }
-    : null
-  if (existing && Date.parse(existing.expires_at) > Date.now()) {
-    if (existing.request_hash !== hash) throw new ModerationRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
-    return JSON.parse(existing.response_json) as {
-      caseId: string; decisionId: string; outcome: ModerationOutcome; version: number; effectiveAt: string; requestId: string
-    }
-  }
-
-  if (input.expectedVersion !== row.version || headerExpectedVersion !== row.version) {
-    throw new ModerationRuntimeError('PRECONDITION_FAILED', 412)
-  }
-  if (row.target_type !== 'content') throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
-  if (input.policyVersion !== row.policy_version) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
-  if (!row.target_version || row.target_version < 1) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
-  if (!['OPEN', 'UNDER_REVIEW'].includes(row.state)) throw new ModerationRuntimeError('INVALID_STATE', 409)
-
   const now = new Date().toISOString()
-  const nextCaseVersion = row.version + 1
-  const response = {
-    caseId: row.case_id,
-    decisionId,
-    outcome: input.decision,
-    version: nextCaseVersion,
-    effectiveAt: input.effectiveAt,
-    requestId: input.requestId,
-  }
-  const expiresAt = new Date(Date.now() + IDEMPOTENCY_TTL_MS).toISOString()
-  const outboxId = crypto.randomUUID()
-  const actor: AuditActor = {
-    actorId: input.reviewerId,
-    actorType: 'user',
-    layer: input.reviewerLayer as AuditActor['layer'],
-  }
-  const audit: AuditEvent = {
-    eventId: `audit_${crypto.randomUUID()}`,
-    requestId: input.requestId,
-    traceId: input.correlationId,
-    actor,
-    action: 'moderation.decide',
-    targetType: 'ModerationCase',
-    targetId: row.case_id,
-    before: { caseId: row.case_id, version: row.version, state: row.state, currentDecisionId: row.current_decision_id },
-    after: {
-      caseId: row.case_id, version: nextCaseVersion, state: 'ACTION_TAKEN',
-      currentDecisionId: decisionId, decisionId, outcome: input.decision,
-      policyVersion: input.policyVersion, reasonCode: input.reasonCode, severity: input.severity,
-      scope: input.scope, effectiveAt: input.effectiveAt, expiresAt: input.expiresAt,
-    },
-    reason: input.reasonCode,
-    occurredAt: now,
-  }
-
-  const statements = [
-    db.prepare(
-      `INSERT INTO moderation_decisions (
-        decision_id,case_id,case_version,outcome,target_type,target_id,target_version,
-        policy_version,reason_code,severity,scope,effective_at,expires_at,source_kind,
-        reviewer_id,reviewer_layer,request_id,created_at
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    ).bind(
-      decisionId,row.case_id,row.version,input.decision,row.target_type,row.target_id,row.target_version,
-      input.policyVersion,input.reasonCode,input.severity,input.scope,input.effectiveAt,input.expiresAt,
-      'HUMAN_REVIEW',input.reviewerId,input.reviewerLayer,input.requestId,now,
-    ),
-    db.prepare(
-      `UPDATE moderation_cases
-          SET state='ACTION_TAKEN',current_decision_id=?,version=?,updated_at=?
-        WHERE case_id=? AND version=?`,
-    ).bind(decisionId,nextCaseVersion,now,row.case_id,row.version),
-    db.prepare(
-      `INSERT OR REPLACE INTO moderation_txn_guard(id,successful)
-       VALUES (1, changes())`,
-    ),
-    db.prepare(
-      `DELETE FROM moderation_decision_idempotency
-        WHERE reviewer_id=? AND case_id=? AND idempotency_key=? AND expires_at<=?`,
-    ).bind(input.reviewerId,row.case_id,input.idempotencyKey,now),
-    db.prepare(
-      `INSERT INTO moderation_decision_idempotency (
-        id,reviewer_id,case_id,idempotency_key,request_hash,decision_id,response_status,response_json,created_at,expires_at
-      ) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-    ).bind(crypto.randomUUID(),input.reviewerId,row.case_id,input.idempotencyKey,hash,decisionId,200,JSON.stringify(response),now,expiresAt),
-    db.prepare(
-      `INSERT INTO moderation_enforcement_outbox (
-        outbox_id,decision_id,case_id,target_type,target_id,target_version,outcome,
-        policy_version,idempotency_key,status,attempts,next_attempt_at,last_error,created_at,delivered_at
-      ) VALUES (?,?,?,?,?,?,?,?,?,'PENDING',0,?,NULL,?,NULL)`,
-    ).bind(
-      outboxId,decisionId,row.case_id,row.target_type,row.target_id,row.target_version,
-      input.decision,input.policyVersion,input.idempotencyKey,now,now,
-    ),
-    db.prepare(
-      `INSERT INTO audit_events (
-        event_id,request_id,trace_id,actor_json,action,target_type,target_id,
-        before_json,after_json,reason,ip,user_agent,occurred_at
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    ).bind(
-      audit.eventId,audit.requestId ?? null,audit.traceId ?? null,JSON.stringify(audit.actor),audit.action,
-      audit.targetType,audit.targetId,JSON.stringify(audit.before),JSON.stringify(audit.after),audit.reason ?? null,
-      audit.ip ?? null,audit.userAgent ?? null,audit.occurredAt,
-    ),
-  ]
-
+  let committed: Awaited<ReturnType<ModerationDecisionWriteStore['commit']>>
   try {
-    const results = await db.batch(statements)
-    if (!results.every((result) => result.success)) throw new ModerationRuntimeError('SERVICE_UNAVAILABLE',503)
-  } catch (error) {
-    if (error instanceof ModerationRuntimeError) throw error
-    if (/UNIQUE constraint|constraint failed/i.test(error instanceof Error ? error.message : String(error))) {
-      const replay = await db.prepare(
-        `SELECT request_hash,response_json
-           FROM moderation_decision_idempotency
-          WHERE reviewer_id=? AND case_id=? AND idempotency_key=?
-          LIMIT 1`,
-      ).bind(input.reviewerId,row.case_id,input.idempotencyKey).first<{request_hash:string;response_json:string}>()
-      if (replay?.request_hash === hash) return JSON.parse(replay.response_json) as typeof response
-      throw new ModerationRuntimeError('PRECONDITION_FAILED',412)
-    }
-    throw new ModerationRuntimeError('SERVICE_UNAVAILABLE',503)
-  }
-
-  try {
-    await deliverModerationOutbox(db,w03,{
-      outboxId,
-      decisionId,
-      caseId: row.case_id,
-      targetId: row.target_id,
-      targetVersion: row.target_version,
-      outcome: input.decision,
-      policyVersion: input.policyVersion,
-      idempotencyKey: input.idempotencyKey,
-      attempts: 0,
-      correlationId: input.correlationId,
-      requestId: input.requestId,
+    committed = await db.commit({
       reviewerId: input.reviewerId,
       reviewerLayer: input.reviewerLayer,
+      caseId: input.caseId,
+      ifMatch: input.ifMatch,
+      idempotencyKey: input.idempotencyKey,
+      expectedVersion: input.expectedVersion,
+      requestHash: hash,
+      decisionId: decisionIdFor(hash),
+      outboxId: crypto.randomUUID(),
+      requestId: input.requestId,
+      correlationId: input.correlationId,
+      outcome: input.decision,
+      policyVersion: input.policyVersion,
+      reasonCode: input.reasonCode,
+      severity: input.severity,
+      scope: input.scope,
+      effectiveAt: input.effectiveAt,
+      expiresAt: input.expiresAt,
+      now,
+      idempotencyExpiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS).toISOString(),
     })
-  } catch {
-    // The durable outbox remains pending; scheduled drain will retry.
+  } catch (error) {
+    if (error instanceof ModerationDecisionWriteStoreError) {
+      throw new ModerationRuntimeError(error.code, error.status)
+    }
+    throw error
   }
 
-  return response
+  if (!committed.replayed && committed.outbox) {
+    try {
+      await deliverModerationOutbox(db, w03, committed.outbox)
+    } catch {
+      // The committed outbox remains durable; scheduled drain is the recovery path.
+    }
+  }
+  return committed.response
+
 }

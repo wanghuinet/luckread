@@ -3,7 +3,7 @@ import { assertW09AuditEventStatement } from '../../W09-platform/src/audit-event
 import type { AuditEvent, AuditActor } from './audit-event.js'
 import type { AuditEventStore } from './audit-event-store.js'
 import { AuditEventStoreError } from './audit-event-store.js'
-import type { W06ModerationPostgresPool } from './neon-postgres-d1-database.js'
+import type { W06ModerationPostgresPool } from './moderation-postgres-pool.js'
 
 type QueryResult<Row extends Record<string, unknown>> = {
   rows: Row[]

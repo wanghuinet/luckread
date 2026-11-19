@@ -6,7 +6,6 @@ import { dirname } from 'node:path'
 
 import { decideModerationCase, drainModerationOutbox, getModerationCase } from '../src/moderation-runtime.ts'
 import { createReport } from '../src/report-runtime.ts'
-import { createPostgresModerationD1Database } from '../src/neon-postgres-d1-database.ts'
 import { createPostgresModerationDecisionWriteStore } from '../src/moderation-decision-write-store-postgres.ts'
 import { createPostgresModerationCaseDetailReadStore } from '../src/moderation-case-detail-read-store-postgres.ts'
 import { createPostgresModerationReportWriteStore } from '../src/moderation-report-write-store-postgres.ts'
@@ -84,7 +83,7 @@ try {
       }
     },
   }
-  const db = createPostgresModerationD1Database(executor)
+  const query = (sql, values = []) => client.query(sql, values)
   const decisionStore = createPostgresModerationDecisionWriteStore(executor)
   const caseDetailStore = createPostgresModerationCaseDetailReadStore(executor)
   checks.usesSharedD1_03PostgresPool = true
@@ -100,12 +99,13 @@ try {
   const idempotencyKey = marker + '-idempotency'
   const now = new Date().toISOString()
   const insertCase = async (caseId, targetId) => {
-    await db.prepare(
+    await query(
       `INSERT INTO moderation_cases (
         case_id,target_type,target_id,target_version,policy_version,state,priority,
         assigned_reviewer_id,current_decision_id,evidence_bundle_ref,version,created_at,updated_at
-      ) VALUES (?,?,?,?,?,'OPEN',10,NULL,NULL,NULL,1,?,?)`,
-    ).bind(caseId, 'content', targetId, 1, 'moderation-v1', now, now).run()
+      ) VALUES ($1,'content',$2,1,'moderation-v1','OPEN',10,NULL,NULL,NULL,1,$3::timestamptz,$3::timestamptz)`,
+      [caseId, targetId, now],
+    )
   }
   await insertCase(successfulCaseId, successfulTargetId)
   await insertCase(staleCaseId, staleTargetId)
@@ -152,15 +152,11 @@ try {
   assert.equal(persisted.status, 'ACTION_TAKEN')
   assert.equal(persisted.version, 2)
   assert.equal(persisted.currentDecision?.decisionId, first.decisionId)
-  const outbox = await db.prepare(
-    'SELECT outbox_id,status,attempts FROM moderation_enforcement_outbox WHERE decision_id = ?',
-  ).bind(first.decisionId).first()
+  const outbox = (await query('SELECT outbox_id,status,attempts FROM moderation_enforcement_outbox WHERE decision_id = $1', [first.decisionId])).rows[0]
   assert.ok(outbox)
   assert.equal(outbox.status, 'DELIVERED')
   assert.equal(outbox.attempts, 1)
-  const audit = await db.prepare(
-    'SELECT event_id,action FROM audit_events WHERE target_id = ?',
-  ).bind(successfulCaseId).first()
+  const audit = (await query('SELECT event_id,action FROM audit_events WHERE target_id = $1', [successfulCaseId])).rows[0]
   assert.ok(audit)
   assert.equal(audit.action, 'moderation.decide')
   checks.auditEventWrittenWithDecision = true
@@ -168,9 +164,7 @@ try {
 
   const replay = await decideModerationCase(decisionStore, w03, successfulInput)
   assert.deepEqual(replay, first)
-  const decisionCount = await db.prepare(
-    'SELECT count(*) AS count FROM moderation_decisions WHERE case_id = ?',
-  ).bind(successfulCaseId).first()
+  const decisionCount = (await query('SELECT count(*)::int AS count FROM moderation_decisions WHERE case_id = $1', [successfulCaseId])).rows[0]
   assert.equal(Number(decisionCount?.count), 1)
   checks.sameKeyReplayReturnedStoredDecision = true
 
@@ -180,33 +174,21 @@ try {
   )
   checks.sameKeyDifferentPayloadReturns422 = true
 
-  await db.prepare(
-    "UPDATE moderation_enforcement_outbox SET status='PENDING', attempts=0, next_attempt_at=?, delivered_at=NULL WHERE decision_id=?",
-  ).bind(now, first.decisionId).run()
-  await db.prepare(
-    'UPDATE moderation_decisions SET reviewer_id=NULL, reviewer_layer=NULL WHERE decision_id=?',
-  ).bind(first.decisionId).run()
+  await query("UPDATE moderation_enforcement_outbox SET status='PENDING', attempts=0, next_attempt_at=$1::timestamptz, delivered_at=NULL WHERE decision_id=$2", [now, first.decisionId])
+  await query('UPDATE moderation_decisions SET reviewer_id=NULL, reviewer_layer=NULL WHERE decision_id=$1', [first.decisionId])
   const missingActorDrain = await drainModerationOutbox(decisionStore, w03, 10)
   assert.deepEqual(missingActorDrain, { attempted: 1, delivered: 0, retry: 1 })
-  const missingActorOutbox = await db.prepare(
-    'SELECT status, attempts, last_error FROM moderation_enforcement_outbox WHERE decision_id=?',
-  ).bind(first.decisionId).first()
+  const missingActorOutbox = (await query('SELECT status, attempts, last_error FROM moderation_enforcement_outbox WHERE decision_id=$1', [first.decisionId])).rows[0]
   assert.equal(missingActorOutbox.status, 'RETRY')
   assert.equal(missingActorOutbox.attempts, 1)
   assert.equal(missingActorOutbox.last_error, 'MISSING_DECISION_ACTOR')
   checks.nativeOutboxDrainHandlesMissingActorRetry = true
 
-  await db.prepare(
-    'UPDATE moderation_decisions SET reviewer_id=?, reviewer_layer=? WHERE decision_id=?',
-  ).bind(reviewerId, 'L6', first.decisionId).run()
-  await db.prepare(
-    "UPDATE moderation_enforcement_outbox SET next_attempt_at=? WHERE decision_id=?",
-  ).bind(now, first.decisionId).run()
+  await query('UPDATE moderation_decisions SET reviewer_id=$1, reviewer_layer=$2 WHERE decision_id=$3', [reviewerId, 'L6', first.decisionId])
+  await query("UPDATE moderation_enforcement_outbox SET next_attempt_at=$1::timestamptz WHERE decision_id=$2", [now, first.decisionId])
   const deliveredRetryDrain = await drainModerationOutbox(decisionStore, w03, 10)
   assert.deepEqual(deliveredRetryDrain, { attempted: 1, delivered: 1, retry: 0 })
-  const redeliveredOutbox = await db.prepare(
-    'SELECT status, attempts, last_error FROM moderation_enforcement_outbox WHERE decision_id=?',
-  ).bind(first.decisionId).first()
+  const redeliveredOutbox = (await query('SELECT status, attempts, last_error FROM moderation_enforcement_outbox WHERE decision_id=$1', [first.decisionId])).rows[0]
   assert.equal(redeliveredOutbox.status, 'DELIVERED')
   assert.equal(redeliveredOutbox.attempts, 2)
   assert.equal(redeliveredOutbox.last_error, null)
@@ -226,26 +208,18 @@ try {
   const report = await createReport(reportStore, reportInput)
   checks.moderationReportUsesNativePostgresStore = true
   assert.equal(report.status, 'CREATED')
-  const storedReport = await db.prepare(
-    'SELECT report_id,target_type,target_id,reason_code FROM moderation_reports WHERE report_id = ?',
-  ).bind(report.reportId).first()
+  const storedReport = (await query('SELECT report_id,target_type,target_id,reason_code FROM moderation_reports WHERE report_id = $1', [report.reportId])).rows[0]
   assert.ok(storedReport)
   assert.equal(storedReport.target_type, 'content')
-  const reportAudit = await db.prepare(
-    'SELECT event_id,action FROM audit_events WHERE target_id = ?',
-  ).bind(report.reportId).first()
+  const reportAudit = (await query('SELECT event_id,action FROM audit_events WHERE target_id = $1', [report.reportId])).rows[0]
   assert.ok(reportAudit)
   assert.equal(reportAudit.action, 'moderation.report.created')
   checks.moderationReportWrittenWithAudit = true
 
   const reportReplay = await createReport(reportStore, reportInput)
   assert.deepEqual(reportReplay, report)
-  const reportRows = await db.prepare(
-    'SELECT count(*) AS count FROM moderation_reports WHERE report_id = ?',
-  ).bind(report.reportId).first()
-  const reportAuditRows = await db.prepare(
-    "SELECT count(*) AS count FROM audit_events WHERE target_id = ? AND action = 'moderation.report.created'",
-  ).bind(report.reportId).first()
+  const reportRows = (await query('SELECT count(*)::int AS count FROM moderation_reports WHERE report_id = $1', [report.reportId])).rows[0]
+  const reportAuditRows = (await query("SELECT count(*)::int AS count FROM audit_events WHERE target_id = $1 AND action = 'moderation.report.created'", [report.reportId])).rows[0]
   assert.equal(Number(reportRows?.count), 1)
   assert.equal(Number(reportAuditRows?.count), 1)
   checks.moderationReportReplayReturnedStoredResponse = true
@@ -379,20 +353,12 @@ try {
     decideModerationCase(decisionStore, w03, staleInput),
     (error) => error?.code === 'SERVICE_UNAVAILABLE' && error?.status === 503,
   )
-  const staleCase = await db.prepare(
-    'SELECT state,version FROM moderation_cases WHERE case_id = ?',
-  ).bind(staleCaseId).first()
+  const staleCase = (await query('SELECT state,version FROM moderation_cases WHERE case_id = $1', [staleCaseId])).rows[0]
   assert.equal(staleCase?.state, 'OPEN')
   assert.equal(staleCase?.version, 1)
-  const rolledBackDecision = await db.prepare(
-    'SELECT count(*) AS count FROM moderation_decisions WHERE case_id = ?',
-  ).bind(staleCaseId).first()
-  const rolledBackOutbox = await db.prepare(
-    'SELECT count(*) AS count FROM moderation_enforcement_outbox WHERE case_id = ?',
-  ).bind(staleCaseId).first()
-  const rolledBackAudit = await db.prepare(
-    'SELECT count(*) AS count FROM audit_events WHERE target_id = ?',
-  ).bind(staleCaseId).first()
+  const rolledBackDecision = (await query('SELECT count(*)::int AS count FROM moderation_decisions WHERE case_id = $1', [staleCaseId])).rows[0]
+  const rolledBackOutbox = (await query('SELECT count(*)::int AS count FROM moderation_enforcement_outbox WHERE case_id = $1', [staleCaseId])).rows[0]
+  const rolledBackAudit = (await query('SELECT count(*)::int AS count FROM audit_events WHERE target_id = $1', [staleCaseId])).rows[0]
   assert.equal(Number(rolledBackDecision?.count), 0)
   assert.equal(Number(rolledBackOutbox?.count), 0)
   assert.equal(Number(rolledBackAudit?.count), 0)

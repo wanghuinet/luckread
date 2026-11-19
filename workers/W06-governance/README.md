@@ -32,7 +32,7 @@ Current source slice:
 - The AUTH-013 account-state, AUTH-007 MFA and AUTH-010 Session-revocation queue consumers share a native PostgreSQL AuditEvent Store; W09's SQL policy permits only the AuditEvent SELECT/INSERT statements, with the existing W09 table/trigger remaining authoritative.
 - Consumer validation, event identity conflicts, duplicate delivery, W10 ACK/retry behavior and the native AuditEvent Store are covered by source tests and the disposable PostgreSQL 18 rehearsal.
 - Direct `/internal/audit-events/*` HTTP ingestion now uses the same native AuditEvent Store for SELECT/INSERT and preserves route-specific semantic replay, exact immutable conflict checks, authenticated actor derivation, and 201/200/409/503 responses. The unused D1-only `audit-event-persistence.ts` adapter and its test were removed.
-- The W06 Worker entrypoint commits moderation decisions and idempotency records through the native PostgreSQL transaction Store; scheduled enforcement outbox scanning, retry and dispatch also use that Store. The D1 compatibility adapter remains confined to older disposable rehearsal fixtures, not production request or scheduled paths.
+- The W06 Worker HTTP and scheduled entrypoints are PostgreSQL-native. No D1Database facade, D1 prepared-statement contract, SQLite placeholder translator, or D1 batch emulation remains in W06 runtime or rehearsal code. Decision, idempotency, AuditEvent and outbox writes retain their transaction and replay guarantees.
 
 No remote D1 mutation or production deployment is implied by this source directory.
 

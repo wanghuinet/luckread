@@ -120,7 +120,7 @@ async function count(table, whereSql, values) {
 try {
   // This database is deliberately disposable and has the exact name accepted
   // by W06's production Hyperdrive runtime guard.
-  await adminPool.query('DROP DATABASE IF EXISTS luckread_governance WITH (FORCE)')
+  await adminPool.query('DROP DATABASE IF EXISTS luckread_governance')
   await adminPool.query('CREATE DATABASE luckread_governance')
   pool = new Pool({ connectionString, max: 3, connectionTimeoutMillis: 5_000 })
 
@@ -385,7 +385,14 @@ try {
     failure ??= closeError
   }
   try {
-    await adminPool.query('DROP DATABASE IF EXISTS luckread_governance WITH (FORCE)')
+    const remainingSessions = await adminPool.query(
+      'SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()',
+      ['luckread_governance'],
+    )
+    if (Number(remainingSessions.rows[0]?.count ?? -1) !== 0) {
+      throw new Error('W06_ENTRYPOINT_POSTGRES_SESSIONS_NOT_CLOSED')
+    }
+    await adminPool.query('DROP DATABASE IF EXISTS luckread_governance')
     checks.disposableDatabaseDropped = true
   } catch (dropError) {
     failure ??= dropError

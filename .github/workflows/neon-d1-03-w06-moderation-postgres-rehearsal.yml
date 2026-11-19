@@ -37,8 +37,6 @@ on:
       - 'workers/W06-governance/src/index.ts'
       - 'workers/W09-platform/src/audit-event-postgres-adapter.ts'
       - 'workers/W06-governance/src/moderation-queue-read-store*.ts'
-      - 'workers/W06-governance/src/neon-postgres-d1-database.ts'
-      - 'workers/W06-governance/src/neon-postgres-d1-database.test.ts'
       - 'workers/W09-platform/src/neon-postgres-migrations/**'
       - 'workers/W06-governance/scripts/neon/rehearse-moderation-queue-postgres-runtime.mjs'
   push:

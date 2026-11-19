@@ -6,23 +6,22 @@ on:
     paths:
       - '.github/workflows/w06-neon-entrypoint-postgres18-ci.yml'
       - 'workers/W06-governance/scripts/postgres/rehearse-neon-moderation-entrypoint.mjs'
-      - 'workers/W06-governance/src/neon/moderation-database-runtime.ts'
+      - 'workers/W06-governance/src/**'
       - 'workers/W06-governance/src/index.ts'
       - 'workers/W06-governance/src/moderation-runtime.ts'
       - 'workers/W06-governance/src/moderation-decision-write-store-postgres.ts'
-      - 'workers/W06-governance/src/neon-postgres-d1-database.ts'
       - 'workers/W06-governance/src/neon-postgres-migrations/**'
       - 'workers/W09-platform/src/neon-postgres-migrations/**'
   push:
     branches: [main]
     paths:
+      - 'workers/W06-governance/src/**'
       - '.github/workflows/w06-neon-entrypoint-postgres18-ci.yml'
       - 'workers/W06-governance/scripts/postgres/rehearse-neon-moderation-entrypoint.mjs'
       - 'workers/W06-governance/src/neon/moderation-database-runtime.ts'
       - 'workers/W06-governance/src/index.ts'
       - 'workers/W06-governance/src/moderation-runtime.ts'
       - 'workers/W06-governance/src/moderation-decision-write-store-postgres.ts'
-      - 'workers/W06-governance/src/neon-postgres-d1-database.ts'
       - 'workers/W06-governance/src/neon-postgres-migrations/**'
       - 'workers/W09-platform/src/neon-postgres-migrations/**'
 

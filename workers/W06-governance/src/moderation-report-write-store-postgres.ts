@@ -6,7 +6,7 @@ import type {
   ReportResult,
 } from './moderation-report-write-store.js'
 import { ModerationReportWriteStoreError } from './moderation-report-write-store.js'
-import type { W06ModerationPostgresPool } from './neon-postgres-d1-database.js'
+import type { W06ModerationPostgresPool } from './moderation-postgres-pool.js'
 
 type QueryResult<Row extends Record<string, unknown>> = {
   rows: Row[]
