@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RevenueCatSubscriberSnapshot } from './revenuecat-subscriber-api.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import {
   buildRevenueCatSubscriberReconciliationCandidates,
   RevenueCatSubscriberReconciliationError,
@@ -58,22 +59,21 @@ function fakeDb(row: FakeRow | null = {
 }, failure?: Error) {
   const statements: string[] = [];
   const bindings: unknown[][] = [];
-  const db = {
-    prepare(statement: string) {
+  const db: W07WebhookPostgresPool = {
+    async query<Row extends Record<string, unknown> = Record<string, unknown>>(
+      statement: string,
+      values: unknown[] = [],
+    ) {
       statements.push(statement);
+      bindings.push(values);
+      if (failure) throw failure;
       return {
-        bind(...values: unknown[]) {
-          bindings.push(values);
-          return {
-            async first<T>() {
-              if (failure) throw failure;
-              return row as T | null;
-            },
-          };
-        },
+        rows: row ? [row as unknown as Row] : [],
+        rowCount: row ? 1 : 0,
       };
     },
-  } as unknown as D1Database;
+    async connect() { throw new Error('candidate lookup must remain read-only'); },
+  };
   return { db, statements, bindings };
 }
 
