@@ -109,6 +109,12 @@ function sameRecord(actual: Record<string, unknown>, expected: Record<string, un
     actualKeys.every((key, index) => key === expectedKeys[index] && actual[key] === expected[key])
 }
 
+function sameTimestampAtJavaScriptPrecision(left: string, right: string): boolean {
+  const leftMilliseconds = Date.parse(left)
+  const rightMilliseconds = Date.parse(right)
+  return Number.isFinite(leftMilliseconds) && leftMilliseconds === rightMilliseconds
+}
+
 function isSamePersistedMfaAuditEvent(
   existing: AuditEvent,
   event: MfaAuditQueueEvent,
@@ -120,7 +126,7 @@ function isSamePersistedMfaAuditEvent(
     existing.targetType === 'User' &&
     existing.targetId === event.resourceId &&
     (existing.reason ?? null) === (event.payload.reasonCode ?? null) &&
-    existing.occurredAt === event.occurredAt &&
+    sameTimestampAtJavaScriptPrecision(existing.occurredAt, event.occurredAt) &&
     sameRecord(existing.actor as unknown as Record<string, unknown>, {
       actorId: event.resourceId,
       actorType: 'user',
