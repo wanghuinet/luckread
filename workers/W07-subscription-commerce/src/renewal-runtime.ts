@@ -459,7 +459,13 @@ async function isExactMandateActive(
   if (!cycle.mandate_record_id || !cycle.payment_method_id) return false;
   // PAY-007 guard: exact-tuple revalidation also excludes payment_method_revocation_requests
   // rows where r.status <> 'COMPLETED' immediately before MIT submission.
-  return isExactMandateActive(db, cycle);
+  try {
+    return await isExactRenewalMandateActivePostgres(
+      db, cycle.mandate_record_id, cycle.merchant_id, cycle.subscriber_id, cycle.payment_method_id,
+    );
+  } catch {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
 }
 
 async function readActiveMandateFromStore(
@@ -481,13 +487,7 @@ async function isExactMandateActiveFromStore(
   if (!isPostgresRenewalCycleStore(db)) {
     throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
-  try {
-    return await isExactRenewalMandateActivePostgres(
-      db, cycle.mandate_record_id, cycle.merchant_id, cycle.subscriber_id, cycle.payment_method_id,
-    );
-  } catch {
-    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-  }
+  return isExactMandateActive(db, cycle);
 }
 
 
