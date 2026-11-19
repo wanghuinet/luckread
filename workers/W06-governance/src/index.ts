@@ -948,14 +948,6 @@ function canonicalAuditJson(value: unknown): string {
   return JSON.stringify(value)
 }
 
-function matchesAuditJsonText(actual: string, expected: unknown): boolean {
-  try {
-    return canonicalAuditJson(JSON.parse(actual)) === canonicalAuditJson(expected)
-  } catch {
-    return false
-  }
-}
-
 function matchesMembershipPlanMutationRequestAudit(existing: AuditEvent, expected: AuditEvent): boolean {
   const storedActor = existing.actor as unknown as Record<string, unknown>
   const expectedActor = expected.actor as unknown as Record<string, unknown>
@@ -1008,7 +1000,7 @@ async function findAuditEvent(store: AuditEventStore, eventId: string): Promise<
   return store.findByEventId(eventId)
 }
 
-function sameTimestampAtPostgresPrecision(left: string, right: string): boolean {
+function sameTimestampAtPostgresDriverPrecision(left: string, right: string): boolean {
   const leftMilliseconds = Date.parse(left)
   const rightMilliseconds = Date.parse(right)
   return Number.isFinite(leftMilliseconds) && leftMilliseconds === rightMilliseconds
