@@ -13,6 +13,7 @@ import {
   type PaymentAttemptCreation,
   type PaymentAttemptDto,
 } from './payment-persistence.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 const CUSTOMER_ID = 'verified-user-001';
 const ORDER_ID = 'ord_test_001';
@@ -61,9 +62,17 @@ function createFixture(options: {
 
   const attempt = options.attempt ?? { payment: paymentDto, replayed: false, pricingMode: 'live' };
   const remotePayment = options.providerPayment ?? providerPayment;
+  const pool: W07WebhookPostgresPool = {
+    async query<Row extends Record<string, unknown> = Record<string, unknown>>() {
+      return { rows: [] as Row[], rowCount: 0 };
+    },
+    async connect() {
+      throw new Error('payment intent fixture does not open a transaction');
+    },
+  };
   const env = {
-    W07_DATABASE_DRIVER: 'd1',
-    D1_04: {} as D1Database,
+    W07_DATABASE_DRIVER: 'neon',
+    HYPERDRIVE_D1_04: { connectionString: 'postgresql://test.invalid/luckread_finance' },
     HYPERSWITCH_ENVIRONMENT: 'sandbox',
     HYPERSWITCH_API_KEY: 'sandbox-api-key',
     HYPERSWITCH_MERCHANT_ID: MERCHANT_ID,
@@ -71,6 +80,7 @@ function createFixture(options: {
   } as Parameters<typeof handleCommercePaymentIntentRequest>[2];
 
   const dependencies: RuntimeDependencies = {
+    getPostgresPool: () => pool,
     createAttempt: async (...args) => {
       calls.createAttempt.push(args);
       if (options.createAttemptError) throw options.createAttemptError;
@@ -93,7 +103,7 @@ function createFixture(options: {
     },
   };
 
-  return { env, dependencies, calls };
+  return { env, dependencies, calls, pool };
 }
 
 function request(options: { body?: string; method?: string; idempotencyKey?: string } = {}): Request {
@@ -150,7 +160,7 @@ describe('W07 internal payment-intent runtime', () => {
       ORDER_ID,
       CLIENT_IDEMPOTENCY_KEY,
       MERCHANT_ID,
-      { paymentEnvironment: 'sandbox', databaseDialect: 'd1' },
+      { paymentEnvironment: 'sandbox' },
     ]);
     expect(fixture.calls.createProviderIntent).toHaveLength(1);
     expect(fixture.calls.createProviderIntent[0]?.[0]).toEqual({
@@ -183,17 +193,14 @@ describe('W07 internal payment-intent runtime', () => {
     expect(body.requestId).toMatch(/^req_/);
   });
 
-  it('uses the selected Neon D1-04 database for payment-attempt creation and intent persistence', async () => {
-    const fixture = createFixture({ env: { W07_DATABASE_DRIVER: 'neon' } });
-    const neonDatabase = {} as D1Database;
-    const dependencies = { ...fixture.dependencies, getDatabase: () => neonDatabase };
+  it('uses the native D1-04 PostgreSQL pool for payment-attempt creation and intent persistence', async () => {
+    const fixture = createFixture();
     const response = await handleCommercePaymentIntentRequest(
-      request({ idempotencyKey: CLIENT_IDEMPOTENCY_KEY }), CUSTOMER_ID, fixture.env, dependencies,
+      request({ idempotencyKey: CLIENT_IDEMPOTENCY_KEY }), CUSTOMER_ID, fixture.env, fixture.dependencies,
     );
     expect(response?.status).toBe(201);
-    expect(fixture.calls.createAttempt[0]?.[0]).toBe(neonDatabase);
-    expect(fixture.calls.createAttempt[0]?.[5]).toMatchObject({ databaseDialect: 'postgres' });
-    expect(fixture.calls.recordIntent[0]?.[0]).toBe(neonDatabase);
+    expect(fixture.calls.createAttempt[0]?.[0]).toBe(fixture.pool);
+    expect(fixture.calls.recordIntent[0]?.[0]).toBe(fixture.pool);
   });
 
   it('uses the same provider idempotency key on a client retry and returns HTTP 200 for replay', async () => {
