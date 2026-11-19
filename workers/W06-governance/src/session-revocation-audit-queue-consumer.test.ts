@@ -97,6 +97,18 @@ describe('AUTH-010 W06 session revocation audit consumer', () => {
       .rejects.toThrow('SESSION_AUDIT_EVENT_IDENTITY_CONFLICT')
   })
 
+  it('deduplicates timestamps with PostgreSQL microseconds beyond JavaScript Date precision', async () => {
+    const microsecondEvent = {
+      ...event,
+      occurredAt: '2026-11-06T00:00:00.123456Z',
+    }
+    const existing = storedEvent({ occurredAt: '2026-11-06T00:00:00.123Z' })
+    const { store, append } = createStore(existing)
+
+    await expect(consumeSessionRevokedAuditEvent(store, microsecondEvent)).resolves.toBe('duplicate')
+    expect(append).not.toHaveBeenCalled()
+  })
+
   it('rejects reused event IDs whose actor, action, target or state differs', async () => {
     const conflicts: Partial<AuditEvent>[] = [
       { action: 'identity.account_state_changed' },
