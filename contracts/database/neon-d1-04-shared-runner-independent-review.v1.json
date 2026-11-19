@@ -143,7 +143,7 @@
       },
       {
         "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0006_w07_d1_04_payment_method_revocation.sql",
-        "gitBlobSha1": "e7f7a42d957cf02c1a243a0fdd973b61c7b25721"
+        "gitBlobSha1": "7b790ed1b3499330f87c9368cfe3b74009535f95"
       },
       {
         "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.mjs",
