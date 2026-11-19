@@ -13,11 +13,13 @@ import {
   type RenewalOutcomeSyncResult,
 } from './subscription-renewal-outcome.js';
 import { getW07SelectedD104Database, resolveW07DatabaseDriver } from './neon/payment-method-read-runtime.js';
+import { getW07MembershipPostgresPool } from './neon/membership-database-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 const MAX_CYCLES_PER_TICK = 5;
 const MAX_OUTCOMES_PER_TICK = 10;
 
-const REQUIRED_D1_01_TABLES = [
+const REQUIRED_MEMBERSHIP_TABLES = [
   'membership_subscriptions',
   'membership_plans',
   'membership_plan_versions',
@@ -59,6 +61,7 @@ export type RenewalScheduledBatchResult =
 
 export type RenewalScheduledDependencies = Readonly<{
   readTableNames?: (db: D1Database, expected: readonly string[], dialect?: 'd1' | 'neon') => Promise<Set<string>>;
+  readMembershipTableNames?: (db: W07WebhookPostgresPool, expected: readonly string[]) => Promise<Set<string>>;
   getDatabase?: (env: RenewalRuntimeEnv) => D1Database;
   syncPending?: typeof syncPendingRenewalOutcomes;
   scanDue?: typeof scanDueSubscriptionRenewals;
@@ -78,6 +81,18 @@ async function readTableNames(db: D1Database, expected: readonly string[], diale
   return new Set((result.results ?? []).map((row) => row.name));
 }
 
+async function readMembershipTableNames(
+  pool: W07WebhookPostgresPool,
+  expected: readonly string[],
+): Promise<Set<string>> {
+  const result = await pool.query<{ name: string } & Record<string, unknown>>(
+    "SELECT table_name AS name FROM information_schema.tables " +
+    "WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' AND table_name = ANY($1::text[])",
+    [[...expected]],
+  );
+  return new Set(result.rows.map((row) => row.name));
+}
+
 /**
  * Bounded renewal batch for existing W07 state, invoked by the admitted W10 async runtime.
  *
@@ -95,11 +110,12 @@ export async function runRenewalScheduledBatch(
   const selectedD104 = (dependencies.getDatabase ?? getW07SelectedD104Database)(env);
   const selectedEnv: RenewalRuntimeEnv = { ...env, D1_04: selectedD104 };
   const getSelectedDatabase = () => selectedD104;
-  let d1_01: Set<string>;
-  let d1_04: Set<string>;
+  let membershipTables: Set<string>;
+  let financeTables: Set<string>;
   try {
-    [d1_01, d1_04] = await Promise.all([
-      getTableNames(env.D1_01, REQUIRED_D1_01_TABLES, env.W07_MEMBERSHIP_DATABASE_DRIVER?.trim().toLowerCase() === 'neon' ? 'neon' : 'd1'),
+    const membershipPool = getW07MembershipPostgresPool(env);
+    [membershipTables, financeTables] = await Promise.all([
+      (dependencies.readMembershipTableNames ?? readMembershipTableNames)(membershipPool, REQUIRED_MEMBERSHIP_TABLES),
       getTableNames(selectedD104, REQUIRED_D1_04_TABLES, databaseDialect),
     ]);
   } catch {
@@ -107,8 +123,8 @@ export async function runRenewalScheduledBatch(
   }
 
   const missingTables = [
-    ...REQUIRED_D1_01_TABLES.filter((name) => !d1_01.has(name)).map((name) => 'D1-01.' + name),
-    ...REQUIRED_D1_04_TABLES.filter((name) => !d1_04.has(name)).map((name) => 'D1-04.' + name),
+    ...REQUIRED_MEMBERSHIP_TABLES.filter((name) => !membershipTables.has(name)).map((name) => 'D1-01.' + name),
+    ...REQUIRED_D1_04_TABLES.filter((name) => !financeTables.has(name)).map((name) => 'D1-04.' + name),
   ];
   if (missingTables.length > 0) {
     return { status: 'SCHEMA_NOT_READY', reason: 'REQUIRED_TABLES_MISSING', missingTables };
