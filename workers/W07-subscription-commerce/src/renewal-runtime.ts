@@ -1123,9 +1123,10 @@ export async function processSubscriptionRenewalCycle(
   const membershipStore = getRenewalMembershipStore(env, dependencies);
   const nowFn = dependencies.now ?? (() => new Date());
   let now = nowIso(nowFn);
-  let cycle = await readCycleById(getW07RenewalCycleStore(env), cycleId);
+  const cycleStore = (dependencies.getRenewalCycleStore ?? getW07RenewalCycleStore)(env);
+  let cycle = await readCycleById(cycleStore, cycleId);
   if (cycle.state === 'FAILED') {
-    const retry = await prepareFailedCycleRetry(env, membershipStore, cycle, now);
+    const retry = await prepareFailedCycleRetry(env, membershipStore, cycle, now, cycleStore);
     if (retry !== 'PREPARED') {
       const action = retry === 'AWAITING_OUTCOME_SYNC'
         ? 'AWAITING_OUTCOME_SYNC'
@@ -1134,11 +1135,16 @@ export async function processSubscriptionRenewalCycle(
           : 'TERMINAL';
       return { cycleId, state: cycle.state, action, ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
     }
-    cycle = await readCycleById(getW07RenewalCycleStore(env), cycleId);
+    cycle = await readCycleById(cycleStore, cycleId);
   }
   if (cycle.state === 'SUCCEEDED' || cycle.state === 'SUBMITTED' ||
       cycle.state === 'RECONCILIATION_REQUIRED') {
     return { cycleId, state: cycle.state, action: 'TERMINAL', ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
+  }
+
+  if (cycle.state === 'PREPARED' && !cycle.order_id &&
+      resolveW07DatabaseDriver(env) === 'neon' && !orderCreateStore) {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
 
   let offer = parseOfferSnapshot(cycle.offer_snapshot_json);
@@ -1185,9 +1191,13 @@ export async function processSubscriptionRenewalCycle(
     const rawRequest: CreateCommerceOrderRequest = { items: [{ itemRef: cycle.plan_id, quantity: 1 }] };
 
     if (!cycle.order_id) {
+      const orderPersistenceStore = orderCreateStore ?? (
+        resolveW07DatabaseDriver(env) === 'd1' ? env.D1_04 : undefined
+      );
+      if (!orderPersistenceStore) throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
       const createOrder = dependencies.createOrder ?? createCommerceOrder;
       const order = await createOrder(
-        orderCreateStore ?? env.D1_04,
+        orderPersistenceStore,
         cycle.subscriber_id,
         'renew_' + cycle.cycle_id,
         rawRequest,
