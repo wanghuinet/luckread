@@ -1,7 +1,19 @@
 import { describe, expect, it, vi } from 'vitest'
+
+const { getW06AuditEventStoreMock } = vi.hoisted(() => ({
+  getW06AuditEventStoreMock: vi.fn(),
+}))
+
+vi.mock('./neon/moderation-database-runtime.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./neon/moderation-database-runtime.js')>()),
+  getW06AuditEventStore: getW06AuditEventStoreMock,
+}))
+
 import worker from './index'
 import type { IdentityAccountStateChangedEvent } from './auth-013-queue-consumer'
 import type { MfaAuditQueueEvent } from './mfa-audit-queue-consumer'
+import type { AuditEvent } from './audit-event.js'
+import type { AuditEventStore } from './audit-event-store.js'
 
 const identityEvent: IdentityAccountStateChangedEvent = {
   eventId: 'evt-auth013-w10-1',
@@ -78,97 +90,110 @@ function message(body: unknown, attempts = 1): TestMessage {
   return { body, attempts, ack: vi.fn(), retry: vi.fn() }
 }
 
-function createDb() {
-  const prepare = vi.fn((_sql: string) => {
-    const statement = {
-      bind: vi.fn(() => statement),
-      first: vi.fn(async () => null),
-      run: vi.fn(async () => ({ success: true, meta: { changes: 1 } })),
-    }
-    return statement
+function createStore(findError?: Error) {
+  const rows = new Map<string, AuditEvent>()
+  const findByEventId = vi.fn(async (eventId: string) => {
+    if (findError) throw findError
+    return rows.get(eventId) ?? null
   })
-  return { db: { prepare } as unknown as D1Database, prepare }
+  const append = vi.fn(async (event: AuditEvent) => {
+    if (rows.has(event.eventId)) throw new Error('duplicate AuditEvent')
+    rows.set(event.eventId, event)
+  })
+  const store: AuditEventStore = { findByEventId, append }
+  return { store, findByEventId, append }
 }
 
 const queueRuntime = worker as unknown as {
-  queue(batch: MessageBatch<unknown>, env: { D1_03: D1Database; W06_MODERATION_DATABASE_DRIVER: 'd1' }): Promise<void>
+  queue(batch: MessageBatch<unknown>, env: unknown): Promise<void>
 }
 
-async function invokeQueue(messages: TestMessage[], db: D1Database): Promise<void> {
+async function invokeQueue(messages: TestMessage[], store: AuditEventStore): Promise<void> {
+  getW06AuditEventStoreMock.mockReturnValue(store)
   await queueRuntime.queue(
     { messages } as unknown as MessageBatch<unknown>,
-    { D1_03: db, W06_MODERATION_DATABASE_DRIVER: 'd1' },
+    {
+      HYPERDRIVE_D1_03: {
+        connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread_governance',
+      },
+    },
   )
 }
 
 describe('W06 audit queue reuse of W10 batch executor', () => {
-  it('routes valid AUTH-013 and MFA events through existing consumers and ACKs both', async () => {
-    const { db } = createDb()
+  it('routes valid AUTH-013 and MFA events through the native AuditEvent Store and ACKs both', async () => {
+    const { store, findByEventId, append } = createStore()
     const auth = message(identityEvent)
     const mfa = message(mfaEvent)
 
-    await invokeQueue([auth, mfa], db)
+    await invokeQueue([auth, mfa], store)
 
     expect(auth.ack).toHaveBeenCalledOnce()
     expect(auth.retry).not.toHaveBeenCalled()
     expect(mfa.ack).toHaveBeenCalledOnce()
     expect(mfa.retry).not.toHaveBeenCalled()
+    expect(findByEventId).toHaveBeenCalledTimes(2)
+    expect(append).toHaveBeenCalledTimes(2)
   })
 
   it('routes user.session.revoked to the dedicated immutable Session AuditEvent consumer', async () => {
-    const { db, prepare } = createDb()
+    const { store, findByEventId, append } = createStore()
     const session = message(sessionRevokedEvent)
 
-    await invokeQueue([session], db)
+    await invokeQueue([session], store)
 
     expect(session.ack).toHaveBeenCalledOnce()
     expect(session.retry).not.toHaveBeenCalled()
-    expect(prepare).toHaveBeenCalledTimes(2)
-    expect(prepare).toHaveBeenCalledWith(expect.stringContaining('FROM audit_events WHERE event_id = ?'))
-    expect(prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO audit_events'))
+    expect(findByEventId).toHaveBeenCalledWith(sessionRevokedEvent.eventId)
+    expect(append).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'user.session.revoked',
+      targetType: 'Session',
+      targetId: 'session-001',
+    }))
   })
 
   it('classifies malformed envelopes as poison and continues processing the batch', async () => {
-    const { db } = createDb()
+    const { store, findByEventId, append } = createStore()
     const poison = message({ eventType: 'identity.account_state_changed', producer: 'untrusted' })
     const valid = message(mfaEvent)
 
-    await invokeQueue([poison, valid], db)
+    await invokeQueue([poison, valid], store)
 
     expect(poison.ack).not.toHaveBeenCalled()
     expect(poison.retry).toHaveBeenCalledWith({ delaySeconds: 1 })
     expect(valid.ack).toHaveBeenCalledOnce()
     expect(valid.retry).not.toHaveBeenCalled()
+    expect(findByEventId).toHaveBeenCalledTimes(1)
+    expect(append).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects invalid shared event metadata before D1 access and keeps valid later messages flowing', async () => {
-    const { db, prepare } = createDb()
+  it('rejects invalid shared event metadata before audit Store access and keeps valid later messages flowing', async () => {
+    const { store, findByEventId, append } = createStore()
     const invalid = message({
       ...identityEvent,
       publishedAt: '2026-02-31T00:00:00.000Z',
     })
     const valid = message(mfaEvent)
 
-    await invokeQueue([invalid, valid], db)
+    await invokeQueue([invalid, valid], store)
 
     expect(invalid.ack).not.toHaveBeenCalled()
     expect(invalid.retry).toHaveBeenCalledWith({ delaySeconds: 1 })
     expect(valid.ack).toHaveBeenCalledOnce()
     expect(valid.retry).not.toHaveBeenCalled()
-    // Only the valid MFA event is allowed to reach the audit store (read + insert).
-    expect(prepare).toHaveBeenCalledTimes(2)
+    expect(findByEventId).toHaveBeenCalledTimes(1)
+    expect(append).toHaveBeenCalledTimes(1)
   })
 
-  it('uses W10 bounded transient backoff for D1 failures without logging exception details', async () => {
-    const db = {
-      prepare: vi.fn(() => { throw new Error('sensitive database exception detail') }),
-    } as unknown as D1Database
+  it('uses W10 bounded transient backoff for native PostgreSQL Store failures without logging exception details', async () => {
+    const { store, append } = createStore(new Error('sensitive database exception detail'))
     const failed = message(identityEvent, 4)
 
-    await invokeQueue([failed], db)
+    await invokeQueue([failed], store)
 
     expect(failed.ack).not.toHaveBeenCalled()
     expect(failed.retry).toHaveBeenCalledOnce()
+    expect(append).not.toHaveBeenCalled()
     const delaySeconds = failed.retry.mock.calls[0]?.[0]?.delaySeconds as number
     expect(Number.isInteger(delaySeconds)).toBe(true)
     expect(delaySeconds).toBeGreaterThanOrEqual(1)
