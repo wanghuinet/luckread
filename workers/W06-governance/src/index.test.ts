@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AuditEvent } from './audit-event'
 import type { AuditEventStore } from './audit-event-store.js'
 
-const { auditEventStoresByDatabase, queueReadStoreOverride } = vi.hoisted(() => ({
-  auditEventStoresByDatabase: new WeakMap<object, unknown>(),
+const { auditEventStoresByBinding, queueReadStoreOverride } = vi.hoisted(() => ({
+  auditEventStoresByBinding: new WeakMap<object, unknown>(),
   queueReadStoreOverride: { current: undefined as unknown },
 }))
 
@@ -11,81 +11,38 @@ vi.mock('./neon/moderation-database-runtime.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./neon/moderation-database-runtime.js')>()
   return {
     ...actual,
-    getW06AuditEventStore: (env: { D1_03?: D1Database }) => {
-      const database = env.D1_03 as object | undefined
-      const store = database ? auditEventStoresByDatabase.get(database) : undefined
-      if (!store) throw new Error('AUDIT_EVENT_TEST_STORE_NOT_REGISTERED')
-      return store as AuditEventStore
+    getW06AuditEventStore: (env: { HYPERDRIVE_D1_03?: object }) => {
+      const binding = env.HYPERDRIVE_D1_03
+      const registration = binding
+        ? auditEventStoresByBinding.get(binding) as { store?: AuditEventStore } | undefined
+        : undefined
+      if (!registration?.store) throw new Error('AUDIT_EVENT_TEST_STORE_NOT_REGISTERED')
+      return registration.store
     },
     getW06ModerationQueueReadStore: (env: unknown) =>
       queueReadStoreOverride.current ?? actual.getW06ModerationQueueReadStore(env as never),
   }
 })
 
-function registerAuditEventStoreTestDouble(database: D1Database): AuditEventStore {
-  const key = database as object
-  const existing = auditEventStoresByDatabase.get(key)
-  if (existing) return existing as AuditEventStore
-
-  const store: AuditEventStore = {
-    async findByEventId(eventId) {
-      const row = await database.prepare(
-        'SELECT event_id, request_id, trace_id, actor_json, action, target_type, target_id, before_json, after_json, reason, ip, user_agent, occurred_at FROM audit_events WHERE event_id = ? LIMIT 1',
-      ).bind(eventId).first<{
-        event_id: string
-        request_id: string | null
-        trace_id: string | null
-        actor_json: string
-        action: string
-        target_type: string
-        target_id: string
-        before_json: string
-        after_json: string
-        reason: string | null
-        ip: string | null
-        user_agent: string | null
-        occurred_at: string
-      }>()
-      if (!row) return null
-      return {
-        eventId: row.event_id,
-        ...(row.request_id !== null ? { requestId: row.request_id } : {}),
-        ...(row.trace_id !== null ? { traceId: row.trace_id } : {}),
-        actor: JSON.parse(row.actor_json),
-        action: row.action,
-        targetType: row.target_type,
-        targetId: row.target_id,
-        before: JSON.parse(row.before_json),
-        after: JSON.parse(row.after_json),
-        ...(row.reason !== null ? { reason: row.reason } : {}),
-        ...(row.ip !== null ? { ip: row.ip } : {}),
-        ...(row.user_agent !== null ? { userAgent: row.user_agent } : {}),
-        occurredAt: row.occurred_at,
-      }
-    },
-    async append(event) {
-      const result = await database.prepare(
-        'INSERT INTO audit_events (event_id, request_id, trace_id, actor_json, action, target_type, target_id, before_json, after_json, reason, ip, user_agent, occurred_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      ).bind(
-        event.eventId,
-        event.requestId ?? null,
-        event.traceId ?? null,
-        JSON.stringify(event.actor),
-        event.action,
-        event.targetType,
-        event.targetId,
-        JSON.stringify(event.before),
-        JSON.stringify(event.after),
-        event.reason ?? null,
-        event.ip ?? null,
-        event.userAgent ?? null,
-        event.occurredAt,
-      ).run()
-      if (!result.success) throw new Error('AUDIT_EVENT_PERSISTENCE_FAILED')
-    },
-  }
-  auditEventStoresByDatabase.set(key, store)
-  return store
+function registerAuditEventStoreTestDouble(binding: object, writeSuccess = true) {
+  const existing = auditEventStoresByBinding.get(binding) as {
+    store: AuditEventStore
+    rows: Map<string, AuditEvent>
+    append: ReturnType<typeof vi.fn>
+    findByEventId: ReturnType<typeof vi.fn>
+  } | undefined
+  if (existing) return existing
+  const rows = new Map<string, AuditEvent>()
+  const append = vi.fn(async (event: AuditEvent) => {
+    if (!writeSuccess) throw new Error('AUDIT_EVENT_PERSISTENCE_FAILED')
+    if (rows.has(event.eventId)) throw new Error('AUDIT_EVENT_CONFLICT')
+    rows.set(event.eventId, event)
+  })
+  const findByEventId = vi.fn(async (eventId: string) => rows.get(eventId) ?? null)
+  const store: AuditEventStore = { findByEventId, append }
+  const registration = { store, rows, append, findByEventId }
+  auditEventStoresByBinding.set(binding, registration)
+  return registration
 }
 
 const eventInput = {
@@ -106,23 +63,14 @@ const eventInput = {
   reason: 'verification completed',
 }
 
-const auditStoreTestEnv = (database: D1Database) => {
-  registerAuditEventStoreTestDouble(database)
-  return {
-    D1_03: database,
-  }
+const auditStoreTestEnv = (binding: object) => {
+  registerAuditEventStoreTestDouble(binding)
+  return { HYPERDRIVE_D1_03: binding }
 }
 
-function createDb(success = true) {
-  const run = vi.fn().mockResolvedValue({ success })
-  const bind = vi.fn().mockReturnValue({ run })
-  const prepare = vi.fn().mockReturnValue({ bind })
-  return {
-    db: { prepare } as unknown as D1Database,
-    prepare,
-    bind,
-    run,
-  }
+function createDb(writeSuccess = true) {
+  const db = { connectionString: 'postgresql://test.local/luckread_governance' }
+  return { db, ...registerAuditEventStoreTestDouble(db, writeSuccess) }
 }
 
 describe('W06 canonical API error mapping', () => {
@@ -240,8 +188,8 @@ describe('W06 moderation queue pagination scope', () => {
 
 describe('W06 moderation permission proof', () => {
   it('fails closed for queue, case-read, and decision routes when W01 has not attached an allowed W08 CASL decision', async () => {
-    const prepare = vi.fn()
-    const db = { prepare } as unknown as D1Database
+    const db = { connectionString: 'postgresql://test.local/luckread_governance' }
+    const { append } = registerAuditEventStoreTestDouble(db)
     const runtime = await import('./index')
     const headers = {
       'X-LuckRead-Caller': 'W01',
@@ -268,15 +216,9 @@ describe('W06 moderation permission proof', () => {
       const response = await runtime.default.fetch(request, auditStoreTestEnv(db))
       expect(response.status).toBe(403)
     }
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 })
-
-type PlanAuditTestStatement = {
-  bind(...args: unknown[]): PlanAuditTestStatement
-  first<T>(): Promise<T | null>
-  run(): Promise<{ success: boolean; meta?: { changes: number } }>
-}
 
 describe('W06 runtime', () => {
   const planId = 'plan_' + 'a'.repeat(64)
@@ -508,52 +450,20 @@ describe('W06 runtime', () => {
     },
   )
   const createPlanAuditDb = (writeSuccess = true) => {
-    const rows = new Map<string, Record<string, unknown>>()
-    const prepare = vi.fn((sql: string) => {
-      let values: unknown[] = []
-      const statement: PlanAuditTestStatement = {
-        bind(...args: unknown[]) { values = args; return statement },
-        async first<T>() {
-          if (sql.includes('FROM audit_events WHERE event_id = ?')) {
-            return (rows.get(String(values[0])) ?? null) as T | null
-          }
-          return null as T | null
-        },
-        async run() {
-          if (sql.includes('INSERT INTO audit_events')) {
-            if (!writeSuccess) return { success: false }
-            if (rows.has(String(values[0]))) return { success: false }
-            rows.set(String(values[0]), {
-              event_id: String(values[0]),
-              request_id: values[1],
-              trace_id: values[2],
-              actor_json: String(values[3]),
-              action: String(values[4]),
-              target_type: String(values[5]),
-              target_id: String(values[6]),
-              before_json: String(values[7]),
-              after_json: String(values[8]),
-              occurred_at: String(values[12]),
-            })
-          }
-          return { success: true, meta: { changes: 1 } }
-        },
-      }
-      return statement
-    })
-    return { db: { prepare } as unknown as D1Database, prepare, rows }
+    const db = { connectionString: 'postgresql://test.local/luckread_governance' }
+    return { db, ...registerAuditEventStoreTestDouble(db, writeSuccess) }
   }
 
   it('requires the private W01 transport for membership-plan audit writes', async () => {
-    const { db, prepare } = createPlanAuditDb()
+    const { db, append } = createPlanAuditDb()
     const runtime = await import('./index')
     const response = await runtime.default.fetch(planAuditRequest(planAuditInput, false), auditStoreTestEnv(db))
     expect(response.status).toBe(403)
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 
   it('rejects membership-plan audit requests below creator-capable layers', async () => {
-    const { db, prepare } = createPlanAuditDb()
+    const { db, append } = createPlanAuditDb()
     const runtime = await import('./index')
     const response = await runtime.default.fetch(
       planAuditRequest(planAuditInput, true, 'req_plan_audit_l2', 'L2'),
@@ -561,7 +471,7 @@ describe('W06 runtime', () => {
     )
     expect(response.status).toBe(403)
     expect(await response.json()).toEqual({ error: 'PERMISSION_DENIED' })
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 
   it('accepts higher creator-capable layers and records the actual W01 layer', async () => {
@@ -580,7 +490,7 @@ describe('W06 runtime', () => {
   })
 
   it('persists a canonical membership-plan creation event using the W01 principal', async () => {
-    const { db, prepare, rows } = createPlanAuditDb()
+    const { db, append, rows } = createPlanAuditDb()
     const runtime = await import('./index')
     const response = await runtime.default.fetch(planAuditRequest(planAuditInput), auditStoreTestEnv(db))
     expect(response.status).toBe(201)
@@ -591,7 +501,7 @@ describe('W06 runtime', () => {
       targetId: planId,
       replayed: false,
     })
-    expect(prepare).toHaveBeenCalledTimes(2)
+    expect(append).toHaveBeenCalledTimes(1)
     const row = rows.get(planAuditInput.eventId)
     expect(row).toMatchObject({
       actor_json: JSON.stringify({ actorId: 'creator_user_001', actorType: 'user', layer: 'L3' }),
@@ -615,7 +525,7 @@ describe('W06 runtime', () => {
   })
 
   it('rejects noncanonical plan commercial terms before any audit database access', async () => {
-    const { db, prepare } = createPlanAuditDb()
+    const { db, append } = createPlanAuditDb()
     const runtime = await import('./index')
     const response = await runtime.default.fetch(
       planAuditRequest({ ...planAuditInput, priceMinor: -1 }),
@@ -623,7 +533,7 @@ describe('W06 runtime', () => {
     )
     expect(response.status).toBe(400)
     expect(await response.json()).toEqual({ error: 'INVALID_MEMBERSHIP_PLAN_AUDIT' })
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 
   it('replays the same durable audit event without a duplicate write', async () => {
@@ -659,22 +569,22 @@ describe('W06 runtime', () => {
 
 
   it('requires the private W01 transport and creator-capable layer for publish intent audit', async () => {
-    const { db, prepare } = createPlanAuditDb()
+    const { db, append } = createPlanAuditDb()
     const runtime = await import('./index')
     const noTransport = await runtime.default.fetch(planPublishRequestAuditRequest(publishRequestAuditInput, false), auditStoreTestEnv(db))
     expect(noTransport.status).toBe(403)
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
 
     const tooLow = await runtime.default.fetch(
       planPublishRequestAuditRequest(publishRequestAuditInput, true, 'req_plan_publish_intent_l2', 'L2'),
       auditStoreTestEnv(db),
     )
     expect(tooLow.status).toBe(403)
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 
   it('persists publish intent before lifecycle mutation using W01-derived actor and a stable request identity', async () => {
-    const { db, prepare, rows } = createPlanAuditDb()
+    const { db, append, rows } = createPlanAuditDb()
     const runtime = await import('./index')
     const response = await runtime.default.fetch(planPublishRequestAuditRequest(publishRequestAuditInput), auditStoreTestEnv(db))
     expect(response.status).toBe(201)
@@ -685,7 +595,7 @@ describe('W06 runtime', () => {
       targetId: planId,
       replayed: false,
     })
-    expect(prepare).toHaveBeenCalledTimes(2)
+    expect(append).toHaveBeenCalledTimes(1)
     const row = rows.get(publishRequestAuditInput.eventId)
     expect(row).toMatchObject({
       actor_json: JSON.stringify({ actorId: 'creator_user_001', actorType: 'user', layer: 'L3' }),
@@ -735,33 +645,33 @@ describe('W06 runtime', () => {
       { ...publishRequestAuditInput, actorId: 'spoofed-actor' },
     ]
     for (const input of cases) {
-      const { db, prepare } = createPlanAuditDb()
+      const { db, append } = createPlanAuditDb()
       const runtime = await import('./index')
       const response = await runtime.default.fetch(planPublishRequestAuditRequest(input), auditStoreTestEnv(db))
       expect(response.status).toBe(400)
       expect(await response.json()).toEqual({ error: 'INVALID_MEMBERSHIP_PLAN_PUBLISH_REQUEST_AUDIT' })
-      expect(prepare).not.toHaveBeenCalled()
+      expect(append).not.toHaveBeenCalled()
     }
   })
 
   it('requires the private W01 transport and creator-capable layer for plan publish audits', async () => {
-    const { db, prepare } = createPlanAuditDb()
+    const { db, append } = createPlanAuditDb()
     const runtime = await import('./index')
     const noTransport = await runtime.default.fetch(planPublishAuditRequest(publishAuditInput, false), auditStoreTestEnv(db))
     expect(noTransport.status).toBe(403)
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
 
     const tooLow = await runtime.default.fetch(
       planPublishAuditRequest(publishAuditInput, true, 'req_plan_publish_l2', 'L2'),
       auditStoreTestEnv(db),
     )
     expect(tooLow.status).toBe(403)
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 
 
   it('durably records membership plan update intent and idempotently confirms semantic retries', async () => {
-    const { db, prepare, rows } = createPlanAuditDb()
+    const { db, append, rows } = createPlanAuditDb()
     const runtime = await import('./index')
     const first = await runtime.default.fetch(planUpdateRequestAuditRequest(planUpdateRequestAuditInput), auditStoreTestEnv(db))
     const replay = await runtime.default.fetch(
@@ -782,18 +692,18 @@ describe('W06 runtime', () => {
     )
     expect(conflict.status).toBe(409)
     expect(rows.size).toBe(1)
-    expect(prepare).toHaveBeenCalled()
+    expect(append).toHaveBeenCalled()
   })
 
   it('rejects malformed update-intent facts and missing private transport before D1-03 access', async () => {
     const malformed = { ...planUpdateRequestAuditInput, priceMinor: -1 }
-    const { db, prepare } = createPlanAuditDb()
+    const { db, append } = createPlanAuditDb()
     const runtime = await import('./index')
     const bad = await runtime.default.fetch(planUpdateRequestAuditRequest(malformed), auditStoreTestEnv(db))
     const noTransport = await runtime.default.fetch(planUpdateRequestAuditRequest(planUpdateRequestAuditInput, false), auditStoreTestEnv(db))
     expect(bad.status).toBe(400)
     expect(noTransport.status).toBe(403)
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 
   it('durably records lifecycle intent and rejects conflicting semantic replay', async () => {
@@ -812,7 +722,7 @@ describe('W06 runtime', () => {
   })
 
   it('rejects malformed lifecycle intent and requires private W01 transport', async () => {
-    const { db, prepare } = createPlanAuditDb()
+    const { db, append } = createPlanAuditDb()
     const runtime = await import('./index')
     const malformed = await runtime.default.fetch(
       planLifecycleRequestAuditRequest({ ...planLifecycleRequestAuditInput, requestedStatus: 'ACTIVE' }), auditStoreTestEnv(db),
@@ -820,7 +730,7 @@ describe('W06 runtime', () => {
     const noTransport = await runtime.default.fetch(planLifecycleRequestAuditRequest(planLifecycleRequestAuditInput, false), auditStoreTestEnv(db))
     expect(malformed.status).toBe(400)
     expect(noTransport.status).toBe(403)
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 
   it('persists an immutable plan pause event with before and after state', async () => {
@@ -881,7 +791,7 @@ describe('W06 runtime', () => {
   })
 
   it('persists membership plan publication with immutable before/after lifecycle facts', async () => {
-    const { db, prepare, rows } = createPlanAuditDb()
+    const { db, append, rows } = createPlanAuditDb()
     const runtime = await import('./index')
     const response = await runtime.default.fetch(planPublishAuditRequest(publishAuditInput), auditStoreTestEnv(db))
     expect(response.status).toBe(201)
@@ -892,7 +802,7 @@ describe('W06 runtime', () => {
       targetId: planId,
       replayed: false,
     })
-    expect(prepare).toHaveBeenCalledTimes(2)
+    expect(append).toHaveBeenCalledTimes(1)
     expect(rows.get(publishAuditInput.eventId)).toMatchObject({
       actor_json: JSON.stringify({ actorId: 'creator_user_001', actorType: 'user', layer: 'L3' }),
       action: 'membership.plan.published',
@@ -949,25 +859,25 @@ describe('W06 runtime', () => {
       { ...publishAuditInput, actorId: 'spoofed-actor' },
     ]
     for (const input of cases) {
-      const { db, prepare } = createPlanAuditDb()
+      const { db, append } = createPlanAuditDb()
       const runtime = await import('./index')
       const response = await runtime.default.fetch(planPublishAuditRequest(input), auditStoreTestEnv(db))
       expect(response.status).toBe(400)
       expect(await response.json()).toEqual({ error: 'INVALID_MEMBERSHIP_PLAN_PUBLISH_AUDIT' })
-      expect(prepare).not.toHaveBeenCalled()
+      expect(append).not.toHaveBeenCalled()
     }
   })
 
   it('requires the private W01 transport for commerce order audit writes', async () => {
-    const { db, prepare } = createPlanAuditDb()
+    const { db, append } = createPlanAuditDb()
     const runtime = await import('./index')
     const response = await runtime.default.fetch(orderAuditRequest(orderAuditInput, false), auditStoreTestEnv(db))
     expect(response.status).toBe(403)
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 
   it('rejects L1 order audit writes before touching D1-03', async () => {
-    const { db, prepare } = createPlanAuditDb()
+    const { db, append } = createPlanAuditDb()
     const runtime = await import('./index')
     const response = await runtime.default.fetch(
       orderAuditRequest(orderAuditInput, true, 'req_order_audit_l1', 'L1'),
@@ -975,11 +885,11 @@ describe('W06 runtime', () => {
     )
     expect(response.status).toBe(403)
     expect(await response.json()).toEqual({ error: 'PERMISSION_DENIED' })
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 
   it('persists commerce order facts using the W01-derived actor and immutable audit identity', async () => {
-    const { db, prepare, rows } = createPlanAuditDb()
+    const { db, append, rows } = createPlanAuditDb()
     const runtime = await import('./index')
     const response = await runtime.default.fetch(orderAuditRequest(orderAuditInput), auditStoreTestEnv(db))
     expect(response.status).toBe(201)
@@ -990,7 +900,7 @@ describe('W06 runtime', () => {
       targetId: orderId,
       replayed: false,
     })
-    expect(prepare).toHaveBeenCalledTimes(2)
+    expect(append).toHaveBeenCalledTimes(1)
     expect(rows.get(orderAuditInput.eventId)).toMatchObject({
       actor_json: JSON.stringify({ actorId: 'buyer_user_001', actorType: 'user', layer: 'L2' }),
       action: 'commerce.order.created',
@@ -1011,7 +921,7 @@ describe('W06 runtime', () => {
   })
 
   it('rejects inconsistent order totals and caller-supplied audit fields before any D1 access', async () => {
-    const { db, prepare } = createPlanAuditDb()
+    const { db, append } = createPlanAuditDb()
     const runtime = await import('./index')
     const badTotal = await runtime.default.fetch(
       orderAuditRequest({ ...orderAuditInput, totalMinor: 1 }),
@@ -1019,14 +929,14 @@ describe('W06 runtime', () => {
     )
     expect(badTotal.status).toBe(400)
     expect(await badTotal.json()).toEqual({ error: 'INVALID_COMMERCE_ORDER_AUDIT' })
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
 
     const spoofedActor = await runtime.default.fetch(
       orderAuditRequest({ ...orderAuditInput, actorId: 'attacker', userId: 'attacker' }),
       auditStoreTestEnv(db),
     )
     expect(spoofedActor.status).toBe(400)
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 
   it('replays an identical commerce order audit and rejects conflicting facts', async () => {
@@ -1057,10 +967,9 @@ describe('W06 runtime', () => {
     expect(await response.json()).toEqual({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' })
   })
 
-  it('persists a canonical AUTH-013 account-state AuditEvent', async () => {
-    const { db, prepare, bind, run } = createDb(true)
+  it('persists a canonical AUTH-013 account-state AuditEvent through the native Store', async () => {
+    const { db, append, rows } = createDb(true)
     const runtime = await import('./index')
-
     const response = await runtime.default.fetch(
       new Request('https://w06.internal/internal/audit-events/account-state-changed', {
         method: 'POST',
@@ -1069,7 +978,6 @@ describe('W06 runtime', () => {
       }),
       auditStoreTestEnv(db),
     )
-
     expect(response.status).toBe(201)
     expect(await response.json()).toEqual({
       eventId: 'evt-runtime-1',
@@ -1077,32 +985,19 @@ describe('W06 runtime', () => {
       targetType: 'User',
       targetId: 'user-001',
     })
-    expect(prepare).toHaveBeenCalledTimes(1)
-    expect(bind).toHaveBeenCalledWith(
-      'evt-runtime-1',
-      'req_runtime-1',
-      'trace-runtime-1',
-      JSON.stringify(eventInput.actor),
-      'identity.account_state_changed',
-      'User',
-      'user-001',
-      JSON.stringify({
-        account_state: 'PENDING_VERIFICATION',
-        account_state_version: 1,
-      }),
-      JSON.stringify({
-        account_state: 'ACTIVE',
-        account_state_version: 2,
-      }),
-      'verification completed',
-      null,
-      null,
-      '2026-09-24T08:30:00.000Z',
-    )
-    expect(run).toHaveBeenCalledTimes(1)
+    expect(append).toHaveBeenCalledTimes(1)
+    expect(rows.get('evt-runtime-1')).toMatchObject({
+      actor: eventInput.actor,
+      action: 'identity.account_state_changed',
+      targetType: 'User',
+      targetId: 'user-001',
+      before: { account_state: 'PENDING_VERIFICATION', account_state_version: 1 },
+      after: { account_state: 'ACTIVE', account_state_version: 2 },
+      reason: 'verification completed',
+    })
   })
 
-  it('rejects malformed runtime input without touching D1', async () => {
+  it('rejects malformed runtime input without touching persistence', async () => {
     const { db, prepare } = createDb(true)
     const runtime = await import('./index')
 
@@ -1119,7 +1014,7 @@ describe('W06 runtime', () => {
     )
 
     expect(response.status).toBe(400)
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 
   it('rejects non-canonical resource and correlation identifiers', async () => {
@@ -1141,7 +1036,7 @@ describe('W06 runtime', () => {
 
     expect(response.status).toBe(400)
     expect(await response.json()).toEqual({ error: 'INVALID_AUDIT_EVENT' })
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 
   it('fails closed when AuditEvent persistence fails', async () => {
@@ -1161,8 +1056,7 @@ describe('W06 runtime', () => {
     expect(await response.json()).toEqual({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' })
   })
 
-  it('fails closed on moderation case detail when Neon Hyperdrive is missing, even with a D1 test fixture', async () => {
-    const { db, prepare } = createDb(true)
+  it('fails closed on moderation case detail when Neon Hyperdrive is missing', async () => {
     const runtime = await import('./index')
     const response = await runtime.default.fetch(
       new Request('https://w06.internal/admin/moderation/cases/case_1', {
@@ -1181,11 +1075,10 @@ describe('W06 runtime', () => {
           'X-LuckRead-Authz-Layer': 'L6',
         },
       }),
-      auditStoreTestEnv(db),
+      {} as never,
     )
     expect(response.status).toBe(503)
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'SERVICE_UNAVAILABLE' } })
-    expect(prepare).not.toHaveBeenCalled()
   })
 
   it('keeps the health response explicit about persistence support', async () => {
@@ -1207,17 +1100,8 @@ describe('W06 runtime', () => {
   })
 
   it('persists a token-free push endpoint mutation intent using the authenticated W01 actor', async () => {
-    const inserted: unknown[][] = []
-    const prepare = vi.fn((sql: string) => ({
-      bind: (...values: unknown[]) => ({
-        first: async () => null,
-        run: async () => {
-          if (sql.includes('INSERT INTO audit_events')) inserted.push(values)
-          return { success: true, meta: { changes: 1 } }
-        },
-      }),
-    }))
-    const db = { prepare } as unknown as D1Database
+    const db = { connectionString: 'postgresql://test.local/luckread_governance' }
+    const { append, rows } = registerAuditEventStoreTestDouble(db)
     const runtime = await import('./index')
     const eventId = 'evt_push_endpoint_' + 'a'.repeat(64)
     const idempotencyKey = 'idem_push_register_0001'
@@ -1254,28 +1138,21 @@ describe('W06 runtime', () => {
       targetId: '6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c',
       replayed: false,
     })
-    expect(inserted).toHaveLength(1)
-    const values = inserted[0] ?? []
-    expect(JSON.parse(String(values[3]))).toMatchObject({
-      actorId: 'push_owner_001',
-      actorType: 'user',
-      layer: 'L2',
+    expect(append).toHaveBeenCalledTimes(1)
+    const event = rows.get(eventId)
+    expect(event).toMatchObject({
+      actor: { actorId: 'push_owner_001', actorType: 'user', layer: 'L2' },
+      action: 'notification.push_endpoint.mutation_requested',
+      targetType: 'NotificationPushEndpoint',
+      targetId: '6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c',
+      after: { operation: 'REGISTER', provider: 'expo', platform: 'android', permissionStatus: 'granted' },
     })
-    expect(values[4]).toBe('notification.push_endpoint.mutation_requested')
-    expect(values[5]).toBe('NotificationPushEndpoint')
-    expect(values[6]).toBe('6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c')
-    expect(JSON.parse(String(values[8]))).toEqual({
-      operation: 'REGISTER',
-      provider: 'expo',
-      platform: 'android',
-      permissionStatus: 'granted',
-    })
-    expect(JSON.stringify(values)).not.toContain('ExponentPushToken')
+    expect(JSON.stringify(event)).not.toContain('ExponentPushToken')
   })
 
-  it('rejects an idempotency mismatch and L1 audit attempt before D1 access', async () => {
-    const prepare = vi.fn()
-    const db = { prepare } as unknown as D1Database
+  it('rejects an idempotency mismatch and L1 audit attempt before AuditEvent Store access', async () => {
+    const db = { connectionString: 'postgresql://test.local/luckread_governance' }
+    const { append } = registerAuditEventStoreTestDouble(db)
     const runtime = await import('./index')
     const body = {
       eventId: 'evt_push_endpoint_' + 'b'.repeat(64),
@@ -1302,7 +1179,7 @@ describe('W06 runtime', () => {
       auditStoreTestEnv(db),
     )
     expect(mismatch.status).toBe(409)
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
 
     const lowLayer = await runtime.default.fetch(
       new Request('https://w06.internal/internal/audit-events/push-endpoint-mutation-requested', {
@@ -1313,21 +1190,12 @@ describe('W06 runtime', () => {
       auditStoreTestEnv(db),
     )
     expect(lowLayer.status).toBe(403)
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 
   it('persists a notification-preferences mutation intent with the authenticated W01 actor', async () => {
-    const inserted: unknown[][] = []
-    const prepare = vi.fn((sql: string) => ({
-      bind: (...values: unknown[]) => ({
-        first: async () => null,
-        run: async () => {
-          if (sql.includes('INSERT INTO audit_events')) inserted.push(values)
-          return { success: true, meta: { changes: 1 } }
-        },
-      }),
-    }))
-    const db = { prepare } as unknown as D1Database
+    const db = { connectionString: 'postgresql://test.local/luckread_governance' }
+    const { append, rows } = registerAuditEventStoreTestDouble(db)
     const runtime = await import('./index')
     const eventId = 'evt_notification_preferences_123e4567-e89b-42d3-a456-426614174000'
     const response = await runtime.default.fetch(
@@ -1351,20 +1219,19 @@ describe('W06 runtime', () => {
       eventId, action: 'notification.preferences.update_requested',
       targetType: 'Notification', targetId: 'preferences-owner-001', replayed: false,
     })
-    expect(inserted).toHaveLength(1)
-    const values = inserted[0] ?? []
-    expect(JSON.parse(String(values[3]))).toMatchObject({
-      actorId: 'preferences-owner-001', actorType: 'user', layer: 'L2',
+    expect(append).toHaveBeenCalledTimes(1)
+    expect(rows.get(eventId)).toMatchObject({
+      actor: { actorId: 'preferences-owner-001', actorType: 'user', layer: 'L2' },
+      action: 'notification.preferences.update_requested',
+      targetType: 'Notification',
+      targetId: 'preferences-owner-001',
+      after: { preferences: { follow: false, mention: true } },
     })
-    expect(values[4]).toBe('notification.preferences.update_requested')
-    expect(values[5]).toBe('Notification')
-    expect(values[6]).toBe('preferences-owner-001')
-    expect(JSON.parse(String(values[8]))).toEqual({ preferences: { follow: false, mention: true } })
   })
 
-  it('rejects spoofed owner fields and an L1 audit before D1 access', async () => {
-    const prepare = vi.fn()
-    const db = { prepare } as unknown as D1Database
+  it('rejects spoofed owner fields and an L1 audit before AuditEvent Store access', async () => {
+    const db = { connectionString: 'postgresql://test.local/luckread_governance' }
+    const { append } = registerAuditEventStoreTestDouble(db)
     const runtime = await import('./index')
     const eventId = 'evt_notification_preferences_123e4567-e89b-42d3-a456-426614174001'
     const headers = {
@@ -1388,7 +1255,7 @@ describe('W06 runtime', () => {
       auditStoreTestEnv(db),
     )
     expect(lowLayer.status).toBe(403)
-    expect(prepare).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 
 })
