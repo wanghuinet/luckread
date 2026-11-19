@@ -406,7 +406,7 @@ export async function recordHyperswitchMerchantInitiatedSubmissionPostgres(
     existing.updated_at,
   );
   try {
-    await db.query<{ payment_id: string } & Record<string, unknown>>(
+    const updated = await db.query<{ payment_id: string } & Record<string, unknown>>(
       "UPDATE payments SET status = $1, version = version + 1, updated_at = $2::timestamptz " +
       "WHERE payment_id = $3 AND customer_id = $4 AND provider = 'hyperswitch' AND merchant_id = $5 " +
       "AND amount_minor = $6 AND currency = $7 AND status = 'INITIATING' AND version = 1 RETURNING payment_id",
@@ -415,6 +415,12 @@ export async function recordHyperswitchMerchantInitiatedSubmissionPostgres(
         expectedMerchantIdInput, providerPayment.amount, providerPayment.currency,
       ],
     );
+    if (updated.rows.length !== 1) {
+      const raced = await selectById();
+      if (!raced) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
+      if (raced.status !== 'INITIATING' || raced.version !== 1) return toDto(raced);
+      throw new PaymentPersistenceError('CONFLICT', 409);
+    }
     const latest = await selectById();
     if (!latest) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
     return toDto(latest);
