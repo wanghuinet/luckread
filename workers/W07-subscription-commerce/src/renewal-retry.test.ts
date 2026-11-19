@@ -140,11 +140,9 @@ function setup(options: {
     W07_DATABASE_DRIVER: 'neon',
     W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
     HYPERDRIVE_D1_04: { connectionString: 'postgresql://test.invalid/luckread' },
-    D1_04: {} as D1Database,
   };
   const dependencies = {
     now: () => new Date(NOW),
-    getDatabase: () => ({} as D1Database),
     getMembershipPostgresPool: () => membershipPool,
     getRenewalCycleStore: () => financePool,
   };
