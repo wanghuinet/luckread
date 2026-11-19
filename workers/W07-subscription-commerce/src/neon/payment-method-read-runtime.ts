@@ -13,7 +13,7 @@ import type { RevenueCatWebhookReceiptStore } from '../revenuecat-webhook-contra
 
 export type W07PaymentMethodReadRuntimeEnv = Readonly<{
   W07_DATABASE_DRIVER?: string
-  HYPERDRIVE_D1_04?: { connectionString?: string }
+  HYPERDRIVE_FINANCE_DB?: { connectionString?: string }
   W07_MEMBERSHIP_DATABASE_DRIVER?: string
 }>
 
@@ -59,7 +59,7 @@ function getW07PostgresPool(
 ): Pool {
   resolveW07DatabaseDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_04
+  const binding = env.HYPERDRIVE_FINANCE_DB
   if (!binding || typeof binding !== 'object') {
     throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
@@ -91,7 +91,7 @@ export function getW07PaymentMethodReadStore(
   poolFactory: W07PoolFactory = (config) => new Pool(config),
 ): PaymentMethodReadStore {
   resolveW07DatabaseDriver(env)
-  const binding = env.HYPERDRIVE_D1_04
+  const binding = env.HYPERDRIVE_FINANCE_DB
   if (!binding || typeof binding !== 'object') {
     throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
@@ -117,7 +117,7 @@ export function getW07RevenueCatWebhookReceiptStore(
   poolFactory: W07PoolFactory = (config) => new Pool(config),
 ): RevenueCatWebhookReceiptStore {
   resolveW07DatabaseDriver(env)
-  const binding = env.HYPERDRIVE_D1_04
+  const binding = env.HYPERDRIVE_FINANCE_DB
   if (!binding || typeof binding !== 'object') {
     throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
@@ -138,7 +138,7 @@ export function getW07RevenueCatWebhookReceiptStore(
 export async function closeW07PostgresRuntimeForTest(
   env: W07PaymentMethodReadRuntimeEnv,
 ): Promise<void> {
-  const binding = env.HYPERDRIVE_D1_04
+  const binding = env.HYPERDRIVE_FINANCE_DB
   if (!binding || typeof binding !== 'object') return
   const pool = pools.get(binding)
   if (!pool) return
@@ -156,7 +156,7 @@ export function getW07OrderCreatePersistenceStore(
   poolFactory: W07PoolFactory = (config) => new Pool(config),
 ): OrderCreatePersistenceStore {
   resolveW07DatabaseDriver(env)
-  const binding = env.HYPERDRIVE_D1_04
+  const binding = env.HYPERDRIVE_FINANCE_DB
   if (!binding || typeof binding !== 'object') {
     throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
