@@ -71,6 +71,12 @@ function reviewedPinnedSource(pin, source) {
   if (gitBlobSha1(source) === pin.gitBlobSha1) return source
   let normalized = source
   if (pin.path === paths.wrangler) {
+    // Binding aliases were renamed after the backing Hyperdrive resources had
+    // already moved to Neon. Normalize the names only for comparison with the
+    // independently reviewed source snapshot.
+    normalized = normalized
+      .replaceAll('"binding": "HYPERDRIVE_MEMBERSHIP_DB"', '"binding": "HYPERDRIVE_D1_01"')
+      .replaceAll('"binding": "HYPERDRIVE_FINANCE_DB"', '"binding": "HYPERDRIVE_D1_04"')
     normalized = normalized.replace(
       /  "compatibility_flags":\s*\[\s*"nodejs_compat"\s*\],\r?\n/,
       '',
