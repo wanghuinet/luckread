@@ -21,6 +21,7 @@ import {
   getW06ModerationQueueReadStore,
   getW06ModerationReportWriteStore,
   getW06ModerationCaseDetailReadStore,
+  getW06ModerationDecisionWriteStore,
   type W06ModerationDatabaseRuntimeEnv,
 } from './neon/moderation-database-runtime.js'
 
@@ -1180,7 +1181,7 @@ export default {
         const principal = requireW01Transport(request)
         requireModerationPermission('decideModerationCase', principal, request)
         const body = parseDecision(await request.json())
-        const result = await decideModerationCase(getW06ModerationDatabase(env), env.W03_CONTENT_MODERATION, {
+        const result = await decideModerationCase(getW06ModerationDecisionWriteStore(env), env.W03_CONTENT_MODERATION, {
           reviewerId: principal.userId,
           reviewerLayer: principal.layer,
           caseId: decodeURIComponent(decisionMatch[1]),
