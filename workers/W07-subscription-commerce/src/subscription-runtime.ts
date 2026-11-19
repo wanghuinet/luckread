@@ -254,86 +254,69 @@ export async function listSubscriptions(
 }
 
 export async function listActiveMembershipPlans(
-  db: D1Database | W07WebhookPostgresPool,
+  db: W07WebhookPostgresPool,
   limit = 20,
   cursorValue: string | null = null,
   creatorIdInput: string | null = null,
 ): Promise<{
   docs: Array<{
-    planId: string
-    creatorId: string
-    planVersion: number
-    name: string
-    tier: string
-    billingInterval: string
-    priceMinor: number
-    currency: string
-    trialPeriodDays: number
-    benefits: unknown
-    createdAt: string
-    updatedAt: string
-  }>
-  limit: number
-  nextCursor: string | null
-  hasMore: boolean
+    planId: string;
+    creatorId: string;
+    planVersion: number;
+    name: string;
+    tier: string;
+    billingInterval: string;
+    priceMinor: number;
+    currency: string;
+    trialPeriodDays: number;
+    benefits: unknown;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  limit: number;
+  nextCursor: string | null;
+  hasMore: boolean;
 }> {
-  const safeLimit = Number.isSafeInteger(limit) ? Math.min(Math.max(limit, 1), 50) : 20
-  const cursor = decodePlanListCursor(cursorValue)
-  const creatorId = creatorIdInput === null ? null : ensureId(creatorIdInput)
-  const baseSql =
-    'SELECT p.plan_id, p.owner_id, p.current_version, p.created_at, p.updated_at, ' +
+  const safeLimit = Number.isSafeInteger(limit) ? Math.min(Math.max(limit, 1), 50) : 20;
+  const cursor = decodePlanListCursor(cursorValue);
+  const creatorId = creatorIdInput === null ? null : ensureId(creatorIdInput);
+  let sql =
+    'SELECT p.plan_id, p.owner_id, p.current_version, ' +
+    `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
+    `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
     'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
     'FROM membership_plans AS p ' +
     'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
-    "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' "
-  let candidates: ActiveMembershipPlanRow[]
-  if (isPostgresSubscriptionStore(db)) {
-    let sql =
-      'SELECT p.plan_id, p.owner_id, p.current_version, ' +
-      `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
-      `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
-      'FROM membership_plans AS p ' +
-      'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
-      "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' "
-    const values: unknown[] = []
-    if (creatorId) {
-      values.push(creatorId)
-      sql += `AND p.owner_id = $${values.length} `
-    }
-    if (cursor) {
-      values.push(cursor.createdAt, cursor.createdAt, cursor.planId)
-      sql += `AND (p.created_at < $${values.length - 2}::timestamptz OR ` +
-        `(p.created_at = $${values.length - 1}::timestamptz AND p.plan_id < $${values.length})) `
-    }
-    values.push(safeLimit + 1)
-    sql += `ORDER BY p.created_at DESC, p.plan_id DESC LIMIT $${values.length}`
-    try {
-      const result = await db.query<ActiveMembershipPlanRow & Record<string, unknown>>(sql, values)
-      candidates = result.rows
-    } catch {
-      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
-    }
-  } else {
-    const creatorFilterSql = creatorId ? 'AND p.owner_id = ? ' : ''
-    const creatorBindings = creatorId ? [creatorId] : []
-    const statement = cursor
-      ? db.prepare(baseSql + creatorFilterSql + 'AND (p.created_at < ? OR (p.created_at = ? AND p.plan_id < ?)) ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?')
-        .bind(...creatorBindings, cursor.createdAt, cursor.createdAt, cursor.planId, safeLimit + 1)
-      : db.prepare(baseSql + creatorFilterSql + 'ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?')
-        .bind(...creatorBindings, safeLimit + 1)
-    const rows = await statement.all<ActiveMembershipPlanRow>()
-    candidates = rows.results ?? []
+    "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' ";
+  const values: unknown[] = [];
+  if (creatorId) {
+    values.push(creatorId);
+    sql += `AND p.owner_id = $${values.length} `;
   }
-  const hasMore = candidates.length > safeLimit
-  const page = candidates.slice(0, safeLimit)
+  if (cursor) {
+    values.push(cursor.createdAt, cursor.createdAt, cursor.planId);
+    sql += `AND (p.created_at < $${values.length - 2}::timestamptz OR ` +
+      `(p.created_at = $${values.length - 1}::timestamptz AND p.plan_id < $${values.length})) `;
+  }
+  values.push(safeLimit + 1);
+  sql += `ORDER BY p.created_at DESC, p.plan_id DESC LIMIT $${values.length}`;
+  let candidates: ActiveMembershipPlanRow[];
+  try {
+    const result = await db.query<ActiveMembershipPlanRow & Record<string, unknown>>(sql, values);
+    candidates = result.rows;
+  } catch {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
+
+  const hasMore = candidates.length > safeLimit;
+  const page = candidates.slice(0, safeLimit);
   const docs = page.map((row) => {
     const trialPeriodDays = row.trial_period_days === undefined || row.trial_period_days === null ? 0 : row.trial_period_days;
-    let benefits: unknown
+    let benefits: unknown;
     try {
-      benefits = JSON.parse(row.benefits_json) as unknown
+      benefits = JSON.parse(row.benefits_json) as unknown;
     } catch {
-      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
     }
     if (
       !Array.isArray(benefits) ||
@@ -342,7 +325,7 @@ export async function listActiveMembershipPlans(
       new Set(benefits).size !== benefits.length ||
       row.benefits_json.length > 8192
     ) {
-      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
     }
     if (
       !Number.isSafeInteger(row.current_version) || row.current_version < 1 ||
@@ -353,7 +336,7 @@ export async function listActiveMembershipPlans(
       !/^[a-z][a-z0-9_-]{0,63}$/.test(row.tier) ||
       typeof row.name !== 'string' || row.name.trim().length < 1 || row.name.length > 120
     ) {
-      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
     }
     return {
       planId: row.plan_id,
@@ -368,15 +351,15 @@ export async function listActiveMembershipPlans(
       benefits,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-    }
-  })
-  const last = page.at(-1)
+    };
+  });
+  const last = page.at(-1);
   return {
     docs,
     limit: safeLimit,
     hasMore,
     nextCursor: hasMore && last ? encodePlanListCursor({ createdAt: last.created_at, planId: last.plan_id }) : null,
-  }
+  };
 }
 
 export type MembershipPlanDraftInput = {
@@ -722,103 +705,37 @@ async function insertMembershipPlanDraftPostgres(
  * replay detect key reuse with a different request even after later edits.
  */
 export async function createMembershipPlanDraft(
-  db: D1Database | W07WebhookPostgresPool,
+  db: W07WebhookPostgresPool,
   actorUserId: string,
   verifiedCreatorId: string,
   input: unknown,
   key: string | null,
 ): Promise<ReturnType<typeof mapMembershipPlan>> {
-  const actor = validatePrincipal(actorUserId)
-  const creatorId = validatePrincipal(verifiedCreatorId)
-  const idempotencyKey = validateIdempotencyKey(key)
-  const plan = normalizeMembershipPlanDraft(input)
-  const planId = await membershipPlanIdFromIdempotency(creatorId, idempotencyKey)
-  const benefitsJson = canonicalBenefitsJson(plan.benefits)
+  const actor = validatePrincipal(actorUserId);
+  const creatorId = validatePrincipal(verifiedCreatorId);
+  const idempotencyKey = validateIdempotencyKey(key);
+  const plan = normalizeMembershipPlanDraft(input);
+  const planId = await membershipPlanIdFromIdempotency(creatorId, idempotencyKey);
+  const benefitsJson = canonicalBenefitsJson(plan.benefits);
 
-  if (isPostgresSubscriptionStore(db)) {
-    const existing = await readMembershipPlanDraftByIdPostgres(db, planId)
-    if (existing) {
-      if (!membershipPlanDraftMatches(existing, creatorId, plan, benefitsJson)) {
-        throw new SubscriptionRuntimeError('CONFLICT', 409)
-      }
-      return replayMembershipPlanDraft(existing)
-    }
-
-    const now = nowIso()
-    const inserted = await insertMembershipPlanDraftPostgres(db, {
-      planId, creatorId, plan, benefitsJson, now,
-    })
-    if (!inserted) {
-      const raced = await readMembershipPlanDraftByIdPostgres(db, planId)
-      if (!raced || !membershipPlanDraftMatches(raced, creatorId, plan, benefitsJson)) {
-        throw new SubscriptionRuntimeError('CONFLICT', 409)
-      }
-      return replayMembershipPlanDraft(raced)
-    }
-
-    console.log(JSON.stringify({
-      event: 'membership.plan.draft.created',
-      operation: 'createMembershipPlanDraft',
-      planId,
-      creatorId,
-      actorUserId: actor,
-    }))
-    return {
-      planId,
-      creatorId,
-      planVersion: 1,
-      name: plan.name,
-      tier: plan.tier,
-      billingInterval: plan.billingInterval,
-      priceMinor: plan.priceMinor,
-      currency: plan.currency,
-      benefits: plan.benefits,
-      trialPeriodDays: plan.trialPeriodDays,
-      status: 'DRAFT',
-      visibility: 'PRIVATE',
-      version: 1,
-      createdAt: now,
-      updatedAt: now,
-      etag: '"lr-plan-v1"',
-      replayed: false,
-    }
-  }
-
-  const existing = await db.prepare(
-    'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-    'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
-    'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
-    'ON v.plan_id = p.plan_id AND v.plan_version = 1 WHERE p.plan_id = ? LIMIT 1',
-  ).bind(planId).first<MembershipPlanStoredRow>()
+  const existing = await readMembershipPlanDraftByIdPostgres(db, planId);
   if (existing) {
     if (!membershipPlanDraftMatches(existing, creatorId, plan, benefitsJson)) {
-      throw new SubscriptionRuntimeError('CONFLICT', 409)
+      throw new SubscriptionRuntimeError('CONFLICT', 409);
     }
-    return replayMembershipPlanDraft(existing)
+    return replayMembershipPlanDraft(existing);
   }
 
-  const now = nowIso()
-  const results = await db.batch([
-    db.prepare(
-      "INSERT OR IGNORE INTO membership_plans (plan_id, owner_type, owner_id, current_version, status, visibility, version, created_at, updated_at) " +
-      "VALUES (?, 'CREATOR', ?, 1, 'DRAFT', 'PRIVATE', 1, ?, ?)",
-    ).bind(planId, creatorId, now, now),
-    db.prepare(
-      'INSERT OR IGNORE INTO membership_plan_versions (plan_id, plan_version, name, tier, billing_interval, price_minor, currency, benefits_json, trial_period_days, created_at) ' +
-      'VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)',
-    ).bind(planId, plan.name, plan.tier, plan.billingInterval, plan.priceMinor, plan.currency, benefitsJson, plan.trialPeriodDays, now),
-  ])
-  if (Number(results[0]?.meta?.changes ?? 0) !== 1 || Number(results[1]?.meta?.changes ?? 0) !== 1) {
-    const raced = await db.prepare(
-      'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
-      'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
-      'ON v.plan_id = p.plan_id AND v.plan_version = 1 WHERE p.plan_id = ? LIMIT 1',
-    ).bind(planId).first<MembershipPlanStoredRow>()
+  const now = nowIso();
+  const inserted = await insertMembershipPlanDraftPostgres(db, {
+    planId, creatorId, plan, benefitsJson, now,
+  });
+  if (!inserted) {
+    const raced = await readMembershipPlanDraftByIdPostgres(db, planId);
     if (!raced || !membershipPlanDraftMatches(raced, creatorId, plan, benefitsJson)) {
-      throw new SubscriptionRuntimeError('CONFLICT', 409)
+      throw new SubscriptionRuntimeError('CONFLICT', 409);
     }
-    return replayMembershipPlanDraft(raced)
+    return replayMembershipPlanDraft(raced);
   }
 
   console.log(JSON.stringify({
@@ -827,7 +744,7 @@ export async function createMembershipPlanDraft(
     planId,
     creatorId,
     actorUserId: actor,
-  }))
+  }));
   return {
     planId,
     creatorId,
@@ -846,7 +763,7 @@ export async function createMembershipPlanDraft(
     updatedAt: now,
     etag: '"lr-plan-v1"',
     replayed: false,
-  }
+  };
 }
 
 const planVersionFromEtag = (etag: string): number => {
