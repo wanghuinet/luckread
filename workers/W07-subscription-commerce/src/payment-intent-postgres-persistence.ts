@@ -341,3 +341,85 @@ export async function recordUnconfirmedHyperswitchIntentPostgres(
   }
   throw new PaymentPersistenceError('CONFLICT', 409);
 }
+
+
+/**
+ * Persist a synchronous response for a previously-created merchant-initiated
+ * payment. The response is not settlement evidence: only advance INITIATING
+ * to processing and never overwrite a state already applied by a signed webhook.
+ */
+export async function recordHyperswitchMerchantInitiatedSubmissionPostgres(
+  db: W07WebhookPostgresPool,
+  customerIdInput: string,
+  paymentIdInput: string,
+  expectedMerchantIdInput: string,
+  expectedPaymentMethodIdInput: string,
+  providerPayment: HyperswitchPayment,
+  dependencies: Pick<PaymentPersistenceDependencies, 'now'> = {},
+): Promise<PaymentAttemptDto> {
+  if (!nonBlank(customerIdInput, 256) ||
+      !PAYMENT_ID_PATTERN.test(paymentIdInput) ||
+      !nonBlank(expectedMerchantIdInput, 256) ||
+      !nonBlank(expectedPaymentMethodIdInput, 255)) {
+    throw new PaymentPersistenceError('VALIDATION_FAILED', 400);
+  }
+  if (
+    providerPayment.paymentId !== paymentIdInput ||
+    providerPayment.merchantId !== expectedMerchantIdInput ||
+    !safeMinor(providerPayment.amount) ||
+    !CURRENCY_PATTERN.test(providerPayment.currency) ||
+    (providerPayment.customerId != null && providerPayment.customerId !== customerIdInput) ||
+    (providerPayment.paymentMethodId != null && providerPayment.paymentMethodId !== expectedPaymentMethodIdInput)
+  ) {
+    throw new PaymentPersistenceError('WEBHOOK_REJECTED', 400);
+  }
+
+  const selectById = async (): Promise<PaymentRow | null> => {
+    const selected = await db.query<PaymentRow & Record<string, unknown>>(
+      `SELECT ${PAYMENT_COLUMNS} FROM payments WHERE payment_id = $1 AND customer_id = $2 LIMIT 1`,
+      [paymentIdInput, customerIdInput],
+    );
+    return selected.rows[0] ?? null;
+  };
+
+  let existing: PaymentRow | null;
+  try {
+    existing = await selectById();
+  } catch {
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+  if (!existing) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
+  if (
+    existing.provider !== PROVIDER ||
+    existing.merchant_id !== expectedMerchantIdInput ||
+    existing.amount_minor !== providerPayment.amount ||
+    existing.currency !== providerPayment.currency
+  ) {
+    throw new PaymentPersistenceError('WEBHOOK_REJECTED', 400);
+  }
+
+  // A webhook may win the race with the synchronous provider response.
+  if (existing.status !== 'INITIATING' || existing.version !== 1) return toDto(existing);
+
+  const updatedAt = strictlyAfter(
+    parseDate(dependencies.now ?? (() => new Date())),
+    existing.updated_at,
+  );
+  try {
+    await db.query<{ payment_id: string } & Record<string, unknown>>(
+      "UPDATE payments SET status = $1, version = version + 1, updated_at = $2::timestamptz " +
+      "WHERE payment_id = $3 AND customer_id = $4 AND provider = 'hyperswitch' AND merchant_id = $5 " +
+      "AND amount_minor = $6 AND currency = $7 AND status = 'INITIATING' AND version = 1 RETURNING payment_id",
+      [
+        'processing', updatedAt, paymentIdInput, customerIdInput,
+        expectedMerchantIdInput, providerPayment.amount, providerPayment.currency,
+      ],
+    );
+    const latest = await selectById();
+    if (!latest) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
+    return toDto(latest);
+  } catch (error) {
+    if (error instanceof PaymentPersistenceError) throw error;
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+}
