@@ -1,5 +1,5 @@
 import { assertW09AuditEventStatement } from '../../W09-platform/src/audit-event-postgres-adapter.js'
-import type { W06ModerationPostgresPool } from './neon-postgres-d1-database.js'
+import type { W06ModerationPostgresPool } from './moderation-postgres-pool.js'
 
 export type ModerationDecisionOutcome = 'APPROVED' | 'REJECTED'
 
