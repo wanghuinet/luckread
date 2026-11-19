@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AuditEvent } from './audit-event'
 import type { AuditEventStore } from './audit-event-store.js'
 
-const { auditEventStoresByDatabase } = vi.hoisted(() => ({
+const { auditEventStoresByDatabase, queueReadStoreOverride } = vi.hoisted(() => ({
   auditEventStoresByDatabase: new WeakMap<object, unknown>(),
+  queueReadStoreOverride: { current: undefined as unknown },
 }))
 
 vi.mock('./neon/moderation-database-runtime.js', async (importOriginal) => {
@@ -16,6 +17,8 @@ vi.mock('./neon/moderation-database-runtime.js', async (importOriginal) => {
       if (!store) throw new Error('AUDIT_EVENT_TEST_STORE_NOT_REGISTERED')
       return store as AuditEventStore
     },
+    getW06ModerationQueueReadStore: (env: unknown) =>
+      queueReadStoreOverride.current ?? actual.getW06ModerationQueueReadStore(env as never),
   }
 })
 
@@ -184,14 +187,8 @@ describe('W06 moderation queue pagination scope', () => {
     ]
     const list = vi.fn(async () => rows)
     const queueStore = { list }
+    queueReadStoreOverride.current = queueStore
     vi.resetModules()
-    vi.doMock('./neon/moderation-database-runtime.js', async (importOriginal) => {
-      const actual = await importOriginal<typeof import('./neon/moderation-database-runtime.js')>()
-      return {
-        ...actual,
-        getW06ModerationQueueReadStore: () => queueStore,
-      }
-    })
 
     try {
       const runtime = await import('./index')
@@ -236,7 +233,7 @@ describe('W06 moderation queue pagination scope', () => {
       })
       expect(list).toHaveBeenCalledTimes(1)
     } finally {
-      vi.doUnmock('./neon/moderation-database-runtime.js')
+      queueReadStoreOverride.current = undefined
       vi.resetModules()
     }
   })
