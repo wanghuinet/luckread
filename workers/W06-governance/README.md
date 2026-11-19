@@ -29,7 +29,7 @@ Current source slice:
 - The queue route no longer constructs a D1 query adapter or falls back to the D1-shaped database facade; missing/invalid Neon composition fails closed.
 - The `/reports` route writes W06-owned `moderation_reports` and `moderation_report_idempotency` through a native PostgreSQL Store. It appends to W09-owned `audit_events` only after a successful new report insert, under the W09 append-only SQL policy and inside the same transaction.
 - Same-key idempotency replay/conflict, 24-hour dedup buckets, report-plus-audit atomicity and sanitized persistence errors are covered by Store tests and the PostgreSQL 18 rehearsal.
-- This does not claim the remaining moderation decision writes, report writes, audit persistence, or outbox consumers are D1-free.
+- This does not claim the remaining moderation decision writes, non-Report audit consumers, or outbox consumers are D1-free.
 
 No remote D1 mutation or production deployment is implied by this source directory.
 
