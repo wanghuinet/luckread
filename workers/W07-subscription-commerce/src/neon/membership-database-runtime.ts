@@ -20,7 +20,7 @@ export function resolveW07MembershipDatabaseDriver(
   return 'neon'
 }
 
-function validateD101HyperdriveConnectionString(value: unknown): string {
+function validateMembershipHyperdriveConnectionString(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 4096) {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
@@ -57,7 +57,7 @@ function getOrCreateW07MembershipPostgresPool(
   const cached = pools.get(binding)
   if (cached) return cached
 
-  const connectionString = validateD101HyperdriveConnectionString(binding.connectionString)
+  const connectionString = validateMembershipHyperdriveConnectionString(binding.connectionString)
   const pool = poolFactory({
     connectionString,
     max: 5,
@@ -75,7 +75,7 @@ function getOrCreateW07MembershipPostgresPool(
   return pool
 }
 
-/** Return the shared native D1-01 pool for PostgreSQL membership stores. */
+/** Return the shared Neon membership pool for PostgreSQL membership stores. */
 export function getW07MembershipPostgresPool(
   env: W07MembershipDatabaseRuntimeEnv,
   poolFactory: W07MembershipPoolFactory = (config) => new Pool(config),

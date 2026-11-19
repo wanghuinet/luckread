@@ -359,9 +359,9 @@ async function applySubscriptionUpdate(
 }
 
 /**
- * Applies a terminal W07 D1-04 renewal result to the authoritative D1-01
- * Subscription row. No Entitlement copy or payment/order facts are written to
- * D1-01. The D1-04 marker makes cross-database synchronization retryable.
+ * Applies a terminal Neon finance renewal result to the authoritative membership
+ * Subscription row. Payment/order facts stay in the finance database; the finance
+ * sync marker makes cross-database synchronization retryable.
  */
 export async function syncTerminalRenewalCycleToSubscription(
   env: OutcomeSyncEnv, cycleIdInput: string, dependencies: RenewalOutcomeSyncDependencies = {},
@@ -383,8 +383,8 @@ export async function syncTerminalRenewalCycleToSubscription(
   if (cycle.state !== 'SUCCEEDED' && cycle.state !== 'FAILED') {
     return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'NOT_TERMINAL' };
   }
-  // Do not normalize malformed persisted ordering data or mutate D1-01 first:
-  // the D1-04 sync marker must remain retryable when its own timestamp is corrupt.
+  // Do not normalize malformed persisted ordering data or mutate membership state first:
+  // the finance sync marker must remain retryable when its own timestamp is corrupt.
   if (!isCanonicalIso(cycle.updated_at) ||
       (cycle.subscription_sync_updated_at !== null && !isCanonicalIso(cycle.subscription_sync_updated_at))) {
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);

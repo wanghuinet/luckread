@@ -170,7 +170,7 @@ const generatedHeader = [
   '-- Regenerate with scripts/neon/generate-d1-01-membership-postgres-migration.mjs.',
   '-- See scripts/neon/templates/d1-01-membership-postgres.sql for the checked schema template.',
   '-- Source of truth remains migrations/0001..0008 and the W07 Subscription contracts.',
-  '-- This file is schema-only; runtime remains on Cloudflare D1 pending a separate cutover gate.',
+  '-- Generated from historical D1-01 sources; W07 runtime uses Neon PostgreSQL membership stores.',
   '',
 ].join('\n')
 writeFileSync(outputPath, generatedHeader + '\n' + sql)

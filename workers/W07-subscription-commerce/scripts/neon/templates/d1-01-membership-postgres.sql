@@ -7,7 +7,7 @@
 -- benefits_json remains TEXT; JSONB validates only that the value is a JSON array.
 -- No users, subscriptions, plans, purchases or other business rows are seeded.
 -- No speculative active-subscription uniqueness constraint is introduced.
--- Runtime stays on Cloudflare D1; this schema is for disposable PostgreSQL CI only.
+-- W07 runtime uses Neon via HYPERDRIVE_MEMBERSHIP_DB; historical D1-01 migrations are schema provenance only.
 
 BEGIN;
 
