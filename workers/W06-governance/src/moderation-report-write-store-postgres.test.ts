@@ -129,6 +129,21 @@ describe('W06 native PostgreSQL report write store', () => {
       ])
   })
 
+  it('does not append AuditEvent when PostgreSQL ignores a duplicate report insert', async () => {
+    const fake = fakePool([
+      { match: 'FROM moderation_report_idempotency' },
+      { match: 'FROM moderation_reports' },
+      { match: 'INSERT INTO moderation_reports', rowCount: 0 },
+      { match: 'INSERT INTO moderation_report_idempotency', rowCount: 1 },
+    ])
+
+    const result = await createPostgresModerationReportWriteStore(fake.pool).create(command)
+
+    expect(result.status).toBe('CREATED')
+    expect(fake.calls.some((call) => call.sql.includes('INSERT INTO audit_events'))).toBe(false)
+    expect(fake.calls.at(-1)?.sql).toBe('COMMIT')
+  })
+
   it('returns the stored response for a matching idempotency replay without writing again', async () => {
     const stored = {
       reportId: command.reportId,
