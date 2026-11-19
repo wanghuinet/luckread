@@ -13,6 +13,7 @@ const client = read('src/commerce/w07-commerce-client.ts')
 const w06Client = read('src/moderation/w06-moderation-client.ts')
 const w06Runtime = read('../W06-governance/src/index.ts')
 const w07OrderRuntime = read('../W07-subscription-commerce/src/order-http-runtime.ts')
+const orderPersistence = read('../W07-subscription-commerce/src/order-persistence.ts')
 const wrangler = read('wrangler.jsonc')
 
 describe('v1 commerce order adapter', () => {
@@ -75,6 +76,10 @@ describe('v1 commerce order adapter', () => {
     expect(w07OrderRuntime).toContain('getW07OrderCreatePersistenceStore')
     expect(w07OrderRuntime).toContain('getW07PaymentWebhookPostgresPool')
     expect(w07OrderRuntime).toContain('getCommerceOrderPostgres')
+    expect(orderPersistence).toContain('store.readIdempotencyRow(customerId, key)')
+    expect(orderPersistence).toContain('store.persistNewOrder(transactionInput)')
+    expect(orderPersistence).not.toContain('D1Database')
+    expect(orderPersistence).not.toContain('db.prepare(')
     expect(w07OrderRuntime).toContain('await createOrder(')
     expect(w07OrderRuntime).toContain('orderCreateStore,')
     expect(w07OrderRuntime).toContain('getOrder(pool, customerId, route.orderId)')

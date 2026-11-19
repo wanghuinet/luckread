@@ -43,7 +43,7 @@ function mapPostgresError(error: unknown): OrderPersistenceError {
  *
  * The idempotency claim, completed response, initial Order and every OrderLine
  * are committed on one client transaction. No pricing/network calls occur
- * inside this transaction. D1 remains the production default.
+ * inside this transaction. This native PostgreSQL adapter is the production store.
  */
 export function createPostgresOrderCreateStore(
   db: OrderPersistencePostgresPool,

@@ -1,5 +1,3 @@
-/// <reference types="@cloudflare/workers-types" />
-
 import { sha256CanonicalJsonForIdempotency } from '../../W10-async/src/canonical-json-idempotency.js';
 import {
   MAX_ORDER_ITEMS,
@@ -138,44 +136,13 @@ export type OrderCreateTransactionResult = Readonly<{
 }>;
 
 /**
- * Injected order-create persistence boundary. The D1 adapter remains the
- * default; the PostgreSQL adapter owns the same atomic claim/order/lines
- * transaction and is used only by explicit local rehearsal until cutover.
+ * Required order-create persistence boundary. The production runtime supplies
+ * the native Neon PostgreSQL store, which owns the atomic claim/order/lines transaction.
  */
 export interface OrderCreatePersistenceStore {
   readIdempotencyRow(customerId: string, idempotencyKey: string): Promise<OrderCreateIdempotencyRow | null>;
   persistNewOrder(input: OrderCreateTransactionInput): Promise<OrderCreateTransactionResult>;
 }
-
-type OrderRow = {
-  order_id: string;
-  customer_id: string;
-  status: CommerceOrderStatus;
-  version: number;
-  currency: string;
-  subtotal_minor: number;
-  discount_minor: number;
-  tax_minor: number;
-  total_minor: number;
-  created_at: string;
-  updated_at: string;
-};
-
-type OrderLineRow = {
-  order_line_id: string;
-  order_id: string;
-  item_type: string;
-  item_ref: string;
-  item_version: string;
-  quantity: number;
-  unit_amount_minor: number;
-  line_subtotal_minor: number;
-  line_discount_minor: number;
-  line_tax_minor: number;
-  line_total_minor: number;
-  item_snapshot_json: string;
-  created_at: string;
-};
 
 export type CreateOrderResult = Readonly<{
   data: CommerceOrderData;
@@ -381,80 +348,6 @@ const assertStoredMinor = (value: unknown): number => {
   return value;
 };
 
-const readIdempotencyRow = async (
-  db: D1Database,
-  customerId: string,
-  idempotencyKey: string,
-): Promise<IdempotencyRow | null> => db.prepare(
-  'SELECT id, customer_id, operation_key, idempotency_key, request_hash, state, response_status, response_json, created_at, expires_at ' +
-  'FROM order_create_idempotency WHERE customer_id = ? AND operation_key = ? AND idempotency_key = ? LIMIT 1',
-).bind(customerId, OPERATION_KEY, idempotencyKey).first<IdempotencyRow>();
-
-function isOrderCreatePersistenceStore(
-  source: D1Database | OrderCreatePersistenceStore,
-): source is OrderCreatePersistenceStore {
-  const candidate = source as Partial<OrderCreatePersistenceStore>;
-  return typeof candidate.readIdempotencyRow === 'function' &&
-    typeof candidate.persistNewOrder === 'function';
-}
-
-async function persistNewOrderWithD1(
-  db: D1Database,
-  input: OrderCreateTransactionInput,
-): Promise<OrderCreateTransactionResult> {
-  const { customerId, idempotencyId, operationKey, idempotencyKey, requestHash, createdAt, expiresAt, responseJson, order } = input;
-  const statements: D1PreparedStatement[] = [
-    db.prepare(
-      '/* pay002:expire */ DELETE FROM order_create_idempotency ' +
-      'WHERE customer_id = ? AND operation_key = ? AND idempotency_key = ? AND expires_at <= ?',
-    ).bind(customerId, operationKey, idempotencyKey, createdAt),
-    db.prepare(
-      '/* pay002:claim */ INSERT INTO order_create_idempotency ' +
-      '(id, customer_id, operation_key, idempotency_key, request_hash, state, response_status, response_json, created_at, expires_at) ' +
-      "VALUES (?, ?, ?, ?, ?, 'IN_PROGRESS', NULL, NULL, ?, ?) " +
-      'ON CONFLICT(customer_id, operation_key, idempotency_key) DO NOTHING',
-    ).bind(idempotencyId, customerId, operationKey, idempotencyKey, requestHash, createdAt, expiresAt),
-    db.prepare(
-      '/* pay002:complete */ UPDATE order_create_idempotency ' +
-      "SET state = 'COMPLETED', response_status = 201, response_json = ? " +
-      "WHERE id = ? AND customer_id = ? AND operation_key = ? AND idempotency_key = ? AND request_hash = ? AND state = 'IN_PROGRESS'",
-    ).bind(responseJson, idempotencyId, customerId, operationKey, idempotencyKey, requestHash),
-    db.prepare(
-      '/* pay002:order */ INSERT INTO orders ' +
-      '(order_id, customer_id, status, version, currency, subtotal_minor, discount_minor, tax_minor, total_minor, created_at, updated_at, confirmed_at, cancelled_at, failure_code) ' +
-      "SELECT ?, ?, 'CREATED', 1, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL " +
-      "WHERE EXISTS (SELECT 1 FROM order_create_idempotency WHERE id = ? AND customer_id = ? AND operation_key = ? AND idempotency_key = ? AND request_hash = ? AND state = 'COMPLETED' AND response_json = ?)",
-    ).bind(
-      order.orderId, customerId, order.currency, order.subtotalMinor, order.discountMinor,
-      order.taxMinor, order.totalMinor, createdAt, createdAt,
-      idempotencyId, customerId, operationKey, idempotencyKey, requestHash, responseJson,
-    ),
-    ...input.lines.map(({ orderLineId, item, lineSubtotalMinor, lineTotalMinor }) =>
-      db.prepare(
-        '/* pay002:line */ INSERT INTO order_lines ' +
-        '(order_line_id, order_id, item_type, item_ref, item_version, quantity, unit_amount_minor, line_subtotal_minor, line_discount_minor, line_tax_minor, line_total_minor, item_snapshot_json, created_at) ' +
-        'SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS ' +
-        '(SELECT 1 FROM orders WHERE order_id = ? AND customer_id = ?)',
-      ).bind(
-        orderLineId, order.orderId, item.itemType, item.itemRef, item.itemVersion, item.quantity,
-        item.unitAmountMinor, lineSubtotalMinor, item.lineDiscountMinor, item.lineTaxMinor,
-        lineTotalMinor, item.itemSnapshotJson, createdAt, order.orderId, customerId,
-      ),
-    ),
-  ];
-
-  // D1 batch remains the production path and commits this complete ordered set atomically.
-  const results = await db.batch(statements);
-  return {
-    statementCount: results.length,
-    expireChanges: Number(results[0]?.meta?.changes ?? 0),
-    claimChanges: Number(results[1]?.meta?.changes ?? 0),
-    completionChanges: Number(results[2]?.meta?.changes ?? 0),
-    orderChanges: Number(results[3]?.meta?.changes ?? 0),
-    lineChanges: results.slice(4).map((result) => Number(result?.meta?.changes ?? 0)),
-  };
-}
-
 const replayOrReject = (
   row: IdempotencyRow,
   requestHash: string,
@@ -582,8 +475,12 @@ const validatePricing = (
   return { currency: pricing.currency, pricingMode, lines, subtotalMinor, discountMinor, taxMinor, totalMinor };
 };
 
+/**
+ * Create an order through the injected durable store. Production callers must
+ * provide the Neon PostgreSQL Store; this orchestration layer has no D1 fallback.
+ */
 export async function createCommerceOrder(
-  db: D1Database | OrderCreatePersistenceStore,
+  store: OrderCreatePersistenceStore,
   customerIdInput: string,
   idempotencyKeyInput: string | null | undefined,
   rawRequest: unknown,
@@ -607,18 +504,15 @@ export async function createCommerceOrder(
   if (!Number.isFinite(nowDate.getTime())) throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
   const now = nowDate.toISOString();
 
-  const store = isOrderCreatePersistenceStore(db) ? db : null;
-  const readExistingIdempotencyRow = () => store
-    ? store.readIdempotencyRow(customerId, key)
-    : readIdempotencyRow(db as D1Database, customerId, key);
+  const readExistingIdempotencyRow = () => store.readIdempotencyRow(customerId, key);
   const existing = await readExistingIdempotencyRow();
   if (existing) {
     const replay = replayOrReject(existing, requestHash, now);
     if (replay) return replay;
   }
 
-  // All authoritative lookups/pricing are outside the D1 write transaction:
-  // no cross-D1 operation or provider network call occurs inside the batch.
+  // All authoritative lookups and provider pricing finish before the store's
+  // atomic PostgreSQL order transaction begins.
   const pricing = validatePricing(request, await resolvePricing(request));
   const createId = dependencies.createId ?? defaultId;
   const orderId = requireIdentifier(createId('order'), 'orderId', 255);
@@ -681,9 +575,7 @@ export async function createCommerceOrder(
     },
     lines: lineRecords,
   };
-  const result = store
-    ? await store.persistNewOrder(transactionInput)
-    : await persistNewOrderWithD1(db as D1Database, transactionInput);
+  const result = await store.persistNewOrder(transactionInput);
 
   if (result.claimChanges !== 1) {
     const raced = await readExistingIdempotencyRow();
@@ -703,50 +595,4 @@ export async function createCommerceOrder(
   }
 
   return { data, status: 201, replayed: false };
-}
-
-export async function getCommerceOrder(
-  db: D1Database,
-  customerIdInput: string,
-  orderIdInput: string,
-): Promise<CommerceOrderData> {
-  const customerId = requireIdentifier(customerIdInput, 'customerId');
-  const orderId = requireIdentifier(orderIdInput, 'orderId', 255);
-  const order = await db.prepare(
-    'SELECT order_id, customer_id, status, version, currency, subtotal_minor, discount_minor, tax_minor, total_minor, created_at, updated_at ' +
-    'FROM orders WHERE order_id = ? AND customer_id = ? LIMIT 1',
-  ).bind(orderId, customerId).first<OrderRow>();
-  if (!order) throw new OrderPersistenceError('RESOURCE_NOT_FOUND', 404);
-
-  const result = await db.prepare(
-    'SELECT order_line_id, order_id, item_type, item_ref, item_version, quantity, unit_amount_minor, line_subtotal_minor, line_discount_minor, line_tax_minor, line_total_minor, item_snapshot_json, created_at ' +
-    'FROM order_lines WHERE order_id = ? ORDER BY order_line_id ASC',
-  ).bind(orderId).all<OrderLineRow>();
-  const lineModes = (result.results ?? []).map((line) => readSnapshotPricingMode(line.item_snapshot_json))
-  const firstLineMode = lineModes[0] ?? 'live'
-  if (lineModes.some((mode) => mode !== firstLineMode)) {
-    throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500)
-  }
-  const publicData: unknown = {
-    orderId: order.order_id,
-    status: order.status,
-    version: order.version,
-    currency: order.currency,
-    subtotalMinor: order.subtotal_minor,
-    discountMinor: order.discount_minor,
-    taxMinor: order.tax_minor,
-    totalMinor: order.total_minor,
-    items: (result.results ?? []).map((line) => ({
-      itemRef: line.item_ref,
-      quantity: line.quantity,
-      unitAmountMinor: line.unit_amount_minor,
-      lineSubtotalMinor: line.line_subtotal_minor,
-      lineDiscountMinor: line.line_discount_minor,
-      lineTaxMinor: line.line_tax_minor,
-      lineTotalMinor: line.line_total_minor,
-    })),
-    createdAt: order.created_at,
-    updatedAt: order.updated_at,
-  };
-  return parseStoredOrderData(JSON.stringify(publicData));
 }
