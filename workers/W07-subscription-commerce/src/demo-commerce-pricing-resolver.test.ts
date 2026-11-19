@@ -58,7 +58,7 @@ describe('shared Demo commerce pricing resolver', () => {
     const resolveItems = vi.fn(async () => resolved);
     const applyTaxJar = vi.fn(async () => priced);
 
-    const result = await resolveDemoCommercePricing(env(), input, { resolveItems, applyTaxJar });
+    const result = await resolveDemoCommercePricing(env(), input, { getMembershipPostgresPool: () => membershipPool, resolveItems, applyTaxJar });
 
     expect(result).toEqual(priced);
     expect(resolveItems).toHaveBeenCalledWith(membershipPool, input);
@@ -106,7 +106,7 @@ describe('shared Demo commerce pricing resolver', () => {
       request: input,
     };
 
-    const result = await resolveDemoRenewalPricing(env(), renewalInput, { resolveItems, applyTaxJar });
+    const result = await resolveDemoRenewalPricing(env(), renewalInput, { getMembershipPostgresPool: () => membershipPool, resolveItems, applyTaxJar });
 
     expect(result).toEqual(priced);
     expect(resolveItems).toHaveBeenCalledTimes(1);
