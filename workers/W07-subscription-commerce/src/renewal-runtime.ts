@@ -16,7 +16,9 @@ import {
   recordHyperswitchMerchantInitiatedSubmission,
   PaymentPersistenceError,
   type PaymentAttemptDto,
+  type PaymentAttemptCreation,
 } from './payment-persistence.js';
+import { createPaymentAttemptPostgres } from './payment-intent-postgres-persistence.js';
 import {
   getScheduledPlanChangeStore,
   readScheduledSubscriptionPlanDowngradeForPeriod,
@@ -32,6 +34,7 @@ import {
 import type { CreateCommerceOrderRequest } from './order-request-validation.js';
 import {
   getW07OrderCreatePersistenceStore,
+  getW07PaymentWebhookPostgresPool,
   getW07SelectedD104Database,
   resolveW07DatabaseDriver,
   type W07PaymentMethodReadRuntimeEnv,
@@ -123,12 +126,53 @@ export type RenewalRuntimeDependencies = Readonly<{
   ) => Promise<AuthoritativelyPricedOrder>;
   createOrder?: typeof createCommerceOrder;
   createPaymentAttempt?: typeof createPaymentAttempt;
+  createPaymentAttemptPostgres?: typeof createPaymentAttemptPostgres;
   createProviderCharge?: typeof createHyperswitchMerchantInitiatedPayment;
   recordProviderSubmission?: typeof recordHyperswitchMerchantInitiatedSubmission;
   getDatabase?: (env: RenewalRuntimeEnv) => D1Database;
+  getFinancePostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool | undefined;
   getMembershipPostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool;
   getOrderCreateStore?: (env: RenewalRuntimeEnv) => OrderCreatePersistenceStore | undefined;
 }>;
+
+/**
+ * Create the Payment attempt for a durable renewal cycle in its owning D1-04 store.
+ * Production Neon calls use the native PostgreSQL persistence path; the D1
+ * branch remains only for explicit isolated legacy fixtures during migration.
+ */
+export async function createRenewalPaymentAttempt(
+  env: RenewalRuntimeEnv,
+  customerId: string,
+  orderId: string,
+  idempotencyKey: string,
+  merchantId: string,
+  dependencies: RenewalRuntimeDependencies = {},
+): Promise<PaymentAttemptCreation> {
+  if (resolveW07DatabaseDriver(env) === 'neon') {
+    let pool: W07WebhookPostgresPool | undefined;
+    try {
+      pool = (dependencies.getFinancePostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+    if (!pool) throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    const create = dependencies.createPaymentAttemptPostgres ?? createPaymentAttemptPostgres;
+    const paymentEnvironment = env.HYPERSWITCH_ENVIRONMENT === 'sandbox' ||
+      env.HYPERSWITCH_ENVIRONMENT === 'production'
+      ? env.HYPERSWITCH_ENVIRONMENT
+      : undefined;
+    return create(pool, customerId, orderId, idempotencyKey, merchantId, {
+      now: dependencies.now,
+      paymentEnvironment,
+    });
+  }
+
+  const create = dependencies.createPaymentAttempt ?? createPaymentAttempt;
+  return create(env.D1_04, customerId, orderId, idempotencyKey, merchantId, {
+    now: dependencies.now,
+    databaseDialect: 'd1',
+  });
+}
 
 export type RenewalScanResult = Readonly<{
   scanned: number;
@@ -1172,14 +1216,13 @@ export async function processSubscriptionRenewalCycle(
         return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
       }
       const attemptNumber = cycle.attempt_number + 1;
-      const createAttempt = dependencies.createPaymentAttempt ?? createPaymentAttempt;
-      const attempt = await createAttempt(
-        env.D1_04,
+      const attempt = await createRenewalPaymentAttempt(
+        env,
         cycle.subscriber_id,
         cycle.order_id!,
         'renew_' + cycle.cycle_id + '_' + String(attemptNumber),
         cycle.merchant_id,
-        { now: nowFn, databaseDialect: resolveW07DatabaseDriver(env) === 'neon' ? 'postgres' : 'd1' },
+        dependencies,
       );
       cycle = await storePaymentReference(env, cycle, attempt.payment, attemptNumber, now);
       if (cycle.payment_id !== attempt.payment.paymentId || cycle.attempt_number !== attemptNumber) {
