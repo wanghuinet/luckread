@@ -8,6 +8,7 @@ import {
   getW06ModerationReportWriteStore,
   getW06AuditEventStore,
   getW06ModerationCaseDetailReadStore,
+  getW06ModerationDecisionWriteStore,
   resolveW06ModerationDatabaseDriver,
 } from './moderation-database-runtime.js'
 
@@ -49,6 +50,7 @@ describe('W06 moderation database runtime admission', () => {
     expect(() => getW06ModerationReportWriteStore(env)).toThrow('W06_POSTGRES_POOL_REQUIRES_NEON_DRIVER')
     expect(() => getW06AuditEventStore(env)).toThrow('W06_POSTGRES_POOL_REQUIRES_NEON_DRIVER')
     expect(getW06ModerationCaseDetailReadStore(env)).toBeUndefined()
+    expect(() => getW06ModerationDecisionWriteStore(env)).toThrow('W06_POSTGRES_POOL_REQUIRES_NEON_DRIVER')
   })
 
   it('defaults to Neon when the driver is omitted and never falls back to an available D1 binding', () => {
@@ -64,6 +66,8 @@ describe('W06 moderation database runtime admission', () => {
     expect(getW06ModerationReportWriteStore(env)).toBeDefined()
     expect(getW06AuditEventStore(env)).toBeDefined()
     expect(getW06ModerationCaseDetailReadStore(env)).toBeDefined()
+    expect(getW06ModerationDecisionWriteStore(env)).toBeDefined()
+    expect(getW06ModerationDecisionWriteStore(env)).toBe(getW06ModerationDecisionWriteStore(env))
   })
 
   it('rejects unknown drivers instead of silently falling back to D1', () => {
