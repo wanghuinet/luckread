@@ -1013,7 +1013,7 @@ async function prepareFailedCycleRetry(
   // A retry may reuse only the exact same still-active saved method/mandate.
   // A revoked mandate requires a new customer-present consent flow and is never
   // silently replaced with another token during off-session recovery.
-  if (!(await isExactMandateActiveFromStore(getW07RenewalCycleStore(env), cycle))) return 'TERMINAL';
+  if (!(await isExactMandateActiveFromStore(cycleStore, cycle))) return 'TERMINAL';
 
   const retryCutoff = new Date(Date.parse(now) - renewalRetryDelayMs(cycle.attempt_number)).toISOString();
   const updatedAt = strictlyAfter(now, cycle.updated_at);
@@ -1026,7 +1026,6 @@ async function prepareFailedCycleRetry(
     }
   } else {
     try {
-      if (isPostgresRenewalCycleStore(cycleStore)) throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
       const store = cycleStore;
       const result = await store.prepare(
         "UPDATE subscription_renewal_cycles SET state = 'PREPARED', payment_id = NULL, " +
@@ -1050,7 +1049,7 @@ async function prepareFailedCycleRetry(
 
 /**
  * Prepare a bounded, idempotent retry after a durable failed-cycle outcome was
- * synchronized to D1-01. The caller still separately invokes processSubscriptionRenewalCycle
+ * synchronized to the membership database. The caller still separately invokes processSubscriptionRenewalCycle
  * after this function returns PREPARED; retry preparation alone never charges a provider.
  */
 export async function prepareFailedRenewalCycleRetry(
