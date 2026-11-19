@@ -70,10 +70,13 @@ describe('v1 commerce order adapter', () => {
   it('reads only the authenticated customer order through W07 owner-scoped persistence', () => {
     expect(getRoute).toContain("authorizeOrderPermission(request, principal, 'order.read')")
     expect(getRoute).toContain("pathname: '/commerce/orders/' + encodeURIComponent(orderId)")
-    expect(w07OrderRuntime).toContain('getW07SelectedD104Database')
+    expect(w07OrderRuntime).not.toContain('getW07SelectedD104Database')
+    expect(w07OrderRuntime).not.toContain('D1Database')
     expect(w07OrderRuntime).toContain('getW07OrderCreatePersistenceStore')
-    expect(w07OrderRuntime).toContain('orderCreateStore ?? database')
-    expect(w07OrderRuntime).toContain('getOrder(database, customerId, route.orderId)')
+    expect(w07OrderRuntime).toContain('getW07PaymentWebhookPostgresPool')
+    expect(w07OrderRuntime).toContain('getCommerceOrderPostgres')
+    expect(w07OrderRuntime).toContain('createOrder(orderCreateStore,')
+    expect(w07OrderRuntime).toContain('getOrder(pool, customerId, route.orderId)')
     expect(getRoute).toContain("method: 'GET'")
   })
 
