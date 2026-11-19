@@ -20,7 +20,7 @@ export interface ModerationCaseDetailReadRow extends Record<string, unknown> {
   reason_code: string | null
   severity: string | null
   scope: string | null
-  decision_expires_at: string | null
+  expires_at: string | null
   source_kind: string | null
   reviewer_id: string | null
   reviewer_layer: string | null
@@ -64,7 +64,7 @@ const CASE_DETAIL_SQL = [
   '       d.policy_version AS decision_policy_version,',
   '       to_char(d.effective_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\') AS decision_effective_at,',
   '       d.reason_code,d.severity,d.scope,',
-  '       to_char(d.expires_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\') AS decision_expires_at,',
+  '       to_char(d.expires_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\') AS expires_at,',
   '       d.source_kind,d.reviewer_id,d.reviewer_layer,d.request_id,',
   '       to_char(d.created_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\') AS decision_created_at,',
   '       d.target_type AS decision_target_type,d.target_id AS decision_target_id,',
