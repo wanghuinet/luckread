@@ -84,17 +84,16 @@ test('fails closed if any D1-04 ledger entry is attributed to another Worker', (
   )
 })
 
-test('fails closed if W07 D1_04 runtime binding is renamed or retargeted', () => {
-  const wranglerPath = 'workers/W07-subscription-commerce/wrangler.jsonc'
-  const source = overrideSource(wranglerPath, (text) => {
-    const wrangler = JSON.parse(text)
-    const binding = wrangler.d1_databases.find((row) => row.binding === 'D1_04')
-    binding.database_name = 'luckread_finance'
-    return JSON.stringify(wrangler)
+test('fails closed if W07 D1-04 historical source identity is renamed in its finance contract', () => {
+  const financeContractPath = 'contracts/database/neon-d1-04-w07-order-payment-schema.v1.json'
+  const source = overrideSource(financeContractPath, (text) => {
+    const finance = JSON.parse(text)
+    finance.target.binding = 'D1_04_RENAMED'
+    return JSON.stringify(finance)
   })
   assert.throws(
     () => verifyD104SharedRunnerReview({ readSource: source }),
-    /W07 D1_04 binding must preserve/,
+    /W07 default runtime must be D1-free while preserving the D1-04 source identity/,
   )
 })
 
