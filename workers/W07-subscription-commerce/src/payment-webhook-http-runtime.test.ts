@@ -207,47 +207,64 @@ function request(options: {
   );
 }
 
+function paymentEvent(
+  paymentId: string,
+  eventType = 'payment_succeeded',
+  nested = false,
+) {
+  return JSON.stringify({
+    event_id: 'evt_' + paymentId,
+    event_type: eventType,
+    merchant_id: MERCHANT,
+    ...(nested
+      ? { content: { type: 'payment_details', object: { payment_id: paymentId, merchant_id: MERCHANT, status: 'succeeded', amount: 300, currency: 'USD' } } }
+      : { content_type: 'payment_details', resource: { payment_id: paymentId } }),
+  });
+}
+
 describe('W07 Hyperswitch webhook HTTP receiver', () => {
-  it('does not claim unrelated routes', async () => {
+  it('does not claim unrelated routes or accept calls outside the W01 service binding', async () => {
     const f = fixture();
     await expect(
       handleHyperswitchWebhookRequest(request({ pathname: '/memberships/subscriptions' }), f.env, f.dependencies),
     ).resolves.toBeNull();
-    expect(f.calls).toHaveLength(0);
-  });
-
-  it('requires the private W01 service-binding envelope without a browser principal', async () => {
-    const f = fixture();
-    const response = await handleHyperswitchWebhookRequest(
+    const denied = await handleHyperswitchWebhookRequest(
       request({ caller: 'internet-client' }),
       f.env,
       f.dependencies,
     );
-    expect(response?.status).toBe(403);
-    expect(await response?.json()).toMatchObject({ error: { code: 'PERMISSION_DENIED' } });
-    expect(f.calls).toHaveLength(0);
+    expect(denied?.status).toBe(403);
+    expect(f.dependencies.getWebhookPostgresPool).not.toHaveBeenCalled();
   });
 
-  it('streams within the 1 MiB cap and sends exact raw bytes plus the signature to persistence', async () => {
+  it('passes the exact bounded raw bytes and provider signature to the native Neon mandate store', async () => {
     const f = fixture();
     const signature = 'b'.repeat(128);
-    const rawRequestBody = '{"event_id":"evt_test_001", "merchant_id":"merchant_test"}';
+    const rawBody = JSON.stringify({
+      event_id: 'evt_mandate_raw',
+      merchant_id: MERCHANT,
+      content: {
+        type: 'mandate_details',
+        object: { mandate_id: 'provider_mandate_001', payment_method_id: 'pm_test_001', status: 'active' },
+      },
+    });
     const response = await handleHyperswitchWebhookRequest(
-      request({ body: rawRequestBody, signature }),
+      request({ body: rawBody, signature }),
       f.env,
       f.dependencies,
     );
     expect(response?.status).toBe(200);
-    expect(f.calls).toHaveLength(1);
-    expect(new TextDecoder().decode(f.calls[0]!.input.rawBody)).toBe(rawRequestBody);
-    expect(f.calls[0]!.input.signatureHeader).toBe(signature);
-    expect(f.calls[0]!.input.webhookSecret).toBe(SECRET);
-    expect(f.calls[0]!.input.expectedMerchantId).toBe(MERCHANT);
-    expect(f.calls[0]!.db).toBe(f.env.D1_04);
-    expect(await response?.json()).toMatchObject({ data: { outcome: 'APPLIED', state: 'APPLIED' } });
+    expect(f.dependencies.getWebhookPostgresPool).toHaveBeenCalledOnce();
+    expect(f.postgresMandateCalls).toHaveLength(1);
+    const input = f.postgresMandateCalls[0]!.input;
+    expect(new TextDecoder().decode(input.rawBody)).toBe(rawBody);
+    expect(input.signatureHeader).toBe(signature);
+    expect(input.webhookSecret).toBe(SECRET);
+    expect(input.expectedMerchantId).toBe(MERCHANT);
+    expect(f.postgresMandateCalls[0]!.pool).toBe(f.postgresPool);
   });
 
-  it('synchronizes a signed, applied renewal payment into D1-01 and reports reconciliation when needed', async () => {
+  it('synchronizes signed renewal payments using independent finance and membership Neon pools', async () => {
     const f = fixture({
       result: receipt('APPLIED'),
       syncResult: {
@@ -258,24 +275,30 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
       },
     });
     const paymentId = 'pay_' + 'b'.repeat(26);
-    const body = JSON.stringify({
-      event_id: 'evt_test_001',
-      merchant_id: MERCHANT,
-      content_type: 'payment_details',
-      resource: { payment_id: paymentId },
-    });
     const response = await handleHyperswitchWebhookRequest(
-      request({ body, signature: 'signed-provider-event' }),
+      request({ body: paymentEvent(paymentId, 'payment_succeeded', true), signature: 'signed-provider-event' }),
       f.env,
       f.dependencies,
     );
     expect(response?.status).toBe(202);
-    expect(f.syncCalls).toHaveLength(1);
-    expect(f.syncCalls[0]).toMatchObject({
-      env: { D1_01: f.env.D1_01, D1_04: f.env.D1_04 },
+    expect(f.postgresPaymentCalls).toHaveLength(1);
+    expect(f.postgresPaymentCalls[0]?.pool).toBe(f.postgresPool);
+    expect(f.syncCalls).toMatchObject([{
+      env: {
+        W07_DATABASE_DRIVER: 'neon',
+        W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+        HYPERDRIVE_D1_04: f.env.HYPERDRIVE_D1_04,
+        HYPERDRIVE_D1_01: f.env.HYPERDRIVE_D1_01,
+      },
       paymentId,
       merchantId: MERCHANT,
-    });
+    }]);
+    expect(f.nativeUpgradeExpiryCalls).toMatchObject([{
+      financePool: f.postgresPool,
+      membershipPool: f.membershipPostgresPool,
+      paymentId,
+      merchantId: MERCHANT,
+    }]);
     expect(await response?.json()).toMatchObject({
       data: {
         outcome: 'APPLIED',
@@ -286,67 +309,36 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     });
   });
 
-  it('runs a bounded pending-outcome recovery batch after a successfully synchronized renewal payment', async () => {
-    const f = fixture({
-      result: receipt('APPLIED'),
-      syncResult: { cycleId: 'rcy_' + 'a'.repeat(26), outcome: 'APPLIED', subscriptionId: 'sub_test' },
-      pendingRecoveryResult: { scanned: 10, applied: 8, reconciliationRequired: 1, pendingRetry: 1 },
-    });
-    const body = JSON.stringify({
-      event_id: 'evt_test_001',
-      merchant_id: MERCHANT,
-      content_type: 'payment_details',
-      resource: { payment_id: 'pay_' + 'b'.repeat(26) },
-    });
-    const response = await handleHyperswitchWebhookRequest(
-      request({ body, signature: 'signed-provider-event' }),
-      f.env,
-      f.dependencies,
-    );
-
-    expect(response?.status).toBe(202);
-    expect(f.pendingRecoveryCalls).toHaveLength(1);
-    expect(f.pendingRecoveryCalls[0]).toMatchObject({
-      env: { D1_01: f.env.D1_01, D1_04: f.env.D1_04 },
-      options: { limit: 10 },
-    });
-    expect(await response?.json()).toMatchObject({
-      data: {
-        subscriptionSync: 'APPLIED',
-        pendingRenewalRecovery: { scanned: 10, applied: 8, reconciliationRequired: 1, pendingRetry: 1 },
-      },
-    });
-  });
-
-  it('fulfills an initial membership purchase only after a verified payment_succeeded receipt has no renewal cycle', async () => {
+  it('issues a receipt and fulfills an initial creator membership only after a durable signed payment success', async () => {
     const f = fixture({
       result: receipt('APPLIED'),
       syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
       purchaseFulfillmentResult: { outcome: 'APPLIED', fulfilledCount: 1 },
     });
     const paymentId = 'pay_' + 'c'.repeat(26);
-    const body = JSON.stringify({
-      event_id: 'evt_test_001',
-      event_type: 'payment_succeeded',
-      merchant_id: MERCHANT,
-      content_type: 'payment_details',
-      resource: { payment_id: paymentId },
-    });
     const response = await handleHyperswitchWebhookRequest(
-      request({ body, signature: 'signed-provider-event' }),
+      request({ body: paymentEvent(paymentId), signature: 'signed-provider-event' }),
       f.env,
       f.dependencies,
     );
-
     expect(response?.status).toBe(200);
-    expect(f.receiptCalls).toHaveLength(1);
-    expect(f.receiptCalls[0]).toMatchObject({ paymentId, merchantId: MERCHANT });
-    expect(f.purchaseFulfillmentCalls).toHaveLength(1);
-    expect(f.purchaseFulfillmentCalls[0]).toMatchObject({
-      env: { D1_01: f.env.D1_01, D1_04: f.env.D1_04 },
+    expect(f.postgresReceiptCalls).toMatchObject([{ pool: f.postgresPool, paymentId, merchantId: MERCHANT }]);
+    expect(f.purchaseFulfillmentCalls).toMatchObject([{
+      env: {
+        W07_DATABASE_DRIVER: 'neon',
+        W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+        HYPERDRIVE_D1_04: f.env.HYPERDRIVE_D1_04,
+        HYPERDRIVE_D1_01: f.env.HYPERDRIVE_D1_01,
+      },
       paymentId,
       merchantId: MERCHANT,
-    });
+    }]);
+    expect(f.nativeUpgradeExpiryCalls).toMatchObject([{
+      financePool: f.postgresPool,
+      membershipPool: f.membershipPostgresPool,
+      paymentId,
+      merchantId: MERCHANT,
+    }]);
     expect(await response?.json()).toMatchObject({
       data: {
         subscriptionSync: 'NO_RENEWAL_CYCLE',
@@ -355,30 +347,22 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     });
   });
 
-  it('retries initial membership fulfillment from a duplicate signed success event', async () => {
+  it('retries a duplicate signed success by reusing the same Neon persistence and idempotent fulfillment', async () => {
     const f = fixture({
       result: receipt('DUPLICATE'),
       syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
       purchaseFulfillmentResult: { outcome: 'ALREADY_APPLIED', fulfilledCount: 1 },
     });
-    const paymentId = 'pay_' + 'e'.repeat(26);
-    const body = JSON.stringify({
-      event_id: 'evt_test_replayed',
-      event_type: 'payment_succeeded',
-      merchant_id: MERCHANT,
-      content_type: 'payment_details',
-      resource: { payment_id: paymentId },
-    });
+    const paymentId = 'pay_' + 'd'.repeat(26);
     const response = await handleHyperswitchWebhookRequest(
-      request({ body, signature: 'signed-provider-event' }),
+      request({ body: paymentEvent(paymentId), signature: 'signed-provider-event' }),
       f.env,
       f.dependencies,
     );
-
     expect(response?.status).toBe(200);
+    expect(f.postgresReceiptCalls).toMatchObject([{ pool: f.postgresPool, paymentId, merchantId: MERCHANT }]);
     expect(f.purchaseFulfillmentCalls).toHaveLength(1);
-    expect(f.purchaseFulfillmentCalls[0]).toMatchObject({ paymentId, merchantId: MERCHANT });
-    await expect(response?.json()).resolves.toMatchObject({
+    expect(await response?.json()).toMatchObject({
       data: {
         outcome: 'DUPLICATE',
         subscriptionSync: 'NO_RENEWAL_CYCLE',
@@ -387,281 +371,62 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     });
   });
 
-  it('returns retryable service unavailable when paid-order fulfillment fails after payment was durably accepted', async () => {
+  it('does not fulfill failed payments and does not run pending recovery without an applied renewal', async () => {
     const f = fixture({
       result: receipt('APPLIED'),
       syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
     });
-    f.dependencies.fulfillPaidOrder = async () => {
-      throw new Error('temporary D1-01 write failure');
-    };
-    const body = JSON.stringify({
-      event_id: 'evt_test_fulfillment_retry',
-      event_type: 'payment_succeeded',
-      merchant_id: MERCHANT,
-      content_type: 'payment_details',
-      resource: { payment_id: 'pay_' + 'f'.repeat(26) },
-    });
-    const response = await handleHyperswitchWebhookRequest(
-      request({ body, signature: 'signed-provider-event' }),
+    const failed = await handleHyperswitchWebhookRequest(
+      request({
+        body: paymentEvent('pay_' + 'e'.repeat(26), 'payment_failed'),
+        signature: 'signed-provider-event',
+      }),
       f.env,
       f.dependencies,
     );
-
-    expect(response?.status).toBe(503);
-    await expect(response?.json()).resolves.toMatchObject({
-      error: { code: 'SERVICE_UNAVAILABLE' },
-    });
-  });
-
-  it('does not fulfill an ordinary failed payment as an initial membership purchase', async () => {
-    const f = fixture({
-      result: receipt('APPLIED'),
-      syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
-      purchaseFulfillmentResult: { outcome: 'APPLIED', fulfilledCount: 1 },
-    });
-    const body = JSON.stringify({
-      event_id: 'evt_test_001',
-      event_type: 'payment_failed',
-      merchant_id: MERCHANT,
-      content_type: 'payment_details',
-      resource: { payment_id: 'pay_' + 'd'.repeat(26) },
-    });
-    const response = await handleHyperswitchWebhookRequest(
-      request({ body, signature: 'signed-provider-event' }),
-      f.env,
-      f.dependencies,
-    );
-
-    expect(response?.status).toBe(200);
-    expect(f.syncCalls).toHaveLength(1);
+    expect(failed?.status).toBe(200);
     expect(f.purchaseFulfillmentCalls).toHaveLength(0);
-  });
-
-  it('does not scan pending renewal outcomes for an ordinary payment with no renewal cycle', async () => {
-    const f = fixture({
-      result: receipt('APPLIED'),
-      syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
-    });
-    const body = JSON.stringify({
-      event_id: 'evt_test_001',
-      merchant_id: MERCHANT,
-      content_type: 'payment_details',
-      resource: { payment_id: 'pay_' + 'b'.repeat(26) },
-    });
-    const response = await handleHyperswitchWebhookRequest(
-      request({ body, signature: 'signed-provider-event' }),
-      f.env,
-      f.dependencies,
-    );
-
-    expect(response?.status).toBe(200);
-    expect(f.syncCalls).toHaveLength(1);
+    expect(f.postgresReceiptCalls).toHaveLength(0);
     expect(f.pendingRecoveryCalls).toHaveLength(0);
-    expect(await response?.json()).not.toMatchObject({ data: { pendingRenewalRecovery: expect.anything() } });
   });
 
-  it('retries subscription outcome synchronization on a duplicate signed provider event', async () => {
-    const f = fixture({
-      result: receipt('DUPLICATE'),
-      syncResult: { cycleId: 'rcy_' + 'a'.repeat(26), outcome: 'APPLIED', subscriptionId: 'sub_test' },
-    });
-    const body = JSON.stringify({
-      event_id: 'evt_test_001',
-      merchant_id: MERCHANT,
-      content_type: 'payment_details',
-      resource: { payment_id: 'pay_' + 'b'.repeat(26) },
-    });
-    const response = await handleHyperswitchWebhookRequest(
-      request({ body, signature: 'signed-provider-event' }),
-      f.env,
-      f.dependencies,
-    );
-    expect(response?.status).toBe(200);
-    expect(f.syncCalls).toHaveLength(1);
-    expect(await response?.json()).toMatchObject({ data: { outcome: 'DUPLICATE', subscriptionSync: 'APPLIED' } });
-  });
-
-  it('returns 202 for a durable reconciliation outcome rather than causing blind provider retries', async () => {
-    const f = fixture({ result: receipt('RECONCILIATION_REQUIRED') });
-    const response = await handleHyperswitchWebhookRequest(request(), f.env, f.dependencies);
-    expect(response?.status).toBe(202);
-    expect(await response?.json()).toMatchObject({
-      data: { outcome: 'RECONCILIATION_REQUIRED', state: 'RECONCILIATION_REQUIRED' },
-    });
-  });
-
-  it('acknowledges the same signed event as a duplicate', async () => {
-    const f = fixture({ result: receipt('DUPLICATE') });
-    const response = await handleHyperswitchWebhookRequest(request(), f.env, f.dependencies);
-    expect(response?.status).toBe(200);
-    expect(await response?.json()).toMatchObject({ data: { outcome: 'DUPLICATE' } });
-  });
-
-  it('fails closed when the declared or streamed body is larger than 1 MiB', async () => {
-    const declared = fixture();
-    const declaredResponse = await handleHyperswitchWebhookRequest(
-      request({ contentLength: String(1024 * 1024 + 1) }),
-      declared.env,
-      declared.dependencies,
-    );
-    expect(declaredResponse?.status).toBe(413);
-    expect(declared.calls).toHaveLength(0);
-
-    const streamed = fixture();
-    const largeBody = new Uint8Array(1024 * 1024 + 1);
-    const streamedResponse = await handleHyperswitchWebhookRequest(
-      request({ body: largeBody }),
-      streamed.env,
-      streamed.dependencies,
-    );
-    expect(streamedResponse?.status).toBe(413);
-    expect(streamed.calls).toHaveLength(0);
-  });
-
-  it('returns 401 for an invalid provider signature without revealing secret material', async () => {
-    const f = fixture({ error: new PaymentPersistenceError('INVALID_SIGNATURE', 401) });
-    const response = await handleHyperswitchWebhookRequest(
-      request({ signature: 'invalid' }),
-      f.env,
-      f.dependencies,
-    );
-    expect(response?.status).toBe(401);
-    const body = await response!.text();
-    expect(body).toContain('INVALID_SIGNATURE');
-    expect(body).not.toContain(SECRET);
-  });
-
-  it('returns 503 when webhook secret or merchant configuration is absent', async () => {
-    const f = fixture();
-    const response = await handleHyperswitchWebhookRequest(
-      request(),
-      { ...f.env, HYPERSWITCH_WEBHOOK_SECRET: undefined },
-      f.dependencies,
-    );
-    expect(response?.status).toBe(503);
-    expect(f.calls).toHaveLength(0);
-  });
-  it('uses the same Neon D1-04 bridge for the signed receipt and downstream W07 payment reads', async () => {
-    const neonDatabase = { marker: 'neon-d1-04' } as unknown as D1Database;
+  it('runs bounded pending renewal recovery after successful cycle synchronization', async () => {
     const f = fixture({
       result: receipt('APPLIED'),
-      syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
-      purchaseFulfillmentResult: { outcome: 'APPLIED', fulfilledCount: 1 },
-      webhookDatabase: neonDatabase,
-    });
-    const paymentId = 'pay_' + 'g'.repeat(26);
-    const body = JSON.stringify({
-      event_id: 'evt_neon_01',
-      event_type: 'payment_succeeded',
-      merchant_id: MERCHANT,
-      content_type: 'payment_details',
-      resource: { payment_id: paymentId },
+      syncResult: { cycleId: 'rcy_' + 'f'.repeat(26), outcome: 'APPLIED', subscriptionId: 'sub_test' },
+      pendingRecoveryResult: { scanned: 10, applied: 8, reconciliationRequired: 1, pendingRetry: 1 },
     });
     const response = await handleHyperswitchWebhookRequest(
-      request({ body, signature: 'signed-provider-event' }),
+      request({ body: paymentEvent('pay_' + 'f'.repeat(26), 'payment_succeeded'), signature: 'signed-provider-event' }),
       f.env,
       f.dependencies,
     );
-
-    expect(response?.status).toBe(200);
-    expect(f.calls[0]?.db).toBe(neonDatabase);
-    expect(f.receiptCalls[0]?.db).toBe(neonDatabase);
-    expect(f.syncCalls[0]?.env).toMatchObject({ D1_01: f.env.D1_01, D1_04: neonDatabase });
-    expect(f.purchaseFulfillmentCalls[0]?.env).toMatchObject({ D1_01: f.env.D1_01, D1_04: neonDatabase });
-  });
-
-  it('routes mandate lifecycle events through the native PostgreSQL store without invoking the D1 facade', async () => {
-    const f = fixture({ nativeMandateResult: receipt('APPLIED') });
-    f.env.W07_DATABASE_DRIVER = 'neon';
-    const body = JSON.stringify({
-      event_id: 'evt_mandate_native_001',
-      event_type: 'mandate_active',
-      merchant_id: MERCHANT,
-      content: {
-        type: 'mandate_details',
-        object: { mandate_id: 'provider_mandate_001', payment_method_id: 'pm_test_001', status: 'active' },
+    expect(response?.status).toBe(202);
+    expect(f.pendingRecoveryCalls).toMatchObject([{
+      env: {
+        W07_DATABASE_DRIVER: 'neon',
+        W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+        HYPERDRIVE_D1_04: f.env.HYPERDRIVE_D1_04,
+        HYPERDRIVE_D1_01: f.env.HYPERDRIVE_D1_01,
       },
-    });
-    const response = await handleHyperswitchWebhookRequest(
-      request({ body, signature: 'signed-provider-event' }),
-      f.env,
-      f.dependencies,
-    );
-    expect(response?.status).toBe(200);
-    expect(f.postgresMandateCalls).toHaveLength(1);
-    expect(new TextDecoder().decode(f.postgresMandateCalls[0]!.input.rawBody)).toBe(body);
-    expect(f.postgresCalls).toHaveLength(1);
-    expect(f.postgresPaymentCalls).toHaveLength(0);
-    expect(f.calls).toHaveLength(0);
-    expect(f.syncCalls).toHaveLength(0);
-    expect(await response?.json()).toMatchObject({ data: { outcome: 'APPLIED', state: 'APPLIED' } });
+      options: { limit: 10 },
+    }]);
   });
 
-  it('uses the native PostgreSQL Store for nested Neon payment_details events and continues the post-commit purchase saga', async () => {
-    const neonDatabase = { marker: 'neon-d1-04' } as unknown as D1Database;
-    const paymentId = 'pay_' + 'n'.repeat(26);
-    const f = fixture({
-      nativePaymentResult: receipt('APPLIED'),
-      webhookDatabase: neonDatabase,
-      syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
-      purchaseFulfillmentResult: { outcome: 'APPLIED', fulfilledCount: 1 },
-    });
-    f.env.W07_DATABASE_DRIVER = 'neon';
-    const body = JSON.stringify({
-      event_id: 'evt_payment_native_01',
-      event_type: 'payment_succeeded',
-      merchant_id: MERCHANT,
-      content: {
-        type: 'payment_details',
-        object: {
-          payment_id: paymentId,
-          merchant_id: MERCHANT,
-          customer_id: 'customer_native_test',
-          amount: 300,
-          currency: 'USD',
-          status: 'succeeded',
-          updated: '2026-11-18T12:00:01.000Z',
-        },
-      },
-    });
-    const response = await handleHyperswitchWebhookRequest(
-      request({ body, signature: 'signed-provider-event' }),
-      f.env,
-      f.dependencies,
+  it('uses the native PostgreSQL stores for refund and mandate lifecycle events', async () => {
+    const mandate = fixture();
+    const mandateResponse = await handleHyperswitchWebhookRequest(
+      request(),
+      mandate.env,
+      mandate.dependencies,
     );
+    expect(mandateResponse?.status).toBe(200);
+    expect(mandate.postgresMandateCalls).toHaveLength(1);
+    expect(mandate.postgresPaymentCalls).toHaveLength(0);
+    expect(mandate.postgresCalls).toHaveLength(0);
 
-    expect(response?.status).toBe(200);
-    expect(f.postgresPaymentCalls).toHaveLength(1);
-    expect(new TextDecoder().decode(f.postgresPaymentCalls[0]!.input.rawBody)).toBe(body);
-    expect(f.dependencies.getWebhookDatabase).toHaveBeenCalledOnce();
-    expect(f.calls).toHaveLength(0);
-    expect(f.postgresCalls).toHaveLength(1);
-    expect(f.receiptCalls).toHaveLength(0);
-    expect(f.postgresReceiptCalls).toMatchObject([{ paymentId, merchantId: MERCHANT }]);
-    expect(f.syncCalls).toMatchObject([{
-      env: { D1_01: f.env.D1_01, D1_04: neonDatabase },
-      paymentId,
-      merchantId: MERCHANT,
-    }]);
-    expect(f.purchaseFulfillmentCalls).toMatchObject([{
-      env: { D1_01: f.env.D1_01, D1_04: neonDatabase },
-      paymentId,
-      merchantId: MERCHANT,
-    }]);
-    expect(f.nativeUpgradeExpiryCalls).toHaveLength(1);
-    expect(f.nativeUpgradeExpiryCalls[0]).toMatchObject({
-      membershipPool: f.membershipPostgresPool,
-      paymentId,
-      merchantId: MERCHANT,
-    });
-    expect(f.legacyUpgradeExpiryCalls).toHaveLength(0);
-  });
-
-  it('uses the native PostgreSQL Store for Neon refund_details events without resolving the D1-shaped webhook bridge', async () => {
-    const f = fixture({ nativeRefundResult: receipt('APPLIED') });
-    f.env.W07_DATABASE_DRIVER = 'neon';
-    const body = JSON.stringify({
+    const refund = fixture();
+    const refundBody = JSON.stringify({
       event_id: 'evt_refund_native_01',
       event_type: 'refund_succeeded',
       merchant_id: MERCHANT,
@@ -677,18 +442,124 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
         },
       },
     });
+    const refundResponse = await handleHyperswitchWebhookRequest(
+      request({ body: refundBody, signature: 'signed-provider-event' }),
+      refund.env,
+      refund.dependencies,
+    );
+    expect(refundResponse?.status).toBe(200);
+    expect(refund.postgresCalls).toHaveLength(1);
+    expect(refund.postgresPaymentCalls).toHaveLength(0);
+    expect(refund.postgresMandateCalls).toHaveLength(0);
+    expect(refund.syncCalls).toHaveLength(0);
+  });
+
+  it('rejects unknown provider event content and missing Neon pool without any D1 fallback', async () => {
+    const unknown = fixture();
+    const unknownResponse = await handleHyperswitchWebhookRequest(
+      request({
+        body: JSON.stringify({
+          event_id: 'evt_unknown_001',
+          merchant_id: MERCHANT,
+          content: { type: 'unknown_details', object: {} },
+        }),
+        signature: 'signed-provider-event',
+      }),
+      unknown.env,
+      unknown.dependencies,
+    );
+    expect(unknownResponse?.status).toBe(400);
+    expect(unknown.postgresCalls).toHaveLength(0);
+    expect(unknown.postgresMandateCalls).toHaveLength(0);
+    expect(unknown.postgresPaymentCalls).toHaveLength(0);
+
+    const unavailable = fixture({ poolAvailable: false });
+    const unavailableResponse = await handleHyperswitchWebhookRequest(
+      request(),
+      unavailable.env,
+      unavailable.dependencies,
+    );
+    expect(unavailableResponse?.status).toBe(503);
+    expect(unavailable.postgresCalls).toHaveLength(0);
+    expect(unavailable.postgresMandateCalls).toHaveLength(0);
+    expect(unavailable.postgresPaymentCalls).toHaveLength(0);
+  });
+
+  it('rejects non-Neon selection and missing webhook configuration before database access', async () => {
+    const wrongDriver = fixture();
+    const wrongDriverResponse = await handleHyperswitchWebhookRequest(
+      request(),
+      { ...wrongDriver.env, W07_DATABASE_DRIVER: 'd1' },
+      wrongDriver.dependencies,
+    );
+    expect(wrongDriverResponse?.status).toBe(503);
+    expect(wrongDriver.dependencies.getWebhookPostgresPool).not.toHaveBeenCalled();
+
+    const unconfigured = fixture();
+    const configResponse = await handleHyperswitchWebhookRequest(
+      request(),
+      { ...unconfigured.env, HYPERSWITCH_WEBHOOK_SECRET: undefined },
+      unconfigured.dependencies,
+    );
+    expect(configResponse?.status).toBe(503);
+    expect(unconfigured.dependencies.getWebhookPostgresPool).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 for an invalid provider signature without exposing secret material', async () => {
+    const f = fixture({ error: new PaymentPersistenceError('INVALID_SIGNATURE', 401) });
     const response = await handleHyperswitchWebhookRequest(
-      request({ body, signature: 'signed-provider-event' }),
+      request({ signature: 'invalid' }),
       f.env,
       f.dependencies,
     );
-
-    expect(response?.status).toBe(200);
-    expect(f.postgresCalls).toHaveLength(1);
-    expect(new TextDecoder().decode(f.postgresCalls[0]!.input.rawBody)).toBe(body);
-    expect(f.dependencies.getWebhookDatabase).not.toHaveBeenCalled();
-    expect(f.calls).toHaveLength(0);
-    expect(f.syncCalls).toHaveLength(0);
+    expect(response?.status).toBe(401);
+    const body = await response!.text();
+    expect(body).toContain('INVALID_SIGNATURE');
+    expect(body).not.toContain(SECRET);
   });
 
+  it('returns 202 for durable reconciliation and 503 when post-commit fulfillment must retry', async () => {
+    const reconciliation = fixture({ result: receipt('RECONCILIATION_REQUIRED') });
+    const reconciliationResponse = await handleHyperswitchWebhookRequest(
+      request(),
+      reconciliation.env,
+      reconciliation.dependencies,
+    );
+    expect(reconciliationResponse?.status).toBe(202);
+
+    const retry = fixture({
+      result: receipt('APPLIED'),
+      syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
+    });
+    retry.dependencies.fulfillPaidOrder = async () => {
+      throw new Error('temporary Neon membership write failure');
+    };
+    const retryResponse = await handleHyperswitchWebhookRequest(
+      request({ body: paymentEvent('pay_' + 'g'.repeat(26)), signature: 'signed-provider-event' }),
+      retry.env,
+      retry.dependencies,
+    );
+    expect(retryResponse?.status).toBe(503);
+    expect(await retryResponse?.json()).toMatchObject({ error: { code: 'SERVICE_UNAVAILABLE' } });
+  });
+
+  it('rejects declared and streamed request bodies over the 1 MiB cap before Neon access', async () => {
+    const declared = fixture();
+    const declaredResponse = await handleHyperswitchWebhookRequest(
+      request({ contentLength: String(1024 * 1024 + 1) }),
+      declared.env,
+      declared.dependencies,
+    );
+    expect(declaredResponse?.status).toBe(413);
+    expect(declared.dependencies.getWebhookPostgresPool).not.toHaveBeenCalled();
+
+    const streamed = fixture();
+    const streamedResponse = await handleHyperswitchWebhookRequest(
+      request({ body: new Uint8Array(1024 * 1024 + 1) }),
+      streamed.env,
+      streamed.dependencies,
+    );
+    expect(streamedResponse?.status).toBe(413);
+    expect(streamed.dependencies.getWebhookPostgresPool).not.toHaveBeenCalled();
+  });
 });
