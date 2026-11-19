@@ -159,89 +159,32 @@ const SUBSCRIPTION_READ_COLUMNS =
   `to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
   `to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, version`;
 
-const isPostgresSubscriptionStore = (
-  db: D1Database | W07WebhookPostgresPool,
-): db is W07WebhookPostgresPool => typeof (db as W07WebhookPostgresPool).query === 'function';
-
 const readSubscriptionRow = async (
-  db: D1Database | W07WebhookPostgresPool,
+  db: W07WebhookPostgresPool,
   subscriptionId: string,
   subscriberId?: string,
 ): Promise<SubscriptionRow> => {
   const id = ensureId(subscriptionId);
-  let row: SubscriptionRow | null;
-  if (isPostgresSubscriptionStore(db)) {
-    const values = subscriberId === undefined ? [id] : [id, ensureId(subscriberId)];
-    try {
-      const result = await db.query<SubscriptionRow & Record<string, unknown>>(
-        `SELECT ${SUBSCRIPTION_READ_COLUMNS} FROM membership_subscriptions ` +
-        (subscriberId === undefined
-          ? 'WHERE subscription_id = $1 LIMIT 1'
-          : 'WHERE subscription_id = $1 AND subscriber_id = $2 LIMIT 1'),
-        values,
-      );
-      row = result.rows[0] ?? null;
-    } catch {
-      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
-  } else {
-    const sql = subscriberId === undefined
-      ? 'SELECT * FROM membership_subscriptions WHERE subscription_id = ? LIMIT 1'
-      : 'SELECT * FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1';
-    const args = subscriberId === undefined ? [id] : [id, ensureId(subscriberId)];
-    row = await db.prepare(sql).bind(...args).first<SubscriptionRow>();
-  }
-  if (!row) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
-  return row;
-}
-
-export async function createSubscription(db: D1Database, subscriberId: string, input: { planId: string; idempotencyKey: string }): Promise<ReturnType<typeof toPublic>> {
-  const subscriber = validatePrincipal(subscriberId)
-  const planId = ensureId(input.planId)
-  const idempotencyKey = validateIdempotencyKey(input.idempotencyKey)
-  const subscriptionId = await subscriptionIdFromIdempotency(subscriber, idempotencyKey)
-
-  // Replay first: idempotency preserves the original result even if the plan
-  // was retired after the first successful request.
-  const existing = await db.prepare('SELECT * FROM membership_subscriptions WHERE subscription_id = ? LIMIT 1').bind(subscriptionId).first<SubscriptionRow>()
-  if (existing) {
-    if (existing.subscriber_id !== subscriber || existing.plan_id !== planId) throw new SubscriptionRuntimeError('CONFLICT', 409)
-    return toPublic(existing)
-  }
-
-  const now = nowIso()
-  let result: { meta?: { changes?: number } }
+  const values = subscriberId === undefined ? [id] : [id, ensureId(subscriberId)];
   try {
-    // Resolve the active, public, creator-owned plan and snapshot its current
-    // immutable version in the same SQL statement as the subscription insert.
-    // This prevents a plan retirement/version switch between lookup and insert.
-    result = await db.prepare(
-      "INSERT INTO membership_subscriptions " +
-      "(subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at, version) " +
-      "SELECT ?, ?, p.plan_id, p.current_version, p.owner_id, 'PENDING', ?, ?, " +
-      "CASE pv.billing_interval WHEN 'MONTHLY' THEN ? WHEN 'YEARLY' THEN ? ELSE NULL END, " +
-      "NULL, NULL, ?, ?, 1 " +
-      "FROM membership_plans AS p " +
-      "INNER JOIN membership_plan_versions AS pv ON pv.plan_id = p.plan_id AND pv.plan_version = p.current_version " +
-      "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' " +
-      "LIMIT 1",
-    ).bind(subscriptionId, subscriber, now, now, addBillingPeriod(now, 'MONTHLY'), addBillingPeriod(now, 'YEARLY'), now, now, planId).run()
+    const result = await db.query<SubscriptionRow & Record<string, unknown>>(
+      `SELECT ${SUBSCRIPTION_READ_COLUMNS} FROM membership_subscriptions ` +
+      (subscriberId === undefined
+        ? 'WHERE subscription_id = $1 LIMIT 1'
+        : 'WHERE subscription_id = $1 AND subscriber_id = $2 LIMIT 1'),
+      values,
+    );
+    const row = result.rows[0] ?? null;
+    if (!row) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
+    return row;
   } catch (error) {
-    if (!(error instanceof Error) || !error.message.toLowerCase().includes('unique')) throw error
-    const raced = await db.prepare('SELECT * FROM membership_subscriptions WHERE subscription_id = ? LIMIT 1').bind(subscriptionId).first<SubscriptionRow>()
-    if (!raced) throw error
-    if (raced.subscriber_id !== subscriber || raced.plan_id !== planId) throw new SubscriptionRuntimeError('CONFLICT', 409)
-    return toPublic(raced)
+    if (error instanceof SubscriptionRuntimeError) throw error;
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
-  if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PLAN_NOT_ACTIVE', 409)
-
-  const row = await readSubscriptionRow(db, subscriptionId, subscriber)
-  console.log(JSON.stringify({ event: 'membership.subscription.created', operation: 'createSubscription', subscriptionId: row.subscription_id, subscriberId: row.subscriber_id, status: row.status, planVersion: row.plan_version }))
-  return toPublic(row)
-}
+};
 
 export async function getSubscription(
-  db: D1Database | W07WebhookPostgresPool,
+  db: W07WebhookPostgresPool,
   subscriberId: string,
   subscriptionId: string,
 ): Promise<ReturnType<typeof toPublic>> {
@@ -255,202 +198,61 @@ export async function getSubscription(
  * decision and never reads or persists membership rows.
  */
 export async function hasActiveCreatorMembership(
-  db: D1Database | W07WebhookPostgresPool,
+  db: W07WebhookPostgresPool,
   subscriberIdInput: string,
   creatorIdInput: string,
   now = new Date(),
 ): Promise<boolean> {
-  const subscriberId = validatePrincipal(subscriberIdInput)
-  const creatorId = ensureId(creatorIdInput)
+  const subscriberId = validatePrincipal(subscriberIdInput);
+  const creatorId = ensureId(creatorIdInput);
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
-  const nowValue = now.toISOString()
-  let row: { subscription_id: string } | null
+  const nowValue = now.toISOString();
   try {
-    if (typeof (db as W07WebhookPostgresPool).query === 'function') {
-      const result = await (db as W07WebhookPostgresPool).query<
-        { subscription_id: string } & Record<string, unknown>
-      >(
-        "SELECT subscription_id FROM membership_subscriptions " +
-        "WHERE subscriber_id = $1 AND creator_id = $2 AND status IN ('ACTIVE','TRIALING') " +
-        "AND current_period_start <= $3::timestamptz AND current_period_end > $4::timestamptz " +
-        "AND (cancel_at IS NULL OR cancel_at > $5::timestamptz) " +
-        "ORDER BY current_period_end DESC, subscription_id ASC LIMIT 1",
-        [subscriberId, creatorId, nowValue, nowValue, nowValue],
-      )
-      row = result.rows[0] ?? null
-    } else {
-      row = await (db as D1Database).prepare(
-        "SELECT subscription_id FROM membership_subscriptions " +
-        "WHERE subscriber_id = ? AND creator_id = ? AND status IN ('ACTIVE','TRIALING') " +
-        "AND current_period_start <= ? AND current_period_end > ? " +
-        "AND (cancel_at IS NULL OR cancel_at > ?) " +
-        "ORDER BY current_period_end DESC, subscription_id ASC LIMIT 1",
-      ).bind(subscriberId, creatorId, nowValue, nowValue, nowValue).first<{ subscription_id: string }>()
-    }
+    const result = await db.query<{ subscription_id: string } & Record<string, unknown>>(
+      "SELECT subscription_id FROM membership_subscriptions " +
+      "WHERE subscriber_id = $1 AND creator_id = $2 AND status IN ('ACTIVE','TRIALING') " +
+      "AND current_period_start <= $3::timestamptz AND current_period_end > $4::timestamptz " +
+      "AND (cancel_at IS NULL OR cancel_at > $5::timestamptz) " +
+      "ORDER BY current_period_end DESC, subscription_id ASC LIMIT 1",
+      [subscriberId, creatorId, nowValue, nowValue, nowValue],
+    );
+    const row = result.rows[0];
+    return row !== undefined && typeof row.subscription_id === 'string' && row.subscription_id.length > 0;
   } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
-  return row !== null && typeof row.subscription_id === 'string' && row.subscription_id.length > 0
 }
 
 export async function listSubscriptions(
-  db: D1Database | W07WebhookPostgresPool,
+  db: W07WebhookPostgresPool,
   subscriberId: string,
   limit = 20,
   page = 1,
 ): Promise<{
-  docs: ReturnType<typeof toPublic>[]
-  limit: number
-  page: number
-  hasNextPage: boolean
+  docs: ReturnType<typeof toPublic>[];
+  limit: number;
+  page: number;
+  hasNextPage: boolean;
 }> {
-  const subscriber = validatePrincipal(subscriberId)
-  const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), 50) : 20
-  const safePage = Number.isFinite(page) ? Math.min(Math.max(Math.trunc(page), 1), 10000) : 1
-  const offset = (safePage - 1) * safeLimit
-  let resultRows: SubscriptionRow[];
-  if (isPostgresSubscriptionStore(db)) {
-    try {
-      const result = await db.query<SubscriptionRow & Record<string, unknown>>(
-        `SELECT ${SUBSCRIPTION_READ_COLUMNS} FROM membership_subscriptions ` +
-        'WHERE subscriber_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
-        [subscriber, safeLimit + 1, offset],
-      )
-      resultRows = result.rows;
-    } catch {
-      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
-  } else {
-    const rows = await db.prepare(
-      'SELECT * FROM membership_subscriptions WHERE subscriber_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
-    ).bind(subscriber, safeLimit + 1, offset).all<SubscriptionRow>()
-    resultRows = rows.results ?? [];
-  }
-  const docs = resultRows.slice(0, safeLimit).map(toPublic)
-  return {
-    docs,
-    limit: safeLimit,
-    page: safePage,
-    hasNextPage: resultRows.length > safeLimit,
-  }
-}
-
-const transitionTargets: Record<'cancel' | 'pause' | 'resume', SubscriptionStatus[]> = { cancel: ['ACTIVE', 'PAST_DUE', 'PAUSED'], pause: ['ACTIVE'], resume: ['PAUSED'] }
-const nextStates: Record<'cancel' | 'pause' | 'resume', SubscriptionStatus> = { cancel: 'CANCELED', pause: 'PAUSED', resume: 'ACTIVE' }
-const nextState = (operation: 'cancel' | 'pause' | 'resume'): SubscriptionStatus => nextStates[operation]
-
-export async function transitionSubscription(db: D1Database, subscriberId: string, subscriptionId: string, operation: 'cancel' | 'pause' | 'resume', ifMatch: string): Promise<ReturnType<typeof toPublic>> {
-  const subscriber = validatePrincipal(subscriberId)
-  const etag = validateIfMatch(ifMatch)
-  const expectedVersion = versionFromEtag(etag)
-  const row = await readSubscriptionRow(db, subscriptionId, subscriber)
-  if (row.version !== expectedVersion) {
-    const convergedState = nextState(operation)
-    if (row.status === convergedState) return toPublic(row)
-    throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
-  }
-  if (!transitionTargets[operation].includes(row.status)) throw new SubscriptionRuntimeError('INVALID_STATE', 409)
-  const updatedAt = nextUpdatedAt(row.updated_at)
-  const result = await db.prepare('UPDATE membership_subscriptions SET status = ?, cancel_at = ?, updated_at = ?, version = version + 1 WHERE subscription_id = ? AND subscriber_id = ? AND version = ?')
-    .bind(nextState(operation), operation === 'cancel' ? updatedAt : row.cancel_at, updatedAt, row.subscription_id, subscriber, expectedVersion).run()
-  if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
-  const updated = await readSubscriptionRow(db, row.subscription_id, subscriber)
-  console.log(JSON.stringify({ event: 'membership.subscription.transitioned', operation: operation + 'Subscription', subscriptionId: updated.subscription_id, subscriberId: updated.subscriber_id, from: row.status, to: updated.status }))
-  return toPublic(updated)
-}
-
-export async function changeSubscriptionPlan(db: D1Database, subscriberId: string, subscriptionId: string, planId: string, ifMatch: string): Promise<ReturnType<typeof toPublic>> {
-  const subscriber = validatePrincipal(subscriberId)
-  const nextPlanId = ensureId(planId)
-  const etag = validateIfMatch(ifMatch)
-  const expectedVersion = versionFromEtag(etag)
-  const row = await readSubscriptionRow(db, subscriptionId, subscriber)
-  if (row.version !== expectedVersion) {
-    if (row.plan_id === nextPlanId) return toPublic(row)
-    throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
-  }
-  if (!['ACTIVE', 'PAUSED', 'PAST_DUE'].includes(row.status)) throw new SubscriptionRuntimeError('INVALID_STATE', 409)
-  if (row.plan_id === nextPlanId) return toPublic(row)
-
-  const updatedAt = nextUpdatedAt(row.updated_at)
-  const result = await db.prepare(
-    "UPDATE membership_subscriptions SET plan_id = ?, " +
-    "plan_version = (SELECT current_version FROM membership_plans WHERE plan_id = ? AND owner_type = 'CREATOR' AND status = 'ACTIVE' AND visibility = 'PUBLIC'), " +
-    "creator_id = (SELECT owner_id FROM membership_plans WHERE plan_id = ? AND owner_type = 'CREATOR' AND status = 'ACTIVE' AND visibility = 'PUBLIC'), " +
-    "updated_at = ?, version = version + 1 " +
-    "WHERE subscription_id = ? AND subscriber_id = ? AND version = ? " +
-    "AND EXISTS (SELECT 1 FROM membership_plans WHERE plan_id = ? AND owner_type = 'CREATOR' AND owner_id = ? AND status = 'ACTIVE' AND visibility = 'PUBLIC' " +
-    "AND EXISTS (SELECT 1 FROM membership_plan_versions WHERE plan_id = membership_plans.plan_id AND plan_version = membership_plans.current_version))",
-  ).bind(nextPlanId, nextPlanId, nextPlanId, updatedAt, row.subscription_id, subscriber, expectedVersion, nextPlanId, row.creator_id).run()
-  if (Number(result.meta?.changes ?? 0) !== 1) {
-    const latest = await readSubscriptionRow(db, row.subscription_id, subscriber)
-    if (latest.version !== expectedVersion) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
-    throw new SubscriptionRuntimeError('PLAN_NOT_ACTIVE', 409)
-  }
-
-  const updated = await readSubscriptionRow(db, row.subscription_id, subscriber)
-  console.log(JSON.stringify({ event: 'membership.subscription.plan_changed', operation: 'changeSubscriptionPlan', subscriptionId: updated.subscription_id, subscriberId: updated.subscriber_id, previousPlanId: row.plan_id, planId: updated.plan_id, planVersion: updated.plan_version }))
-  return toPublic(updated)
-}
-
-export type ActiveMembershipPlanRow = {
-  trial_period_days: number
-  plan_id: string
-  owner_id: string
-  current_version: number
-  created_at: string
-  updated_at: string
-  name: string
-  tier: string
-  billing_interval: string
-  price_minor: number
-  currency: string
-  benefits_json: string
-}
-
-type PlanListCursor = { createdAt: string; planId: string }
-
-const encodePlanListCursor = (cursor: PlanListCursor): string => {
-  const bytes = new TextEncoder().encode(JSON.stringify(cursor))
-  let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
-}
-
-const decodePlanListCursor = (value: string | null): PlanListCursor | null => {
-  if (value === null) return null
-  const normalized = value.trim()
-  if (!normalized || normalized.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(normalized)) {
-    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
-  }
+  const subscriber = validatePrincipal(subscriberId);
+  const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), 50) : 20;
+  const safePage = Number.isFinite(page) ? Math.min(Math.max(Math.trunc(page), 1), 10000) : 1;
+  const offset = (safePage - 1) * safeLimit;
   try {
-    const base64 = normalized.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - normalized.length % 4) % 4)
-    const binary = atob(base64)
-    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
-    const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid cursor shape')
-    const candidate = parsed as Record<string, unknown>
-    if (
-      typeof candidate.createdAt !== 'string' ||
-      candidate.createdAt.length > 64 ||
-      !Number.isFinite(Date.parse(candidate.createdAt)) ||
-      typeof candidate.planId !== 'string' ||
-      candidate.planId.trim().length === 0 ||
-      candidate.planId.length > MAX_ID
-    ) throw new Error('invalid cursor fields')
-    return { createdAt: candidate.createdAt, planId: candidate.planId }
+    const result = await db.query<SubscriptionRow & Record<string, unknown>>(
+      `SELECT ${SUBSCRIPTION_READ_COLUMNS} FROM membership_subscriptions ` +
+      'WHERE subscriber_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+      [subscriber, safeLimit + 1, offset],
+    );
+    const docs = result.rows.slice(0, safeLimit).map(toPublic);
+    return { docs, limit: safeLimit, page: safePage, hasNextPage: result.rows.length > safeLimit };
   } catch {
-    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
 }
 
-/**
- * Public discovery returns only active, public creator plans with an immutable
- * current version. The cursor is an opaque stable (createdAt, planId) keyset;
- * no offset scan or private-plan metadata is exposed.
- */
 export async function listActiveMembershipPlans(
   db: D1Database | W07WebhookPostgresPool,
   limit = 20,
