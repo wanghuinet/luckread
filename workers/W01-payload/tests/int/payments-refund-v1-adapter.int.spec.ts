@@ -86,7 +86,7 @@ describe('public customer payment refund adapter', () => {
     expect(w07PostgresRefundWebhook).toContain("envelope.eventType === 'refund_failed'")
     expect(w07PostgresRefundWebhook).toContain("envelope.eventType === 'refund_review'")
     expect(w07PostgresRefundWebhook).toContain('payloadSha256')
-    expect(w07PostgresRefundWebhook).toContain("state = 'RECEIVED'")
+    expect(w07PostgresRefundWebhook).toContain("state: 'RECEIVED'")
     expect(w07Persistence).toContain('signed webhooks finalize outcomes')
     expect(w07Runtime).not.toContain('grantEntitlement(')
   })
