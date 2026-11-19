@@ -19,20 +19,33 @@
   "review": {
     "reviewer": "GPT-6",
     "reviewType": "GPT-6 code-path audit plus current-main SHA and CI evidence reconciliation",
-    "reviewedAt": "2026-11-09",
-    "reviewedMainSha": "745e68501ad292eb7d51556006a85d026330dc45",
-    "implementationMergeSha": "745e68501ad292eb7d51556006a85d026330dc45",
+    "reviewedAt": "2026-11-19",
+    "reviewedMainSha": "cc55bd48e086bf9bf4dec34bc869ebe7ada5dd2b",
+    "implementationMergeSha": "cc55bd48e086bf9bf4dec34bc869ebe7ada5dd2b",
     "result": "NO_BLOCKING_FINDINGS",
     "formalGitHubReviewSubmissions": 0,
     "findings": [],
     "limitations": [
-      "No submitted GitHub review records are present; this is a GPT-6 code review, not a human GitHub APPROVE review.",
-      "The corrected D1-04 runner and catalog verification were validated by source-equivalent PR CI run 42553780174. The validation head is 1704b435374be1e5f773915092de145548b173c2 and all eight reviewed source blobs match the merged main tree at 745e68501ad292eb7d51556006a85d026330dc45. The workflow's remote apply job was skipped; the local PostgreSQL 18 rehearsal ran without Neon credentials.",
+      "No submitted GitHub review records are present; this is a GPT-6 code-path review and current-main/CI evidence reconciliation, not a human GitHub APPROVE review.",
+      "The current PAY-007 schema artifact and independent review source pins were validated by source-equivalent PR candidate run 44511494070 at head 5f43d419427d06213230e6947f1e5bb0fb2f0dd0. Its disposable PostgreSQL 18 rehearsal passed; artifact 14522742681 (sha256:18ad89fcd4bfa16d2118111a78ef2b592352442bc75daf09d72e7914dd5def7a) was uploaded. The candidate workflow had no Neon credentials and its remote apply job was skipped.",
+      "The existing shared D1-04 PostgreSQL 18 rehearsal evidence and remote schema postflight evidence remain the prior successful records. PAY-007 changed only its generated source-guard checksum comment; the migration's executable DDL and the verified 15-table catalog did not change.",
       "Remote Neon DDL execution history is recorded in executionHistory: run 42553336881 committed the six ordered W07 migration and ledger rows but failed only final catalog index classification; run 42555900393 validated the same six-row ledger prefix and completed corrected final catalog Postflight.",
-      "The final remote catalog verifier separately confirmed all 31 manifest-declared explicit indexes and all 29 primary-key/unique-constraint-backed indexes in the D1-04 Neon target. Workflow run 42555900393 produced the successful Postflight report; no further retry is required for this schema-only D1-04 target.",
-      "Neon database UUID is pinned from existing W07 D1_04 Wrangler metadata; PostgreSQL SQL cannot independently verify the Neon control-plane UUID."
+      "The final remote catalog verifier separately confirmed all 31 manifest-declared explicit indexes and all 29 primary-key/unique-constraint-backed indexes in the D1-04 Neon target. Workflow run 42555900393 produced the successful Postflight report; no new remote apply was performed for this review.",
+      "Neon database UUID is pinned from existing W07 D1_04 Wrangler metadata and is not independently exposed for verification by PostgreSQL SQL."
     ],
     "reviewedFiles": [
+      {
+        "path": ".github/workflows/neon-d1-04-reviewed-remote-schema-apply.yml",
+        "gitBlobSha1": "820ad4212f4fcd8a51eaa129d9310e95b07978f8"
+      },
+      {
+        "path": ".github/workflows/neon-d1-04-shared-runner-independent-review.yml",
+        "gitBlobSha1": "00ddee9bcfc533ae8f48280f83522763ac532434"
+      },
+      {
+        "path": ".github/workflows/neon-d1-04-review-candidate-validation.yml",
+        "gitBlobSha1": "7dcf79c053410bad92af3d3887a44dd7e72e36b4"
+      },
       {
         "path": "scripts/neon/d1-04/schema-only-runner.mjs",
         "gitBlobSha1": "a22b7e6e55b0ca3731df0285d16674b1b042b87f"
@@ -40,10 +53,6 @@
       {
         "path": "scripts/neon/d1-04/schema-only-runner.test.mjs",
         "gitBlobSha1": "00a36d6f24393bc67189a209197f2406950d4ef3"
-      },
-      {
-        "path": ".github/workflows/neon-d1-04-reviewed-remote-schema-apply.yml",
-        "gitBlobSha1": "820ad4212f4fcd8a51eaa129d9310e95b07978f8"
       },
       {
         "path": "scripts/neon/d1-04/remote-runner-review.mjs",
@@ -54,16 +63,84 @@
         "gitBlobSha1": "872f8fa8bf3a75d9782910f7d8780490ab13def9"
       },
       {
+        "path": "scripts/neon/shared-domain-schema-runner.mjs",
+        "gitBlobSha1": "53706e33929da41f331acf3892d223d341762817"
+      },
+      {
+        "path": "scripts/neon/shared-domain-schema-runner.test.mjs",
+        "gitBlobSha1": "4620c1ce0e35ae97605d76d02b7140c0600f9857"
+      },
+      {
+        "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
+        "gitBlobSha1": "b8cdec415ee4106d0b0618197b12b61d8656a2c9"
+      },
+      {
         "path": "contracts/database/neon-d1-04-shared-migration-manifest.v1.json",
         "gitBlobSha1": "42b1cc84daa1a50f8ff4bfcea336006d8cab5a41"
       },
       {
         "path": "contracts/database/neon-d1-04-shared-runner-independent-review.v1.json",
-        "gitBlobSha1": "cd3897130108968305b9109b98026be8efc5f187"
+        "gitBlobSha1": "ec0e5282ed46f55e5842a9411ffa90aad1bf4239"
+      },
+      {
+        "path": "contracts/database/neon-schema-migration-ledger.v1.json",
+        "gitBlobSha1": "8e0ed38ab3d30fa9994a80cb0361f914bf51f5f0"
+      },
+      {
+        "path": "contracts/database/neon-shared-runner-local-readiness.v1.json",
+        "gitBlobSha1": "f715cf208b47fdc9a3cca2cebd774b773bc086b8"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/wrangler.jsonc",
+        "gitBlobSha1": "de32f3eff688918142144aa64a201a4ade4ce229"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
+        "gitBlobSha1": "b74244b6bbb6bfa92c27f560d1cb248667ba387b"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-w07-saved-methods-mandates-schema.v1.json",
+        "gitBlobSha1": "61608c5f73c8b8a6530c3aed977766d8c03a7c88"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-w07-renewal-cycles-schema.v1.json",
+        "gitBlobSha1": "593d536e0578956c85031f37b63de7a4b6dd37ea"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-w07-revenuecat-webhook-schema.v1.json",
+        "gitBlobSha1": "d425dfe71068110072edcf0922a847fa54422190"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-w07-refunds-billing-documents-schema.v1.json",
+        "gitBlobSha1": "07038c1ffb505af57b7b3518975cf51b6eb6c3e1"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-w07-payment-method-revocation-schema.v1.json",
+        "gitBlobSha1": "4169c04075c40a41a7376dc6d5c1342b023a869e"
       },
       {
         "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql",
         "gitBlobSha1": "27020aef0c4cd911b290b159553d3c41f9705c0c"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0002_w07_d1_04_saved_methods_mandates.sql",
+        "gitBlobSha1": "a7be466ba09a5f56c2e0bbe7edb76446c5bfd1ff"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0003_w07_d1_04_renewal_cycles.sql",
+        "gitBlobSha1": "c920c6152cce3b8da61170da1ba089e03effcbe6"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0004_w07_d1_04_revenuecat_webhook_inbox.sql",
+        "gitBlobSha1": "3299b84c9274e703f18f45dadee725958ee52431"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0005_w07_d1_04_refunds_billing_documents.sql",
+        "gitBlobSha1": "b19f4f7dc1ecb0fe5a661f2b0e7cc50ee68387eb"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0006_w07_d1_04_payment_method_revocation.sql",
+        "gitBlobSha1": "7b790ed1b3499330f87c9368cfe3b74009535f95"
       }
     ]
   },
@@ -74,16 +151,16 @@
       "url": "https://github.com/wanghuinet/luckread/actions/runs/42509822425"
     },
     "remoteRunnerValidation": {
-      "runId": 42553780174,
+      "runId": 44511494070,
       "conclusion": "success",
-      "headSha": "1704b435374be1e5f773915092de145548b173c2",
-      "sourceCommitSha": "4cba8141a2a34b287160c84a749d47218c54c503",
-      "headBranch": "fix/neon-d1-04-constraint-index-catalog-20261109",
+      "headSha": "5f43d419427d06213230e6947f1e5bb0fb2f0dd0",
+      "sourceCommitSha": "5f43d419427d06213230e6947f1e5bb0fb2f0dd0",
+      "headBranch": "codex/w07-renewal-mandate-read-neon-20261119",
       "validationScope": "D1_04_SCHEMA_ONLY_LOCAL_PG18_NO_NEON_CREDENTIALS",
-      "url": "https://github.com/wanghuinet/luckread/actions/runs/42553780174",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/44511494070",
       "remoteApplyJob": "skipped",
-      "artifactId": 13646875712,
-      "artifactDigest": "sha256:8fb6f14737131e708f65beb1c183cc9516b3dad9a28b90f73745dfde3fe165c7"
+      "artifactId": 14522742681,
+      "artifactDigest": "sha256:18ad89fcd4bfa16d2118111a78ef2b592352442bc75daf09d72e7914dd5def7a"
     },
     "catalogPostflight": {
       "postgresMajor": 18,
@@ -161,6 +238,14 @@
         "runtimeBindingsChanged": false,
         "productionCutoverAuthorized": false
       }
+    },
+    "candidateLocalPostgres18": {
+      "runId": 44511494070,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/44511494070",
+      "artifactId": 14522742681,
+      "artifactDigest": "sha256:18ad89fcd4bfa16d2118111a78ef2b592352442bc75daf09d72e7914dd5def7a",
+      "remoteApplyJob": "skipped"
     }
   },
   "safety": {

@@ -132,6 +132,7 @@ export type RenewalRuntimeDependencies = Readonly<{
   getDatabase?: (env: RenewalRuntimeEnv) => D1Database;
   getFinancePostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool | undefined;
   getMembershipPostgresPool?: (env: RenewalRuntimeEnv) => W07WebhookPostgresPool;
+  getRenewalCycleStore?: (env: RenewalRuntimeEnv) => RenewalCycleStore;
   getOrderCreateStore?: (env: RenewalRuntimeEnv) => OrderCreatePersistenceStore | undefined;
 }>;
 
@@ -438,33 +439,33 @@ async function readCycleByPeriod(
 }
 
 async function readActiveMandate(
-  db: D1Database,
+  db: W07WebhookPostgresPool,
   merchantId: string,
   customerId: string,
 ): Promise<ActiveMandateRow | null> {
-  return db.prepare(
-    'SELECT m.mandate_record_id, m.payment_method_id FROM payment_mandates m ' +
-    'JOIN saved_payment_methods s ON s.provider = m.provider AND s.merchant_id = m.merchant_id ' +
-    'AND s.customer_id = m.customer_id AND s.payment_method_id = m.payment_method_id ' +
-    "WHERE m.provider = 'hyperswitch' AND m.merchant_id = ? AND m.customer_id = ? " +
-    "AND m.status = 'ACTIVE' AND m.provider_mandate_id IS NOT NULL " +
-    "AND NOT EXISTS (SELECT 1 FROM payment_method_revocation_requests r JOIN saved_payment_methods rs ON rs.saved_payment_method_id = r.saved_payment_method_id WHERE rs.provider = m.provider AND rs.merchant_id = m.merchant_id AND rs.customer_id = m.customer_id AND rs.payment_method_id = m.payment_method_id AND r.status <> 'COMPLETED') " +
-    'ORDER BY m.updated_at DESC, m.mandate_record_id DESC LIMIT 1',
-  ).bind(merchantId, customerId).first<ActiveMandateRow>();
+  // PAY-007 guard: the PostgreSQL adapter excludes any payment_method_revocation_requests
+  // row where r.status <> 'COMPLETED' before returning an active off-session mandate.
+  try {
+    return await readActiveRenewalMandatePostgres(db, merchantId, customerId);
+  } catch {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
 }
 
-async function isExactMandateActive(db: D1Database, cycle: RenewalCycleRow): Promise<boolean> {
+async function isExactMandateActive(
+  db: W07WebhookPostgresPool,
+  cycle: RenewalCycleRow,
+): Promise<boolean> {
   if (!cycle.mandate_record_id || !cycle.payment_method_id) return false;
-  const row = await db.prepare(
-    'SELECT 1 AS active FROM payment_mandates m ' +
-    'JOIN saved_payment_methods s ON s.provider = m.provider AND s.merchant_id = m.merchant_id ' +
-    'AND s.customer_id = m.customer_id AND s.payment_method_id = m.payment_method_id ' +
-    "WHERE m.mandate_record_id = ? AND m.provider = 'hyperswitch' AND m.merchant_id = ? " +
-    "AND m.customer_id = ? AND m.payment_method_id = ? AND m.status = 'ACTIVE' " +
-    'AND m.provider_mandate_id IS NOT NULL ' +
-    "AND NOT EXISTS (SELECT 1 FROM payment_method_revocation_requests r JOIN saved_payment_methods rs ON rs.saved_payment_method_id = r.saved_payment_method_id WHERE rs.provider = m.provider AND rs.merchant_id = m.merchant_id AND rs.customer_id = m.customer_id AND rs.payment_method_id = m.payment_method_id AND r.status <> 'COMPLETED') LIMIT 1",
-  ).bind(cycle.mandate_record_id, cycle.merchant_id, cycle.subscriber_id, cycle.payment_method_id).first<{ active: number }>();
-  return row?.active === 1;
+  // PAY-007 guard: exact-tuple revalidation also excludes payment_method_revocation_requests
+  // rows where r.status <> 'COMPLETED' immediately before MIT submission.
+  try {
+    return await isExactRenewalMandateActivePostgres(
+      db, cycle.mandate_record_id, cycle.merchant_id, cycle.subscriber_id, cycle.payment_method_id,
+    );
+  } catch {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
 }
 
 async function readActiveMandateFromStore(
@@ -472,12 +473,8 @@ async function readActiveMandateFromStore(
   merchantId: string,
   customerId: string,
 ): Promise<ActiveMandateRow | null> {
-  if (isPostgresRenewalCycleStore(db)) {
-    try {
-      return await readActiveRenewalMandatePostgres(db, merchantId, customerId);
-    } catch {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
+  if (!isPostgresRenewalCycleStore(db)) {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
   return readActiveMandate(db, merchantId, customerId);
 }
@@ -487,14 +484,8 @@ async function isExactMandateActiveFromStore(
   cycle: RenewalCycleRow,
 ): Promise<boolean> {
   if (!cycle.mandate_record_id || !cycle.payment_method_id) return false;
-  if (isPostgresRenewalCycleStore(db)) {
-    try {
-      return await isExactRenewalMandateActivePostgres(
-        db, cycle.mandate_record_id, cycle.merchant_id, cycle.subscriber_id, cycle.payment_method_id,
-      );
-    } catch {
-      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-    }
+  if (!isPostgresRenewalCycleStore(db)) {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
   return isExactMandateActive(db, cycle);
 }
@@ -786,7 +777,7 @@ export async function scanDueSubscriptionRenewals(
         cycle.subscription_sync_state === 'APPLIED' &&
         cycle.attempt_number < MAX_ATTEMPTS &&
         renewalRetryDue(cycle, now) &&
-        await isExactMandateActiveFromStore(getW07RenewalCycleStore(env), cycle)) {
+        await isExactMandateActiveFromStore(cycleStore, cycle)) {
         cycleIds.push(cycle.cycle_id);
       } else if (
         cycle.state === 'PREPARED' ||
@@ -1002,6 +993,7 @@ async function prepareFailedCycleRetry(
   membershipStore: RenewalMembershipStore,
   cycle: RenewalCycleRow,
   now: string,
+  cycleStore: RenewalCycleStore = getW07RenewalCycleStore(env),
 ): Promise<FailedCycleRetryPreparation> {
   if (cycle.state !== 'FAILED') return 'TERMINAL';
   if (cycle.subscription_sync_state !== 'APPLIED') return 'AWAITING_OUTCOME_SYNC';
@@ -1041,20 +1033,20 @@ async function prepareFailedCycleRetry(
   // A retry may reuse only the exact same still-active saved method/mandate.
   // A revoked mandate requires a new customer-present consent flow and is never
   // silently replaced with another token during off-session recovery.
-  if (!(await isExactMandateActiveFromStore(getW07RenewalCycleStore(env), cycle))) return 'TERMINAL';
+  if (!(await isExactMandateActiveFromStore(cycleStore, cycle))) return 'TERMINAL';
 
   const retryCutoff = new Date(Date.parse(now) - renewalRetryDelayMs(cycle.attempt_number)).toISOString();
   const updatedAt = strictlyAfter(now, cycle.updated_at);
-  const store = getW07RenewalCycleStore(env);
   let updated = false;
-  if (isPostgresRenewalCycleStore(store)) {
+  if (isPostgresRenewalCycleStore(cycleStore)) {
     try {
-      updated = await retryFailedRenewalCyclePostgres(store, cycle, updatedAt, retryCutoff, MAX_ATTEMPTS);
+      updated = await retryFailedRenewalCyclePostgres(cycleStore, cycle, updatedAt, retryCutoff, MAX_ATTEMPTS);
     } catch {
       throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
     }
   } else {
     try {
+      const store = cycleStore;
       const result = await store.prepare(
         "UPDATE subscription_renewal_cycles SET state = 'PREPARED', payment_id = NULL, " +
         "provider_response_status = NULL, outcome_code = 'RETRY_PREPARED', " +
@@ -1069,7 +1061,7 @@ async function prepareFailedCycleRetry(
     }
   }
   if (updated) return 'PREPARED';
-  const latest = await readCycleById(store, cycle.cycle_id);
+  const latest = await readCycleById(cycleStore, cycle.cycle_id);
   if (latest.state === 'PREPARED') return 'PREPARED';
   if (latest.state === 'FAILED' && latest.subscription_sync_state !== 'APPLIED') return 'AWAITING_OUTCOME_SYNC';
   return 'AWAITING_RETRY';
@@ -1077,24 +1069,25 @@ async function prepareFailedCycleRetry(
 
 /**
  * Prepare a bounded, idempotent retry after a durable failed-cycle outcome was
- * synchronized to D1-01. The caller still separately invokes processSubscriptionRenewalCycle
+ * synchronized to the membership database. The caller still separately invokes processSubscriptionRenewalCycle
  * after this function returns PREPARED; retry preparation alone never charges a provider.
  */
 export async function prepareFailedRenewalCycleRetry(
   env: RenewalRuntimeEnv,
   cycleIdInput: string,
-  dependencies: Pick<RenewalRuntimeDependencies, 'now' | 'getDatabase' | 'getMembershipPostgresPool'> = {},
+  dependencies: Pick<RenewalRuntimeDependencies, 'now' | 'getDatabase' | 'getMembershipPostgresPool' | 'getRenewalCycleStore'> = {},
 ): Promise<RenewalProcessResult> {
   env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
   if (!/^rcy_[A-Za-z0-9]{26}$/.test(cycleIdInput)) {
     throw new RenewalRuntimeError('VALIDATION_FAILED', 400);
   }
   const now = nowIso(dependencies.now ?? (() => new Date()));
-  const cycle = await readCycleById(getW07RenewalCycleStore(env), cycleIdInput);
+  const cycleStore = (dependencies.getRenewalCycleStore ?? getW07RenewalCycleStore)(env);
+  const cycle = await readCycleById(cycleStore, cycleIdInput);
   const membershipStore = getRenewalMembershipStore(env, dependencies);
-  const preparation = await prepareFailedCycleRetry(env, membershipStore, cycle, now);
+  const preparation = await prepareFailedCycleRetry(env, membershipStore, cycle, now, cycleStore);
   const latest = preparation === 'PREPARED'
-    ? await readCycleById(getW07RenewalCycleStore(env), cycleIdInput)
+    ? await readCycleById(cycleStore, cycleIdInput)
     : cycle;
   const action = preparation === 'PREPARED'
     ? 'PREPARED'

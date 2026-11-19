@@ -11,12 +11,22 @@ const MANDATE_ID = 'mnd_' + 'm'.repeat(26);
 const SUB_ID = 'sub_' + 's'.repeat(64);
 
 type Cycle = Record<string, unknown> & {
-  cycle_id: string; state: string; subscription_sync_state: string; version: number; updated_at: string;
-  attempt_number: number; payment_id: string | null;
+  cycle_id: string;
+  state: string;
+  subscription_sync_state: string;
+  version: number;
+  updated_at: string;
+  attempt_number: number;
+  payment_id: string | null;
 };
 type Subscription = Record<string, unknown> & {
-  subscription_id: string; subscriber_id: string; plan_id: string; plan_version: number;
-  status: string; current_period_end: string; cancel_at: string | null;
+  subscription_id: string;
+  subscriber_id: string;
+  plan_id: string;
+  plan_version: number;
+  status: string;
+  current_period_end: string;
+  cancel_at: string | null;
 };
 
 const baseCycle = (overrides: Partial<Cycle> = {}): Cycle => ({
@@ -38,65 +48,65 @@ const baseCycle = (overrides: Partial<Cycle> = {}): Cycle => ({
 
 const baseSubscription = (overrides: Partial<Subscription> = {}): Subscription => ({
   subscription_id: SUB_ID, subscriber_id: 'user_1', plan_id: 'plan_1', plan_version: 3,
-  status: 'PAST_DUE', current_period_start: '2026-09-28T10:00:00.000Z',
-  current_period_end: CYCLE_START, cancel_at: null,
+  creator_id: 'creator_1', status: 'PAST_DUE', current_period_start: '2026-09-28T10:00:00.000Z',
+  current_period_end: CYCLE_START, trial_started_at: null, trial_ends_at: null, cancel_at: null,
   updated_at: '2026-10-28T11:00:00.000Z', version: 4,
   ...overrides,
 });
 
-const result = (changes: number): D1Result => ({ success: true, meta: { changes } }) as D1Result;
+class MemoryFinancePostgres implements W07WebhookPostgresPool {
+  constructor(public cycle: Cycle | null, public activeMandate = true) {}
 
-class Statement {
-  values: unknown[] = [];
-  constructor(readonly db: MemoryD1, readonly sql: string) {}
-  bind(...values: unknown[]) { this.values = values; return this as unknown as D1PreparedStatement; }
-  async first<T>() { return this.db.first<T>(this.sql, this.values); }
-  async run<T>() { return this.db.run<T>(this.sql, this.values) as Promise<D1Result<T>>; }
-}
-
-class MemoryD1 {
-  constructor(
-    public cycle: Cycle | null,
-    public subscription: Subscription | null,
-    public activeMandate = true,
-  ) {}
-  prepare(sql: string) { return new Statement(this, sql) as unknown as D1PreparedStatement; }
-  async first<T>(sql: string, values: unknown[]): Promise<T | null> {
-    if (sql.includes('FROM membership_subscription_scheduled_plan_changes')) return null;
-    if (sql.includes('FROM subscription_renewal_cycles') && sql.includes('WHERE cycle_id = ?')) {
-      return this.cycle ? structuredClone(this.cycle) as T : null;
+  async query<Row extends Record<string, unknown> = Record<string, unknown>>(
+    sql: string,
+    values: unknown[] = [],
+  ): Promise<{ rows: Row[]; rowCount: number }> {
+    if (sql.includes('FROM subscription_renewal_cycles') && sql.includes('WHERE cycle_id = $1')) {
+      const row = this.cycle?.cycle_id === values[0] ? structuredClone(this.cycle) : null;
+      const rows = row ? [row] : [];
+      return { rows: rows as Row[], rowCount: rows.length };
     }
-    if (sql.includes('FROM membership_subscriptions')) {
-      if (this.subscription &&
-          this.subscription.subscription_id === values[0] && this.subscription.subscriber_id === values[1]) {
-        return structuredClone(this.subscription) as T;
-      }
-      return null;
+    if (sql.includes('FROM payment_mandates')) {
+      const rows = this.activeMandate ? [{ active: 1 }] : [];
+      return { rows: rows as Row[], rowCount: rows.length };
     }
-    if (sql.includes('FROM payment_mandates')) return this.activeMandate ? { active: 1 } as T : null;
-    throw new Error('Unexpected renewal retry query: ' + sql);
-  }
-  async run<T>(sql: string, values: unknown[]): Promise<D1Result<T>> {
-    if (sql.includes("UPDATE subscription_renewal_cycles SET state = 'PREPARED'")) {
-      if (!this.cycle) return result(0) as D1Result<T>;
+    if (sql.startsWith("UPDATE subscription_renewal_cycles SET state = 'PREPARED'")) {
       const [updatedAt, cycleId, version, maxAttempts, retryCutoff] = values;
       const c = this.cycle;
-      if (c.cycle_id !== cycleId || c.version !== version || c.state !== 'FAILED' ||
-          c.subscription_sync_state !== 'APPLIED' || c.attempt_number >= Number(maxAttempts) ||
-          Date.parse(c.updated_at) > Date.parse(String(retryCutoff))) return result(0) as D1Result<T>;
+      const canRetry = !!c &&
+        c.cycle_id === cycleId &&
+        c.version === version &&
+        c.state === 'FAILED' &&
+        c.subscription_sync_state === 'APPLIED' &&
+        c.attempt_number < Number(maxAttempts) &&
+        Date.parse(c.updated_at) <= Date.parse(String(retryCutoff));
+      if (!canRetry) return { rows: [], rowCount: 0 };
       this.cycle = {
-        ...c, state: 'PREPARED', payment_id: null, provider_response_status: null,
-        outcome_code: 'RETRY_PREPARED', subscription_sync_state: 'PENDING',
-        subscription_sync_updated_at: null, subscription_sync_error_code: null,
-        lease_token: null, lease_expires_at: null, version: c.version + 1, updated_at: String(updatedAt),
+        ...c!,
+        state: 'PREPARED',
+        payment_id: null,
+        provider_response_status: null,
+        outcome_code: 'RETRY_PREPARED',
+        subscription_sync_state: 'PENDING',
+        subscription_sync_updated_at: null,
+        subscription_sync_error_code: null,
+        lease_token: null,
+        lease_expires_at: null,
+        version: c!.version + 1,
+        updated_at: String(updatedAt),
       };
-      return result(1) as D1Result<T>;
+      const rows = [{ cycle_id: this.cycle.cycle_id }];
+      return { rows: rows as Row[], rowCount: rows.length };
     }
-    throw new Error('Unexpected renewal retry update: ' + sql);
+    throw new Error('Unexpected Neon finance query: ' + sql);
+  }
+
+  async connect(): Promise<W07WebhookPostgresClient> {
+    return { query: this.query.bind(this), release() {} };
   }
 }
 
-function membershipPoolFor(store: MemoryD1): W07WebhookPostgresPool {
+function membershipPoolFor(subscription: Subscription | null): W07WebhookPostgresPool {
   const query = async <Row extends Record<string, unknown> = Record<string, unknown>>(
     sql: string,
     values: unknown[] = [],
@@ -105,12 +115,13 @@ function membershipPoolFor(store: MemoryD1): W07WebhookPostgresPool {
       return { rows: [] as Row[], rowCount: 0 };
     }
     if (sql.includes('FROM membership_subscriptions')) {
-      const row = await store.first<Row>(sql, values);
-      return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
-    }
-    if (sql.includes('FROM payment_mandates')) {
-      const row = await store.first<Row>(sql, values);
-      return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+      const row = subscription &&
+        subscription.subscription_id === values[0] &&
+        subscription.subscriber_id === values[1]
+        ? structuredClone(subscription)
+        : null;
+      const rows = row ? [row] : [];
+      return { rows: rows as Row[], rowCount: rows.length };
     }
     throw new Error('Unexpected Neon membership query: ' + sql);
   };
@@ -123,50 +134,55 @@ function setup(options: {
   subscription?: Partial<Subscription>;
   activeMandate?: boolean;
 } = {}) {
-  const d1_04 = new MemoryD1(baseCycle(options.cycle), null, options.activeMandate);
-  const membershipState = new MemoryD1(null, baseSubscription(options.subscription));
-  const membershipPool = membershipPoolFor(membershipState);
+  const financePool = new MemoryFinancePostgres(baseCycle(options.cycle), options.activeMandate);
+  const membershipPool = membershipPoolFor(baseSubscription(options.subscription));
   const env: RenewalRuntimeEnv = {
-    W07_DATABASE_DRIVER: 'd1',
+    W07_DATABASE_DRIVER: 'neon',
     W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-    D1_04: d1_04 as unknown as D1Database,
+    HYPERDRIVE_D1_04: { connectionString: 'postgresql://test.invalid/luckread' },
+    D1_04: {} as D1Database,
   };
-  return { env, d1_04, d1_01: membershipState, membershipPool };
+  const dependencies = {
+    now: () => new Date(NOW),
+    getDatabase: () => ({} as D1Database),
+    getMembershipPostgresPool: () => membershipPool,
+    getRenewalCycleStore: () => financePool,
+  };
+  return { env, financePool, membershipPool, dependencies };
 }
 
 describe('failed recurring payment recovery', () => {
   it('prepares one retry only after backoff and applied PAST_DUE synchronization', async () => {
     const f = setup();
-    const first = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => f.membershipPool });
+    const first = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, f.dependencies);
     expect(first).toMatchObject({ state: 'PREPARED', action: 'PREPARED', cycleId: CYCLE_ID });
-    expect(f.d1_04.cycle).toMatchObject({
+    expect(f.financePool.cycle).toMatchObject({
       state: 'PREPARED', payment_id: null, provider_response_status: null, outcome_code: 'RETRY_PREPARED',
       subscription_sync_state: 'PENDING', subscription_sync_updated_at: null, version: 9,
     });
-    const replay = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => f.membershipPool });
+    const replay = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, f.dependencies);
     expect(replay).toMatchObject({ state: 'PREPARED', action: 'TERMINAL' });
   });
 
   it('waits for backoff instead of immediately repeating a failed off-session charge', async () => {
     const f = setup({ cycle: { updated_at: '2026-10-28T11:59:00.000Z' } });
-    const result = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => f.membershipPool });
+    const result = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, f.dependencies);
     expect(result).toMatchObject({ state: 'FAILED', action: 'AWAITING_RETRY' });
-    expect(f.d1_04.cycle?.state).toBe('FAILED');
+    expect(f.financePool.cycle?.state).toBe('FAILED');
   });
 
   it('never retries without applied subscription outcome or the exact active mandate', async () => {
-    const pendingSync = setup({ cycle: {
-      subscription_sync_state: 'PENDING',
-      subscription_sync_updated_at: null,
-    } });
-    expect(await prepareFailedRenewalCycleRetry(pendingSync.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => pendingSync.membershipPool }))
+    const pendingSync = setup({
+      cycle: { subscription_sync_state: 'PENDING', subscription_sync_updated_at: null },
+    });
+    expect(await prepareFailedRenewalCycleRetry(pendingSync.env, CYCLE_ID, pendingSync.dependencies))
       .toMatchObject({ action: 'AWAITING_OUTCOME_SYNC' });
-    expect(pendingSync.d1_04.cycle?.state).toBe('FAILED');
+    expect(pendingSync.financePool.cycle?.state).toBe('FAILED');
 
     const revokedMandate = setup({ activeMandate: false });
-    expect(await prepareFailedRenewalCycleRetry(revokedMandate.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => revokedMandate.membershipPool }))
+    expect(await prepareFailedRenewalCycleRetry(revokedMandate.env, CYCLE_ID, revokedMandate.dependencies))
       .toMatchObject({ action: 'TERMINAL', state: 'FAILED' });
-    expect(revokedMandate.d1_04.cycle?.state).toBe('FAILED');
+    expect(revokedMandate.financePool.cycle?.state).toBe('FAILED');
   });
 
   it('does not retry after cancellation, period movement or plan-version drift', async () => {
@@ -177,9 +193,9 @@ describe('failed recurring payment recovery', () => {
       { cancel_at: CYCLE_START },
     ]) {
       const f = setup({ subscription });
-      const retry = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW), getMembershipPostgresPool: () => f.membershipPool });
+      const retry = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, f.dependencies);
       expect(retry.action).toBe('TERMINAL');
-      expect(f.d1_04.cycle?.state).toBe('FAILED');
+      expect(f.financePool.cycle?.state).toBe('FAILED');
     }
   });
 });

@@ -110,6 +110,85 @@ describe('renewal payment-attempt persistence selection', () => {
 });
 
 describe('renewal cycle runtime', () => {
+  it('fails closed instead of reading active renewal mandates from D1', async () => {
+    const cycle = {
+      cycle_id: 'rcy_' + 'a'.repeat(26),
+      provider: 'hyperswitch' as const,
+      merchant_id: 'merchant_test',
+      subscription_id: 'sub_creator_monthly',
+      subscriber_id: 'user_1',
+      plan_id: 'plan_' + 'b'.repeat(64),
+      plan_version: 1,
+      cycle_start: CYCLE_START,
+      cycle_end: CYCLE_END,
+      billing_interval: 'MONTHLY' as const,
+      currency: 'USD',
+      offer_snapshot_json: JSON.stringify({
+        subscriptionId: 'sub_creator_monthly',
+        subscriberId: 'user_1',
+        creatorId: 'creator_1',
+        planId: 'plan_' + 'b'.repeat(64),
+        planVersion: 1,
+        name: 'Creator Plus',
+        tier: 'plus',
+        billingInterval: 'MONTHLY',
+        priceMinor: 1000,
+        currency: 'USD',
+        benefits: ['member-posts'],
+      }),
+      amount_minor: null,
+      pricing_snapshot_json: null,
+      payment_method_id: null,
+      mandate_record_id: null,
+      order_id: null,
+      payment_id: null,
+      state: 'AWAITING_MANDATE' as const,
+      subscription_sync_state: 'PENDING' as const,
+      subscription_sync_updated_at: null,
+      subscription_sync_error_code: null,
+      attempt_number: 0,
+      provider_response_status: null,
+      outcome_code: 'ACTIVE_MANDATE_REQUIRED',
+      lease_token: null,
+      lease_expires_at: null,
+      version: 1,
+      created_at: CYCLE_START,
+      updated_at: CYCLE_START,
+    };
+    const statements: string[] = [];
+    const db = {
+      prepare(sql: string) {
+        statements.push(sql);
+        return {
+          bind() { return this; },
+          async first() { return structuredClone(cycle); },
+          async run() { return { meta: { changes: 1 } }; },
+        };
+      },
+    } as unknown as D1Database;
+    const membershipPool = {
+      async query() { return { rows: [], rowCount: 0 }; },
+      async connect() { throw new Error('membership queries are not needed for an awaiting-mandate cycle'); },
+    } as unknown as W07WebhookPostgresPool;
+    const env: RenewalRuntimeEnv = {
+      W07_DATABASE_DRIVER: 'd1',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+      D1_04: db,
+      HYPERSWITCH_ENVIRONMENT: 'sandbox',
+      HYPERSWITCH_API_KEY: 'test-api-key',
+      HYPERSWITCH_MERCHANT_ID: 'merchant_test',
+    };
+
+    await expect(processSubscriptionRenewalCycle(env, cycle.cycle_id, {
+      getDatabase: () => db,
+      getOrderCreateStore: () => undefined,
+      getMembershipPostgresPool: () => membershipPool,
+    })).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
+
+    expect(statements.some((sql) => sql.includes('FROM payment_mandates'))).toBe(false);
+    expect(statements).toHaveLength(1);
+  });
+
   it('uses a stable cycle id for a subscription and one exact billing period', async () => {
     const first = await renewalCycleIdFor('sub_creator_monthly', CYCLE_START, CYCLE_END);
     const replay = await renewalCycleIdFor('sub_creator_monthly', CYCLE_START, CYCLE_END);
