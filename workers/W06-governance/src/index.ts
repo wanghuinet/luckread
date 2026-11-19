@@ -1,5 +1,5 @@
 import { buildAccountStateChangedAuditEvent, type AccountStateChangedAuditInput, type AuditEvent } from './audit-event'
-import { persistAuditEvent } from './audit-event-persistence'
+import type { AuditEventStore } from './audit-event-store.js'
 import { consumeAccountStateChanged } from './auth-013-queue-consumer'
 import { consumeMfaAuditEvent } from './mfa-audit-queue-consumer'
 import { consumeSessionRevokedAuditEvent } from './session-revocation-audit-queue-consumer'
@@ -779,17 +779,6 @@ function parseCommerceOrderAuditInput(value: unknown): CommerceOrderAuditInput {
   return body as CommerceOrderAuditInput
 }
 
-type StoredAuditEvent = {
-  event_id: string
-  actor_json: string
-  action: string
-  target_type: string
-  target_id: string
-  before_json: string
-  after_json: string
-  occurred_at: string
-}
-
 function parseMembershipPlanAuditInput(value: unknown): MembershipPlanAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
   const body = value as Record<string, unknown>
@@ -967,22 +956,18 @@ function matchesAuditJsonText(actual: string, expected: unknown): boolean {
   }
 }
 
-function matchesMembershipPlanMutationRequestAudit(existing: StoredAuditEvent, expected: AuditEvent): boolean {
-  try {
-    const storedActor = JSON.parse(existing.actor_json) as Record<string, unknown>
-    const expectedActor = expected.actor as unknown as Record<string, unknown>
-    return existing.event_id === expected.eventId &&
-      storedActor.actorId === expectedActor.actorId &&
-      storedActor.actorType === expectedActor.actorType &&
-      storedActor.layer === expectedActor.layer &&
-      existing.action === expected.action &&
-      existing.target_type === expected.targetType &&
-      existing.target_id === expected.targetId &&
-      matchesAuditJsonText(existing.before_json, expected.before) &&
-      matchesAuditJsonText(existing.after_json, expected.after)
-  } catch {
-    return false
-  }
+function matchesMembershipPlanMutationRequestAudit(existing: AuditEvent, expected: AuditEvent): boolean {
+  const storedActor = existing.actor as unknown as Record<string, unknown>
+  const expectedActor = expected.actor as unknown as Record<string, unknown>
+  return existing.eventId === expected.eventId &&
+    storedActor.actorId === expectedActor.actorId &&
+    storedActor.actorType === expectedActor.actorType &&
+    storedActor.layer === expectedActor.layer &&
+    existing.action === expected.action &&
+    existing.targetType === expected.targetType &&
+    existing.targetId === expected.targetId &&
+    canonicalAuditJson(existing.before) === canonicalAuditJson(expected.before) &&
+    canonicalAuditJson(existing.after) === canonicalAuditJson(expected.after)
 }
 
 /**
@@ -991,9 +976,11 @@ function matchesMembershipPlanMutationRequestAudit(existing: StoredAuditEvent, e
  * first immutable request-intent event is already durable.
  */
 async function persistMembershipPlanMutationRequestAudit(env: Env, event: AuditEvent): Promise<Response> {
-  let existing: StoredAuditEvent | null
+  let store: AuditEventStore
+  let existing: AuditEvent | null
   try {
-    existing = await findAuditEvent(getW06ModerationDatabase(env), event.eventId)
+    store = getW06AuditEventStore(env)
+    existing = await store.findByEventId(event.eventId)
   } catch {
     return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
   }
@@ -1002,11 +989,11 @@ async function persistMembershipPlanMutationRequestAudit(env: Env, event: AuditE
     return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
   }
   try {
-    await persistAuditEvent(getW06ModerationDatabase(env), event)
+    await store.append(event)
     return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: false }, 201)
   } catch {
     try {
-      const raced = await findAuditEvent(getW06ModerationDatabase(env), event.eventId)
+      const raced = await store.findByEventId(event.eventId)
       if (raced && matchesMembershipPlanMutationRequestAudit(raced, event)) {
         return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
       }
@@ -1017,36 +1004,37 @@ async function persistMembershipPlanMutationRequestAudit(env: Env, event: AuditE
   }
 }
 
-async function findAuditEvent(db: D1Database, eventId: string): Promise<StoredAuditEvent | null> {
-  return db.prepare(
-    'SELECT event_id, actor_json, action, target_type, target_id, before_json, after_json, occurred_at ' +
-    'FROM audit_events WHERE event_id = ? LIMIT 1',
-  ).bind(eventId).first<StoredAuditEvent>()
+async function findAuditEvent(store: AuditEventStore, eventId: string): Promise<AuditEvent | null> {
+  return store.findByEventId(eventId)
 }
 
-function matchesImmutableAuditEvent(existing: StoredAuditEvent, expected: AuditEvent): boolean {
-  try {
-    const storedActor = JSON.parse(existing.actor_json) as Record<string, unknown>
-    const expectedActor = expected.actor as unknown as Record<string, unknown>
-    return existing.event_id === expected.eventId &&
-      storedActor.actorId === expectedActor.actorId &&
-      storedActor.actorType === expectedActor.actorType &&
-      storedActor.layer === expectedActor.layer &&
-      existing.action === expected.action &&
-      existing.target_type === expected.targetType &&
-      existing.target_id === expected.targetId &&
-      matchesAuditJsonText(existing.before_json, expected.before) &&
-      matchesAuditJsonText(existing.after_json, expected.after) &&
-      existing.occurred_at === expected.occurredAt
-  } catch {
-    return false
-  }
+function sameTimestampAtPostgresPrecision(left: string, right: string): boolean {
+  const leftMilliseconds = Date.parse(left)
+  const rightMilliseconds = Date.parse(right)
+  return Number.isFinite(leftMilliseconds) && leftMilliseconds === rightMilliseconds
+}
+
+function matchesImmutableAuditEvent(existing: AuditEvent, expected: AuditEvent): boolean {
+  const storedActor = existing.actor as unknown as Record<string, unknown>
+  const expectedActor = expected.actor as unknown as Record<string, unknown>
+  return existing.eventId === expected.eventId &&
+    storedActor.actorId === expectedActor.actorId &&
+    storedActor.actorType === expectedActor.actorType &&
+    storedActor.layer === expectedActor.layer &&
+    existing.action === expected.action &&
+    existing.targetType === expected.targetType &&
+    existing.targetId === expected.targetId &&
+    canonicalAuditJson(existing.before) === canonicalAuditJson(expected.before) &&
+    canonicalAuditJson(existing.after) === canonicalAuditJson(expected.after) &&
+    sameTimestampAtPostgresPrecision(existing.occurredAt, expected.occurredAt)
 }
 
 async function persistImmutableAuditEvent(env: Env, event: AuditEvent): Promise<Response> {
-  let existing: StoredAuditEvent | null
+  let store: AuditEventStore
+  let existing: AuditEvent | null
   try {
-    existing = await findAuditEvent(getW06ModerationDatabase(env), event.eventId)
+    store = getW06AuditEventStore(env)
+    existing = await findAuditEvent(store, event.eventId)
   } catch {
     return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
   }
@@ -1056,13 +1044,13 @@ async function persistImmutableAuditEvent(env: Env, event: AuditEvent): Promise<
   }
 
   try {
-    await persistAuditEvent(getW06ModerationDatabase(env), event)
+    await store.append(event)
     return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: false }, 201)
   } catch {
     // A concurrent retry may have won the unique event_id insert. Confirm the
     // durable row before treating this request as an idempotent success.
     try {
-      const raced = await findAuditEvent(getW06ModerationDatabase(env), event.eventId)
+      const raced = await findAuditEvent(store, event.eventId)
       if (raced && matchesImmutableAuditEvent(raced, event)) {
         return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
       }
@@ -1082,14 +1070,16 @@ async function persistIdempotentSubscriptionPlanChangeRequestAudit(
   env: Env,
   event: AuditEvent,
 ): Promise<Response> {
-  let existing: StoredAuditEvent | null
+  let store: AuditEventStore
+  let existing: AuditEvent | null
   try {
-    existing = await findAuditEvent(getW06ModerationDatabase(env), event.eventId)
+    store = getW06AuditEventStore(env)
+    existing = await findAuditEvent(store, event.eventId)
   } catch {
     return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
   }
   if (!existing) return persistImmutableAuditEvent(env, event)
-  const stable = { ...event, occurredAt: existing.occurred_at }
+  const stable = { ...event, occurredAt: existing.occurredAt }
   if (!matchesImmutableAuditEvent(existing, stable)) {
     return json({ error: 'AUDIT_EVENT_CONFLICT' }, 409)
   }
@@ -1782,7 +1772,7 @@ export default {
       catch { return json({ error: 'INVALID_AUDIT_EVENT' }, 400) }
       try {
         const event = buildAccountStateChangedAuditEvent(input)
-        await persistAuditEvent(getW06ModerationDatabase(env), event)
+        await getW06AuditEventStore(env).append(event)
         return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId }, 201)
       } catch (error) {
         if (error instanceof Error && error.message.startsWith('INVALID_AUDIT_EVENT:')) return json({ error: 'INVALID_AUDIT_EVENT' }, 400)
