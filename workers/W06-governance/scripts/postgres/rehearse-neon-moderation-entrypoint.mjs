@@ -151,7 +151,6 @@ try {
   )
 
   const env = {
-    W06_MODERATION_DATABASE_DRIVER: 'neon',
     HYPERDRIVE_D1_03: binding,
     W03_CONTENT_MODERATION: {
       async fetch() {
