@@ -3,7 +3,7 @@ import type {
   W07WebhookPostgresClient,
   W07WebhookPostgresPool,
 } from './payment-webhook-database-postgres.js'
-import { BillingPersistenceError } from './billing-persistence.js'
+import { BillingPersistenceError } from './billing-contracts.js'
 import {
   issueInvoiceForOrderPostgres,
   issueReceiptForPaidPaymentPostgres,

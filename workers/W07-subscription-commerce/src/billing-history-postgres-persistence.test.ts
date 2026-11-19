@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js'
-import { BillingPersistenceError, encodeBillingHistoryCursor } from './billing-persistence.js'
+import { BillingPersistenceError, encodeBillingHistoryCursor } from './billing-contracts.js'
 import {
   listBillingDocumentsForCustomerPostgres,
   listPaymentHistoryForCustomerPostgres,
