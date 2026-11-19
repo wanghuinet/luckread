@@ -1,5 +1,5 @@
 import { buildAccountStateChangedAuditEvent } from './audit-event'
-import { persistAuditEvent } from './audit-event-persistence'
+import type { AuditEventStore } from './audit-event-store.js'
 
 export type IdentityAccountStateChangedEvent = {
   eventId: string
@@ -55,17 +55,13 @@ function assertEvent(value: unknown): asserts value is IdentityAccountStateChang
 }
 
 export async function consumeAccountStateChanged(
-  db: D1Database,
+  store: AuditEventStore,
   raw: unknown,
 ): Promise<'persisted' | 'duplicate'> {
   assertEvent(raw)
   const event = raw
 
-  const existing = await db
-    .prepare('SELECT event_id AS eventId FROM audit_events WHERE event_id = ? LIMIT 1')
-    .bind(event.eventId)
-    .first<{ eventId: string }>()
-
+  const existing = await store.findByEventId(event.eventId)
   if (existing) return 'duplicate'
 
   const auditEvent = buildAccountStateChangedAuditEvent({
@@ -82,6 +78,6 @@ export async function consumeAccountStateChanged(
     reason: event.reason,
   })
 
-  await persistAuditEvent(db, auditEvent)
+  await store.append(auditEvent)
   return 'persisted'
 }
