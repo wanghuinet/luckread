@@ -203,6 +203,12 @@ describe('native PostgreSQL D1-04 renewal cycle persistence', () => {
     expect(f.calls[0]?.values).toEqual([later, cycleId, 3, 20, now])
   })
 
+  it('returns null when the scheduler singleton has not been initialized', async () => {
+    const f = poolWith(async () => ({ rows: [], rowCount: 0 }))
+
+    await expect(readRenewalSchedulerCursorPostgres(f.pool)).resolves.toBeNull()
+  })
+
   it('reads and advances the scheduler singleton through version CAS', async () => {
     const row = cursorRow()
     const f = poolWith(async (sql) => sql.startsWith('SELECT')

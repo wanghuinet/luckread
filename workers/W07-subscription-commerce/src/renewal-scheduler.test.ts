@@ -10,12 +10,10 @@ import type {
   RenewalScanResult,
 } from './renewal-runtime.js';
 
-const database = {} as D1Database;
 const env = {
   W07_DATABASE_DRIVER: 'neon',
   W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
   HYPERDRIVE_D1_04: { connectionString: 'postgresql://test.invalid/luckread' },
-  D1_04: database,
 } as RenewalRuntimeEnv;
 const membershipPool = { query: async () => ({ rows: [], rowCount: 0 }), connect: async () => { throw new Error('unused') } } as unknown as W07WebhookPostgresPool;
 const financePool = { query: async () => ({ rows: [], rowCount: 0 }), connect: async () => { throw new Error('unused') } } as unknown as W07WebhookPostgresPool;
@@ -39,7 +37,7 @@ function dependencies(options: TestOptions = {}): RenewalScheduledDependencies {
 
   return {
     readFinanceTableNames: async (_pool, expected) => new Set(expected),
-    getDatabase: () => database,
+    getRenewalCycleStore: () => financePool,
     readMembershipTableNames: async (_db, expected) => new Set(expected),
     getMembershipPostgresPool: () => membershipPool,
     getFinancePostgresPool: () => financePool,
@@ -178,7 +176,7 @@ describe('W07 renewal scheduler completion status', () => {
       readMembershipTableNames: async (_pool, expected) => new Set(expected),
       getMembershipPostgresPool: () => membershipPool,
       getFinancePostgresPool: () => financePool,
-      getDatabase: () => database,
+      getRenewalCycleStore: () => financePool,
       syncPending: async () => cleanRecovery,
       scanDue: async (_runtimeEnv, options): Promise<RenewalScanResult> => {
         scanLimit = options?.limit ?? 0
