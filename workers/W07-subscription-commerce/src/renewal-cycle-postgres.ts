@@ -1,6 +1,5 @@
 import {
   getW07PaymentWebhookPostgresPool,
-  resolveW07DatabaseDriver,
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js'
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js'
@@ -57,31 +56,15 @@ export type RenewalCursorRow = {
   updated_at: string
 }
 
-export type RenewalCycleStore = D1Database | W07WebhookPostgresPool
+export type RenewalCycleStore = W07WebhookPostgresPool
 
-export type RenewalCycleRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
-  D1_04?: D1Database
-}>
-
-export function isPostgresRenewalCycleStore(store: RenewalCycleStore): store is W07WebhookPostgresPool {
-  return typeof (store as W07WebhookPostgresPool).query === 'function'
-}
+export type RenewalCycleRuntimeEnv = Omit<W07PaymentMethodReadRuntimeEnv, 'D1_04'>
 
 /**
- * Production renewal-cycle state is owned by D1-04 and uses the existing
- * Neon Hyperdrive pool. An absent selector/binding is tolerated only for
- * isolated legacy D1 fixtures; an explicit Neon selection fails closed.
+ * Renewal-cycle state is Neon PostgreSQL-only. Legacy D1 mode is never
+ * selected by scheduler or renewal processing.
  */
 export function getW07RenewalCycleStore(env: RenewalCycleRuntimeEnv): RenewalCycleStore {
-  const configured = env.W07_DATABASE_DRIVER?.trim().toLowerCase()
-  if (!configured && !env.HYPERDRIVE_D1_04) {
-    if (!env.D1_04) throw new Error('W07_RENEWAL_CYCLE_STORE_UNAVAILABLE')
-    return env.D1_04
-  }
-  if (resolveW07DatabaseDriver(env) === 'd1') {
-    if (!env.D1_04) throw new Error('W07_RENEWAL_CYCLE_STORE_UNAVAILABLE')
-    return env.D1_04
-  }
   try {
     const pool = getW07PaymentWebhookPostgresPool(env)
     if (!pool) throw new Error('W07_RENEWAL_CYCLE_STORE_UNAVAILABLE')
