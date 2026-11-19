@@ -1,9 +1,6 @@
 import { Pool } from 'pg'
 
-import {
-  createPostgresAnalyticsDatabase,
-  type AnalyticsPostgresPool,
-} from './analytics-postgres-store.js'
+import type { AnalyticsPostgresPool } from './analytics-postgres-store.js'
 
 export interface W11AnalyticsHyperdriveBinding {
   connectionString?: string
@@ -11,7 +8,6 @@ export interface W11AnalyticsHyperdriveBinding {
 
 interface RuntimeState {
   pool: Pool
-  database: ReturnType<typeof createPostgresAnalyticsDatabase>
 }
 
 const runtimes = new WeakMap<object, RuntimeState>()
@@ -39,16 +35,16 @@ function validateConnectionString(value: unknown): string {
   return value
 }
 
-/** Lazily constructs one bounded PostgreSQL pool per Hyperdrive binding. */
-export function getW11AnalyticsPostgresDatabase(
+/** Lazily constructs one bounded native PostgreSQL pool per Hyperdrive binding. */
+export function getW11AnalyticsPostgresPool(
   binding: W11AnalyticsHyperdriveBinding,
-): ReturnType<typeof createPostgresAnalyticsDatabase> {
+): AnalyticsPostgresPool {
   if (!binding || typeof binding !== 'object') {
     throw new Error('W11_ANALYTICS_HYPERDRIVE_BINDING_REQUIRED')
   }
 
   const cached = runtimes.get(binding)
-  if (cached) return cached.database
+  if (cached) return cached.pool as unknown as AnalyticsPostgresPool
 
   const pool = new Pool({
     connectionString: validateConnectionString(binding.connectionString),
@@ -65,18 +61,15 @@ export function getW11AnalyticsPostgresDatabase(
     }))
   })
 
-  const database = createPostgresAnalyticsDatabase(
-    pool as unknown as AnalyticsPostgresPool,
-  )
-  runtimes.set(binding, { pool, database })
-  return database
+  runtimes.set(binding, { pool })
+  return pool as unknown as AnalyticsPostgresPool
 }
 
 /**
  * Closes the cached pool created for a disposable integration-test binding.
  * Workers do not call this: Hyperdrive pools live for the isolate lifetime.
  */
-export async function closeW11AnalyticsPostgresDatabaseForTest(
+export async function closeW11AnalyticsPostgresPoolForTest(
   binding: W11AnalyticsHyperdriveBinding,
 ): Promise<void> {
   const runtime = runtimes.get(binding)
