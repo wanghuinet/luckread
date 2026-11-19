@@ -654,7 +654,7 @@ async function writeSchedulerCursor(
 }
 
 /**
- * W10-facing scan primitive. It creates a durable D1-04 cycle before emitting
+ * W10-facing scan primitive. It creates a durable Neon finance cycle before emitting
  * its identifier to the existing async execution path. Re-enqueueing duplicates
  * is safe because (subscription_id, cycle_start) is unique and processing below
  * uses CAS leases plus stable Order/Payment idempotency keys.
