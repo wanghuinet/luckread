@@ -8,35 +8,37 @@ import {
   type HyperswitchClientConfig,
 } from './hyperswitch-client.js';
 import {
-  createRefundReservation,
-  findExistingRefundReservation,
-  recordHyperswitchRefundAcknowledgement,
-  resolveRefundPaymentReference,
   RefundPersistenceError,
   type RefundDto,
   type RefundReservation,
 } from './refund-persistence.js';
 import {
-  getW07SelectedD104Database,
+  createRefundReservationPostgres,
+  findExistingRefundReservationPostgres,
+  recordHyperswitchRefundAcknowledgementPostgres,
+  resolveRefundPaymentReferencePostgres,
+} from './refund-postgres-persistence.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
+import {
+  getW07PaymentWebhookPostgresPool,
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
 
 type RefundRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
-  D1_04: D1Database;
   HYPERSWITCH_ENVIRONMENT?: string | null;
   HYPERSWITCH_API_KEY?: string | null;
   HYPERSWITCH_MERCHANT_ID?: string | null;
 }>;
 
 type RefundRuntimeDependencies = Readonly<{
-  resolvePayment?: typeof resolveRefundPaymentReference;
+  resolvePayment?: typeof resolveRefundPaymentReferencePostgres;
   retrievePayment?: typeof retrieveHyperswitchPayment;
-  reserve?: typeof createRefundReservation;
-  findExistingReservation?: typeof findExistingRefundReservation;
+  reserve?: typeof createRefundReservationPostgres;
+  findExistingReservation?: typeof findExistingRefundReservationPostgres;
   retrieveProviderRefund?: typeof retrieveHyperswitchRefund;
   createProviderRefund?: typeof createHyperswitchRefund;
-  recordAcknowledgement?: typeof recordHyperswitchRefundAcknowledgement;
-  getDatabase?: (env: RefundRuntimeEnv) => D1Database;
+  recordAcknowledgement?: typeof recordHyperswitchRefundAcknowledgementPostgres;
+  getPostgresPool?: (env: RefundRuntimeEnv) => W07WebhookPostgresPool | undefined;
 }>;
 
 const REFUND_PATH = '/commerce/payments/refunds';
@@ -182,7 +184,8 @@ export async function handleCommerceRefundRequest(
   }
 
   try {
-    const database = (dependencies.getDatabase ?? getW07SelectedD104Database)(env);
+    const pool = (dependencies.getPostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+    if (!pool) throw new RefundPersistenceError('SERVICE_UNAVAILABLE', 503);
     const input = await readBody(request);
     if (
       !isRecord(input) ||
@@ -205,9 +208,9 @@ export async function handleCommerceRefundRequest(
       return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Payment provider is not configured');
     }
 
-    const resolvePayment = dependencies.resolvePayment ?? resolveRefundPaymentReference;
+    const resolvePayment = dependencies.resolvePayment ?? resolveRefundPaymentReferencePostgres;
     const paymentReference = await resolvePayment(
-      database, customerId, input.paymentId, config.expectedMerchantId as string,
+      pool, customerId, input.paymentId, config.expectedMerchantId as string,
     );
     if (paymentReference.currency !== input.currency) {
       return errorResponse(409, 'CONFLICT', 'Refund currency does not match the original payment');
@@ -226,8 +229,8 @@ export async function handleCommerceRefundRequest(
     // Check the durable D1-04 idempotency record before external I/O. A replay
     // can return the accepted state during provider downtime; REQUESTED retries
     // reuse the same refund_id without re-reading the original Payment.
-    const findExisting = dependencies.findExistingReservation ?? findExistingRefundReservation;
-    let reservation: RefundReservation | null = await findExisting(database, idempotencyInput);
+    const findExisting = dependencies.findExistingReservation ?? findExistingRefundReservationPostgres;
+    let reservation: RefundReservation | null = await findExisting(pool, idempotencyInput);
     let reconcileProviderBeforeCreate = reservation !== null;
 
     if (!reservation) {
@@ -249,8 +252,8 @@ export async function handleCommerceRefundRequest(
         return errorResponse(409, 'REFUND_CAPTURE_NOT_CONFIRMED', 'Captured amount could not be verified for this payment');
       }
 
-      const reserve = dependencies.reserve ?? createRefundReservation;
-      reservation = await reserve(database, {
+      const reserve = dependencies.reserve ?? createRefundReservationPostgres;
+      reservation = await reserve(pool, {
         ...idempotencyInput,
         capturedAmountMinor: providerPayment.amountCaptured,
       });
@@ -287,8 +290,8 @@ export async function handleCommerceRefundRequest(
     }
 
     if (providerRefund) {
-      const record = dependencies.recordAcknowledgement ?? recordHyperswitchRefundAcknowledgement;
-      const persisted = await record(database, providerRefund);
+      const record = dependencies.recordAcknowledgement ?? recordHyperswitchRefundAcknowledgementPostgres;
+      const persisted = await record(pool, providerRefund);
       return refundResponse(persisted, reservation.replayed);
     }
 
@@ -299,7 +302,7 @@ export async function handleCommerceRefundRequest(
     });
 
     const record = dependencies.recordAcknowledgement ?? recordHyperswitchRefundAcknowledgement;
-    const persisted = await record(database, createdRefund);
+    const persisted = await record(pool, createdRefund);
     return refundResponse(persisted, reservation.replayed);
   } catch (error) {
     if (error instanceof RefundPersistenceError) return mapPersistenceError(error);
