@@ -1,6 +1,5 @@
 import type { AuditActor, AuditEvent } from './audit-event'
 import {
-  createD1ModerationQueueReadStore,
   ModerationQueueReadStoreError,
   type ModerationQueueReadCursor,
   type ModerationQueueReadStore,
@@ -212,17 +211,8 @@ const readCurrentDecision = async (db: D1Database, caseId: string): Promise<Mode
     .bind(caseId)
     .first<ModerationDecisionRow>()
 
-type ModerationQueueReadSource = D1Database | ModerationQueueReadStore
-
-function resolveModerationQueueReadStore(source: ModerationQueueReadSource): ModerationQueueReadStore {
-  if (typeof (source as ModerationQueueReadStore).list === 'function') {
-    return source as ModerationQueueReadStore
-  }
-  return createD1ModerationQueueReadStore(source as D1Database)
-}
-
 export async function listModerationQueue(
-  source: ModerationQueueReadSource,
+  source: ModerationQueueReadStore,
   reviewerId: string,
   cursor: string | null,
   requestedLimit: number | null,
@@ -233,7 +223,7 @@ export async function listModerationQueue(
 
   let rows
   try {
-    rows = await resolveModerationQueueReadStore(source).list({
+    rows = await source.list({
       reviewerId,
       openStates: OPEN_QUEUE_STATES,
       cursor: decoded,
