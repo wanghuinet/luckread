@@ -113,7 +113,9 @@ export function createPostgresModerationReportWriteStore(
 ): ModerationReportWriteStore {
   // W09 owns AuditEvent. Validate this exact append-only INSERT with W09's
   // existing SQL policy before using it inside the W06-owned transaction.
-  assertW09AuditEventStatement(INSERT_AUDIT_EVENT_SQL)
+  if (!assertW09AuditEventStatement(INSERT_AUDIT_EVENT_SQL)) {
+    throw new Error('W09_AUDIT_EVENT_APPEND_ONLY_STATEMENT_REQUIRED')
+  }
 
   return {
     async create(command: ModerationReportWriteCommand): Promise<ReportResult> {
