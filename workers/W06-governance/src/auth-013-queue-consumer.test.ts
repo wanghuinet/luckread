@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { consumeAccountStateChanged, type IdentityAccountStateChangedEvent } from './auth-013-queue-consumer'
+import type { AuditEventStore } from './audit-event-store.js'
+import type { AuditEvent } from './audit-event.js'
 
 const event: IdentityAccountStateChangedEvent = {
   eventId: 'evt-auth013-1',
@@ -25,44 +27,66 @@ const event: IdentityAccountStateChangedEvent = {
   reason: 'policy restriction',
 }
 
-function createDb(existing: boolean) {
-  const first = vi.fn().mockResolvedValue(existing ? { eventId: event.eventId } : null)
-  const run = vi.fn().mockResolvedValue({ success: true })
-  const prepare = vi.fn((sql: string) => {
-    if (sql.includes('SELECT event_id')) {
-      return { bind: vi.fn().mockReturnValue({ first }) }
-    }
-    return { bind: vi.fn().mockReturnValue({ run }) }
-  })
-  return { db: { prepare } as unknown as D1Database, prepare, first, run }
+function createStore(existing: AuditEvent | null = null) {
+  const findByEventId = vi.fn(async () => existing)
+  const append = vi.fn(async (_auditEvent: AuditEvent) => undefined)
+  const store: AuditEventStore = { findByEventId, append }
+  return { store, findByEventId, append }
 }
 
 describe('AUTH-013 W06 queue consumer', () => {
   it('persists a canonical event and retains PLATFORM_OPERATOR role', async () => {
-    const { db, prepare, run } = createDb(false)
+    const { store, findByEventId, append } = createStore()
 
-    await expect(consumeAccountStateChanged(db, event)).resolves.toBe('persisted')
+    await expect(consumeAccountStateChanged(store, event)).resolves.toBe('persisted')
 
-    expect(prepare).toHaveBeenCalledTimes(2)
-    expect(run).toHaveBeenCalledTimes(1)
+    expect(findByEventId).toHaveBeenCalledWith(event.eventId)
+    expect(append).toHaveBeenCalledOnce()
+    expect(append).toHaveBeenCalledWith(expect.objectContaining({
+      eventId: event.eventId,
+      actor: expect.objectContaining({
+        actorId: 'operator-1',
+        actorType: 'user',
+        operationalRole: 'PLATFORM_OPERATOR',
+      }),
+      action: 'identity.account_state_changed',
+      targetType: 'User',
+      targetId: 'user-001',
+      before: { account_state: 'ACTIVE', account_state_version: 1 },
+      after: { account_state: 'RESTRICTED', account_state_version: 2 },
+    }))
   })
 
   it('acknowledges duplicates by eventId without a second write', async () => {
-    const { db, prepare, run } = createDb(true)
+    const existing: AuditEvent = {
+      eventId: event.eventId,
+      requestId: event.correlationId,
+      traceId: event.causationId,
+      actor: { actorId: 'operator-1', actorType: 'user' },
+      action: 'identity.account_state_changed',
+      targetType: 'User',
+      targetId: 'user-001',
+      before: { account_state: 'ACTIVE', account_state_version: 1 },
+      after: { account_state: 'RESTRICTED', account_state_version: 2 },
+      reason: 'policy restriction',
+      occurredAt: event.occurredAt,
+    }
+    const { store, findByEventId, append } = createStore(existing)
 
-    await expect(consumeAccountStateChanged(db, event)).resolves.toBe('duplicate')
+    await expect(consumeAccountStateChanged(store, event)).resolves.toBe('duplicate')
 
-    expect(prepare).toHaveBeenCalledTimes(1)
-    expect(run).not.toHaveBeenCalled()
+    expect(findByEventId).toHaveBeenCalledWith(event.eventId)
+    expect(append).not.toHaveBeenCalled()
   })
 
-  it('rejects a non-canonical producer envelope', async () => {
-    const { db, prepare } = createDb(false)
+  it('rejects a non-canonical producer envelope before Store access', async () => {
+    const { store, findByEventId, append } = createStore()
 
     await expect(
-      consumeAccountStateChanged(db, { ...event, producer: 'W06' }),
+      consumeAccountStateChanged(store, { ...event, producer: 'W06' }),
     ).rejects.toThrow('INVALID_AUTH_013_EVENT')
 
-    expect(prepare).not.toHaveBeenCalled()
+    expect(findByEventId).not.toHaveBeenCalled()
+    expect(append).not.toHaveBeenCalled()
   })
 })
