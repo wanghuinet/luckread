@@ -5,7 +5,7 @@ import {
   recordHyperswitchRefundAcknowledgementPostgres,
   resolveRefundPaymentReferencePostgres,
 } from './refund-postgres-persistence.js';
-import { RefundPersistenceError } from './refund-persistence.js';
+import { RefundPersistenceError } from './refund-contracts.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import type { HyperswitchRefund } from './hyperswitch-client.js';
 
