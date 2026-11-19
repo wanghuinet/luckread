@@ -162,6 +162,7 @@ describe('W07 renewal scheduler completion status', () => {
       readTableNames: async (_db, expected) => new Set(expected),
       readMembershipTableNames: async (_pool, expected) => new Set(expected),
       getMembershipPostgresPool: () => membershipPool,
+      getFinancePostgresPool: () => financePool,
       syncPending: async () => cleanRecovery,
       scanDue: async (_runtimeEnv, options): Promise<RenewalScanResult> => {
         scanLimit = options?.limit ?? 0
