@@ -424,15 +424,16 @@ describe('W07 scheduled renewal batch', () => {
     const financePool = { query: async () => ({ rows: [], rowCount: 0 }), connect: async () => { throw new Error('unused') } } as unknown as W07WebhookPostgresPool;
     const d1_04 = { marker: 'D1-04' } as unknown as D1Database;
     const env: RenewalRuntimeEnv = {
-      W07_DATABASE_DRIVER: 'd1',
+      W07_DATABASE_DRIVER: 'neon',
       W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
+      HYPERDRIVE_D1_04: { connectionString: 'postgresql://test.invalid/luckread' },
       D1_04: d1_04,
       HYPERSWITCH_ENVIRONMENT: 'sandbox',
       HYPERSWITCH_API_KEY: 'test',
       HYPERSWITCH_MERCHANT_ID: 'merchant_test',
     };
-    const readTableNames = vi.fn(async (db: D1Database, expected: readonly string[]) =>
-      new Set(expected.filter((name) => !(db === d1_04 && missing.includes('D1-04.' + name)))));
+    const readFinanceTableNames = vi.fn(async (_pool: W07WebhookPostgresPool, expected: readonly string[]) =>
+      new Set(expected.filter((name) => !missing.includes('D1-04.' + name))));
     const readMembershipTableNames = vi.fn(async (_pool: W07WebhookPostgresPool, expected: readonly string[]) =>
       new Set(expected.filter((name) => !missing.includes('D1-01.' + name))));
     const syncPending = vi.fn(async () => syncResult);
@@ -448,18 +449,19 @@ describe('W07 scheduled renewal batch', () => {
       action: 'PREPARED' as const,
     }));
     const dependencies: RenewalScheduledDependencies = {
-      readTableNames,
+      readFinanceTableNames,
       readMembershipTableNames,
       getMembershipPostgresPool: () => membershipPool,
       getFinancePostgresPool: () => financePool,
+      getDatabase: () => d1_04,
       syncPending,
       scanDue,
       processCycle,
     };
-    return { env, dependencies, readTableNames, readMembershipTableNames, syncPending, scanDue, processCycle };
+    return { env, dependencies, readFinanceTableNames, readMembershipTableNames, syncPending, scanDue, processCycle };
   }
 
-  it('does not access renewal rows until the D1 schemas are ready', async () => {
+  it('does not access renewal rows until Neon finance and membership schemas are ready', async () => {
     const f = scheduledSetup(['D1-04.subscription_renewal_cycles']);
     const result = await runRenewalScheduledBatch(f.env, f.dependencies);
     expect(result).toMatchObject({
