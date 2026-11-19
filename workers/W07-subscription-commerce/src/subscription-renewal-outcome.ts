@@ -383,8 +383,8 @@ export async function syncTerminalRenewalCycleToSubscription(
   if (cycle.state !== 'SUCCEEDED' && cycle.state !== 'FAILED') {
     return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'NOT_TERMINAL' };
   }
-  // Do not normalize malformed persisted ordering data or mutate D1-01 first:
-  // the D1-04 sync marker must remain retryable when its own timestamp is corrupt.
+  // Do not normalize malformed persisted ordering data or mutate membership state first:
+  // the finance sync marker must remain retryable when its own timestamp is corrupt.
   if (!isCanonicalIso(cycle.updated_at) ||
       (cycle.subscription_sync_updated_at !== null && !isCanonicalIso(cycle.subscription_sync_updated_at))) {
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
