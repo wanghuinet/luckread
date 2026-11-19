@@ -1,16 +1,16 @@
-# W07 D1-01 Membership PostgreSQL Schema
+# W07 Membership Neon PostgreSQL Schema
 
-This directory contains the schema-only PostgreSQL 18 translation for W07's D1-01 subscription and membership persistence.
+This directory contains the generated PostgreSQL 18 schema translation for W07's membership database. Its eight D1-01 migration files are retained as historical schema-source provenance, not as a runtime D1 dependency.
 
 ## Authority and boundaries
 
-- D1-01 / luckread remains the logical authority for MembershipPlan, Subscription lifecycle and entitlement references.
+- The membership database (`luckread`; historical source domain D1-01) is authoritative for MembershipPlan, Subscription lifecycle and entitlement references.
 - W07 owns the subscription workflow; W02 remains authoritative for account identity and access.
-- D1-04 orders, payments, refunds, mandates and financial facts are not included. The order_id in paid plan-change attempt metadata is an opaque reference only.
+- The finance database (`luckread_finance`; historical source domain D1-04) owns orders, payments, refunds, mandates and financial facts. The order_id in paid plan-change attempt metadata is an opaque reference only.
 - Subscriber and creator IDs remain opaque identifiers. Only the two source-defined plan-version foreign keys are created.
 - No active-subscription uniqueness constraint is invented; the applicable policy remains DECISION_REQUIRED.
 - No existing business rows are imported or seeded.
-- Cloudflare D1 remains production authority. This migration does not change W07 runtime SQL, D1 bindings, Workers, Queues, Service Bindings, Payload Core or public APIs.
+- W07 runtime code/config now uses Neon through `HYPERDRIVE_MEMBERSHIP_DB` and native PostgreSQL Stores. The historical D1 source migrations remain inputs to deterministic schema generation; their names do not denote a live D1 binding. This README does not prove a production Worker deployment or remote schema-apply event.
 
 ## Source and conversion
 
@@ -30,6 +30,6 @@ The generated schema preserves:
 
 The GitHub Actions workflow .github/workflows/neon-d1-01-w07-membership-schema.yml generates this DDL and applies it only to a disposable PostgreSQL 18 CI service. The SQL verifier runs synthetic inserts and negative probes inside one transaction, rolls everything back, then records zero rows across the six W07 tables.
 
-This PR does not apply any schema to the remote Neon database. D1-01 remote application remains blocked until the complete D1-01 owner schema package, the shared deterministic migration ledger/checksum execution gate, reviewed migration ordering and read-only target revalidation are complete. No manually dispatched workflow or remote DDL is part of this workflow.
+The generated SQL and disposable PostgreSQL rehearsal verify the schema shape locally; they are not evidence of a remote Neon DDL operation. Read the bootstrap/ledger contracts and deployment evidence for actual remote schema and Worker rollout status. This source file does not authorize remote DDL or production cutover.
 
-The eventual W07 PostgreSQL runtime adapter is a separate implementation and test slice. It must explicitly handle TIMESTAMPTZ values and preserve the current D1 runtime contract before any production authority change can be considered.
+W07 now has native PostgreSQL runtime Stores and the Neon membership binding. Keep schema-generation inputs separate from runtime code; do not reintroduce D1 adapters or fallback paths. Any production deployment or authority change remains a separately evidenced release action.
