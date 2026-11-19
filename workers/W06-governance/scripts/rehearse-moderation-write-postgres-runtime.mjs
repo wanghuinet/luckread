@@ -8,6 +8,7 @@ import { decideModerationCase, drainModerationOutbox, getModerationCase } from '
 import { createReport } from '../src/report-runtime.ts'
 import { createPostgresModerationD1Database } from '../src/neon-postgres-d1-database.ts'
 import { createPostgresModerationDecisionWriteStore } from '../src/moderation-decision-write-store-postgres.ts'
+import { createPostgresModerationCaseDetailReadStore } from '../src/moderation-case-detail-read-store-postgres.ts'
 import { createPostgresModerationReportWriteStore } from '../src/moderation-report-write-store-postgres.ts'
 import { consumeAccountStateChanged } from '../src/auth-013-queue-consumer.ts'
 import { consumeMfaAuditEvent } from '../src/mfa-audit-queue-consumer.ts'
@@ -85,6 +86,7 @@ try {
   }
   const db = createPostgresModerationD1Database(executor)
   const decisionStore = createPostgresModerationDecisionWriteStore(executor)
+  const caseDetailStore = createPostgresModerationCaseDetailReadStore(executor)
   checks.usesSharedD1_03PostgresPool = true
   checks.usesNativeModerationDecisionWriteStore = true
   const reportStore = createPostgresModerationReportWriteStore(executor)
@@ -146,7 +148,7 @@ try {
   checks.decisionBatchCommittedAtomically = true
   checks.moderationTransactionGuardAcceptedSuccessfulCas = true
 
-  const persisted = await getModerationCase(db, reviewerId, successfulCaseId)
+  const persisted = await getModerationCase(caseDetailStore, reviewerId, successfulCaseId)
   assert.equal(persisted.status, 'ACTION_TAKEN')
   assert.equal(persisted.version, 2)
   assert.equal(persisted.currentDecision?.decisionId, first.decisionId)
