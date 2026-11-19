@@ -1,4 +1,4 @@
-import { persistAuditEvent } from './audit-event-persistence'
+import type { AuditEventStore } from './audit-event-store.js'
 import type { AuditActor, AuditEvent } from './audit-event'
 
 const operationIds: Record<string, readonly string[]> = {
@@ -102,33 +102,7 @@ function assertMfaAuditEvent(value: unknown): asserts value is MfaAuditQueueEven
   }
 }
 
-type ExistingMfaAuditRow = {
-  eventId: string
-  requestId: string | null
-  traceId: string | null
-  actorJson: string
-  action: string
-  targetType: string
-  targetId: string
-  beforeJson: string
-  afterJson: string
-  reason: string | null
-  occurredAt: string
-}
-
-function parseJsonObject(value: string): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(value)
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null
-  } catch {
-    return null
-  }
-}
-
-function sameRecord(actual: Record<string, unknown> | null, expected: Record<string, unknown>): boolean {
-  if (!actual) return false
+function sameRecord(actual: Record<string, unknown>, expected: Record<string, unknown>): boolean {
   const actualKeys = Object.keys(actual).sort()
   const expectedKeys = Object.keys(expected).sort()
   return actualKeys.length === expectedKeys.length &&
@@ -136,44 +110,38 @@ function sameRecord(actual: Record<string, unknown> | null, expected: Record<str
 }
 
 function isSamePersistedMfaAuditEvent(
-  existing: ExistingMfaAuditRow,
+  existing: AuditEvent,
   event: MfaAuditQueueEvent,
 ): boolean {
   return existing.eventId === event.eventId &&
-    existing.requestId === event.correlationId &&
-    existing.traceId === event.causationId &&
+    (existing.requestId ?? null) === event.correlationId &&
+    (existing.traceId ?? null) === event.causationId &&
     existing.action === event.eventType &&
     existing.targetType === 'User' &&
     existing.targetId === event.resourceId &&
-    existing.reason === (event.payload.reasonCode ?? null) &&
+    (existing.reason ?? null) === (event.payload.reasonCode ?? null) &&
     existing.occurredAt === event.occurredAt &&
-    sameRecord(parseJsonObject(existing.actorJson), {
+    sameRecord(existing.actor as unknown as Record<string, unknown>, {
       actorId: event.resourceId,
       actorType: 'user',
     }) &&
-    sameRecord(parseJsonObject(existing.beforeJson), {}) &&
-    sameRecord(parseJsonObject(existing.afterJson), event.payload as unknown as Record<string, unknown>)
+    sameRecord(existing.before, {}) &&
+    sameRecord(existing.after, event.payload as unknown as Record<string, unknown>)
 }
 
 /**
- * Persists a safe MFA security event in W06's canonical immutable AuditEvent
- * store. Event IDs are the deduplication key; D1's primary key remains the
+ * Persists a safe MFA security event through the native AuditEvent Store.
+ * Event IDs are the deduplication key; W09's unique event_id remains the
  * final concurrency guard if duplicate deliveries race.
  */
 export async function consumeMfaAuditEvent(
-  db: D1Database,
+  store: AuditEventStore,
   raw: unknown,
 ): Promise<'persisted' | 'duplicate'> {
   assertMfaAuditEvent(raw)
   const event = raw
 
-  const existing = await db.prepare(
-    'SELECT event_id AS eventId, request_id AS requestId, trace_id AS traceId, ' +
-    'actor_json AS actorJson, action, target_type AS targetType, target_id AS targetId, ' +
-    'before_json AS beforeJson, after_json AS afterJson, reason, occurred_at AS occurredAt ' +
-    'FROM audit_events WHERE event_id = ? LIMIT 1',
-  ).bind(event.eventId).first<ExistingMfaAuditRow>()
-
+  const existing = await store.findByEventId(event.eventId)
   if (existing) {
     if (!isSamePersistedMfaAuditEvent(existing, event)) {
       throw new Error('MFA_AUDIT_EVENT_IDENTITY_CONFLICT')
@@ -194,6 +162,6 @@ export async function consumeMfaAuditEvent(
     ...(event.payload.reasonCode ? { reason: event.payload.reasonCode } : {}),
     occurredAt: event.occurredAt,
   }
-  await persistAuditEvent(db, auditEvent)
+  await store.append(auditEvent)
   return 'persisted'
 }
