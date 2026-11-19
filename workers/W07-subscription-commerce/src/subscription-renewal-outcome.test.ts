@@ -181,6 +181,11 @@ function financePoolFor(store: MemoryStore): W07WebhookPostgresPool {
       error.code = '42P01';
       throw error;
     }
+    if (sql.startsWith('SELECT cycle_id FROM subscription_renewal_cycles') &&
+        sql.includes('subscription_sync_state = \'PENDING\'') && sql.includes('ORDER BY')) {
+      const result = await store.all<Row>(sql, values);
+      return { rows: result.results, rowCount: result.results.length };
+    }
     if (sql.startsWith('SELECT') && sql.includes('FROM subscription_renewal_cycles')) {
       const row = await store.first<Row>(sql, values);
       return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
@@ -189,10 +194,6 @@ function financePoolFor(store: MemoryStore): W07WebhookPostgresPool {
       const result = await store.run(sql, values);
       const rows = result.meta.changes === 1 ? [{ cycle_id: store.cycle?.cycle_id } as Row] : [];
       return { rows, rowCount: rows.length };
-    }
-    if (sql.startsWith('SELECT cycle_id FROM subscription_renewal_cycles')) {
-      const result = await store.all<Row>(sql, values);
-      return { rows: result.results, rowCount: result.results.length };
     }
     throw new Error('Unexpected finance Neon query: ' + sql);
   };
