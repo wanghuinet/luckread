@@ -287,8 +287,6 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
       env: {
         W07_DATABASE_DRIVER: 'neon',
         W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-        HYPERDRIVE_D1_04: f.env.HYPERDRIVE_D1_04,
-        HYPERDRIVE_D1_01: f.env.HYPERDRIVE_D1_01,
       },
       paymentId,
       merchantId: MERCHANT,
@@ -327,8 +325,6 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
       env: {
         W07_DATABASE_DRIVER: 'neon',
         W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-        HYPERDRIVE_D1_04: f.env.HYPERDRIVE_D1_04,
-        HYPERDRIVE_D1_01: f.env.HYPERDRIVE_D1_01,
       },
       paymentId,
       merchantId: MERCHANT,
@@ -406,8 +402,6 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
       env: {
         W07_DATABASE_DRIVER: 'neon',
         W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
-        HYPERDRIVE_D1_04: f.env.HYPERDRIVE_D1_04,
-        HYPERDRIVE_D1_01: f.env.HYPERDRIVE_D1_01,
       },
       options: { limit: 10 },
     }]);
