@@ -37,13 +37,13 @@ describe('W06 moderation database runtime admission', () => {
     }))
   })
 
-  it('keeps the legacy D1 adapter available only when explicitly selected for isolated compatibility tests', () => {
+  it('does not route moderation queue reads through the legacy D1 provider', () => {
     const d1 = { prepare() {}, batch() {} } as unknown as D1Database
     const env = { D1_03: d1, W06_MODERATION_DATABASE_DRIVER: 'd1' }
 
     expect(resolveW06ModerationDatabaseDriver(env)).toBe('d1')
     expect(getW06ModerationDatabase(env)).toBe(d1)
-    expect(getW06ModerationQueueReadStore(env)).toBeUndefined()
+    expect(() => getW06ModerationQueueReadStore(env)).toThrow('W06_POSTGRES_POOL_REQUIRES_NEON_DRIVER')
     expect(getW06ModerationCaseDetailReadStore(env)).toBeUndefined()
   })
 
@@ -84,7 +84,7 @@ describe('W06 moderation database runtime admission', () => {
     })).toThrow('W06_HYPERDRIVE_D1_03_CONNECTION_STRING_INVALID')
   })
 
-  it('caches one PostgreSQL pool, D1 bridge and keyset read store per Hyperdrive binding', async () => {
+  it('caches one PostgreSQL pool, compatibility bridge and Neon read stores per Hyperdrive binding', async () => {
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread_governance',
     }

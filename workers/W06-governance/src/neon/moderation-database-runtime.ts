@@ -164,9 +164,8 @@ export function getW06ModerationDatabase(env: W06ModerationDatabaseRuntimeEnv): 
 /** Dedicated PostgreSQL projection preserves native keyset timestamp precision. */
 export function getW06ModerationQueueReadStore(
   env: W06ModerationDatabaseRuntimeEnv,
-): ModerationQueueReadStore | undefined {
-  if (resolveW06ModerationDatabaseDriver(env) === 'd1') return undefined
-
+): ModerationQueueReadStore {
+  const pool = getW06ModerationPostgresPool(env)
   const binding = env.HYPERDRIVE_D1_03
   if (!binding || typeof binding !== 'object') {
     throw new Error('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
@@ -174,7 +173,7 @@ export function getW06ModerationQueueReadStore(
   const cached = queueStores.get(binding)
   if (cached) return cached
 
-  const store = createPostgresModerationQueueReadStore(getW06ModerationPostgresPool(env))
+  const store = createPostgresModerationQueueReadStore(pool)
   queueStores.set(binding, store)
   return store
 }

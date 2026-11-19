@@ -48,7 +48,7 @@ describe('W06 canonical API error mapping', () => {
 })
 
 describe('W06 moderation queue pagination scope', () => {
-  it('rejects queue cursors reused by a different reviewer before D1 access', async () => {
+  it('rejects queue cursors reused by a different reviewer before Store access', async () => {
     const rows = [
       {
         case_id: 'case_2',
@@ -62,8 +62,8 @@ describe('W06 moderation queue pagination scope', () => {
         current_decision_id: null,
         evidence_bundle_ref: null,
         version: 1,
-        created_at: '2026-10-07T00:00:00.000Z',
-        updated_at: '2026-10-07T00:00:00.000Z',
+        created_at: '2026-10-07T00:00:00.000000Z',
+        updated_at: '2026-10-07T00:00:00.000000Z',
         decision_id: null,
         case_version: null,
         outcome: null,
@@ -84,8 +84,8 @@ describe('W06 moderation queue pagination scope', () => {
         current_decision_id: null,
         evidence_bundle_ref: null,
         version: 1,
-        created_at: '2026-10-07T00:01:00.000Z',
-        updated_at: '2026-10-07T00:01:00.000Z',
+        created_at: '2026-10-07T00:01:00.000000Z',
+        updated_at: '2026-10-07T00:01:00.000000Z',
         decision_id: null,
         case_version: null,
         outcome: null,
@@ -95,48 +95,63 @@ describe('W06 moderation queue pagination scope', () => {
         decision_created_at: null,
       },
     ]
-    const prepare = vi.fn(() => ({
-      bind: vi.fn(() => ({
-        all: vi.fn(async () => ({ results: rows })),
-      })),
-    }))
-    const db = { prepare } as unknown as D1Database
-    const runtime = await import('./index')
-    const requestFor = (reviewerId: string, requestId: string, cursor?: string) =>
-      new Request('https://w06.internal/admin/moderation/queue?limit=1' + (cursor ? '&cursor=' + encodeURIComponent(cursor) : ''), {
-        headers: {
-          'X-LuckRead-Caller': 'W01',
-          'X-LuckRead-Transport-Version': '1.0',
-          'X-LuckRead-Principal-User-Id': reviewerId,
-          'X-LuckRead-Principal-Layer': 'L6',
-          'X-LuckRead-Correlation-Id': 'correlation-' + reviewerId,
-          'X-LuckRead-Request-Id': requestId,
-          'X-LuckRead-Authz-Decision': 'ALLOW',
-          'X-LuckRead-Authz-Permission': 'moderation.queue.read',
-          'X-LuckRead-Authz-Resource-Type': 'ModerationQueue',
-          'X-LuckRead-Authz-Policy-Version': 'casl-l0-l8-v1',
-          'X-LuckRead-Authz-Subject-Id': reviewerId,
-          'X-LuckRead-Authz-Layer': 'L6',
-        },
-      })
-
-    const first = await runtime.default.fetch(requestFor('reviewer_1', 'req_queue_first'), legacyD1TestEnv(db))
-    expect(first.status).toBe(200)
-    const payload = await first.json() as { nextCursor?: string }
-    expect(payload.nextCursor).toEqual(expect.any(String))
-    expect(payload.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/)
-    expect(prepare).toHaveBeenCalledTimes(1)
-
-    const reused = await runtime.default.fetch(
-      requestFor('reviewer_2', 'req_queue_second', payload.nextCursor),
-      legacyD1TestEnv(db),
-    )
-    expect(reused.status).toBe(400)
-    await expect(reused.json()).resolves.toMatchObject({
-      error: { code: 'INVALID_CURSOR', details: {} },
-      requestId: 'req_queue_second',
+    const list = vi.fn(async () => rows)
+    const queueStore = { list }
+    vi.resetModules()
+    vi.doMock('./neon/moderation-database-runtime.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('./neon/moderation-database-runtime.js')>()
+      return {
+        ...actual,
+        getW06ModerationQueueReadStore: () => queueStore,
+      }
     })
-    expect(prepare).toHaveBeenCalledTimes(1)
+
+    try {
+      const runtime = await import('./index')
+      const env = {
+        HYPERDRIVE_D1_03: {
+          connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread_governance',
+        },
+      }
+      const requestFor = (reviewerId: string, requestId: string, cursor?: string) =>
+        new Request('https://w06.internal/admin/moderation/queue?limit=1' + (cursor ? '&cursor=' + encodeURIComponent(cursor) : ''), {
+          headers: {
+            'X-LuckRead-Caller': 'W01',
+            'X-LuckRead-Transport-Version': '1.0',
+            'X-LuckRead-Principal-User-Id': reviewerId,
+            'X-LuckRead-Principal-Layer': 'L6',
+            'X-LuckRead-Correlation-Id': 'correlation-' + reviewerId,
+            'X-LuckRead-Request-Id': requestId,
+            'X-LuckRead-Authz-Decision': 'ALLOW',
+            'X-LuckRead-Authz-Permission': 'moderation.queue.read',
+            'X-LuckRead-Authz-Resource-Type': 'ModerationQueue',
+            'X-LuckRead-Authz-Policy-Version': 'casl-l0-l8-v1',
+            'X-LuckRead-Authz-Subject-Id': reviewerId,
+            'X-LuckRead-Authz-Layer': 'L6',
+          },
+        })
+
+      const first = await runtime.default.fetch(requestFor('reviewer_1', 'req_queue_first'), env as never)
+      expect(first.status).toBe(200)
+      const payload = await first.json() as { nextCursor?: string }
+      expect(payload.nextCursor).toEqual(expect.any(String))
+      expect(payload.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/)
+      expect(list).toHaveBeenCalledTimes(1)
+
+      const reused = await runtime.default.fetch(
+        requestFor('reviewer_2', 'req_queue_second', payload.nextCursor),
+        env as never,
+      )
+      expect(reused.status).toBe(400)
+      await expect(reused.json()).resolves.toMatchObject({
+        error: { code: 'INVALID_CURSOR', details: {} },
+        requestId: 'req_queue_second',
+      })
+      expect(list).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.doUnmock('./neon/moderation-database-runtime.js')
+      vi.resetModules()
+    }
   })
 })
 

@@ -1164,7 +1164,7 @@ export default {
         requireModerationPermission('listModerationQueue', principal, request)
         return json({
           ...(await listModerationQueue(
-            getW06ModerationQueueReadStore(env) ?? getW06ModerationDatabase(env),
+            getW06ModerationQueueReadStore(env),
             principal.userId,
             url.searchParams.get('cursor'),
             url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : null,

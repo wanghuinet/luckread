@@ -3,6 +3,12 @@ import { ModerationRuntimeError, decideModerationCase, getModerationCase, listMo
 import { createPostgresModerationQueueReadStore } from './moderation-queue-read-store-postgres'
 import type { ModerationQueuePostgresQueryExecutor } from './moderation-queue-read-store-postgres'
 import {
+  ModerationQueueReadStoreError,
+  type ModerationQueueReadInput,
+  type ModerationQueueReadRow,
+  type ModerationQueueReadStore,
+} from './moderation-queue-read-store'
+import {
   createPostgresModerationCaseDetailReadStore,
   type ModerationCaseDetailPostgresQueryExecutor,
   type ModerationCaseDetailReadRow,
@@ -128,9 +134,9 @@ describe('moderation runtime admission guards', () => {
     expect(error.code).toBe('PERMISSION_DENIED')
   })
 
-  it('keeps D1 as the default moderation queue read adapter', async () => {
-    const calls: Array<{ sql: string; values: unknown[] }> = []
-    const row = {
+  it('maps the provider-neutral moderation queue Store into a bounded reviewer-visible page', async () => {
+    const calls: ModerationQueueReadInput[] = []
+    const row: ModerationQueueReadRow = {
       case_id: 'case_1',
       target_type: 'content',
       target_id: 'content_1',
@@ -142,8 +148,8 @@ describe('moderation runtime admission guards', () => {
       current_decision_id: null,
       evidence_bundle_ref: null,
       version: 1,
-      created_at: '2026-11-10T00:00:00.000Z',
-      updated_at: '2026-11-10T00:00:00.000Z',
+      created_at: '2026-11-10T00:00:00.000000Z',
+      updated_at: '2026-11-10T00:00:00.000000Z',
       decision_id: null,
       case_version: null,
       outcome: null,
@@ -152,28 +158,40 @@ describe('moderation runtime admission guards', () => {
       decision_request_id: null,
       decision_created_at: null,
     }
-    const db = {
-      prepare(sql: string) {
-        return {
-          bind(...values: unknown[]) {
-            calls.push({ sql, values })
-            return { all: async () => ({ results: [row] }) }
-          },
-        }
+    const store: ModerationQueueReadStore = {
+      async list(input) {
+        calls.push(input)
+        return [row]
       },
-    } as unknown as D1Database
+    }
 
-    const result = await listModerationQueue(db, 'reviewer_1', null, 1)
+    const result = await listModerationQueue(store, 'reviewer_1', null, 1)
 
     expect(result.items).toHaveLength(1)
     expect(result.items[0]?.caseId).toBe('case_1')
     expect(result.hasMore).toBe(false)
-    expect(calls).toHaveLength(1)
-    expect(calls[0]?.values).toEqual(['OPEN', 'UNDER_REVIEW', 'ESCALATED', 'APPEALED', 'reviewer_1', 2])
-    expect(calls[0]?.sql).toContain('c.state IN (?,?,?,?)')
-    expect(calls[0]?.sql).toContain("c.target_type = 'content'")
-    expect(calls[0]?.sql).toContain('c.assigned_reviewer_id = ?')
-    expect(calls[0]?.sql).toContain('ORDER BY c.priority DESC, c.created_at ASC, c.case_id ASC')
+    expect(calls).toEqual([{
+      reviewerId: 'reviewer_1',
+      openStates: ['OPEN', 'UNDER_REVIEW', 'ESCALATED', 'APPEALED'],
+      cursor: null,
+      limit: 2,
+    }])
+  })
+
+  it('maps queue Store failures to a sanitized service-unavailable response', async () => {
+    const store: ModerationQueueReadStore = {
+      async list() {
+        throw new ModerationQueueReadStoreError()
+      },
+    }
+
+    await expect(
+      listModerationQueue(store, 'reviewer_1', null, 20),
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+      message: 'SERVICE_UNAVAILABLE',
+    })
   })
 
   it('uses the PostgreSQL moderation queue store with identical reviewer and page boundaries', async () => {
