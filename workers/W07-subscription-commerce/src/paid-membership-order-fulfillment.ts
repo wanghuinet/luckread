@@ -308,33 +308,23 @@ async function readOrderLines(db: FulfillmentDatabase, orderId: string): Promise
 }
 
 async function readPlanVersion(
-  db: FulfillmentDatabase,
+  db: W07WebhookPostgresPool,
   snapshot: MembershipOfferSnapshot,
 ): Promise<MembershipPlanVersionRow> {
   let row: MembershipPlanVersionRow | null;
   try {
-    if (isPostgresFulfillmentDatabase(db)) {
-      const result = await db.query<MembershipPlanVersionRow & Record<string, unknown>>(
-        'SELECT p.plan_id, p.owner_type, p.owner_id, v.plan_version, v.name, v.tier, ' +
-        'v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
-        'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id ' +
-        'WHERE p.plan_id = $1 AND v.plan_version = $2 LIMIT 1',
-        [snapshot.planId, snapshot.planVersion],
-      )
-      row = result.rows[0] ?? null
-    } else {
-      row = await db.prepare(
-        'SELECT p.plan_id, p.owner_type, p.owner_id, v.plan_version, v.name, v.tier, ' +
-        'v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
-        'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id ' +
-        'WHERE p.plan_id = ? AND v.plan_version = ? LIMIT 1',
-      ).bind(snapshot.planId, snapshot.planVersion).first<MembershipPlanVersionRow>();
-    }
+    const result = await db.query<MembershipPlanVersionRow & Record<string, unknown>>(
+      'SELECT p.plan_id, p.owner_type, p.owner_id, v.plan_version, v.name, v.tier, ' +
+      'v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id ' +
+      'WHERE p.plan_id = $1 AND v.plan_version = $2 LIMIT 1',
+      [snapshot.planId, snapshot.planVersion],
+    );
+    row = result.rows[0] ?? null;
   } catch {
     return failClosed();
   }
   if (!row) return failClosed();
-
   let benefits: unknown;
   try {
     benefits = JSON.parse(row.benefits_json) as unknown;
@@ -441,7 +431,6 @@ async function createOrReplayPaidSubscription(
   return 'APPLIED';
 }
 
-/** 
 /**
  * Fulfill only a durable, successfully reconciled Hyperswitch payment against its
  * D1-04 Order and immutable MembershipPlan snapshot. This is intentionally
