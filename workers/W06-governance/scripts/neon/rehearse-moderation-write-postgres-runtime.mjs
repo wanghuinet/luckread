@@ -7,6 +7,7 @@ import { dirname } from 'node:path'
 import { decideModerationCase, getModerationCase } from '../../src/moderation-runtime.ts'
 import { createReport } from '../../src/report-runtime.ts'
 import { createPostgresModerationD1Database } from '../../src/neon-postgres-d1-database.ts'
+import { createPostgresModerationCaseDetailReadStore } from '../../src/moderation-case-detail-read-store-postgres.ts'
 
 const requireFromW02 = createRequire(new URL('../../../W02-identity/package.json', import.meta.url))
 const { Pool } = requireFromW02('pg')
@@ -71,6 +72,7 @@ try {
     },
   }
   const db = createPostgresModerationD1Database(executor)
+  const caseDetailStore = createPostgresModerationCaseDetailReadStore(executor)
   checks.usesSharedD1_03PostgresPool = true
 
   const reviewerId = marker + '-reviewer'
@@ -129,7 +131,7 @@ try {
   checks.decisionBatchCommittedAtomically = true
   checks.moderationTransactionGuardAcceptedSuccessfulCas = true
 
-  const persisted = await getModerationCase(db, reviewerId, successfulCaseId)
+  const persisted = await getModerationCase(caseDetailStore, reviewerId, successfulCaseId)
   assert.equal(persisted.status, 'ACTION_TAKEN')
   assert.equal(persisted.version, 2)
   assert.equal(persisted.currentDecision?.decisionId, first.decisionId)

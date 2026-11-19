@@ -26,13 +26,13 @@ Current source slice:
 ## Moderation queue and case-detail reads
 
 - The moderation queue and single-case detail endpoints use dedicated native PostgreSQL read Stores composed from the existing Neon Hyperdrive pool.
-- The queue route no longer constructs a D1 query adapter or falls back to the D1-shaped database facade; missing/invalid Neon composition fails closed.
+- Both moderation read routes fail closed when the existing Neon Hyperdrive binding is missing or invalid; neither constructs a D1 query adapter nor falls back to a D1-shaped database facade.
 - The `/reports` route writes W06-owned `moderation_reports` and `moderation_report_idempotency` through a native PostgreSQL Store. It appends to W09-owned `audit_events` only after a successful new report insert, under the W09 append-only SQL policy and inside the same transaction.
 - Same-key idempotency replay/conflict, 24-hour dedup buckets, report-plus-audit atomicity and sanitized persistence errors are covered by Store tests and the PostgreSQL 18 rehearsal.
 - The AUTH-013 account-state, AUTH-007 MFA and AUTH-010 Session-revocation queue consumers share a native PostgreSQL AuditEvent Store; W09's SQL policy permits only the AuditEvent SELECT/INSERT statements, with the existing W09 table/trigger remaining authoritative.
 - Consumer validation, event identity conflicts, duplicate delivery, W10 ACK/retry behavior and the native AuditEvent Store are covered by source tests and the disposable PostgreSQL 18 rehearsal.
 - Direct `/internal/audit-events/*` HTTP ingestion now uses the same native AuditEvent Store for SELECT/INSERT and preserves route-specific semantic replay, exact immutable conflict checks, authenticated actor derivation, and 201/200/409/503 responses. The unused D1-only `audit-event-persistence.ts` adapter and its test were removed.
-- The remaining D1-backed W06 runtime paths are moderation decision/idempotency transactions and moderation enforcement outbox processing; they are not part of the AuditEvent HTTP cutover.
+- The W06 Worker entrypoint commits moderation decisions and idempotency records through the native PostgreSQL transaction Store; scheduled enforcement outbox scanning, retry and dispatch also use that Store. The D1 compatibility adapter remains confined to older disposable rehearsal fixtures, not production request or scheduled paths.
 
 No remote D1 mutation or production deployment is implied by this source directory.
 
@@ -42,5 +42,5 @@ No remote D1 mutation or production deployment is implied by this source directo
 - W06 owns the staged PostgreSQL 18 schema for the seven physical moderation/report tables admitted by the existing D1 migrations 0002_moderation_queue_foundation.sql and 0003_moderation_report_v1.sql.
 - The generated PostgreSQL artifact is workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql; its source contract and disposable PostgreSQL 18 rehearsal are maintained under contracts/database/neon-d1-03-w06-moderation-schema.v1.json and .github/workflows/neon-d1-03-w06-moderation-postgres-rehearsal.yml.
 - Appeal remains a W06-owned logical capability but is not included as a physical table: the API/domain contract describes it, while the system contract still marks its implementation pending and no admitted W06 migration defines Appeal persistence.
-- AuditEvent remains W09-owned. This schema does not create a duplicate audit_events table or alter W09's append-only triggers; W06 Report writes, direct audit HTTP ingestion and AUTH-013/AUTH-007/AUTH-010 queue consumers use the native Neon Store. Moderation decisions and outbox remain on the compatibility bridge.
+- AuditEvent remains W09-owned. This schema does not create a duplicate audit_events table or alter W09's append-only triggers; W06 Report writes, direct audit HTTP ingestion and AUTH-013/AUTH-007/AUTH-010 queue consumers use the native Neon Store. Moderation decisions and enforcement outbox use native PostgreSQL Stores in the Worker runtime; the historical D1-03 identity remains only as schema/migration lineage.
 - The PostgreSQL schema and owner postflight are already admitted for the W06 moderation runtime. This README describes schema ownership; it does not authorize a new production deployment or any business-data import.

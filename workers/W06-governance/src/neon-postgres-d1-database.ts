@@ -2,21 +2,14 @@
 
 import { assertW09AuditEventStatement } from '../../W09-platform/src/audit-event-postgres-adapter.js'
 
-export interface W06ModerationPostgresClient {
-  query<Row extends Record<string, unknown> = Record<string, unknown>>(
-    sql: string,
-    values?: unknown[],
-  ): Promise<{ rows: Row[]; rowCount: number | null }>
-  release(): void
-}
-
-export interface W06ModerationPostgresPool {
-  query<Row extends Record<string, unknown> = Record<string, unknown>>(
-    sql: string,
-    values?: unknown[],
-  ): Promise<{ rows: Row[]; rowCount: number | null }>
-  connect(): Promise<W06ModerationPostgresClient>
-}
+import type {
+  W06ModerationPostgresClient,
+  W06ModerationPostgresPool,
+} from './moderation-postgres-pool.js'
+export type {
+  W06ModerationPostgresClient,
+  W06ModerationPostgresPool,
+} from './moderation-postgres-pool.js'
 
 type BoundStatement = Readonly<{ sql: string; values: unknown[] }>
 const boundStatements = new WeakMap<object, BoundStatement>()
