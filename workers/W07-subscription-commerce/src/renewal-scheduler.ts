@@ -174,7 +174,7 @@ export async function runRenewalScheduledBatch(
   try {
     dueScan = dependencies.resolvePricing
       ? await scanDue(selectedEnv, { limit: maxCycles }, { resolvePricing: dependencies.resolvePricing, getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool })
-      : await scanDue(selectedEnv, { limit: maxCycles }, { getFinancePostgresPool: getSelectedFinancePool, getMembershipPostgresPool: getSelectedMembershipPool });
+      : await scanDue(selectedEnv, { limit: maxCycles }, { getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool });
   } catch {
     return { status: 'PARTIAL', phase: 'DUE_SCAN' };
   }
@@ -185,7 +185,7 @@ export async function runRenewalScheduledBatch(
     try {
       cycleResults.push(dependencies.resolvePricing
         ? await processCycle(selectedEnv, cycleId, { resolvePricing: dependencies.resolvePricing, getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool })
-        : await processCycle(selectedEnv, cycleId, { getFinancePostgresPool: getSelectedFinancePool, getMembershipPostgresPool: getSelectedMembershipPool }));
+        : await processCycle(selectedEnv, cycleId, { getDatabase: getSelectedDatabase, getMembershipPostgresPool: getSelectedMembershipPool }));
     } catch (error) {
       processFailures += 1;
       console.error(JSON.stringify({
