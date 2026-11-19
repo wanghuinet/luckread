@@ -84,16 +84,16 @@ test('fails closed if any D1-04 ledger entry is attributed to another Worker', (
   )
 })
 
-test('fails closed if W07 D1-04 historical source identity is renamed in its finance contract', () => {
+test('fails closed if W07 D1-04 historical source UUID is retargeted in its finance contract', () => {
   const financeContractPath = 'contracts/database/neon-d1-04-w07-order-payment-schema.v1.json'
   const source = overrideSource(financeContractPath, (text) => {
     const finance = JSON.parse(text)
-    finance.target.binding = 'D1_04_RENAMED'
+    finance.target.cloudflareD1DatabaseUuid = '00000000-0000-4000-8000-000000000000'
     return JSON.stringify(finance)
   })
   assert.throws(
     () => verifyD104SharedRunnerReview({ readSource: source }),
-    /W07 default runtime must be D1-free while preserving the D1-04 source identity/,
+    /schema contract target or safety declaration drifted/,
   )
 })
 
