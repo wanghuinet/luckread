@@ -17,7 +17,7 @@ import {
 } from './neon/payment-method-read-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
-type OrderRuntimeEnv = Omit<W07PaymentMethodReadRuntimeEnv, 'D1_04'>;
+type OrderRuntimeEnv = W07PaymentMethodReadRuntimeEnv;
 
 type OrderRuntimeDependencies = Readonly<{
   createOrder?: typeof createCommerceOrder;
