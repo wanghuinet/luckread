@@ -67,7 +67,7 @@
       },
       {
         "path": "workers/W07-subscription-commerce/wrangler.jsonc",
-        "gitBlobSha1": "189e2afedfa9a8cf8d53141c12f2469bfa765ab0"
+        "gitBlobSha1": "0e22591d91d4a517ada03ff027aefe039e404273"
       },
       {
         "path": "contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
