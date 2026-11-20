@@ -69,3 +69,12 @@ No Worker deployment is implied by source changes. Remote D1 mutation and contro
 - Handler tests now exercise the Store contract, rate-limit ordering, current-session protection, ownership privacy, and fail-closed behavior without a D1 binding.
 - PostgreSQL tests cover effective base-user authority locks, owned-session row locking, atomic session deletion plus durable audit outbox insertion, and rollback when the outbox write is incomplete.
 - The shared D1 outbox helper remains temporarily because the separate session-logout D1 adapter still uses it; historical D1 migrations and session-logout behavior are unchanged in this slice.
+
+
+## W02 AUTH-010 Session Logout Store Cleanup
+
+- Removed the legacy D1 session-logout Store adapter and the handler's default D1 fallback; the handler now requires an explicitly injected `SessionLogoutStore`.
+- The production W02 entrypoint already injects `createPostgresSessionLogoutStore` from the existing Neon runtime; the disposable PostgreSQL 18 rehearsal continues to exercise the real handler and the atomic session-delete plus durable audit-outbox transaction.
+- Replaced the D1-only handler and adapter fixtures with provider-neutral Store contract tests, retaining authenticated-session derivation, CSRF/Origin checks, rate-limit ordering, fail-closed storage errors, idempotent replay and Better Auth cookie clearing.
+- Removed the D1-only session-revocation outbox SQL builder after its final caller (the retired logout adapter) was removed. The event builder and validator remain provider-neutral.
+- Historical D1/SQLite migrations, W02 source Wrangler configuration, Neon schema artifacts, Queue names/bindings, and production runtime are unchanged.

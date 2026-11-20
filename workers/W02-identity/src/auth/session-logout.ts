@@ -1,8 +1,5 @@
-import { createLuckReadAuth, requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
-import {
-  createD1SessionLogoutStore,
-  type SessionLogoutStore,
-} from './session-logout-store.js'
+import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import type { SessionLogoutStore } from './session-logout-store.js'
 import {
   enforceSessionLogoutRateLimits,
   sessionRateLimitErrorResponse,
@@ -14,7 +11,7 @@ type SessionIdentity = {
 } | null
 
 export type SessionLogoutHandlerDependencies = {
-  store?: SessionLogoutStore
+  store: SessionLogoutStore
   auth?: ReturnType<typeof createLuckReadAuth>
   getSession?: (headers: Headers) => Promise<SessionIdentity>
 }
@@ -77,7 +74,7 @@ async function clearBetterAuthSessionCookies(
 export async function handleCurrentUserSessionLogout(
   env: BetterAuthEnv,
   request: Request,
-  dependencies: SessionLogoutHandlerDependencies = {},
+  dependencies: SessionLogoutHandlerDependencies,
 ): Promise<Response> {
   let auth: ReturnType<typeof createLuckReadAuth>
   let current: { user?: { id?: unknown }; session?: { id?: unknown } } | null
@@ -125,8 +122,7 @@ export async function handleCurrentUserSessionLogout(
     }
 
     try {
-      const store = dependencies.store ?? createD1SessionLogoutStore(requireLegacyW02D1Database(env))
-      await store.logout({
+      await dependencies.store.logout({
         userId,
         sessionId,
         now: new Date().toISOString(),
