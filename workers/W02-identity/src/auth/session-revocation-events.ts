@@ -89,44 +89,6 @@ export async function buildSessionRevokedEvent(input: {
   }
 }
 
-/**
- * The caller batches the session DELETE immediately before this statement.
- * changes() therefore inserts the durable event only when that DELETE
- * actually removed one caller-owned session row.
- */
-/**
- * @deprecated-next-version
- * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
- * Replacement: PostgreSQL session revocation Store and publisher in src/neon/.
- * Removal: Next release.
- * Condition: Session revocation outbox tests use the PostgreSQL Store and do not construct D1 prepared statements.
- */
-export function buildSessionRevocationOutboxInsert(
-  db: D1Database,
-  event: SessionRevokedEvent,
-): D1PreparedStatement {
-  return db.prepare(
-    'INSERT INTO auth_010_session_revocation_journal ' +
-    '(journal_id, event_id, event_type, schema_version, resource_id, source_version, idempotency_key, payload, status, attempt, next_attempt_at, created_at, published_at, last_error_code) ' +
-    'SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1',
-  ).bind(
-    crypto.randomUUID(),
-    event.eventId,
-    event.eventType,
-    event.schemaVersion,
-    event.resourceId,
-    event.sourceVersion,
-    event.idempotencyKey,
-    JSON.stringify(event),
-    'PENDING',
-    1,
-    null,
-    event.publishedAt,
-    null,
-    null,
-  )
-}
-
 export async function assertSessionRevokedEvent(value: unknown): Promise<SessionRevokedEvent> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('INVALID_AUTH_010_SESSION_EVENT')
