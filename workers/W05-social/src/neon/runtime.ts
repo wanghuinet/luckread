@@ -2,6 +2,7 @@ import { Pool, type PoolConfig } from 'pg'
 
 import type { W05SocialWorkerDependencies } from '../index.js'
 import { createPostgresFollowListReadStore } from '../follow-list-read-store-postgres.js'
+import { createPostgresMessagingStore } from '../messaging-store-postgres.js'
 import { createPostgresFollowStore } from '../follow-store-postgres.js'
 import { createPostgresReplyAudienceStore } from '../reply-audience-store-postgres.js'
 import { createPostgresRelationshipGraphReadStore } from '../relationship-graph-store-postgres.js'
@@ -179,6 +180,7 @@ export function getW05SocialWorkerDependencies(
   const pool = getPool(binding, connectionString, poolFactory)
 
   const dependencies: W05SocialWorkerDependencies = {
+    messagingStore: createPostgresMessagingStore(asExecutor(pool)),
     followListReadStore: createPostgresFollowListReadStore(
       asExecutor<Parameters<typeof createPostgresFollowListReadStore>[0]>(pool),
     ),

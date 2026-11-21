@@ -58,6 +58,7 @@ import { buildPublicProfileUrl } from '~/lib/public-profile-url';
 import { useAuthStore } from '~/store/auth-store';
 import { readSessionToken } from '~/lib/secure-session';
 import { fetchUserLikedContentsPage, fetchUserProfileContentPage, fetchUserRepliesPage } from '~/lib/social-screen-api';
+import { createDirectConversation } from '~/lib/messaging-api';
 import Messages from "~/assets/svg/tabs/messages.svg"
 
 const PULL_TO_REFRESH_THRESHOLD = 70; 
@@ -135,6 +136,15 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
   const isDark = colorScheme === 'dark';
   const navigation = useNavigation();
   const router = useRouter();
+  const handleMessagePress = useCallback(async () => {
+    try {
+      const conversation = await createDirectConversation(user.id);
+      router.push(('/messages/' + conversation.conversationId) as never);
+    } catch (cause) {
+      Alert.alert('无法发起私信', cause instanceof Error ? cause.message : '请稍后重试。');
+    }
+  }, [router, user.id]);
+
   const handleShareProfile = useCallback(async () => {
     const url = buildPublicProfileUrl(user.public_profile_id);
     if (!url) {
@@ -461,7 +471,15 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
             </TouchableOpacity>
           </Animated.View>
           {user.id !== currentUserId ? (
-            <View className="absolute bottom-0 right-0">
+            <View className="absolute bottom-0 right-0 flex-row items-center gap-2">
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="发送私信"
+                onPress={handleMessagePress}
+                className="h-10 w-10 items-center justify-center rounded-full border border-neutral-300 bg-white dark:border-neutral-700 dark:bg-black"
+              >
+                <Feather name="message-circle" size={18} color={APP_PRIMARY_COLOR} />
+              </TouchableOpacity>
               <FollowButton targetUsername={user.handle} />
             </View>
           ) : null}

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1.0",
+  "status": "PHASE_1_IMPLEMENTATION_CONTRACT",
+  "primaryWorker": "W05",
+  "authoritativeDomain": "D1-02",
+  "physicalResource": {
+    "databaseName": "luckreadpro",
+    "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+    "runtime": "Neon PostgreSQL via W05 HYPERDRIVE_D1_02"
+  },
+  "tables": {
+    "social_conversations": {
+      "primaryKey": [
+        "conversation_id"
+      ],
+      "unique": [
+        [
+          "direct_pair_key"
+        ]
+      ]
+    },
+    "social_conversation_memberships": {
+      "primaryKey": [
+        "conversation_id",
+        "user_id"
+      ]
+    },
+    "social_messages": {
+      "primaryKey": [
+        "message_id"
+      ],
+      "unique": [
+        [
+          "conversation_id",
+          "sequence"
+        ],
+        [
+          "sender_user_id",
+          "client_message_id"
+        ]
+      ]
+    }
+  },
+  "invariants": [
+    "message accepted only after transaction commit",
+    "sequence allocated under conversation row lock",
+    "sender/client_message_id unique for retry deduplication",
+    "read cursor monotonic",
+    "membership checked before reads and writes",
+    "block relationship checked before conversation creation and message send",
+    "no cross-domain foreign keys",
+    "no physical D1 or D1-03 writes"
+  ]
+}

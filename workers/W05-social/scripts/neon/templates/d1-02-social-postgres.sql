@@ -1,7 +1,7 @@
 -- W05 / D1-02 PostgreSQL 18 schema-only bootstrap.
 -- Source authority: W05 / D1-02 social graph, interactions and notification delivery state.
 -- Endpoint state remains owned by W09 / D1-03 and is intentionally not created here.
--- Existing runtime authority remains Cloudflare D1; this artifact is for an empty Neon schema rehearsal.
+-- W05 application runtime uses the existing Neon Hyperdrive D1-02 binding; this artifact is an empty-schema bootstrap only.
 BEGIN;
 
 CREATE TABLE social_follow_relationships (
@@ -238,5 +238,43 @@ $$;
 CREATE TRIGGER trg_social_notifications_push_outbox_insert
 AFTER INSERT ON social_notifications
 FOR EACH ROW EXECUTE FUNCTION w05_enqueue_social_notification_push_outbox();
+
+
+CREATE TABLE social_conversations (
+  conversation_id TEXT PRIMARY KEY NOT NULL,
+  conversation_type TEXT NOT NULL CHECK (conversation_type IN ('direct')),
+  direct_pair_key TEXT NOT NULL UNIQUE,
+  created_by_user_id TEXT NOT NULL,
+  last_sequence BIGINT NOT NULL DEFAULT 0 CHECK (last_sequence >= 0),
+  last_message_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE TABLE social_conversation_memberships (
+  conversation_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  member_role TEXT NOT NULL CHECK (member_role IN ('owner', 'member')),
+  joined_at TIMESTAMPTZ NOT NULL,
+  left_at TIMESTAMPTZ,
+  archived_at TIMESTAMPTZ,
+  muted_at TIMESTAMPTZ,
+  last_read_sequence BIGINT NOT NULL DEFAULT 0 CHECK (last_read_sequence >= 0),
+  PRIMARY KEY (conversation_id, user_id)
+);
+CREATE TABLE social_messages (
+  message_id TEXT PRIMARY KEY NOT NULL,
+  conversation_id TEXT NOT NULL,
+  sender_user_id TEXT NOT NULL,
+  sequence BIGINT NOT NULL CHECK (sequence > 0),
+  client_message_id TEXT NOT NULL,
+  body TEXT NOT NULL CHECK (char_length(body) BETWEEN 1 AND 10000),
+  created_at TIMESTAMPTZ NOT NULL,
+  edited_at TIMESTAMPTZ,
+  recalled_at TIMESTAMPTZ,
+  UNIQUE (conversation_id, sequence),
+  UNIQUE (sender_user_id, client_message_id)
+);
+CREATE INDEX ix_social_conversations_updated ON social_conversations(updated_at DESC, conversation_id DESC);
+CREATE INDEX ix_social_conversation_memberships_user ON social_conversation_memberships(user_id, left_at, conversation_id);
 
 COMMIT;

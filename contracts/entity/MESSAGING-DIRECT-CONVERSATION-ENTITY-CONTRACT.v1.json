@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1.0",
+  "entityId": "ENT-MESSAGING-DIRECT-CONVERSATION",
+  "status": "PHASE_1_IMPLEMENTATION_CONTRACT",
+  "primaryWorker": "W05",
+  "authoritativeDomain": "D1-02",
+  "entities": [
+    {
+      "name": "SocialConversation",
+      "table": "social_conversations",
+      "fields": [
+        "conversation_id",
+        "conversation_type",
+        "direct_pair_key",
+        "created_by_user_id",
+        "last_sequence",
+        "last_message_id",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "SocialConversationMembership",
+      "table": "social_conversation_memberships",
+      "fields": [
+        "conversation_id",
+        "user_id",
+        "member_role",
+        "joined_at",
+        "left_at",
+        "archived_at",
+        "muted_at",
+        "last_read_sequence"
+      ]
+    },
+    {
+      "name": "SocialMessage",
+      "table": "social_messages",
+      "fields": [
+        "message_id",
+        "conversation_id",
+        "sender_user_id",
+        "sequence",
+        "client_message_id",
+        "body",
+        "created_at",
+        "edited_at",
+        "recalled_at"
+      ]
+    }
+  ],
+  "phase1Scope": [
+    "1:1 direct conversation",
+    "text message send",
+    "idempotent send",
+    "cursor message history",
+    "monotonic read cursor",
+    "block enforcement"
+  ],
+  "deferred": [
+    "group conversations",
+    "attachments",
+    "typing",
+    "presence",
+    "WebSocket delivery",
+    "message requests",
+    "edit",
+    "recall",
+    "per-message delete",
+    "push fanout"
+  ]
+}

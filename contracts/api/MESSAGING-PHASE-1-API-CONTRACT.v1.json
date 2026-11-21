@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1.0",
+  "status": "PHASE_1_IMPLEMENTATION_CONTRACT",
+  "operations": [
+    {
+      "method": "GET",
+      "path": "/v1/conversations",
+      "operationId": "messagingConversationList",
+      "auth": "required",
+      "query": [
+        "cursor",
+        "limit"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/conversations",
+      "operationId": "messagingDirectConversationCreate",
+      "auth": "required",
+      "body": [
+        "recipientUserId"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/conversations/{conversationId}/messages",
+      "operationId": "messagingMessageList",
+      "auth": "required",
+      "query": [
+        "beforeSequence",
+        "limit"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/conversations/{conversationId}/messages",
+      "operationId": "messagingMessageSend",
+      "auth": "required",
+      "headers": [
+        "Idempotency-Key"
+      ],
+      "body": [
+        "body"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/conversations/{conversationId}/read",
+      "operationId": "messagingConversationRead",
+      "auth": "required",
+      "body": [
+        "sequence"
+      ]
+    }
+  ],
+  "limits": {
+    "pageSizeMax": 50,
+    "messageBodyMaxLength": 10000
+  },
+  "responsePolicy": "no-store",
+  "phase1NonGoals": [
+    "group messaging",
+    "attachments",
+    "presence",
+    "typing",
+    "websocket",
+    "push delivery",
+    "message requests"
+  ]
+}

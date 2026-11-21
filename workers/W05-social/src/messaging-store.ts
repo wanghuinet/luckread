@@ -1,0 +1,40 @@
+export type MessagingConversationRow = Readonly<{
+  conversation_id: string
+  participant_user_id: string
+  updated_at: string
+  last_sequence: string
+  last_message_id: string | null
+  last_message_body: string | null
+  last_message_sender_user_id: string | null
+  last_message_created_at: string | null
+  last_read_sequence: string
+}>
+export type MessagingMessageRow = Readonly<{
+  message_id: string
+  conversation_id: string
+  sender_user_id: string
+  sequence: string
+  body: string
+  created_at: string
+}>
+export interface MessagingStore {
+  createDirectConversation(actorUserId: string, recipientUserId: string): Promise<{ conversationId: string }>
+  listConversations(actorUserId: string, cursor: string | null, limit: number): Promise<{
+    items: MessagingConversationRow[]; nextCursor: string | null; hasMore: boolean
+  }>
+  listMessages(actorUserId: string, conversationId: string, beforeSequence: string | null, limit: number): Promise<{
+    items: MessagingMessageRow[]; nextCursor: string | null; hasMore: boolean
+  }>
+  sendMessage(actorUserId: string, conversationId: string, clientMessageId: string, body: string): Promise<MessagingMessageRow>
+  markRead(actorUserId: string, conversationId: string, sequence: string): Promise<void>
+}
+export class MessagingStoreError extends Error {
+  readonly code: string
+  readonly status: number
+  constructor(code = 'SERVICE_UNAVAILABLE', status = 503) {
+    super('MESSAGING_STORE_UNAVAILABLE')
+    this.name = 'MessagingStoreError'
+    this.code = code
+    this.status = status
+  }
+}
