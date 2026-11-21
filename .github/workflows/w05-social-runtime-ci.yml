@@ -31,7 +31,7 @@ on:
       - 'workers/W01-payload/tests/int/notification-preferences-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/src/social/social-token-parser.ts'
       - 'workers/W01-payload/src/social/social-token-parser.test.ts'
-      - 'workers/W01-payload/tests/int/social-followers-v1-adapter.int.spec.ts'
+      - 'workers/W01-payload/tests/int/social-followers-v1-adapter.int.spec.ts tests/int/messaging-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/tests/int/social-follow-mutation-v1-adapter.int.spec.ts'
       - 'package.json'
       - 'pnpm-lock.yaml'
