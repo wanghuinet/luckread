@@ -83,6 +83,12 @@ export function createIdempotencyKey(): string {
   return 'lr-' + Date.now().toString(36) + '-' + segment() + segment();
 }
 
+/** Headers for native image/file components that cannot call apiRequest directly. */
+export async function getApiAuthHeaders(): Promise<Record<string, string>> {
+  const token = await readSessionToken().catch(() => null);
+  return token ? { Authorization: 'Bearer ' + token } : {};
+}
+
 export function getApiBaseUrl(): string {
   const configured = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
   return (configured || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
