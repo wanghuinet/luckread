@@ -13,7 +13,7 @@ CREATE TABLE social_conversations (
   updated_at TIMESTAMPTZ NOT NULL
 );
 CREATE TABLE social_conversation_memberships (
-  conversation_id TEXT NOT NULL,
+  conversation_id TEXT NOT NULL REFERENCES social_conversations(conversation_id) ON DELETE CASCADE,
   user_id TEXT NOT NULL,
   member_role TEXT NOT NULL CHECK (member_role IN ('owner', 'member')),
   joined_at TIMESTAMPTZ NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE social_conversation_memberships (
 );
 CREATE TABLE social_messages (
   message_id TEXT PRIMARY KEY NOT NULL,
-  conversation_id TEXT NOT NULL,
+  conversation_id TEXT NOT NULL REFERENCES social_conversations(conversation_id) ON DELETE CASCADE,
   sender_user_id TEXT NOT NULL,
   sequence BIGINT NOT NULL CHECK (sequence > 0),
   client_message_id TEXT NOT NULL,

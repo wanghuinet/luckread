@@ -44,9 +44,13 @@ try {
   if (indexes.rows.length !== 2) throw new Error('Conversation and membership lookup indexes are missing')
 
   const foreignKeys = await pool.query(
-    "SELECT count(*)::integer AS count FROM pg_catalog.pg_constraint WHERE connamespace='public'::regnamespace AND contype='f' AND conrelid IN ('public.social_conversations'::regclass,'public.social_conversation_memberships'::regclass,'public.social_messages'::regclass)",
+    "SELECT count(*)::integer AS count FROM pg_catalog.pg_constraint WHERE connamespace='public'::regnamespace AND contype='f' AND conrelid IN ('public.social_conversation_memberships'::regclass,'public.social_messages'::regclass)",
   )
-  if (Number(foreignKeys.rows[0]?.count) !== 0) throw new Error('Messaging schema must not introduce cross-domain foreign keys')
+  if (Number(foreignKeys.rows[0]?.count) !== 2) throw new Error('Memberships and messages must reference their owning conversation')
+  const crossDomainForeignKeys = await pool.query(
+    "SELECT count(*)::integer AS count FROM pg_catalog.pg_constraint WHERE connamespace='public'::regnamespace AND contype='f' AND conrelid IN ('public.social_conversation_memberships'::regclass,'public.social_messages'::regclass) AND pg_get_constraintdef(oid) NOT LIKE '%REFERENCES social_conversations%'",
+  )
+  if (Number(crossDomainForeignKeys.rows[0]?.count) !== 0) throw new Error('Messaging schema must not introduce cross-domain foreign keys')
 
   const rows = await pool.query(
     'SELECT (SELECT count(*) FROM social_conversations) + (SELECT count(*) FROM social_conversation_memberships) + (SELECT count(*) FROM social_messages) AS count',
