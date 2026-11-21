@@ -173,6 +173,37 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
         throw new MessagingStoreError()
       }
     },
+    async listMessagesAfter(actorUserId, conversationId, afterSequence, limit) {
+      if (!validId(conversationId) || !/^(0|[1-9][0-9]{0,17})$/.test(afterSequence)) {
+        throw new MessagingStoreError('INVALID_CURSOR', 400)
+      }
+      try {
+        const membership = await db.query(
+          `SELECT 1 FROM social_conversation_memberships mine
+             JOIN social_conversation_memberships peer
+               ON peer.conversation_id = mine.conversation_id AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+             WHERE mine.conversation_id = $1 AND mine.user_id = $2 AND mine.left_at IS NULL
+               AND NOT EXISTS (
+                 SELECT 1 FROM social_user_interactions blocked
+                  WHERE blocked.relation_type = 'block'
+                    AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                      OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+               ) LIMIT 1`,
+          [conversationId, actorUserId])
+        if (!membership.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
+        const result = await db.query<MessageRow>(
+          `SELECT ${messageSelect} FROM social_messages
+            WHERE conversation_id = $1 AND recalled_at IS NULL AND sequence > $2::bigint
+            ORDER BY sequence ASC LIMIT $3`,
+          [conversationId, afterSequence, limit + 1])
+        const hasMore = result.rows.length > limit
+        const items = result.rows.slice(0, limit)
+        return { items, nextCursor: hasMore && items.length ? items[items.length - 1]!.sequence : null, hasMore }
+      } catch (error) {
+        if (error instanceof MessagingStoreError) throw error
+        throw new MessagingStoreError()
+      }
+    },
     async sendMessage(actorUserId, conversationId, clientMessageId, body) {
       if (!validId(conversationId) || !validId(clientMessageId) || body.length < 1 || body.length > 10000) {
         throw new MessagingStoreError('VALIDATION_FAILED', 422)
