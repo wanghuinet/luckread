@@ -149,7 +149,7 @@ export default function ConversationScreen() {
     setPendingAttachments((current) => current.map((item) => item.localId === localId
       ? { ...item, status: 'uploading', error: undefined } : item));
     try {
-      const attachment = await uploadMessageAttachment(file);
+      const attachment = await uploadMessageAttachment(file, localId);
       setPendingAttachments((current) => current.map((item) => item.localId === localId
         ? { ...item, status: 'ready', attachment, error: undefined } : item));
     } catch (error) {
