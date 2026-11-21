@@ -26,6 +26,8 @@ export type MessagingMessageRow = Readonly<{
   body: string
   attachments?: MessagingAttachment[]
   created_at: string
+  edited_at?: string | null
+  recalled_at?: string | null
 }>
 export interface MessagingStore {
   createDirectConversation(actorUserId: string, recipientUserId: string): Promise<{ conversationId: string }>
@@ -40,6 +42,8 @@ export interface MessagingStore {
   }>
   sendMessage(actorUserId: string, conversationId: string, clientMessageId: string, body: string, attachments?: MessagingAttachment[]): Promise<MessagingMessageRow>
   canReadAttachment(actorUserId: string, conversationId: string, mediaId: string): Promise<boolean>
+  editMessage(actorUserId: string, conversationId: string, messageId: string, body: string): Promise<MessagingMessageRow>
+  recallMessage(actorUserId: string, conversationId: string, messageId: string): Promise<MessagingMessageRow>
   markRead(actorUserId: string, conversationId: string, sequence: string): Promise<void>
 }
 export class MessagingStoreError extends Error {
