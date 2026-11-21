@@ -36,6 +36,13 @@ export async function listMessages(store: MessagingStore | undefined, actorValue
   if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
   return storeCall(() => store.listMessages(requireId(actorValue, 'UNAUTHENTICATED'), requireId(conversationId), beforeSequence, limit(rawLimit)))
 }
+export async function listMessagesAfter(store: MessagingStore | undefined, actorValue: string, conversationId: string, afterSequence: string | null, rawLimit: string | null) {
+  if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
+  if (afterSequence === null || !/^(0|[1-9][0-9]{0,17})$/.test(afterSequence)) {
+    throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+  }
+  return storeCall(() => store.listMessagesAfter(requireId(actorValue, 'UNAUTHENTICATED'), requireId(conversationId), afterSequence, limit(rawLimit)))
+}
 export async function sendMessage(store: MessagingStore | undefined, actorValue: string, conversationId: string, idempotencyKey: string, bodyValue: unknown) {
   if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
   const actor = requireId(actorValue, 'UNAUTHENTICATED')

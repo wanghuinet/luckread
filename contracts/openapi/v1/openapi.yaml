@@ -1742,12 +1742,17 @@ paths:
     get:
       tags: [Messaging]
       operationId: listMessagingMessages
-      summary: List messages in a direct conversation
+      summary: List message history or incrementally read messages after a sequence cursor
+      description: beforeSequence and afterSequence are mutually exclusive. Incremental reads return messages in ascending sequence order.
       parameters:
         - name: beforeSequence
           in: query
           required: false
           schema: { type: string, pattern: '^[1-9][0-9]{0,17}$' }
+        - name: afterSequence
+          in: query
+          required: false
+          schema: { type: string, pattern: '^(0|[1-9][0-9]{0,17})$' }
         - name: limit
           in: query
           required: false
