@@ -19,10 +19,6 @@ ALTER TABLE social_messages
   );
 
 COMMENT ON COLUMN social_messages.attachments IS
-  'Validated W01-owned Payload Media references for this message; contains metadata only, never binary data or public delivery URLs.';
-
-CREATE INDEX ix_social_messages_attachments_gin
-  ON social_messages USING GIN (attachments)
-  WHERE jsonb_array_length(attachments) > 0;
+  'W01-validated Payload Media references for this message; metadata only, never binary data or delivery URLs.';
 
 COMMIT;
