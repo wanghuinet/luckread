@@ -177,7 +177,7 @@ export default function Messages() {
               <View className="mx-4 mt-3 rounded-xl bg-red-50 px-3 py-2 dark:bg-red-950/30">
                 <Text className="text-sm text-red-600 dark:text-red-300">{requestAction.error instanceof Error ? requestAction.error.message : '操作失败，请稍后重试。'}</Text>
               </View>
-            ) : null}
+            ) : undefined}
             ListEmptyComponent={<View className="flex-1 items-center justify-center px-8 py-20"><Feather name="mail" size={30} color="#9ca3af" /><Text className="mt-4 text-base font-semibold text-neutral-900 dark:text-white">暂无私信请求</Text><Text className="mt-2 text-center text-sm text-neutral-500">陌生人的私信会先出现在这里，由你决定是否接受。</Text></View>}
             renderItem={({ item }) => <MessageRequestRow item={item} direction={direction} busy={requestAction.isPending} onAction={(requestId, action) => requestAction.mutate({ requestId, action })} />}
             ListFooterComponent={requests.isFetchingNextPage ? <View className="py-4"><ActivityIndicator color="#1d9bf0" /></View> : undefined}
