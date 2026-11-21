@@ -2,7 +2,7 @@ import '../global.css';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { type ErrorBoundaryProps, Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
+import { type ErrorBoundaryProps, Stack, useGlobalSearchParams, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { QueryProvider } from '~/lib/query-provider';
@@ -52,6 +52,7 @@ export default function RootLayout() {
   const hydrateThemePreference = useThemePreferenceStore((state) => state.hydrate);
   const isDark = colorScheme === 'dark';
   const segments = useSegments();
+  const searchParams = useGlobalSearchParams<{ addAccount?: string }>();
   const router = useRouter();
   const navigationState = useRootNavigationState();
   const lastNotificationResponse = Notifications.useLastNotificationResponse();
@@ -159,10 +160,11 @@ export default function RootLayout() {
   useEffect(() => {
     if (!navigationState?.key || !isLoaded || status === 'loading') return;
     const isAuthEntryRoute = ['login', 'register', 'forgot-password', 'verify-email'].includes(String(segments[0] ?? ''));
-    if (status === 'authenticated' && isAuthEntryRoute) {
+    const isAddingAccount = segments[0] === 'login' && searchParams.addAccount === '1';
+    if (status === 'authenticated' && isAuthEntryRoute && !isAddingAccount) {
       router.replace('/' as never);
     }
-  }, [isLoaded, navigationState?.key, router, segments, status]);
+  }, [isLoaded, navigationState?.key, router, searchParams.addAccount, segments, status]);
 
   return (
     <PostHogDiagnosticsProvider>

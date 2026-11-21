@@ -20,7 +20,8 @@ export default function LoginScreen() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
-  const params = useLocalSearchParams<{ verified?: string }>();
+  const params = useLocalSearchParams<{ verified?: string; addAccount?: string }>();
+  const isAddingAccount = params.addAccount === '1';
   const login = useAuthStore((state) => state.login);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -90,7 +91,12 @@ export default function LoginScreen() {
   };
 
   return (
-    <AuthScreen title="登录 LuckRead" subtitle="继续阅读你关注的内容，与创作者和社区保持联系。">
+    <AuthScreen
+      title={isAddingAccount ? '登录其他账号' : '登录 LuckRead'}
+      subtitle={isAddingAccount
+        ? '登录成功后将切换到此账号，当前设备保存的其他账号不会被移除。'
+        : '继续阅读你关注的内容，与创作者和社区保持联系。'}
+    >
       {params.verified === '1' ? <AuthMessage message="邮箱验证成功，现在可以登录了。" variant="success" /> : null}
 
       <AuthInput
@@ -141,11 +147,17 @@ export default function LoginScreen() {
         </View>
       ) : null}
 
-      <AuthPrimaryButton label="登录" busy={submitting} onPress={() => void submit()} />
-      <View style={{ marginTop: 20 }}>
-        <Text style={{ color: isDark ? '#9ca3af' : AUTH_COLORS.secondary, fontSize: 14, lineHeight: 21 }}>还没有账号？</Text>
-        <AuthSecondaryButton label="创建账号" onPress={() => router.push('/register' as never)} />
-      </View>
+      <AuthPrimaryButton
+        label={isAddingAccount ? '添加并切换到此账号' : '登录'}
+        busy={submitting}
+        onPress={() => void submit()}
+      />
+      {!isAddingAccount ? (
+        <View style={{ marginTop: 20 }}>
+          <Text style={{ color: isDark ? '#9ca3af' : AUTH_COLORS.secondary, fontSize: 14, lineHeight: 21 }}>还没有账号？</Text>
+          <AuthSecondaryButton label="创建账号" onPress={() => router.push('/register' as never)} />
+        </View>
+      ) : null}
 
       <View style={{ marginTop: 14, alignItems: 'center' }}>
         <Pressable onPress={() => router.push('/verify-email' as never)} accessibilityRole="button" hitSlop={8}>
