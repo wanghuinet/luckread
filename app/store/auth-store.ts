@@ -177,6 +177,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       throw new Error('Sign-in succeeded without a native session credential.');
     }
 
+    // Only the active account owns this device's Expo token. Release the old
+    // endpoint while its credential is still active before activating a new account.
+    const previousAccountId = await getActiveStoredAccountId();
+    if (previousAccountId && previousAccountId !== user.id) {
+      await unregisterPushEndpointForUser(previousAccountId);
+    }
+
     await saveAccountSession(user, token);
     clearPendingMutationKeys();
     set({ status: 'authenticated', user, accounts: await listStoredAccounts() });
@@ -186,6 +193,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     const previousAccountId = await getActiveStoredAccountId();
     const previousUser = get().user;
     if (previousAccountId === userId && previousUser?.id === userId) return;
+
+    // The endpoint registry has one row per Expo token. Remove the previous
+    // account's endpoint before the next account registers the same device token.
+    if (previousAccountId) {
+      await unregisterPushEndpointForUser(previousAccountId);
+    }
 
     set({ status: 'loading', user: null });
     try {
@@ -234,6 +247,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   removeAccount: async (userId) => {
     const activeAccountId = await getActiveStoredAccountId();
+    if (activeAccountId === userId) {
+      // Do not orphan a server-side endpoint after deleting its local session.
+      await unregisterPushEndpointForUser(userId);
+    }
     await removeStoredAccount(userId);
     const accounts = await listStoredAccounts();
     if (activeAccountId === userId) {
