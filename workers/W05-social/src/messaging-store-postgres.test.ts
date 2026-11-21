@@ -18,8 +18,7 @@ describe('W05 PostgreSQL messaging store', () => {
   it('creates a direct conversation and both memberships in one transaction', async () => {
     const { db, client } = executor([
       { rows: [] },
-      { rows: [] },
-      { rows: [] },
+      { rows: [{ mutual: 1 }] },
       { rows: [{ conversation_id: 'conversation-1' }] },
       { rows: [] },
       { rows: [] },
