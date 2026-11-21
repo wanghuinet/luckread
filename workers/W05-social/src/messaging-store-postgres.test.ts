@@ -4,11 +4,11 @@ import { createPostgresMessagingStore } from './messaging-store-postgres.js'
 type Row = Record<string, unknown>
 function executor(clientResponses: Array<{ rows: Row[]; rowCount?: number }> = [], directResponses: Array<{ rows: Row[]; rowCount?: number }> = []) {
   const client = {
-    query: vi.fn(async () => clientResponses.shift() ?? { rows: [] }),
+    query: vi.fn(async (..._args: unknown[]) => clientResponses.shift() ?? { rows: [] }),
     release: vi.fn(),
   }
   const db = {
-    query: vi.fn(async () => directResponses.shift() ?? { rows: [] }),
+    query: vi.fn(async (..._args: unknown[]) => directResponses.shift() ?? { rows: [] }),
     connect: vi.fn(async () => client),
   }
   return { db, client }
