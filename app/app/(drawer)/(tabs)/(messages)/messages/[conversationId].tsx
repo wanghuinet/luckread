@@ -49,6 +49,7 @@ export default function ConversationScreen() {
     return () => subscription.remove();
   }, []);
   const pendingSend = useRef<{ fingerprint: string; key: string } | null>(null);
+  const sendMutationPendingRef = useRef(false);
   const messagesQuery = useInfiniteQuery({
     queryKey: ['messaging', 'messages', conversationId],
     initialPageParam: null as string | null,
@@ -158,7 +159,6 @@ export default function ConversationScreen() {
     }
   }, [isPicking, pendingAttachments.length, uploadOne]);
 
-  const sendMutationPendingRef = useRef(false);
   const sendMutation = useMutation({
     mutationFn: (variables: SendVariables) => {
       const fingerprint = JSON.stringify([variables.body, variables.attachments.map((item) => item.mediaId)]);
