@@ -795,6 +795,36 @@
       ]
     },
     {
+      "operationId": "listMessagingConversations",
+      "method": "GET",
+      "path": "/v1/conversations",
+      "openapiPath": "/conversations",
+      "domain": "messaging",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/conversations",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "listMessagingMessages",
+      "method": "GET",
+      "path": "/v1/conversations/{conversationId}/messages",
+      "openapiPath": "/conversations/{conversationId}/messages",
+      "domain": "messaging",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/conversations/{conversationId}/messages",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "getMyCreatorApplication",
       "method": "GET",
       "path": "/v1/creator-applications",
@@ -2576,6 +2606,51 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents/{contentId}/thread",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "createMessagingConversation",
+      "method": "POST",
+      "path": "/v1/conversations",
+      "openapiPath": "/conversations",
+      "domain": "messaging",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/conversations",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "sendMessagingMessage",
+      "method": "POST",
+      "path": "/v1/conversations/{conversationId}/messages",
+      "openapiPath": "/conversations/{conversationId}/messages",
+      "domain": "messaging",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/conversations/{conversationId}/messages",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "markMessagingConversationRead",
+      "method": "POST",
+      "path": "/v1/conversations/{conversationId}/read",
+      "openapiPath": "/conversations/{conversationId}/read",
+      "domain": "messaging",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/conversations/{conversationId}/read",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
