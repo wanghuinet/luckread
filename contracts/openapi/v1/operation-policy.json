@@ -794,6 +794,32 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "listMessagingConversations",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "listMessagingMessages",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
       "operationId": "getMyCreatorApplication",
       "auth": {
         "mode": "authenticated"
@@ -2344,6 +2370,45 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "createMessagingConversation",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "sendMessagingMessage",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "markMessagingConversationRead",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
       "operationId": "applyForCreator",
       "auth": {
         "mode": "permission"
@@ -3025,71 +3090,6 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "CONTRACTED_PARTIAL",
       "x-luckread-source": "contracts/api/notification-operation-policy.v1.json"
-    },
-    {
-      "operationId": "listMessagingConversations",
-      "auth": {
-        "mode": "authenticated"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "createMessagingConversation",
-      "auth": {
-        "mode": "authenticated"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "listMessagingMessages",
-      "auth": {
-        "mode": "authenticated"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "sendMessagingMessage",
-      "auth": {
-        "mode": "authenticated"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "markMessagingConversationRead",
-      "auth": {
-        "mode": "authenticated"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
     }
   ]
 }
