@@ -23,6 +23,7 @@ import { useColorScheme } from 'nativewind';
 import { KeyboardAwareScrollView, KeyboardProvider } from 'react-native-keyboard-controller';
 import Sortable from 'react-native-sortables';
 import PublishMediaActionSheet from '~/components/PublishMediaActionSheet';
+import PostThreadComposer from '~/components/PostThreadComposer';
 
 import { apiRequest, createIdempotencyKey, fetchContentBodyReference } from '~/lib/api-client';
 import { computeAutoSaveDelay, createPublishDraftFingerprint, createReplyAudienceFingerprint } from '~/lib/publish-draft-autosave';
@@ -216,6 +217,7 @@ function PublishScreenContent() {
   const user = useAuthStore((state) => state.user);
 
   const [body, setBody] = useState('');
+  const [threadComposerVisible, setThreadComposerVisible] = useState(false);
   const [accessMode, setAccessMode] = useState<'PUBLIC' | 'MEMBERS_ONLY'>('PUBLIC');
   const [assets, setAssets] = useState<ComposerAsset[]>([]);
   const [cameraVisible, setCameraVisible] = useState(false);
@@ -2334,6 +2336,18 @@ function PublishScreenContent() {
             <Text style={[styles.helperText, isDark && { color: '#9ca3af' }]}>Ordinary social posts publish directly; no extra review screen.</Text>
             <Text style={[styles.counter, isDark && { color: '#9ca3af' }]}>{body.length}/{MAX_TEXT_LENGTH}</Text>
           </View>
+          {!contentId && !quoteContentId && Platform.OS !== 'web' ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Create a text thread"
+              disabled={busy || publishPending || !body.trim()}
+              onPress={() => setThreadComposerVisible(true)}
+              style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8, borderWidth: 1, borderColor: isDark ? '#3f3f46' : '#d0d5dd', borderRadius: 999, opacity: busy || publishPending || !body.trim() ? 0.45 : 1 }}
+            >
+              <Feather name="list" size={17} color={PRIMARY} />
+              <Text style={{ color: PRIMARY, fontSize: 13, fontWeight: '700' }}>将内容扩展为连续线程</Text>
+            </Pressable>
+          ) : null}
           <View style={[styles.replyAudienceSection, isDark && { borderBottomColor: '#27272a' }]}>
             <Text style={[styles.replyAudienceHeading, isDark && { color: '#f9fafb' }]}>回复权限</Text>
             <Pressable
@@ -2610,6 +2624,15 @@ function PublishScreenContent() {
           </View>
         </KeyboardAwareScrollView>
       )}
+      <PostThreadComposer
+        visible={threadComposerVisible}
+        initialText={body}
+        onClose={() => setThreadComposerVisible(false)}
+        onComplete={(firstContentId) => {
+          setThreadComposerVisible(false);
+          router.replace(('/?published=' + encodeURIComponent(firstContentId) + '&refresh=' + Date.now()) as never);
+        }}
+      />
       <PublishMediaActionSheet
         visible={mediaActionsVisible}
         disabled={busy || loadingEdit || publishPending || assets.length >= MAX_MEDIA_ITEMS}
