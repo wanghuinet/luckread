@@ -94,6 +94,31 @@ export async function createRepost(
   }
 }
 
+/**
+ * Preflight a quote-post relationship against W05-owned bilateral Block state.
+ * W03 remains authoritative for the quoted post's publication and owner.
+ */
+export async function assertQuotePostAllowed(
+  w03Content: W03ContentBinding | undefined,
+  actorUserIdValue: string,
+  contentIdValue: string,
+  correlationId: string,
+  store: RepostStore,
+): Promise<void> {
+  const actorUserId = validateActor(actorUserIdValue)
+  const contentId = validateId(contentIdValue)
+  const ownerUserId = await getPublishedOwner(w03Content, contentId, correlationId)
+  try {
+    if (await store.isBlocked(actorUserId, ownerUserId)) {
+      throw new RepostRuntimeError('NOT_FOUND', 404)
+    }
+  } catch (error) {
+    if (error instanceof RepostRuntimeError) throw error
+    if (error instanceof RepostStoreError) throw new RepostRuntimeError(error.code, error.status)
+    throw new RepostRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+}
+
 /** Delete only the current actor's relation; repeated deletes are harmless. */
 export async function removeRepost(
   actorUserIdValue: string,
