@@ -69,5 +69,11 @@
     "websocket",
     "push delivery",
     "message requests"
-  ]
+  ],
+  "admissionPolicy": {
+    "newConversation": "MUTUAL_FOLLOWERS_ONLY",
+    "nonMutualAdmission": "DENY_WITH_403_CONTACT_POLICY_DENIED",
+    "messageRequests": "NOT_SUPPORTED_IN_PHASE_1",
+    "blockPolicy": "BIDIRECTIONAL_BLOCK_DENIES_CREATE_INBOX_HISTORY_SEND_AND_READ"
+  }
 }
