@@ -26,6 +26,9 @@ export interface MessagingStore {
   listMessages(actorUserId: string, conversationId: string, beforeSequence: string | null, limit: number): Promise<{
     items: MessagingMessageRow[]; nextCursor: string | null; hasMore: boolean
   }>
+  listMessagesAfter(actorUserId: string, conversationId: string, afterSequence: string, limit: number): Promise<{
+    items: MessagingMessageRow[]; nextCursor: string | null; hasMore: boolean
+  }>
   sendMessage(actorUserId: string, conversationId: string, clientMessageId: string, body: string): Promise<MessagingMessageRow>
   markRead(actorUserId: string, conversationId: string, sequence: string): Promise<void>
 }
