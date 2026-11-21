@@ -1320,6 +1320,21 @@
       ]
     },
     {
+      "operationId": "listMessageRequests",
+      "method": "GET",
+      "path": "/v1/message-requests",
+      "openapiPath": "/message-requests",
+      "domain": "messaging",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/message-requests",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "getNotificationPreferences",
       "method": "GET",
       "path": "/v1/notification-preferences",
@@ -3116,6 +3131,36 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/trial",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "createMessageRequest",
+      "method": "POST",
+      "path": "/v1/message-requests",
+      "openapiPath": "/message-requests",
+      "domain": "messaging",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/message-requests",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "respondToMessageRequest",
+      "method": "POST",
+      "path": "/v1/message-requests/{requestId}/{action}",
+      "openapiPath": "/message-requests/{requestId}/{action}",
+      "domain": "messaging",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/message-requests/{requestId}/{action}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
