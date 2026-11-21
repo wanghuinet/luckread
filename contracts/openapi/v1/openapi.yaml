@@ -1697,6 +1697,66 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ListResponse' }
         '4XX': { $ref: '#/components/responses/ClientError' }
+  /message-requests:
+    get:
+      tags: [Messaging]
+      operationId: listMessageRequests
+      summary: List incoming or outgoing direct message requests
+      parameters:
+        - name: direction
+          in: query
+          required: true
+          schema: { type: string, enum: [incoming, outgoing] }
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50 }
+      responses:
+        '200': { description: Message request page }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+    post:
+      tags: [Messaging]
+      operationId: createMessageRequest
+      summary: Send a first-contact message request
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipientUserId, body]
+              properties:
+                recipientUserId: { type: string, minLength: 1, maxLength: 128 }
+                body: { type: string, minLength: 1, maxLength: 1000 }
+      responses:
+        '201': { description: Pending message request created }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+  /message-requests/{requestId}/{action}:
+    parameters:
+      - name: requestId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+      - name: action
+        in: path
+        required: true
+        schema: { type: string, enum: [accept, decline, cancel] }
+    post:
+      tags: [Messaging]
+      operationId: respondToMessageRequest
+      summary: Accept, decline, or cancel a first-contact message request
+      responses:
+        '200': { description: Request decision recorded }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
   /conversations:
     get:
       tags: [Messaging]
