@@ -40,8 +40,8 @@ function ConversationRow({ item }: { item: MessagingConversation }) {
 }
 
 
-function MessageRequestRow({ item, direction, onAction }: {
-  item: MessageRequest; direction: 'incoming' | 'outgoing';
+function MessageRequestRow({ item, direction, busy, onAction }: {
+  item: MessageRequest; direction: 'incoming' | 'outgoing'; busy: boolean;
   onAction: (requestId: string, action: 'accept' | 'decline' | 'cancel') => void;
 }) {
   const peerId = direction === 'incoming' ? item.sender_user_id : item.recipient_user_id;
@@ -68,15 +68,15 @@ function MessageRequestRow({ item, direction, onAction }: {
       <View className="mt-3 flex-row justify-end gap-2">
         {direction === 'incoming' ? (
           <>
-            <Pressable onPress={() => onAction(item.request_id, 'decline')} className="rounded-full border border-neutral-300 px-4 py-2 dark:border-neutral-700">
+            <Pressable disabled={busy} onPress={() => onAction(item.request_id, 'decline')} className="rounded-full border border-neutral-300 px-4 py-2 dark:border-neutral-700">
               <Text className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">拒绝</Text>
             </Pressable>
-            <Pressable onPress={() => onAction(item.request_id, 'accept')} className="rounded-full bg-sky-500 px-4 py-2">
+            <Pressable disabled={busy} onPress={() => onAction(item.request_id, 'accept')} className="rounded-full bg-sky-500 px-4 py-2">
               <Text className="text-sm font-semibold text-white">接受</Text>
             </Pressable>
           </>
         ) : (
-          <Pressable onPress={() => onAction(item.request_id, 'cancel')} className="rounded-full border border-neutral-300 px-4 py-2 dark:border-neutral-700">
+          <Pressable disabled={busy} onPress={() => onAction(item.request_id, 'cancel')} className="rounded-full border border-neutral-300 px-4 py-2 dark:border-neutral-700">
             <Text className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">撤回请求</Text>
           </Pressable>
         )}
@@ -173,8 +173,13 @@ export default function Messages() {
             onRefresh={() => requests.refetch()}
             onEndReached={() => { if (requests.hasNextPage && !requests.isFetchingNextPage) void requests.fetchNextPage(); }}
             onEndReachedThreshold={0.4}
+            ListHeaderComponent={requestAction.isError ? (
+              <View className="mx-4 mt-3 rounded-xl bg-red-50 px-3 py-2 dark:bg-red-950/30">
+                <Text className="text-sm text-red-600 dark:text-red-300">{requestAction.error instanceof Error ? requestAction.error.message : '操作失败，请稍后重试。'}</Text>
+              </View>
+            ) : null}
             ListEmptyComponent={<View className="flex-1 items-center justify-center px-8 py-20"><Feather name="mail" size={30} color="#9ca3af" /><Text className="mt-4 text-base font-semibold text-neutral-900 dark:text-white">暂无私信请求</Text><Text className="mt-2 text-center text-sm text-neutral-500">陌生人的私信会先出现在这里，由你决定是否接受。</Text></View>}
-            renderItem={({ item }) => <MessageRequestRow item={item} direction={direction} onAction={(requestId, action) => requestAction.mutate({ requestId, action })} />}
+            renderItem={({ item }) => <MessageRequestRow item={item} direction={direction} busy={requestAction.isPending} onAction={(requestId, action) => requestAction.mutate({ requestId, action })} />}
             ListFooterComponent={requests.isFetchingNextPage ? <View className="py-4"><ActivityIndicator color="#1d9bf0" /></View> : undefined}
           />
         )
