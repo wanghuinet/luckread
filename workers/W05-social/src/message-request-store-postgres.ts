@@ -50,6 +50,10 @@ export function createPostgresMessageRequestStore(db: MessageRequestPostgresExec
             if (prior.rows[0].recipient_user_id !== recipient || prior.rows[0].initial_message !== body) throw new MessageRequestStoreError('CONFLICT', 409)
             return prior.rows[0]
           }
+          const duplicatePending = await client.query(`SELECT 1 FROM social_message_requests
+            WHERE status = 'pending' AND ((sender_user_id = $1 AND recipient_user_id = $2)
+              OR (sender_user_id = $2 AND recipient_user_id = $1)) LIMIT 1`, [actor, recipient])
+          if (duplicatePending.rows.length) throw new MessageRequestStoreError('REQUEST_ALREADY_PENDING', 409)
           const quota = await client.query<{ count: number }>(`SELECT COUNT(*)::int AS count FROM social_message_requests
             WHERE sender_user_id = $1 AND created_at > CURRENT_TIMESTAMP - INTERVAL '24 hours'`, [actor])
           if ((quota.rows[0]?.count ?? 0) >= 10) throw new MessageRequestStoreError('RATE_LIMITED', 429)
@@ -72,7 +76,7 @@ export function createPostgresMessageRequestStore(db: MessageRequestPostgresExec
       const peerColumn = direction === 'incoming' ? 'sender_user_id' : 'recipient_user_id'
       try {
         const result = await db.query<MessageRequestRow>(`SELECT ${requestSelect} FROM social_message_requests r
-          WHERE r.${ownerColumn} = $1
+          WHERE r.${ownerColumn} = $1 AND r.status = 'pending'
             AND ($2::timestamptz IS NULL OR (r.created_at, r.request_id) < ($2::timestamptz, $3::text))
             AND NOT EXISTS (SELECT 1 FROM social_user_interactions b WHERE b.relation_type = 'block'
               AND ((b.actor_user_id = $1 AND b.target_user_id = r.${peerColumn})
