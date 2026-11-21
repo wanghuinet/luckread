@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StatusBar, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StatusBar, Text, View } from 'react-native';
+import { Chat, type IMessage } from '@kesha-antonov/react-native-chat';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
@@ -19,7 +20,8 @@ export default function ConversationScreen() {
   const queryClient = useQueryClient();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const userId = useAuthStore((state) => state.user?.id);
+  const user = useAuthStore((state) => state.user);
+  const userId = user?.id;
   const [draft, setDraft] = useState('');
   const [isFocused, setIsFocused] = useState(true);
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState ?? 'active');
@@ -42,6 +44,16 @@ export default function ConversationScreen() {
   });
   // The API returns newest-first pages; an inverted list keeps the newest message at the bottom.
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
+  const chatMessages = useMemo<IMessage[]>(() => messages.map((message) => ({
+    _id: message.message_id,
+    text: message.body,
+    createdAt: new Date(message.created_at),
+    user: {
+      _id: message.sender_user_id,
+      name: message.sender_user_id === userId ? (user?.name || '我') : (params.participantName || '对方'),
+    },
+    sent: message.sender_user_id === userId,
+  })), [messages, params.participantName, user?.name, userId]);
   const latestSequence = messages.reduce((latest, message) =>
     compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const incrementalQuery = useQuery({
@@ -110,6 +122,12 @@ export default function ConversationScreen() {
       await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
     },
   });
+  const handleChatSend = useCallback((newMessages: IMessage[]) => {
+    const body = newMessages[0]?.text?.trim();
+    if (!body || sendMutation.isPending) return;
+    sendMutation.mutate(body);
+  }, [sendMutation]);
+
   useEffect(() => {
     const latest = messagesQuery.data?.pages?.[0]?.items?.[0];
     if (latest?.sequence) {
@@ -126,7 +144,7 @@ export default function ConversationScreen() {
   };
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-white dark:bg-black" behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}>
+    <View className="flex-1 bg-white dark:bg-black">
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View className="flex-row items-center border-b border-neutral-100 px-3 py-3 dark:border-neutral-800">
         <Pressable accessibilityRole="button" accessibilityLabel="返回私信列表" onPress={() => router.back()} className="p-2">
@@ -145,43 +163,40 @@ export default function ConversationScreen() {
           <Pressable onPress={() => messagesQuery.refetch()} className="mt-4 rounded-full bg-sky-500 px-5 py-2.5"><Text className="font-bold text-white">重试</Text></Pressable>
         </View>
       ) : (
-        <FlatList
-          className="flex-1"
-          contentContainerStyle={{ paddingHorizontal: 14, paddingVertical: 16, flexGrow: 1 }}
-          data={messages}
-          inverted
-          maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
-          onEndReached={loadOlder}
-          onEndReachedThreshold={0.3}
-          ListFooterComponent={messagesQuery.isFetchingNextPage ? <View className="py-4"><ActivityIndicator color="#1d9bf0" /></View> : undefined}
-          keyExtractor={(item) => item.message_id}
-          renderItem={({ item }: { item: MessagingMessage }) => {
-            const own = Boolean(userId && item.sender_user_id === userId);
-            return (
-              <View className={'mb-3 max-w-[84%] rounded-2xl px-4 py-3 ' + (own ? 'self-end bg-sky-500' : 'self-start bg-neutral-100 dark:bg-neutral-800')}>
-                <Text className={own ? 'text-white' : 'text-neutral-900 dark:text-white'}>{item.body}</Text>
-              </View>
-            );
+        <Chat
+          messages={chatMessages}
+          user={{ _id: userId || 'anonymous', name: user?.name || '我' }}
+          onSend={handleChatSend}
+          text={draft}
+          onDraftChange={setDraft}
+          isLoading={messagesQuery.isFetching && !messagesQuery.data}
+          loadEarlierMessagesProps={{
+            isAvailable: Boolean(messagesQuery.hasNextPage),
+            isLoading: messagesQuery.isFetchingNextPage,
+            isInfiniteScrollEnabled: true,
+            onPress: loadOlder,
+            label: '加载更早消息',
           }}
-          ListEmptyComponent={<View className="flex-1 items-center justify-center"><Text className="text-sm text-neutral-500">发送第一条消息，开始对话</Text></View>}
+          locale="zh"
+          colorScheme={isDark ? 'dark' : 'light'}
+          appearance="plain"
+          enableGestureHandlerRootView={false}
+          attachments={false}
+          audioRecording={false}
+          videoRecording={false}
+          reply={{ isEnabled: false }}
+          defaultMessageActions={false}
+          emptyChatGreeting={null}
+          textInputProps={{
+            placeholder: '发送消息…',
+            placeholderTextColor: '#9ca3af',
+            maxLength: 10000,
+            editable: !sendMutation.isPending,
+          }}
+          isSendButtonAlwaysVisible
         />
       )}
-      {sendMutation.isError ? <Text className="px-4 pb-2 text-sm text-red-500">发送失败，请检查网络后重试。</Text> : null}
-      <View className="flex-row items-end border-t border-neutral-100 px-3 py-3 dark:border-neutral-800">
-        <TextInput
-          value={draft}
-          onChangeText={setDraft}
-          editable={!sendMutation.isPending}
-          placeholder="发送消息…"
-          placeholderTextColor="#9ca3af"
-          multiline
-          maxLength={10000}
-          className="max-h-28 min-h-11 flex-1 rounded-2xl bg-neutral-100 px-4 py-3 text-base text-neutral-900 dark:bg-neutral-900 dark:text-white"
-        />
-        <Pressable accessibilityRole="button" accessibilityLabel="发送消息" disabled={!draft.trim() || sendMutation.isPending} onPress={send} className="ml-2 h-11 w-11 items-center justify-center rounded-full bg-sky-500 disabled:opacity-40">
-          {sendMutation.isPending ? <ActivityIndicator color="#fff" size="small" /> : <Feather name="send" size={18} color="#fff" />}
-        </Pressable>
-      </View>
-    </KeyboardAvoidingView>
+      {sendMutation.isError ? <Text className="px-4 py-2 text-sm text-red-500">发送失败，请检查网络后重试。</Text> : null}
+    </View>
   );
 }
