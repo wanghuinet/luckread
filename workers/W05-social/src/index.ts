@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { listContentLikers } from './like-list-runtime.js'
-import { MessagingRuntimeError, createDirectConversation, listConversations, listMessages, listMessagesAfter, markConversationRead, sendMessage } from './messaging-runtime.js'
+import { MessagingRuntimeError, createDirectConversation, listConversations, listMessages, listMessagesAfter, markConversationRead, sendMessage, editMessage, recallMessage } from './messaging-runtime.js'
 import type { MessagingStore } from './messaging-store.js'
 import { MessageRequestRuntimeError, createMessageRequest, listMessageRequests, respondToMessageRequest } from './message-request-runtime.js'
 import type { MessageRequestStore } from './message-request-store.js'
@@ -919,6 +919,30 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         if (!body || typeof body !== 'object' || Array.isArray(body)) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
         const data = await sendMessage(dependencies.messagingStore, actorUserId, conversationId, idempotencyKey, (body as { body?: unknown }).body, (body as { attachments?: unknown }).attachments)
         return json({ data, requestId: createRequestId() }, 201)
+      }
+
+      const messagingMessageActionMatch = /^\\/internal\\/messaging\\/conversations\\/([^/]+)\\/messages\\/([^/]+)$/.exec(url.pathname)
+      if (messagingMessageActionMatch) {
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const conversationId = decodePathPart(messagingMessageActionMatch[1] ?? '')
+        const messageId = decodePathPart(messagingMessageActionMatch[2] ?? '')
+        if (!conversationId || !messageId) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        if (request.method === 'PATCH') {
+          let body: unknown
+          try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
+          if (!body || typeof body !== 'object' || Array.isArray(body) ||
+            Object.keys(body).some(key => key !== 'body') || typeof (body as { body?: unknown }).body !== 'string') {
+            throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+          }
+          const data = await editMessage(dependencies.messagingStore, actorUserId, conversationId, messageId, (body as { body: string }).body)
+          return json({ data, requestId: createRequestId() })
+        }
+        if (request.method === 'DELETE') {
+          const data = await recallMessage(dependencies.messagingStore, actorUserId, conversationId, messageId)
+          return json({ data, requestId: createRequestId() })
+        }
+        return new Response(null, { status: 405, headers: { Allow: 'PATCH, DELETE' } })
       }
 
       const messagingAttachmentAuthorizeMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/attachments\/([^/]+)\/authorize$/.exec(url.pathname)
