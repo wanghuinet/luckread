@@ -213,7 +213,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
         if (!membership.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
         const result = await db.query<MessageRow>(
           `SELECT ${messageSelect} FROM social_messages
-            WHERE conversation_id = $1 AND recalled_at IS NULL AND sequence > $2::bigint
+            WHERE conversation_id = $1 AND sequence > $2::bigint
             ORDER BY sequence ASC LIMIT $3`,
           [conversationId, afterSequence, limit + 1])
         const hasMore = result.rows.length > limit
