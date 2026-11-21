@@ -107,7 +107,7 @@ CREATE TABLE content_relationships (
   target_type TEXT NOT NULL CHECK (target_type IN ('content', 'series', 'collection')),
   target_id TEXT NOT NULL,
   relation_type TEXT NOT NULL
-    CHECK (relation_type IN ('reference', 'series-member', 'collection-member', 'thread-next')),
+    CHECK (relation_type IN ('reference', 'quote-post', 'series-member', 'collection-member', 'thread-next')),
   position INTEGER,
   schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
   status TEXT NOT NULL CHECK (status IN ('ACTIVE', 'REVOKED', 'SUPERSEDED')),
@@ -117,7 +117,7 @@ CREATE TABLE content_relationships (
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
   CHECK (
-    (relation_type = 'reference' AND target_type = 'content' AND position IS NULL)
+    (relation_type IN ('reference', 'quote-post') AND target_type = 'content' AND position IS NULL)
     OR (relation_type = 'series-member' AND target_type = 'series' AND position IS NOT NULL AND position >= 0)
     OR (relation_type = 'collection-member' AND target_type = 'collection' AND position IS NOT NULL AND position >= 0)
     OR (relation_type = 'thread-next' AND target_type = 'content' AND position IS NULL)
