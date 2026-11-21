@@ -28,7 +28,7 @@ CREATE TABLE social_message_request_audit (
   actor_user_id TEXT NOT NULL,
   action TEXT NOT NULL CHECK (action IN ('created', 'accepted', 'declined', 'cancelled')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(metadata) = 'object')
 );
 CREATE INDEX ix_social_message_request_audit_request
   ON social_message_request_audit(request_id, created_at ASC, audit_id ASC);
