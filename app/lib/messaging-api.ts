@@ -3,7 +3,7 @@ import { apiRequest, createIdempotencyKey } from './api-client';
 export type MessagingConversation = {
   conversation_id: string; participant_user_id: string; updated_at: string; last_sequence: string;
   last_message_id: string | null; last_message_body: string | null; last_message_sender_user_id: string | null;
-  last_message_created_at: string | null; last_read_sequence: string;
+  last_message_created_at: string | null; last_read_sequence: string; unread_count: number;
 };
 export type MessagingMessage = {
   message_id: string; conversation_id: string; sender_user_id: string; sequence: string; body: string; created_at: string;
