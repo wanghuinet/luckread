@@ -13,6 +13,7 @@ mock.module('../lib/api-client.ts', () => ({
     return nextResult;
   },
   createIdempotencyKey: () => 'generated-comment-key',
+  getApiErrorMessage: (data, fallback) => data?.error?.message || fallback,
 }));
 
 const { createComment } = await import('../lib/comment-create-api.ts');
