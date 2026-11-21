@@ -108,11 +108,20 @@ test('publisher uses permanent server media references and stable per-operation 
 });
 
 test('editing is ETag guarded and returns to a refreshed authoritative timeline', () => {
-  expect(composer).toContain("useLocalSearchParams<{ contentId?: string | string[]; draftId?: string | string[] }>()");
+  expect(composer).toContain("useLocalSearchParams<{ contentId?: string | string[]; draftId?: string | string[]; quoteContentId?: string | string[] }>()");
   expect(composer).toContain("headers: { 'If-Match': record.etag }");
   expect(composer).toContain('idempotencyKey: attempt.mutationKey');
   expect(composer).toContain("router.replace(('/?published=' + encodeURIComponent(contentId) + '&refresh=' + Date.now()) as never)");
   expect(composer).toContain("router.replace(('/?published=' + encodeURIComponent(contentId) + '&refresh=' + Date.now()) as never)");
+});
+
+test('native quote composer preserves and validates the canonical public post target', () => {
+  expect(composer).toContain("const quoteContentId = Array.isArray(params.quoteContentId) ? params.quoteContentId[0] : params.quoteContentId;");
+  expect(composer).toContain("target.contentType !== 'post' || target.state !== 'PUBLISHED' || target.accessMode !== 'PUBLIC'");
+  expect(composer).toContain("relationType: 'quote-post'");
+  expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id) + '/relationships'");
+  expect(feedItem).toContain("{ id: 'quote-post', title: 'Quote post' }");
+  expect(feedItem).toContain("params: { quoteContentId: itemData.contentId }");
 });
 
 test('edit and delete controls are only shown for the authenticated owner and use authoritative checks', () => {
