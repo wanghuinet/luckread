@@ -133,7 +133,7 @@ function fixture(options: { revokeMiss?: boolean; uniqueConflict?: boolean; appe
   const database: ContentRelationshipPostgresDatabase = {
     async query<Row>(sql: string, values?: unknown[]) {
       directQueries.push({ sql, values })
-      if (sql.includes('source_content_type')) {
+      if (sql.includes('source_owner_user_id')) {
         return { rows: [appendRow] as Row[] }
       }
       if (sql.includes('WITH RECURSIVE previous(id')) {
@@ -182,7 +182,7 @@ describe('W03 Neon content relationship mutation store', () => {
     }])
     expect(first.hasMore).toBe(true)
     expect(first.nextCursor).toBeTruthy()
-    expect(calls[0]?.sql).toContain("r.relation_type = 'reference'")
+    expect(calls[0]?.sql).toContain("r.relation_type IN ('reference', 'quote-post')")
     expect(calls[0]?.sql).toContain("s.state = 'PUBLISHED'")
     expect(calls[0]?.sql).toContain("t.state = 'PUBLISHED'")
     expect(calls[0]?.sql).toContain('ORDER BY r.created_at DESC, r.relationship_id DESC')
@@ -261,7 +261,7 @@ describe('W03 Neon content relationship mutation store', () => {
     expect(sql[0]).toBe('BEGIN')
     expect(sql[1]).toContain('DELETE FROM content_mutation_idempotency')
     expect(sql[2]).toContain('INSERT INTO content_mutation_idempotency')
-    expect(sql[3]).toContain("VALUES ($1, 'content', $2, 'content', $3, 'reference', 1, 'ACTIVE'")
+    expect(sql[3]).toContain("VALUES ($1, 'content', $2, 'content', $3, $4, 1, 'ACTIVE'")
     expect(sql[3]).toContain('RETURNING relationship_id')
     expect(sql[4]).toBe('COMMIT')
     expect(fake.transactionQueries[2]?.values?.[5]).toBe(201)
@@ -269,6 +269,7 @@ describe('W03 Neon content relationship mutation store', () => {
       relationship.relationshipId,
       relationship.sourceId,
       relationship.targetId,
+      relationship.relationType,
       relationship.actorId,
       relationship.provenanceRef,
       relationship.authorizationRef,
