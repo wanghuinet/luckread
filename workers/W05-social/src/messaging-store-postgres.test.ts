@@ -19,6 +19,7 @@ describe('W05 PostgreSQL messaging store', () => {
     const { db, client } = executor([
       { rows: [] },
       { rows: [] },
+      { rows: [] },
       { rows: [{ conversation_id: 'conversation-1' }] },
       { rows: [] },
       { rows: [] },
@@ -38,6 +39,16 @@ describe('W05 PostgreSQL messaging store', () => {
     const store = createPostgresMessagingStore(db as never)
     await expect(store.createDirectConversation('user-a', 'user-b'))
       .rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO social_conversations'))).toBe(false)
+    expect(client.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK')
+  })
+
+  it('denies new conversations unless both users follow each other', async () => {
+    const { db, client } = executor([{ rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }])
+    const store = createPostgresMessagingStore(db as never)
+    await expect(store.createDirectConversation('user-a', 'user-b'))
+      .rejects.toMatchObject({ code: 'CONTACT_POLICY_DENIED', status: 403 })
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes('social_follow_relationships'))).toBe(true)
     expect(client.query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO social_conversations'))).toBe(false)
     expect(client.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK')
   })
@@ -127,6 +138,7 @@ describe('W05 PostgreSQL messaging store', () => {
     const page = await store.listMessages('user-a', 'conversation-1', '9', 2)
     expect(page.items.map(item => item.sequence)).toEqual(['8', '7'])
     expect(page).toMatchObject({ nextCursor: '7', hasMore: true })
+    expect(db.query.mock.calls[0]?.[0]).toContain('social_user_interactions')
     expect(db.query.mock.calls[1]?.[0]).toContain('sequence < $2::bigint')
     expect(db.query.mock.calls[1]?.[0]).toContain('ORDER BY sequence DESC LIMIT $3')
     expect(db.query.mock.calls[1]?.[1]).toEqual(['conversation-1', '9', 3])
@@ -138,6 +150,17 @@ describe('W05 PostgreSQL messaging store', () => {
     await expect(store.listMessages('user-outsider', 'conversation-1', null, 30))
       .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
     expect(db.query).toHaveBeenCalledOnce()
+  })
+
+  it('filters blocked peers from inbox and calculates incoming unread counts', async () => {
+    const { db } = executor([], [{ rows: [] }])
+    const store = createPostgresMessagingStore(db as never)
+    await expect(store.listConversations('user-a', null, 30)).resolves.toMatchObject({ items: [], hasMore: false })
+    const sql = String(db.query.mock.calls[0]?.[0])
+    expect(sql).toContain('social_user_interactions')
+    expect(sql).toContain("relation_type = 'block'")
+    expect(sql).toContain('unread.sender_user_id <> $1')
+    expect(sql).toContain('unread.sequence > mine.last_read_sequence')
   })
 
   it('rejects malformed conversation cursors before querying the database', async () => {
