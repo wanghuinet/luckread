@@ -40,12 +40,12 @@ test('D1-02 manifest is a frozen ordered W03/W05/W03 corrective schema-only plan
 
 test('artifact checksums cover exact W03, W05 and zero-table W03 corrective SQL bytes', () => {
   const checksums = buildArtifactChecksums(manifest, readArtifact)
-  assert.equal(checksums.length, 4)
-  assert.deepEqual(checksums.map((entry) => entry.ownerWorker), ['W03', 'W05', 'W03', 'W05'])
-  assert.deepEqual(checksums.map((entry) => entry.order), [1, 2, 3, 4])
+  assert.equal(checksums.length, 3)
+  assert.deepEqual(checksums.map((entry) => entry.ownerWorker), ['W03', 'W05', 'W03'])
+  assert.deepEqual(checksums.map((entry) => entry.order), [1, 2, 3])
   assert.equal(checksums.every((entry) => /^[0-9a-f]{64}$/.test(entry.artifactSha256)), true)
   assert.equal(checksums.every((entry) => /^[0-9a-f]{64}$/.test(entry.manifestEntrySha256)), true)
-  assert.deepEqual(checksums.map((entry) => entry.tableNames.length), [9, 19, 0, 3])
+  assert.deepEqual(checksums.map((entry) => entry.tableNames.length), [9, 19, 0])
 })
 
 test('manifest checksum canonicalization ignores object property insertion order but preserves array order', () => {

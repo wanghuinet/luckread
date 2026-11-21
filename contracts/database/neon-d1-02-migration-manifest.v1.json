@@ -53,33 +53,18 @@
         "d1-02-w05-social-schema-v1"
       ],
       "expectedTableCount": 0
-    },
-    {
-      "migrationId": "d1-02-w05-messaging-core-v1",
-      "order": 4,
-      "ownerWorker": "W05",
-      "kind": "POSTGRESQL_SQL",
-      "artifactPaths": [
-        "workers/W05-social/src/neon-postgres-migrations/0002_w05_messaging_core.sql"
-      ],
-      "dependsOn": [
-        "d1-02-w03-content-schema-v1",
-        "d1-02-w05-social-schema-v1",
-        "d1-02-w03-content-snowflake-timestamp-bigint-v1"
-      ],
-      "expectedTableCount": 3
     }
   ],
   "expected": {
-    "tables": 31,
-    "explicitIndexes": 65,
+    "tables": 28,
+    "explicitIndexes": 63,
     "triggers": 9,
     "triggerFunctions": 10,
     "businessRows": 0,
     "snowflakeAllocatorRows": 1,
     "foreignKeys": 0,
     "d1_03EndpointTable": false,
-    "migrationLedgerRows": 4
+    "migrationLedgerRows": 3
   },
   "safetyInvariants": [
     "Apply only the committed PostgreSQL-native W03 artifact followed by the committed PostgreSQL-native W05 artifact.",
