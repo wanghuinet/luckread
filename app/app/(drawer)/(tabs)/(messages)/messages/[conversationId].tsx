@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, type AppStateStatus, ActivityIndicator, Pressable, StatusBar, Text, View } from 'react-native';
+import { Alert, AppState, type AppStateStatus, ActivityIndicator, Image, Pressable, StatusBar, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Chat, type IMessage } from '@kesha-antonov/react-native-chat';
 import { Feather } from '@expo/vector-icons';
@@ -7,11 +7,11 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  fetchMessages, fetchMessagesAfter, markConversationRead, sendDirectMessage, uploadMessageAttachment,
+  fetchMessages, fetchMessagesAfter, getMessageAttachmentUrl, markConversationRead, sendDirectMessage, uploadMessageAttachment,
   type MessagingAttachment,
 } from '~/lib/messaging-api';
 import type { LocalMediaFile } from '~/lib/publish-api';
-import { createIdempotencyKey } from '~/lib/api-client';
+import { createIdempotencyKey, getApiAuthHeaders } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
 
 type PendingAttachment = {
@@ -22,6 +22,40 @@ type PendingAttachment = {
   error?: string;
 };
 type SendVariables = { body: string; attachments: MessagingAttachment[] };
+
+function PrivateMessageImages({ currentMessage }: { currentMessage: IMessage }) {
+  const [headers, setHeaders] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let active = true;
+    void getApiAuthHeaders().then((value) => {
+      if (active) setHeaders(value);
+    });
+    return () => { active = false; };
+  }, []);
+  const imageUrls = useMemo(() => {
+    if (!currentMessage.image) return [];
+    try {
+      const parsed: unknown = JSON.parse(currentMessage.image);
+      return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
+    } catch {
+      return [currentMessage.image];
+    }
+  }, [currentMessage.image]);
+  if (!imageUrls.length) return null;
+  return (
+    <View className="flex-row flex-wrap gap-1.5 px-1 pb-1">
+      {imageUrls.map((uri) => (
+        <Image
+          key={uri}
+          source={{ uri, headers }}
+          resizeMode="cover"
+          style={{ width: imageUrls.length === 1 ? 224 : 108, height: 132, borderRadius: 10 }}
+          accessibilityLabel="私信图片附件"
+        />
+      ))}
+    </View>
+  );
+}
 
 const compareSequence = (left: string, right: string) =>
   left.length === right.length ? left.localeCompare(right) : left.length - right.length;
@@ -59,19 +93,27 @@ export default function ConversationScreen() {
     staleTime: 15_000,
   });
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
-  const chatMessages = useMemo<IMessage[]>(() => messages.map((message) => ({
-    _id: message.message_id,
-    text: [
-      message.body,
-      ...(message.attachments ?? []).map((attachment) => '📎 ' + attachment.filename),
-    ].filter(Boolean).join('\n'),
-    createdAt: new Date(message.created_at),
-    user: {
-      _id: message.sender_user_id,
-      name: message.sender_user_id === userId ? (user?.name || '我') : (params.participantName || '对方'),
-    },
-    sent: message.sender_user_id === userId,
-  })), [messages, params.participantName, user?.name, userId]);
+  const chatMessages = useMemo<IMessage[]>(() => messages.map((message) => {
+    const attachments = message.attachments ?? [];
+    const imageUrls = attachments
+      .filter((attachment) => attachment.mimeType.startsWith('image/'))
+      .map((attachment) => getMessageAttachmentUrl(message.conversation_id, attachment.mediaId));
+    return {
+      _id: message.message_id,
+      text: [
+        message.body,
+        ...attachments.filter((attachment) => !attachment.mimeType.startsWith('image/'))
+          .map((attachment) => '📎 ' + attachment.filename),
+      ].filter(Boolean).join('\n'),
+      ...(imageUrls.length ? { image: JSON.stringify(imageUrls) } : {}),
+      createdAt: new Date(message.created_at),
+      user: {
+        _id: message.sender_user_id,
+        name: message.sender_user_id === userId ? (user?.name || '我') : (params.participantName || '对方'),
+      },
+      sent: message.sender_user_id === userId,
+    };
+  }), [messages, params.participantName, user?.name, userId]);
   const latestSequence = messages.reduce((latest, message) =>
     compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const incrementalQuery = useQuery({
@@ -275,6 +317,7 @@ export default function ConversationScreen() {
               appearance="plain"
               enableGestureHandlerRootView={false}
               attachments={false}
+              renderMessageImage={(props) => <PrivateMessageImages currentMessage={props.currentMessage} />}
               audioRecording={false}
               videoRecording={false}
               reply={{ isEnabled: false }}
