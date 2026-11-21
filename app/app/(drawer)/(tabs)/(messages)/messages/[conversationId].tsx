@@ -22,7 +22,7 @@ export default function ConversationScreen() {
   const userId = useAuthStore((state) => state.user?.id);
   const [draft, setDraft] = useState('');
   const [isFocused, setIsFocused] = useState(true);
-  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
+  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState ?? 'active');
   useFocusEffect(useCallback(() => {
     setIsFocused(true);
     return () => setIsFocused(false);
