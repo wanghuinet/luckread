@@ -51,6 +51,7 @@ describe('W05 Neon runtime composition', () => {
     const second = getW05SocialWorkerDependencies(env, poolFactory)
 
     expect(first).toBe(second)
+    expect(first.messagingStore).toBeDefined()
     expect(Object.keys(first).sort()).toEqual([
       'blockMuteListReadStore',
       'blockMuteRelationStore',
@@ -68,6 +69,7 @@ describe('W05 Neon runtime composition', () => {
       'likeMutationStore',
       'likeStatusReadStore',
       'likeTargetContextReadStore',
+      'messagingStore',
       'notificationEnqueueStore',
       'notificationPreferencesStore',
       'pollConfigurationStore',
