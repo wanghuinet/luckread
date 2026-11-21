@@ -51,5 +51,13 @@
     "block relationship checked before conversation creation and message send",
     "no cross-domain foreign keys",
     "no physical D1 or D1-03 writes"
-  ]
+  ],
+  "migrationArtifact": {
+    "path": "workers/W05-social/src/neon-postgres-migrations/0002_w05_messaging_core.sql",
+    "database": "luckreadpro",
+    "domain": "D1-02",
+    "applyStatus": "LOCAL_POSTGRESQL_18_REHEARSAL_REQUIRED",
+    "remoteApplyAuthorized": false,
+    "note": "Separate additive migration; do not alter the frozen D1-02 baseline manifest or execute against production from this PR."
+  }
 }
