@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createDirectConversation, listConversations, listMessages, markConversationRead, sendMessage } from './messaging-runtime.js'
+import { createDirectConversation, listConversations, listMessages, listMessagesAfter, markConversationRead, sendMessage } from './messaging-runtime.js'
 import type { MessagingStore } from './messaging-store.js'
 
 const store = (): MessagingStore => ({
