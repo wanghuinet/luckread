@@ -62,7 +62,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
                   ON peer.conversation_id = direct.conversation_id
                  AND peer.user_id = target.user_id AND peer.left_at IS NULL
                 WHERE direct.conversation_type = 'direct'
-                  AND direct.direct_pair_key = LEAST($1, target.user_id) || ':' || GREATEST($1, target.user_id)
+                  AND direct.direct_pair_key = LEAST($1::text, target.user_id) || ':' || GREATEST($1::text, target.user_id)
               ) ORDER BY target.user_id`,
             [actorUserId, members])
           if (contacts.rows.length !== members.length) throw new MessagingStoreError('CONTACT_POLICY_DENIED', 403)
