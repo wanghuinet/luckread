@@ -29,6 +29,11 @@ function ConversationRow({ item }: { item: MessagingConversation }) {
         <Text className="font-semibold text-neutral-900 dark:text-white" numberOfLines={1}>{displayName}</Text>
         <Text className="mt-1 text-sm text-neutral-500" numberOfLines={1}>{item.last_message_body || '开始聊天'}</Text>
       </View>
+      {item.unread_count > 0 ? (
+        <View className="mr-2 min-w-5 items-center justify-center rounded-full bg-sky-500 px-1.5 py-0.5">
+          <Text className="text-xs font-bold text-white">{item.unread_count > 99 ? '99+' : item.unread_count}</Text>
+        </View>
+      ) : null}
       <Feather name="chevron-right" size={18} color="#9ca3af" />
     </Pressable>
   );
