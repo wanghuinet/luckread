@@ -202,6 +202,8 @@ jobs:
         run: bun run test:push-notifications
       - name: Test native publishing and media upload contracts
         run: bun run test:publish-api
+      - name: Test native quoted post source preview
+        run: bun test tests/quote-post-preview.test.mjs
       - name: Test native image upload preparation and fallback behavior
         run: bun run test:image-upload-preparation
       - name: Test native publishing flow and owner-only post actions
