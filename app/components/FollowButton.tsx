@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert } from 'react-native';
 import { useColorScheme } from 'nativewind';
+import { useAuthStore } from '~/store/auth-store';
 import { Button } from '~/components/ui/button';
 import { Text } from '~/components/ui/text';
 import {
@@ -16,6 +17,7 @@ type FollowButtonProps = {
 
 export default function FollowButton({ targetUserId, targetUsername }: FollowButtonProps) {
   const { colorScheme } = useColorScheme();
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
   const [resolvedTargetId, setResolvedTargetId] = useState(targetUserId?.trim() ?? '');
   const [resolvingProfile, setResolvingProfile] = useState(!targetUserId?.trim());
   const [profileResolutionError, setProfileResolutionError] = useState('');
@@ -91,7 +93,7 @@ export default function FollowButton({ targetUserId, targetUsername }: FollowBut
       setRetrying(true);
       await refreshStatus();
       setRetrying(false);
-      const latest = getUserFollowSnapshot(resolvedTargetId);
+      const latest = getUserFollowSnapshot(resolvedTargetId, viewerId);
       if (!latest.loaded && latest.error) {
         Alert.alert('Unable to load follow status', latest.error);
       }

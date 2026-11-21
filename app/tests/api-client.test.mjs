@@ -212,13 +212,13 @@ test('loads authoritative content like state and aggregate count from W01/W05', 
     return new Response(JSON.stringify({ data: { liked: true, likeCount: 8 } }), { status: 200 });
   };
 
-  await refreshContentLikeStatus(contentId);
+  await refreshContentLikeStatus(contentId, activeViewerId);
 
   expect(capturedUrl.pathname).toBe('/v1/interactions/likes');
   expect(capturedUrl.searchParams.get('targetType')).toBe('content');
   expect(capturedUrl.searchParams.get('targetId')).toBe(contentId);
   expect(capturedHeaders.get('Authorization')).toBe('Bearer secure-test-token');
-  expect(getContentLikeSnapshot(contentId)).toMatchObject({ liked: true, likeCount: 8, loading: false });
+  expect(getContentLikeSnapshot(contentId, {}, activeViewerId)).toMatchObject({ liked: true, likeCount: 8, loading: false });
 });
 
 test('likes through the real API client with an idempotency key and reconciles count', async () => {
@@ -237,8 +237,8 @@ test('likes through the real API client with an idempotency key and reconciles c
     return new Response(JSON.stringify({ data: { relationshipId: 'like-stage3', targetId: contentId } }), { status: 200 });
   };
 
-  await refreshContentLikeStatus(contentId);
-  const outcome = await toggleContentLike(contentId);
+  await refreshContentLikeStatus(contentId, activeViewerId);
+  const outcome = await toggleContentLike(contentId, activeViewerId);
 
   const headers = new Headers(mutationInit.headers);
   expect(outcome.ok).toBe(true);
@@ -247,7 +247,7 @@ test('likes through the real API client with an idempotency key and reconciles c
   expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
   expect(JSON.parse(String(mutationInit.body))).toEqual({ targetType: 'content', targetId: contentId });
   expect(getCount).toBe(2);
-  expect(getContentLikeSnapshot(contentId)).toMatchObject({
+  expect(getContentLikeSnapshot(contentId, {}, activeViewerId)).toMatchObject({
     liked: true,
     likeCount: 3,
     loading: false,
@@ -272,8 +272,8 @@ test('unlikes through DELETE and reconciles the server count after a 204 respons
     return new Response(null, { status: 204 });
   };
 
-  await refreshContentLikeStatus(contentId);
-  const outcome = await toggleContentLike(contentId);
+  await refreshContentLikeStatus(contentId, activeViewerId);
+  const outcome = await toggleContentLike(contentId, activeViewerId);
 
   const headers = new Headers(deleteInit.headers);
   expect(outcome.ok).toBe(true);
@@ -282,7 +282,7 @@ test('unlikes through DELETE and reconciles the server count after a 204 respons
   expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
   expect(JSON.parse(String(deleteInit.body))).toEqual({ targetType: 'content', targetId: contentId });
   expect(getCount).toBe(2);
-  expect(getContentLikeSnapshot(contentId)).toMatchObject({
+  expect(getContentLikeSnapshot(contentId, {}, activeViewerId)).toMatchObject({
     liked: false,
     likeCount: 4,
     loading: false,
@@ -305,13 +305,13 @@ test('rolls back the optimistic like state after an authorization failure', asyn
     }), { status: 403 });
   };
 
-  await refreshContentLikeStatus(contentId);
-  const outcome = await toggleContentLike(contentId);
+  await refreshContentLikeStatus(contentId, activeViewerId);
+  const outcome = await toggleContentLike(contentId, activeViewerId);
 
   expect(outcome).toMatchObject({ ok: false, status: 403 });
   expect(outcome.message).toContain('permission');
   expect(mutationCount).toBe(1);
-  expect(getContentLikeSnapshot(contentId)).toMatchObject({
+  expect(getContentLikeSnapshot(contentId, {}, activeViewerId)).toMatchObject({
     liked: false,
     likeCount: 4,
     pending: false,
@@ -338,16 +338,16 @@ test('deduplicates rapid like taps while a mutation is in flight', async () => {
     });
   };
 
-  await refreshContentLikeStatus(contentId);
-  const firstToggle = toggleContentLike(contentId);
+  await refreshContentLikeStatus(contentId, activeViewerId);
+  const firstToggle = toggleContentLike(contentId, activeViewerId);
   await postStarted;
-  const secondToggle = await toggleContentLike(contentId);
+  const secondToggle = await toggleContentLike(contentId, activeViewerId);
 
   expect(secondToggle.ok).toBe(false);
   expect(postCount).toBe(1);
   releasePost();
   expect((await firstToggle).ok).toBe(true);
-  expect(getContentLikeSnapshot(contentId)).toMatchObject({ liked: true, likeCount: 2, pending: false });
+  expect(getContentLikeSnapshot(contentId, {}, activeViewerId)).toMatchObject({ liked: true, likeCount: 2, pending: false });
 });
 
 
@@ -520,11 +520,11 @@ test('loads authoritative follow state from the existing W01/W05 relationship ro
     return new Response(JSON.stringify({ data: { following: true } }), { status: 200 });
   };
 
-  await refreshUserFollowStatus(targetUserId);
+  await refreshUserFollowStatus(targetUserId, activeViewerId);
 
   expect(capturedUrl.pathname).toBe('/v1/social/follows/' + targetUserId);
   expect(capturedHeaders.get('Authorization')).toBe('Bearer secure-test-token');
-  expect(getUserFollowSnapshot(targetUserId)).toMatchObject({
+  expect(getUserFollowSnapshot(targetUserId, activeViewerId)).toMatchObject({
     following: true,
     loaded: true,
     loading: false,
@@ -552,8 +552,8 @@ test('follows through POST with an idempotency key and reconciles server state',
     }), { status: 200 });
   };
 
-  await refreshUserFollowStatus(targetUserId);
-  const outcome = await toggleUserFollow(targetUserId);
+  await refreshUserFollowStatus(targetUserId, activeViewerId);
+  const outcome = await toggleUserFollow(targetUserId, activeViewerId);
 
   const headers = new Headers(mutationRequest.init.headers);
   expect(outcome.ok).toBe(true);
@@ -562,7 +562,7 @@ test('follows through POST with an idempotency key and reconciles server state',
   expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
   expect(headers.get('Idempotency-Key')).toBeTruthy();
   expect(getCount).toBe(2);
-  expect(getUserFollowSnapshot(targetUserId)).toMatchObject({
+  expect(getUserFollowSnapshot(targetUserId, activeViewerId)).toMatchObject({
     following: true,
     loaded: true,
     pending: false,
@@ -587,8 +587,8 @@ test('unfollows through DELETE and reconciles the status after a 204 response', 
     return new Response(null, { status: 204 });
   };
 
-  await refreshUserFollowStatus(targetUserId);
-  const outcome = await toggleUserFollow(targetUserId);
+  await refreshUserFollowStatus(targetUserId, activeViewerId);
+  const outcome = await toggleUserFollow(targetUserId, activeViewerId);
 
   const headers = new Headers(deleteInit.headers);
   expect(outcome.ok).toBe(true);
@@ -596,7 +596,7 @@ test('unfollows through DELETE and reconciles the status after a 204 response', 
   expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
   expect(headers.get('Idempotency-Key')).toBeTruthy();
   expect(getCount).toBe(2);
-  expect(getUserFollowSnapshot(targetUserId)).toMatchObject({
+  expect(getUserFollowSnapshot(targetUserId, activeViewerId)).toMatchObject({
     following: false,
     loaded: true,
     pending: false,
@@ -617,12 +617,12 @@ test('rolls back an optimistic follow change after an authorization failure', as
     }), { status: 403 });
   };
 
-  await refreshUserFollowStatus(targetUserId);
-  const outcome = await toggleUserFollow(targetUserId);
+  await refreshUserFollowStatus(targetUserId, activeViewerId);
+  const outcome = await toggleUserFollow(targetUserId, activeViewerId);
 
   expect(outcome).toMatchObject({ ok: false, status: 403 });
   expect(outcome.message).toContain('permission');
-  expect(getUserFollowSnapshot(targetUserId)).toMatchObject({
+  expect(getUserFollowSnapshot(targetUserId, activeViewerId)).toMatchObject({
     following: false,
     loaded: true,
     pending: false,
@@ -653,16 +653,16 @@ test('deduplicates rapid follow taps while a POST is in flight', async () => {
     });
   };
 
-  await refreshUserFollowStatus(targetUserId);
-  const firstToggle = toggleUserFollow(targetUserId);
+  await refreshUserFollowStatus(targetUserId, activeViewerId);
+  const firstToggle = toggleUserFollow(targetUserId, activeViewerId);
   await postStarted;
-  const secondToggle = await toggleUserFollow(targetUserId);
+  const secondToggle = await toggleUserFollow(targetUserId, activeViewerId);
 
   expect(secondToggle.ok).toBe(false);
   expect(mutationCount).toBe(1);
   releasePost();
   expect((await firstToggle).ok).toBe(true);
-  expect(getUserFollowSnapshot(targetUserId)).toMatchObject({
+  expect(getUserFollowSnapshot(targetUserId, activeViewerId)).toMatchObject({
     following: true,
     loaded: true,
     pending: false,
