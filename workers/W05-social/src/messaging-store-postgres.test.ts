@@ -110,6 +110,21 @@ describe('W05 PostgreSQL messaging store', () => {
     expect(client.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK')
   })
 
+  it('does not return an idempotent retry after a Block is created', async () => {
+    const { db, client } = executor([
+      { rows: [] },
+      { rows: [{ conversation_id: 'conversation-1' }] },
+      { rows: [{ user_id: 'user-b' }] },
+      { rows: [{ blocked: 1 }] },
+      { rows: [] },
+    ])
+    const store = createPostgresMessagingStore(db as never)
+    await expect(store.sendMessage('user-a', 'conversation-1', 'client-1', 'hello'))
+      .rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes('client_message_id'))).toBe(false)
+    expect(client.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK')
+  })
+
   it('rejects reuse of an idempotency key with a different payload', async () => {
     const prior = {
       message_id: 'message-1', conversation_id: 'conversation-1', sender_user_id: 'user-a',
