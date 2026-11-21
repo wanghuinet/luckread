@@ -422,7 +422,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           })
         }
         await unpinProfileContent(actorUserId, contentId, store)
-        return new Response(null, { status: 204 })
+        return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       }
 
       const pinnedContentMatch = /^\/internal\/social\/users\/([^/]+)\/pinned-content$/.exec(url.pathname)

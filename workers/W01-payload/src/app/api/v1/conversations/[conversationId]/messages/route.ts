@@ -5,7 +5,7 @@ import {
 } from '../../../../../../social/w05-social-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
-  Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, { status })
+  Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, { status, headers: { 'cache-control': 'no-store' } })
 
 type RouteContext = { params: Promise<{ conversationId: string }> }
 
