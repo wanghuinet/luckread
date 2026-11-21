@@ -6,6 +6,8 @@ let activeAccountId = null;
 let rejectSessionFor = null;
 const sessionRequests = [];
 const loginRequests = [];
+const pushUnregisterCalls = [];
+let failPushUnregisterFor = null;
 
 const userFromEmail = (email) => ({
   id: 'user-' + email.toLowerCase(),
@@ -98,7 +100,12 @@ mock.module('../lib/api-client.ts', () => ({
   },
 }));
 mock.module('../lib/push-notifications.ts', () => ({
-  unregisterPushEndpointForUser: async () => undefined,
+  unregisterPushEndpointForUser: async (userId) => {
+    pushUnregisterCalls.push({ userId, activeAccountId });
+    if (failPushUnregisterFor === userId) {
+      throw new Error('Push endpoint could not be unregistered');
+    }
+  },
 }));
 
 const { useAuthStore } = await import('../store/auth-store.ts');
@@ -110,6 +117,8 @@ beforeEach(() => {
   rejectSessionFor = null;
   sessionRequests.length = 0;
   loginRequests.length = 0;
+  pushUnregisterCalls.length = 0;
+  failPushUnregisterFor = null;
   useAuthStore.setState({ status: 'anonymous', user: null, accounts: [] });
 });
 
@@ -121,14 +130,38 @@ test('login stores each new session separately and switching validates the selec
   expect(useAuthStore.getState().accounts).toHaveLength(2);
   expect(storedTokens.get('user-first@example.com')).toBe('token-first@example.com');
   expect(storedTokens.get('user-second@example.com')).toBe('token-second@example.com');
+  expect(pushUnregisterCalls).toEqual([{
+    userId: 'user-first@example.com',
+    activeAccountId: 'user-first@example.com',
+  }]);
 
   await useAuthStore.getState().switchAccount('user-first@example.com');
+  expect(pushUnregisterCalls.at(-1)).toEqual({
+    userId: 'user-second@example.com',
+    activeAccountId: 'user-second@example.com',
+  });
   expect(activeAccountId).toBe('user-first@example.com');
   expect(useAuthStore.getState().user?.email).toBe('first@example.com');
   expect(sessionRequests.at(-1)).toEqual({
     accountId: 'user-first@example.com',
     token: 'token-first@example.com',
   });
+});
+
+test('does not switch accounts when the current push endpoint cannot be released', async () => {
+  await useAuthStore.getState().login('first@example.com', 'password-one');
+  await useAuthStore.getState().login('second@example.com', 'password-two');
+  failPushUnregisterFor = 'user-second@example.com';
+  const previousSessionRequestCount = sessionRequests.length;
+
+  await expect(
+    useAuthStore.getState().switchAccount('user-first@example.com'),
+  ).rejects.toThrow('Push endpoint could not be unregistered');
+
+  expect(activeAccountId).toBe('user-second@example.com');
+  expect(useAuthStore.getState().status).toBe('authenticated');
+  expect(useAuthStore.getState().user?.id).toBe('user-second@example.com');
+  expect(sessionRequests).toHaveLength(previousSessionRequestCount);
 });
 
 test('refuses a sixth distinct account before making a login request', async () => {
@@ -165,6 +198,10 @@ test('removing the active account leaves other saved accounts intact and signs o
 
   await useAuthStore.getState().removeAccount('user-second@example.com');
 
+  expect(pushUnregisterCalls.at(-1)).toEqual({
+    userId: 'user-second@example.com',
+    activeAccountId: 'user-second@example.com',
+  });
   expect(activeAccountId).toBeNull();
   expect(useAuthStore.getState().status).toBe('anonymous');
   expect(useAuthStore.getState().user).toBeNull();
