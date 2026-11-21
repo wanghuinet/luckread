@@ -162,6 +162,32 @@ describe('W05 PostgreSQL messaging store', () => {
     expect(db.query.mock.calls[1]?.[1]).toEqual(['conversation-1', '9', 3])
   })
 
+  it('reads only messages after the cursor in ascending sequence order', async () => {
+    const rows = [
+      { message_id: 'message-11', conversation_id: 'conversation-1', sender_user_id: 'user-b', sequence: '11', body: 'eleven', created_at: '2026-11-21T00:00:11.000Z' },
+      { message_id: 'message-12', conversation_id: 'conversation-1', sender_user_id: 'user-a', sequence: '12', body: 'twelve', created_at: '2026-11-21T00:00:12.000Z' },
+      { message_id: 'message-13', conversation_id: 'conversation-1', sender_user_id: 'user-b', sequence: '13', body: 'thirteen', created_at: '2026-11-21T00:00:13.000Z' },
+    ]
+    const { db } = executor([], [{ rows: [{ member: 1 }] }, { rows }])
+    const store = createPostgresMessagingStore(db as never)
+    const page = await store.listMessagesAfter('user-a', 'conversation-1', '10', 2)
+    expect(page.items.map(item => item.sequence)).toEqual(['11', '12'])
+    expect(page).toMatchObject({ nextCursor: '12', hasMore: true })
+    expect(db.query.mock.calls[0]?.[0]).toContain('social_user_interactions')
+    expect(db.query.mock.calls[1]?.[0]).toContain('sequence > $2::bigint')
+    expect(db.query.mock.calls[1]?.[0]).toContain('ORDER BY sequence ASC LIMIT $3')
+    expect(db.query.mock.calls[1]?.[1]).toEqual(['conversation-1', '10', 3])
+  })
+
+  it('denies incremental reads when the actor is not an active member or the peer is blocked', async () => {
+    const { db } = executor([], [{ rows: [] }])
+    const store = createPostgresMessagingStore(db as never)
+    await expect(store.listMessagesAfter('user-a', 'conversation-1', '0', 30))
+      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(db.query).toHaveBeenCalledOnce()
+    expect(String(db.query.mock.calls[0]?.[0])).toContain('social_user_interactions')
+  })
+
   it('hides message history when the actor is not an active conversation member', async () => {
     const { db } = executor([], [{ rows: [] }])
     const store = createPostgresMessagingStore(db as never)
