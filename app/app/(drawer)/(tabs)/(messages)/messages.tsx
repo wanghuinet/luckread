@@ -9,7 +9,8 @@ import { fetchConversations, type MessagingConversation } from '~/lib/messaging-
 import { resolvePublicProfileById } from '~/lib/content-adapter';
 
 
-function ConversationRow({ item, onPress }: { item: MessagingConversation; onPress: () => void }) {
+function ConversationRow({ item }: { item: MessagingConversation }) {
+  const router = useRouter();
   const profile = useQuery({
     queryKey: ['public-profile', item.participant_user_id],
     queryFn: ({ signal }) => resolvePublicProfileById(item.participant_user_id, signal),
@@ -20,7 +21,7 @@ function ConversationRow({ item, onPress }: { item: MessagingConversation; onPre
     (profile.data?.username ? '@' + profile.data.username : 'LuckRead 用户');
 
   return (
-    <Pressable onPress={onPress} className="flex-row items-center border-b border-neutral-100 px-4 py-4 dark:border-neutral-800">
+    <Pressable onPress={() => router.push({ pathname: '/messages/[conversationId]', params: { conversationId: item.conversation_id, participantName: displayName } } as never)} className="flex-row items-center border-b border-neutral-100 px-4 py-4 dark:border-neutral-800">
       <View className="h-12 w-12 items-center justify-center rounded-full bg-sky-50 dark:bg-sky-950/40">
         <Feather name="user" size={22} color="#1d9bf0" />
       </View>
@@ -92,10 +93,7 @@ export default function Messages() {
             </View>
           }
           renderItem={({ item }) => (
-            <ConversationRow
-              item={item}
-              onPress={() => router.push(('/messages/' + item.conversation_id) as never)}
-            />
+            <ConversationRow item={item} />
           )}
         />
       )}

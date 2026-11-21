@@ -139,7 +139,7 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
   const handleMessagePress = useCallback(async () => {
     try {
       const conversation = await createDirectConversation(user.id);
-      router.push(('/messages/' + conversation.conversationId) as never);
+      router.push({ pathname: '/messages/[conversationId]', params: { conversationId: conversation.conversationId, participantName: user.name } } as never);
     } catch (cause) {
       Alert.alert('无法发起私信', cause instanceof Error ? cause.message : '请稍后重试。');
     }

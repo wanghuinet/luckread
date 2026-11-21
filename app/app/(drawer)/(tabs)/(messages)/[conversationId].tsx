@@ -8,7 +8,7 @@ import { fetchMessages, markConversationRead, sendDirectMessage, type MessagingM
 import { useAuthStore } from '~/store/auth-store';
 
 export default function ConversationScreen() {
-  const params = useLocalSearchParams<{ conversationId: string }>();
+  const params = useLocalSearchParams<{ conversationId: string; participantName?: string }>();
   const conversationId = Array.isArray(params.conversationId) ? params.conversationId[0] : params.conversationId;
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -50,7 +50,7 @@ export default function ConversationScreen() {
         <Pressable accessibilityRole="button" accessibilityLabel="返回私信列表" onPress={() => router.back()} className="p-2">
           <Feather name="chevron-left" size={24} color={isDark ? '#fff' : '#111827'} />
         </Pressable>
-        <Text className="ml-2 flex-1 text-lg font-bold text-neutral-900 dark:text-white">对话</Text>
+        <Text className="ml-2 flex-1 text-lg font-bold text-neutral-900 dark:text-white" numberOfLines={1}>{params.participantName || '对话'}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="刷新消息" onPress={() => messagesQuery.refetch()} className="p-2">
           <Feather name="refresh-cw" size={18} color="#1d9bf0" />
         </Pressable>
