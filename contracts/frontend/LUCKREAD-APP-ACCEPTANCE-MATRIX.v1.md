@@ -91,7 +91,7 @@ docs/41 是全平台的 UX 能力和用户旅程矩阵。本文件只定义 Expo
 | ACC-PUBLISH-006 | 选择并发布视频 | 上传、授权播放、详情和视频 Feed 播放使用同一真实媒体引用 | app/tests/publish-flow.test.mjs；video-feed-api.test.mjs | CODE_TEST_SOURCE_PRESENT / L3-L4 NOT_VERIFIED |
 | ACC-PUBLISH-007 | 上传中断、超时或播放授权失败后重试 | 不重复创建媒体记录；同一文件可恢复整文件重试；不可误称字节级断点续传 | app/tests/publish-pending-media-recovery.test.mjs | CODE_TEST_SOURCE_PRESENT / L3-L4 NOT_VERIFIED |
 | ACC-PUBLISH-008 | 创建、投票、结束投票 | 一人一票、选项和结果以 W05 权威响应为准 | app/tests/publish-flow.test.mjs；paid/content 或 poll 相关 Worker 测试 | CODE_TEST_SOURCE_PRESENT / L3-L4 NOT_VERIFIED |
-| ACC-PUBLISH-009 | 保存草稿、退出、重启并恢复 | 服务端 DRAFT 能恢复；失败状态不丢失已上传媒体引用 | app/tests/publish-draft-autosave.test.mjs；publish-pending-media-recovery.test.mjs | CODE_TEST_SOURCE_PRESENT / L3-L4 NOT_VERIFIED |
+| ACC-PUBLISH-009 | 保存草稿、退出、重启并恢复 | 服务端 DRAFT 能恢复；失败状态不丢失已上传媒体引用 | app/lib/publish-draft-autosave.ts；app/tests/publish-flow.test.mjs、publish-pending-media-recovery.test.mjs（当前 main 未找到独立 autosave 专项测试） | CODE_TEST_SOURCE_PRESENT / L3-L4 NOT_VERIFIED |
 | ACC-PUBLISH-010 | 定时发布、改期、取消并等待触发 | W03 权威状态变化；时区正确；发布后 Feed 可读取 | app/tests/publish-schedule.test.mjs | CODE_TEST_SOURCE_PRESENT / L3-L4 NOT_VERIFIED |
 | ACC-PUBLISH-011 | 编辑和删除自己的帖子 | 所有权、ETag/版本和真实状态转换生效；内容 ID / URL 不被错误重建 | app/tests/publish-flow.test.mjs；publish-api.test.mjs | CODE_TEST_SOURCE_PRESENT / L3-L4 NOT_VERIFIED |
 | ACC-PUBLISH-012 | 公开 / MEMBERS_ONLY 内容访问 | 非会员和未授权用户不能因客户端缓存绕过权益限制 | app/tests/paid-content-entitlement.test.mjs；W07/W03 权限测试 | CODE_TEST_SOURCE_PRESENT / L3-L4 NOT_VERIFIED |
