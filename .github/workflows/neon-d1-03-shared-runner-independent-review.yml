@@ -1,0 +1,109 @@
+name: D1-03 Shared Runner Independent Local Review
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-03-shared-runner-independent-review.yml'
+      - 'contracts/database/neon-d1-03-shared-runner-independent-review.v1.json'
+      - 'contracts/database/neon-d1-03-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-03-w06-moderation-schema.v1.json'
+      - 'contracts/database/neon-d1-03-w09-platform-schema.v1.json'
+      - 'contracts/database/neon-d1-03-w10-execution-schema.v1.json'
+      - 'contracts/database/neon-d1-03-w09-owner-reconciliation.v1.json'
+      - 'contracts/database/neon-d1-03-w11-owner-reconciliation.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/transport/worker-d1-access-boundary.v1.json'
+      - 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json'
+      - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/review-d1-03-shared-runner-independent.mjs'
+      - 'scripts/neon/review-d1-03-shared-runner-independent.test.mjs'
+      - 'scripts/verify-d1-03-entity-owner-boundary.mjs'
+      - 'workers/W06-governance/wrangler.jsonc'
+      - 'workers/W06-governance/migrations/**'
+      - 'workers/W06-governance/scripts/neon/**'
+      - 'workers/W06-governance/src/neon-postgres-migrations/**'
+      - 'workers/W09-platform/wrangler.d1-03-migrations.jsonc'
+      - 'workers/W09-platform/migrations-d1-03/**'
+      - 'workers/W09-platform/scripts/neon/**'
+      - 'workers/W09-platform/src/neon-postgres-migrations/**'
+      - 'workers/W10-async/wrangler.jsonc'
+      - 'workers/W10-async/scripts/neon/**'
+      - 'workers/W10-async/src/neon-postgres-migrations/**'
+      - 'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc'
+      - 'workers/W11-growth-campaign-analytics-operations/scripts/neon/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-03-shared-runner-independent-review.yml'
+      - 'contracts/database/neon-d1-03-shared-runner-independent-review.v1.json'
+      - 'contracts/database/neon-d1-03-shared-migration-manifest.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/transport/worker-d1-access-boundary.v1.json'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/review-d1-03-shared-runner-independent.mjs'
+      - 'scripts/neon/review-d1-03-shared-runner-independent.test.mjs'
+      - 'workers/W06-governance/scripts/neon/**'
+      - 'workers/W09-platform/scripts/neon/**'
+      - 'workers/W10-async/scripts/neon/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-03-shared-runner-independent-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  independent-review:
+    name: Independently review D1-03 owners, migration artifacts and local-only runner
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run independent review and negative boundary tests
+        run: |
+          set -euo pipefail
+          node --check scripts/neon/review-d1-03-shared-runner-independent.mjs
+          node --test \
+            scripts/neon/review-d1-03-shared-runner-independent.test.mjs \
+            workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.test.mjs \
+            workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.test.mjs \
+            workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.test.mjs \
+            workers/W10-async/scripts/neon/generate-d1-03-w10-postgres-migration.test.mjs \
+            workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-03-w11-owner-reconciliation.test.mjs
+      - name: Regenerate the admitted W06/W09/W10 PostgreSQL artifacts
+        run: |
+          set -euo pipefail
+          node workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.mjs
+          node workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.mjs
+          node workers/W10-async/scripts/neon/generate-d1-03-w10-postgres-migration.mjs
+          git diff --exit-code -- \
+            workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql \
+            workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql \
+            workers/W10-async/src/neon-postgres-migrations/0001_w10_d1_03_async_execution.sql
+      - name: Run existing W09/W11 owner reconciliation and canonical D1-03 boundary gates
+        run: |
+          set -euo pipefail
+          node workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.mjs
+          node workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-03-w11-owner-reconciliation.mjs
+          node scripts/verify-d1-03-entity-owner-boundary.mjs
+      - name: Emit independent D1-03 review evidence
+        run: |
+          set -euo pipefail
+          node scripts/neon/review-d1-03-shared-runner-independent.mjs
+      - name: Upload D1-03 independent review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-03-shared-runner-independent-review-${{ github.sha }}
+          path: artifacts/neon/d1-03-shared-runner-independent-review.json
+          if-no-files-found: error
+          retention-days: 90

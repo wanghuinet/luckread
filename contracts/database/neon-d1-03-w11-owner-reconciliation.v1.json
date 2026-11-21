@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-03-w11-owner-reconciliation.v1.json",
+  "title": "LuckRead D1-03 W11 Campaign and Growth Logical Owner Reconciliation",
+  "version": "1.0.0",
+  "status": "LOGICAL_OWNERS_RECONCILED_SCHEMA_ADMISSION_BLOCKED",
+  "scope": {
+    "domainId": "D1-03",
+    "worker": "W11",
+    "primaryTask": "T22",
+    "purpose": "Account for W11's frozen D1-03 Campaign/GrowthOperation ownership while preventing analytics-only D1-05 sources from being treated as D1-03 business persistence.",
+    "noRuntimeOrBindingChange": true,
+    "noRemoteDdl": true
+  },
+  "logicalOwnerEntities": [
+    "Campaign",
+    "GrowthOperation"
+  ],
+  "admittedPhysicalSchemaEntities": [],
+  "deferredPhysicalSchemaEntities": [
+    {
+      "entity": "Campaign",
+      "status": "LOGICAL_OWNER_ONLY_SCHEMA_NOT_ADMITTED",
+      "admissionEvidence": {
+        "featureOperationContract": null,
+        "entityFieldContract": null,
+        "persistenceContract": null,
+        "governanceAccessContract": null,
+        "sourceMigration": null,
+        "postgresqlTranslation": null
+      },
+      "reason": "The frozen T22 mapping assigns Campaign to W11 in D1-03, but the repository contains no admitted Campaign field/persistence contract, operation-level D1-03 governance access contract, or authoritative W11 D1-03 source migration. Campaign attribution and analytics dimensions in D1-05 are not Campaign business-state persistence.",
+      "requiredBeforeAdmission": [
+        "Canonical T22 Feature ID and API operation contract for each Campaign mutation/read.",
+        "Campaign entity field and lifecycle contract covering identity, ownership, status transitions, retention, privacy and indexes.",
+        "Explicit W11 D1-03 governance access contract with operation-level authorization, caller identity and audit requirements.",
+        "Authoritative D1-03 source migration owned by W11, or a precise contract naming the existing primary schema owner and delegated operation scope.",
+        "Deterministic PostgreSQL 18 translation that contains only admitted Campaign business state.",
+        "Disposable PostgreSQL 18 catalog, constraint, idempotency and rollback rehearsal."
+      ]
+    },
+    {
+      "entity": "GrowthOperation",
+      "status": "LOGICAL_OWNER_ONLY_SCHEMA_NOT_ADMITTED",
+      "admissionEvidence": {
+        "featureOperationContract": null,
+        "entityFieldContract": null,
+        "persistenceContract": null,
+        "governanceAccessContract": null,
+        "sourceMigration": null,
+        "postgresqlTranslation": null
+      },
+      "reason": "The frozen T22 mapping assigns GrowthOperation to W11 in D1-03, but the repository contains no admitted GrowthOperation state machine, field/persistence contract, operation-level D1-03 governance access contract, or authoritative W11 D1-03 source migration. D1-05 analytics projection/rebuild state is not the authoritative growth-operation lifecycle.",
+      "requiredBeforeAdmission": [
+        "Canonical T22 Feature ID and API operation contract for each GrowthOperation transition.",
+        "GrowthOperation field and state-machine contract, including eligibility, idempotency, terminal states, retry/replay, actor and audit semantics.",
+        "Explicit W11 D1-03 governance access contract with operation-level authorization, caller identity and audit requirements.",
+        "Authoritative D1-03 source migration owned by W11, or a precise contract naming the existing primary schema owner and delegated operation scope.",
+        "Deterministic PostgreSQL 18 translation that contains only admitted GrowthOperation business state.",
+        "Disposable PostgreSQL 18 catalog, transition, idempotency and rollback rehearsal."
+      ]
+    }
+  ],
+  "authoritySources": {
+    "taskMapping": "docs/02-FINAL-MAPPING-v1.0.md",
+    "domainMaster": "docs/09-D1-DOMAIN-MASTER-v1.0.md",
+    "d1_03OwnerBoundary": "contracts/transport/d1-03-entity-owner-boundary.v1.json",
+    "d1_03PhysicalSchemaContract": "contracts/database/neon-d1-03-w09-platform-schema.v1.json",
+    "fiveDomainBootstrap": "contracts/database/neon-five-domain-schema-bootstrap.v1.json",
+    "w11RuntimeReadme": "workers/W11-growth-campaign-analytics-operations/README.md",
+    "w11WranglerConfig": "workers/W11-growth-campaign-analytics-operations/wrangler.jsonc",
+    "d1_05OwnerBoundary": "contracts/transport/d1-05-analytics-owner-boundary.v1.json"
+  },
+  "d1_05Separation": {
+    "task": "T23",
+    "authority": "Analytics-only derived events, counters, rollups and rebuildable projections.",
+    "workerBinding": "D1_05",
+    "databaseName": "allluck",
+    "databaseUuid": "77d82be2-d12e-4a17-b410-9aa7d376bc11",
+    "analyticsMigrationFiles": [
+      "workers/W11-growth-campaign-analytics-operations/migrations/0001_analytics_projection.sql",
+      "workers/W11-growth-campaign-analytics-operations/migrations/0002_analytics_projection_rebuild_state.sql",
+      "workers/W11-growth-campaign-analytics-operations/migrations/0003_analytics_late_event_replay.sql",
+      "workers/W11-growth-campaign-analytics-operations/migrations/0004_analytics_w01_client_telemetry.sql"
+    ],
+    "rules": [
+      "T23 analytics-derived state remains in D1-05 and cannot be used as a substitute for T22 Campaign/GrowthOperation business state.",
+      "Every table created by the four admitted W11 migrations must remain analytics-prefixed.",
+      "W11 Wrangler and runtime environment remain D1_05-only until a separate reviewed D1-03 governance-access admission.",
+      "No Campaign or GrowthOperation physical table may be inferred from analytics dimensions, attribution fields, counters, or projection rebuild state."
+    ]
+  },
+  "safety": {
+    "newTables": 0,
+    "newWorkers": 0,
+    "newD1Databases": 0,
+    "newQueues": 0,
+    "newServiceBindings": 0,
+    "runtimeBindingsChanged": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "nextGate": "Keep Campaign and GrowthOperation physically deferred until their own T22 operation, field/state, D1-03 governance-access and source-migration contracts are admitted; then add a separate deterministic PostgreSQL 18 schema slice. Do not copy D1-05 analytics tables into D1-03."
+}

@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W01-W03-content-http-binding.v1.json",
+  "title": "1.0 W01 to W03 Content Internal HTTP Binding",
+  "version": "1.0.5",
+  "status": "CONTRACTED_PARTIAL",
+  "caller": {
+    "logicalWorker": "W01",
+    "role": "Public API / Gateway",
+    "authority": "Public wire boundary"
+  },
+  "callee": {
+    "logicalWorker": "W03",
+    "role": "Content / Article / Media / Translation",
+    "authority": "Content D1-02"
+  },
+  "transport": {
+    "kind": "Cloudflare Worker Service Binding HTTP",
+    "binding": "W03_CONTENT",
+    "targetWorker": "luckread-w03",
+    "publicExposure": false
+  },
+  "wireRule": "W01 maps the public /api/v1/contents family to the exact internal operations below; status=DRAFT is an authenticated owner-only social post list scoped by W03 to the W02 principal at L2+ and status=SCHEDULED is an authenticated owner-only scheduled social post list scoped by W03 to L3/L4 Creator principals. Both private lifecycle lists bypass shared public caching. Creator Center also uses the authenticated application route /api/creator/contents for owner-scoped reads; W03 never owns a public API namespace.",
+  "operations": [
+    {
+      "operationId": "listContents",
+      "method": "GET",
+      "publicPath": "/api/v1/contents",
+      "internalPath": "/internal/content/contents",
+      "principalRequired": false,
+      "idempotency": false,
+      "conditionalPrincipal": "For status=DRAFT, W01 must authenticate via W02; W03 requires L2+ and returns only caller-owned DRAFT social posts. For status=SCHEDULED, W01 must authenticate via W02; W03 requires L3/L4 Creator permission and returns only caller-owned SCHEDULED social posts. Both private status filters are never shared-cache eligible."
+    },
+    {
+      "operationId": "listPostThread",
+      "method": "GET",
+      "publicPath": "/api/v1/contents/{contentId}/thread",
+      "internalPath": "/internal/content/contents/{contentId}/thread",
+      "principalRequired": false,
+      "idempotency": false,
+      "visibility": "Public callers receive only the contiguous PUBLISHED/PUBLIC prefix. An authenticated owner may also read their own DRAFT posts."
+    },
+    {
+      "operationId": "appendPostThreadNext",
+      "method": "POST",
+      "publicPath": "/api/v1/contents/{contentId}/thread",
+      "internalPath": "/internal/content/contents/{contentId}/thread",
+      "principalRequired": true,
+      "requiredLayer": "L2+",
+      "idempotency": "Idempotency-Key",
+      "body": "{ nextContentId }",
+      "authority": "W03/D1-02 requires both content records to be social posts, owned by the same authenticated user, PUBLIC, and in DRAFT or PUBLISHED state. Each post has at most one predecessor and successor; the append operation rejects forks, merges, cycles, and chains longer than 50 items."
+    },
+    {
+      "operationId": "listCreatorContents",
+      "method": "GET",
+      "publicPath": "/api/creator/contents",
+      "internalPath": "/internal/content/creator-contents",
+      "principalRequired": true,
+      "idempotency": false
+    },
+    {
+      "operationId": "getUsernameRedirectEligibility",
+      "method": "GET",
+      "publicPath": null,
+      "internalPath": "/internal/content/username-redirect-eligibility/{ownerUserId}",
+      "principalRequired": false,
+      "idempotency": false,
+      "subjectOwnerIdSource": "W01 authenticated W02 identity projection; never client supplied",
+      "response": "{ data: { eligible: boolean } }",
+      "eligibility": "At least one W03 content row owned by ownerUserId with state=PUBLISHED, content_type in article/post/video and access_mode=PUBLIC",
+      "d1Owner": "W03 / D1-02 only"
+    },
+    {
+      "operationId": "createContent",
+      "method": "POST",
+      "publicPath": "/api/v1/contents",
+      "internalPath": "/internal/content/contents",
+      "principalRequired": true,
+      "idempotency": "Idempotency-Key"
+    },
+    {
+      "operationId": "getContent",
+      "method": "GET",
+      "publicPath": "/api/v1/contents/{contentId}",
+      "internalPath": "/internal/content/contents/{contentId}",
+      "principalRequired": false,
+      "idempotency": false
+    },
+    {
+      "operationId": "updateContent",
+      "method": "PATCH",
+      "publicPath": "/api/v1/contents/{contentId}",
+      "internalPath": "/internal/content/contents/{contentId}",
+      "principalRequired": true,
+      "precondition": "If-Match",
+      "idempotency": true
+    },
+    {
+      "operationId": "deleteContent",
+      "method": "DELETE",
+      "publicPath": "/api/v1/contents/{contentId}",
+      "internalPath": "/internal/content/contents/{contentId}",
+      "principalRequired": true,
+      "precondition": "If-Match",
+      "idempotency": true
+    },
+    {
+      "operationId": "transitionContentState",
+      "method": "POST",
+      "publicPath": "/api/v1/contents/{contentId}/state",
+      "internalPath": "/internal/content/contents/{contentId}/state",
+      "principalRequired": true,
+      "precondition": "If-Match",
+      "idempotency": "Idempotency-Key",
+      "scheduledPublishIdentity": "For target state SCHEDULED, W01 resolves the current ACTIVE Creator through the existing W08_CREATOR Service Binding and forwards its canonical creatorId in X-LuckRead-Verified-Creator-Id. W03 accepts the header only over the authenticated W01 internal transport, binds the verified creatorId to the owned content record, and keeps W03 as the content-state authority."
+    },
+    {
+      "operationId": "preflightContent",
+      "method": "POST",
+      "publicPath": "/api/creator/contents/{contentId}/preflight",
+      "internalPath": "/internal/content/contents/{contentId}/preflight",
+      "principalRequired": true,
+      "idempotency": false,
+      "d1ReadMax": 0,
+      "d1WriteMax": 0
+    },
+    {
+      "operationId": "listDueScheduledContentCandidates",
+      "method": "GET",
+      "publicPath": null,
+      "internalPath": "/internal/content/scheduled-due",
+      "principalRequired": false,
+      "serviceCaller": "W01 scheduled handler via the existing W03_CONTENT Service Binding",
+      "maxPageSize": 50,
+      "response": "W03-owned contentId, ownerUserId, creatorId, version, scheduledAt only",
+      "cache": "NO_STORE",
+      "d1Owner": "W03 / D1-02 only",
+      "authorizationRole": "Candidate discovery only; this operation does not publish or change content state."
+    },
+    {
+      "operationId": "commitW08AuthorizedScheduledPublication",
+      "method": "POST",
+      "publicPath": null,
+      "internalPath": "/internal/content/scheduled-publish/commit",
+      "principalRequired": false,
+      "serviceCaller": "W01 scheduled handler via the existing W03_CONTENT Service Binding",
+      "maxBatchSize": 50,
+      "bodyAuthority": "Each item must contain the exact W03 candidate fields, expectedCreatorId (the current stored creator_id, including null or the legacy ownerUserId placeholder), the canonical creatorId returned by W08, and that fresh W08 ALLOW decision. W03 validates policyVersion=casl-l0-l8-v1, layer L3/L4, action, resourceType, ownerUserId and canonical creatorId equality.",
+      "finalMutation": "W03 performs the final D1-02 compare-and-set against id, owner_user_id, expectedCreatorId (including NULL equality), state=SCHEDULED, scheduled_at (still due), and version before setting PUBLISHED, replacing creator_id with the W08 canonical creatorId, and clearing scheduled_at.",
+      "idempotency": "Concurrent/duplicate executions converge through the final state/version/time/owner/creator CAS; a row that no longer matches is not published again.",
+      "d1Owner": "W03 / D1-02 only"
+    }
+  ],
+  "headers": {
+    "requiredOnEveryCall": {
+      "X-LuckRead-Caller": "W01",
+      "X-LuckRead-Transport-Version": "1.0"
+    },
+    "principal": {
+      "header": "X-LuckRead-Principal-User-Id",
+      "requiredFor": "principalRequired=true",
+      "source": "W01 authoritative authentication result; never copied from public request body",
+      "layerHeader": "X-LuckRead-Principal-Layer",
+      "layerRequiredFor": "state transition authorization",
+      "layerSource": "W02 canonical L0-L8 resolution performed at W01 boundary; W03 uses it only for contracted creator/moderator transition gates"
+    },
+    "correlation": {
+      "header": "X-LuckRead-Correlation-Id",
+      "required": true
+    },
+    "forwardedConventions": [
+      "W01 forwards If-Match and Idempotency-Key exactly when the public operation requires them.",
+      "W01 does not forward end-user Authorization credentials to W03.",
+      "W03 treats missing/invalid caller or required principal headers as fail-closed transport/authentication failure."
+    ],
+    "verifiedCreator": {
+      "header": "X-LuckRead-Verified-Creator-Id",
+      "requiredFor": "SCHEDULED content state transition",
+      "source": "W01 resolves the caller's current active Creator identity through the existing private W08_CREATOR Service Binding; never copied from the public request body",
+      "failClosed": true
+    },
+    "backgroundScheduledPublish": {
+      "rateKeyHeader": "X-LuckRead-Rate-Key",
+      "rateKey": "scheduled-publish",
+      "requiredCaller": "X-LuckRead-Caller=W01",
+      "transportVersion": "1.0",
+      "credentialPolicy": "No Authorization, Cookie, user principal, or verified-creator headers are forwarded on either background operation."
+    }
+  },
+  "failurePolicy": {
+    "timeoutMs": 2000,
+    "automaticRetries": 0,
+    "mutationRetryRule": "Caller may retry only with the same Idempotency-Key where the public contract permits it.",
+    "failClosed": [
+      "missing W03_CONTENT binding",
+      "missing caller marker",
+      "unsupported transport version",
+      "missing required principal",
+      "invalid W03 response envelope",
+      "missing or invalid W08-verified Creator identity on a scheduled content transition",
+      "content.creatorId conflicts with the authenticated owner's current W08 Creator identity",
+      "missing W01 scheduled handler or W03_CONTENT/W08_CREATOR service binding",
+      "missing or invalid W03 due-candidate response",
+      "missing W08 ALLOW decision for a due candidate",
+      "W08 decision ownerUserId or creatorId does not match the W03 candidate",
+      "stale or concurrently changed content owner, Creator, lifecycle, scheduledAt or version at final W03 CAS"
+    ]
+  },
+  "security": {
+    "trustBoundary": "The binding is internal; W03 has no public route for these operations.",
+    "principalAuthority": "W01 authenticates the caller using existing AUTH contracts and sends only the resolved user id.",
+    "payloadOwnership": "ownerUserId is never accepted from public or internal caller payloads.",
+    "cache": "W01 preserves the public cache rules; internal responses are no-store.",
+    "secrets": "No end-user token or Payload secret is forwarded across the binding.",
+    "principalLayerAuthority": "W01 sends the layer returned by the existing W02 authz resolution; W03 never infers layer from cache or from the public request"
+  },
+  "evidenceRequired": [
+    "exact W01 source commit",
+    "exact W03 source commit",
+    "W03_CONTENT deployment/binding evidence",
+    "positive create/list/detail/state-transition evidence",
+    "negative ownership and stale If-Match evidence",
+    "idempotency replay evidence",
+    "no-secret-forwarding evidence",
+    "principal layer resolution/correlation evidence",
+    "creator-owned list evidence",
+    "cross-user exclusion evidence",
+    "creator list filter/cursor evidence",
+    "publish preflight verdict/recheck evidence",
+    "W03 username redirect eligibility positive/negative public-content evidence"
+  ],
+  "nonGoals": [
+    "No RPC surface.",
+    "No direct W03 public endpoint.",
+    "No new Worker or D1.",
+    "No cross-D1 transaction."
+  ],
+  "execution": {
+    "scheduledWorker": "W01 custom OpenNext Worker entrypoint",
+    "cronExpression": "* * * * *",
+    "orchestration": "W01 reads due candidates from W03, obtains a fresh W08 ALLOW decision for each canonical creator identity, and submits only matching ALLOW decisions to the W03 final CAS endpoint.",
+    "triggerOwnership": "The existing one-minute scheduled trigger is moved from W03 to W01; W03 has no scheduled trigger after this change. No additional Worker or trigger is created.",
+    "boundedWork": "At most 50 due candidates per tick; W01 limits W08 authorization concurrency to 8.",
+    "legacyIdentityCompatibility": "For legacy scheduled records with creator_id NULL or creator_id=owner_user_id, W08 may resolve the W03-provided identity hint via an ACTIVE creators.user_id row. W01 verifies that W08 ownerUserId equals the W03 ownerUserId. W03 only replaces the exact expectedCreatorId in the final CAS; a different or transferred Creator identity is rejected."
+  }
+}

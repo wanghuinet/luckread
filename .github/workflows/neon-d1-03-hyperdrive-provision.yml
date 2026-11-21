@@ -1,0 +1,75 @@
+name: Provision D1-03 Neon Hyperdrive
+run-name: Provision D1-03 governance Hyperdrive @ ${{ github.sha }}
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/neon-d1-03-hyperdrive-provision.yml'
+      - 'scripts/cloudflare/create-neon-hyperdrive.mjs'
+      - 'scripts/cloudflare/create-neon-hyperdrive.test.mjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-03-hyperdrive-provision
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    if: ${{ github.ref == 'refs/heads/main' && github.ref_protected == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Guard exact main ref and D1-03-only target
+        shell: bash
+        env:
+          CONFIRM_TARGET: CREATE_D1_03_NEON_HYPERDRIVE
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "${CONFIRM_TARGET}" = "CREATE_D1_03_NEON_HYPERDRIVE"
+
+      - name: Checkout exact main source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Provision or reuse only the D1-03 governance Hyperdrive
+        id: provision
+        env:
+          GITHUB_ACTIONS: 'true'
+          GITHUB_EVENT_NAME: push
+          GITHUB_REF: ${{ github.ref }}
+          CONFIRM_TARGET: CREATE_D1_03_NEON_HYPERDRIVE
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_HYPERDRIVE_API_TOKEN }}
+          NEON_DATABASE_URL_GOVERNANCE: ${{ secrets.NEON_DATABASE_URL_GOVERNANCE }}
+        run: node scripts/cloudflare/create-neon-hyperdrive.mjs
+
+      - name: Publish sanitized D1-03 Hyperdrive summary
+        shell: bash
+        env:
+          HYPERDRIVE_SUMMARY: ${{ steps.provision.outputs.hyperdrive_summary }}
+          HYPERDRIVE_ID: ${{ steps.provision.outputs.hyperdrive_id }}
+        run: |
+          set -euo pipefail
+          test -n "${HYPERDRIVE_ID}"
+          {
+            echo "## D1-03 governance Hyperdrive"
+            echo
+            echo "${HYPERDRIVE_SUMMARY}"
+            echo
+            echo "- Provisioned target: **luckread_governance**"
+            echo "- Worker binding changed: **No**"
+            echo "- Worker deployed: **No**"
+            echo "- Database writes / DDL / data import: **No**"
+          } >> "${GITHUB_STEP_SUMMARY}"

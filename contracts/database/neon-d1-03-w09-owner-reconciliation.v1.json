@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-03-w09-owner-reconciliation.v1.json",
+  "title": "LuckRead D1-03 W09 Logical Owner to Physical Schema Reconciliation",
+  "version": "1.0.0",
+  "status": "LOGICAL_OWNERS_RECONCILED_SCHEMA_ADMISSION_PARTIAL",
+  "scope": {
+    "domainId": "D1-03",
+    "worker": "W09",
+    "purpose": "Account for every W09-owned D1-03 entity without treating a logical ownership assignment as permission to invent physical tables.",
+    "noRuntimeOrBindingChange": true,
+    "noRemoteDdl": true
+  },
+  "logicalOwnerEntities": [
+    "AuditEvent",
+    "NotificationPushEndpoint",
+    "PlatformRuntime",
+    "ReconciliationOperation",
+    "RecoveryOperation"
+  ],
+  "admittedPhysicalSchemaEntities": [
+    "AuditEvent",
+    "NotificationPushEndpoint"
+  ],
+  "deferredPhysicalSchemaEntities": [
+    {
+      "entity": "PlatformRuntime",
+      "status": "LOGICAL_OWNER_ONLY_SCHEMA_NOT_ADMITTED",
+      "admissionEvidence": {
+        "entityFieldContract": null,
+        "persistenceContract": null,
+        "sourceMigration": null,
+        "postgresqlTranslation": null
+      },
+      "reason": "The canonical D1 owner maps assign PlatformRuntime to W09, but no W09 entity-field contract, persistence contract, or source migration is admitted. The ownership row alone does not define columns, constraints, lifecycle, or indexes.",
+      "requiredBeforeAdmission": [
+        "Canonical entity and field contract",
+        "W09 persistence contract defining lifecycle and constraints",
+        "Authoritative source migration owned or explicitly delegated to W09",
+        "Deterministic PostgreSQL 18 translation",
+        "Disposable PostgreSQL 18 rehearsal and catalog verification"
+      ]
+    },
+    {
+      "entity": "ReconciliationOperation",
+      "status": "LOGICAL_OWNER_ONLY_SCHEMA_NOT_ADMITTED",
+      "admissionEvidence": {
+        "entityFieldContract": null,
+        "persistenceContract": null,
+        "sourceMigration": null,
+        "postgresqlTranslation": null
+      },
+      "reason": "The canonical D1 owner maps assign ReconciliationOperation to W09, but no W09 entity-field contract, persistence contract, or source migration is admitted. Existing reconciliation descriptions do not establish an authoritative W09 row model.",
+      "requiredBeforeAdmission": [
+        "Canonical entity and field contract",
+        "W09 persistence contract defining reconciliation identity, scope, state transitions, and retention",
+        "Authoritative source migration owned or explicitly delegated to W09",
+        "Deterministic PostgreSQL 18 translation",
+        "Disposable PostgreSQL 18 rehearsal and catalog verification"
+      ]
+    },
+    {
+      "entity": "RecoveryOperation",
+      "status": "LOGICAL_OWNER_ONLY_SCHEMA_NOT_ADMITTED",
+      "admissionEvidence": {
+        "entityFieldContract": null,
+        "persistenceContract": null,
+        "sourceMigration": null,
+        "postgresqlTranslation": null
+      },
+      "reason": "The canonical D1 owner maps assign RecoveryOperation to W09, but no W09 entity-field contract, persistence contract, or source migration is admitted. General recovery/DR contracts do not by themselves define a W09-specific operational record.",
+      "requiredBeforeAdmission": [
+        "Canonical entity and field contract",
+        "W09 persistence contract defining recovery scope, checkpoints, outcomes, and audit references",
+        "Authoritative source migration owned or explicitly delegated to W09",
+        "Deterministic PostgreSQL 18 translation",
+        "Disposable PostgreSQL 18 rehearsal and catalog verification"
+      ]
+    }
+  ],
+  "authoritySources": {
+    "ownerBoundary": "contracts/transport/d1-03-entity-owner-boundary.v1.json",
+    "domainMaster": "docs/09-D1-DOMAIN-MASTER-v1.0.md",
+    "physicalSchemaContract": "contracts/database/neon-d1-03-w09-platform-schema.v1.json"
+  },
+  "admittedSources": {
+    "AuditEvent": {
+      "schemaSource": "contracts/schemas/common/audit-event.json",
+      "legacyD1CompatibilitySource": "workers/W06-governance/migrations/0001_audit_event.sql",
+      "owner": "W09",
+      "compatibilityWriter": "W06"
+    },
+    "NotificationPushEndpoint": {
+      "schemaSource": "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql",
+      "persistenceContract": "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
+      "owner": "W09",
+      "scopedDelegation": "W05/T14 only"
+    }
+  },
+  "safety": {
+    "newTables": 0,
+    "newWorkers": 0,
+    "newD1Databases": 0,
+    "newQueues": 0,
+    "newServiceBindings": 0,
+    "runtimeBindingsChanged": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "nextGate": "Admit each deferred W09 entity only after its own field/persistence/source-migration contract exists and passes deterministic PostgreSQL 18 rehearsal. Do not generate tables from the owner map."
+}

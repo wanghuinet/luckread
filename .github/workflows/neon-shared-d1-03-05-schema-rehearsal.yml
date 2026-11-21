@@ -1,0 +1,174 @@
+name: Shared D1-03 D1-04 D1-05 PostgreSQL 18 Schema Rehearsal
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-shared-d1-03-05-schema-rehearsal.yml'
+      - 'contracts/database/neon-d1-03-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-04-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-05-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'contracts/database/neon-d1-03-w06-moderation-schema.v1.json'
+      - 'contracts/database/neon-d1-03-w09-platform-schema.v1.json'
+      - 'contracts/database/neon-d1-03-w10-execution-schema.v1.json'
+      - 'contracts/database/neon-d1-04-w07-*-schema.v1.json'
+      - 'contracts/database/neon-d1-05-w11-analytics-schema.v1.json'
+      - 'scripts/neon/d1-01/0001_schema_migration_ledger.sql'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/shared-domain-schema-runner.test.mjs'
+      - 'workers/W06-governance/src/neon-postgres-migrations/**'
+      - 'workers/W06-governance/migrations/**'
+      - 'workers/W09-platform/src/neon-postgres-migrations/**'
+      - 'workers/W09-platform/migrations-d1-03/**'
+      - 'workers/W10-async/src/neon-postgres-migrations/**'
+      - 'workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/**'
+      - 'workers/W07-subscription-commerce/migrations-d1-04/**'
+      - 'workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/**'
+      - 'workers/W11-growth-campaign-analytics-operations/migrations/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-shared-d1-03-05-schema-rehearsal.yml'
+      - 'contracts/database/neon-d1-03-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-04-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-05-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'scripts/neon/d1-01/0001_schema_migration_ledger.sql'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/shared-domain-schema-runner.test.mjs'
+      - 'workers/W06-governance/src/neon-postgres-migrations/**'
+      - 'workers/W06-governance/migrations/**'
+      - 'workers/W09-platform/src/neon-postgres-migrations/**'
+      - 'workers/W09-platform/migrations-d1-03/**'
+      - 'workers/W10-async/src/neon-postgres-migrations/**'
+      - 'workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/**'
+      - 'workers/W07-subscription-commerce/migrations-d1-04/**'
+      - 'workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/**'
+      - 'workers/W11-growth-campaign-analytics-operations/migrations/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-shared-d1-03-05-schema-rehearsal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  static-contract:
+    name: Validate shared executor and all three domain manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check shared runner and source generator suites
+        run: |
+          set -euo pipefail
+          node --check scripts/neon/shared-domain-schema-runner.mjs
+          node --test \
+            scripts/neon/shared-domain-schema-runner.test.mjs \
+            workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.test.mjs \
+            workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.test.mjs \
+            workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.test.mjs \
+            workers/W10-async/scripts/neon/generate-d1-03-w10-postgres-migration.test.mjs \
+            workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.test.mjs \
+            workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.test.mjs \
+            workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-renewal-cycles-postgres-migration.test.mjs \
+            workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-revenuecat-webhook-postgres-migration.test.mjs \
+            workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-refunds-billing-documents-postgres-migration.test.mjs \
+            workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-payment-method-revocation-postgres-migration.test.mjs \
+            workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.test.mjs \
+            workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-03-w11-owner-reconciliation.test.mjs
+
+      - name: Regenerate every admitted PostgreSQL artifact from its source contract
+        run: |
+          set -euo pipefail
+          node workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.mjs
+          node workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.mjs
+          node workers/W10-async/scripts/neon/generate-d1-03-w10-postgres-migration.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-renewal-cycles-postgres-migration.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-revenuecat-webhook-postgres-migration.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-refunds-billing-documents-postgres-migration.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-payment-method-revocation-postgres-migration.mjs
+          node workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.mjs
+          git diff --exit-code -- \
+            workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql \
+            workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql \
+            workers/W10-async/src/neon-postgres-migrations/0001_w10_d1_03_async_execution.sql \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0002_w07_d1_04_saved_methods_mandates.sql \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0003_w07_d1_04_renewal_cycles.sql \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0004_w07_d1_04_revenuecat_webhook_inbox.sql \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0005_w07_d1_04_refunds_billing_documents.sql \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0006_w07_d1_04_payment_method_revocation.sql \
+            workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/0001_w11_d1_05_analytics_schema.sql
+
+  local-postgres18:
+    name: Rehearse ${{ matrix.domain }} on disposable PostgreSQL 18
+    needs: static-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - domain: D1-03
+            local_database_name: luckread_d1_03_shared
+          - domain: D1-04
+            local_database_name: luckread_d1_04_shared
+          - domain: D1-05
+            local_database_name: alluck_d1_05_shared
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_local_only
+          POSTGRES_DB: ${{ matrix.local_database_name }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ${{ matrix.local_database_name }}"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGPASSWORD: postgres_local_only
+      D1_SHARED_LOCAL_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/${{ matrix.local_database_name }}
+      D1_SHARED_SCHEMA_APPLY_REPORT: artifacts/neon/${{ matrix.domain }}-shared-runner-postflight.json
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install the PostgreSQL driver reused from W02
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Apply the selected domain manifest using the shared append-only ledger executor
+        env:
+          D1_SHARED_DOMAIN: ${{ matrix.domain }}
+          REHEARSAL_SOURCE_COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/neon
+          node scripts/neon/shared-domain-schema-runner.mjs --domain "$D1_SHARED_DOMAIN" --local-only
+      - name: Upload sanitized shared-runner postflight evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-${{ matrix.domain }}-shared-schema-postflight-${{ github.sha }}
+          path: artifacts/neon/${{ matrix.domain }}-shared-runner-postflight.json
+          if-no-files-found: error
+          retention-days: 90

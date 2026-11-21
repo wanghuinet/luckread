@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/migration/AUTH-010-session-revocation-journal.v1.json",
+  "title": "AUTH-010 Session Revocation Journal Migration Contract",
+  "version": "1.0",
+  "status": "CONTRACTED_PARTIAL",
+  "authority": {
+    "worker": "W02",
+    "database": "D1-01",
+    "table": "auth_010_session_revocation_journal"
+  },
+  "migration": {
+    "file": "workers/W02-identity/migrations/0012_auth_010_session_revocation_journal.sql",
+    "number": "0012"
+  },
+  "purpose": "Persist the immutable user.session.revoked publication intent in the same D1 transaction that removes a caller-owned Better Auth session.",
+  "requiredColumns": [
+    "journal_id",
+    "event_id",
+    "event_type",
+    "schema_version",
+    "resource_id",
+    "source_version",
+    "idempotency_key",
+    "payload",
+    "status",
+    "attempt",
+    "next_attempt_at",
+    "created_at",
+    "published_at",
+    "last_error_code"
+  ],
+  "constraints": [
+    "event_id is unique",
+    "idempotency_key is unique",
+    "one user.session.revoked event per Session resource_id",
+    "payload must be valid JSON object",
+    "status is PENDING, PUBLISHED or FAILED",
+    "source_version equals 1"
+  ],
+  "indexes": [
+    "auth_010_session_revocation_journal_status_next_attempt_idx"
+  ],
+  "nonGoals": [
+    "No duplicate native Session table",
+    "No user/device/session credential fields copied from Better Auth",
+    "No new Worker, D1, Queue or Service Binding",
+    "No production D1 migration or deployment implied by source-level code"
+  ]
+}

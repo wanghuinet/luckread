@@ -1,0 +1,768 @@
+import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
+import {
+  cachedPublicGet,
+  invalidatePublicContentComments,
+  invalidatePublicContentRelationships,
+  invalidatePublicContentThreads,
+  invalidatePublicContentList,
+  invalidatePublicContentVisibility,
+  rememberPublicShareContentId,
+  invalidatePublicFollowList,
+  invalidatePublicUserProfileByUsername,
+  publicCacheKey,
+} from './public-response-cache.js'
+
+describe('public response cache', () => {
+  it('uses separate public cache keys for each comment sort mode', () => {
+    const recent = publicCacheKey(
+      new Request('https://luckread.com/api/v1/contents/content-1/comments?limit=20&sort=recent'),
+      'content-comments',
+      'g0',
+    ).url
+    const liked = publicCacheKey(
+      new Request('https://luckread.com/api/v1/contents/content-1/comments?limit=20&sort=liked'),
+      'content-comments',
+      'g0',
+    ).url
+    const relevant = publicCacheKey(
+      new Request('https://luckread.com/api/v1/contents/content-1/comments?limit=20'),
+      'content-comments',
+      'g0',
+    ).url
+
+    expect(recent).not.toBe(liked)
+    expect(recent).not.toBe(relevant)
+    expect(liked).not.toBe(relevant)
+  })
+
+  it('bypasses shared cache for an unregistered namespace', async () => {
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+    const response = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/example?secret=1'),
+      'unregistered-namespace',
+      loader,
+      30,
+    )
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(response.headers.get('X-LuckRead-Cache')).toBeNull()
+  })
+
+  const cache = {
+    match: vi.fn(),
+    put: vi.fn(async () => undefined),
+    delete: vi.fn<(request: Request) => Promise<boolean>>(async (_request) => true),
+  }
+
+  const generationResponse = (generation = 'g0') => new Response(JSON.stringify({ generation }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  })
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-list-generation') ? generationResponse() : undefined,
+    )
+    cache.put.mockResolvedValue(undefined)
+    cache.delete.mockResolvedValue(true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    delete (globalThis as Record<string, unknown>).caches
+  })
+
+  it('caches public discovery topic pages with a bounded key and TTL', async () => {
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+    const request = new Request('https://luckread.com/api/v1/discovery/topics?limit=10&cursor=cursor_1')
+    const payload: { data: { items: Array<{ topicId: string; name: string }>; hasMore: boolean; nextCursor: string | null } } = {
+      data: { items: [{ topicId: 'topic_1', name: 'LuckRead' }], hasMore: false, nextCursor: null },
+    }
+    const loader = vi.fn(async () => Response.json(payload))
+
+    const first = await cachedPublicGet(request, 'social-discovery-topics', loader, 30)
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(first.headers.get('X-LuckRead-Cache')).toBe('MISS')
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
+    const stored = putCalls.find(([key]) => key.url.includes('__edge-cache'))
+    expect(stored?.[0].url).toContain('n=social-discovery-topics')
+    expect(stored?.[0].url).toContain('cursor%3Dcursor_1%26limit%3D10')
+    expect(stored?.[1]?.headers.get('cache-control')).toBe('public, max-age=0, s-maxage=30')
+
+    const cachedResponse = Response.json(payload)
+    cache.match.mockImplementation(async (key: Request) => (
+      key.url.includes('__edge-cache') ? cachedResponse.clone() : undefined
+    ))
+    const second = await cachedPublicGet(request.clone(), 'social-discovery-topics', loader, 30)
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(second.headers.get('X-LuckRead-Cache')).toBe('HIT')
+  })
+
+  it('serves a cache hit without executing the origin loader', async () => {
+    const cached = new Response(JSON.stringify({ data: 'cached' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-list-generation') ? generationResponse() : cached,
+    )
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+    const response = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/contents'),
+      'content-list',
+      loader,
+      30,
+    )
+
+    expect(loader).not.toHaveBeenCalled()
+    expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
+    const firstPayload = await response.json() as { data: string; requestId: string }
+    expect(firstPayload).toMatchObject({
+      data: 'cached',
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
+    const secondResponse = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/contents'),
+      'content-list',
+      loader,
+      30,
+    )
+    const secondPayload = await secondResponse.json() as { requestId: string }
+    expect(secondPayload.requestId).toMatch(/^req_[A-Za-z0-9_-]+$/)
+    expect(secondPayload.requestId).not.toBe(firstPayload.requestId)
+  })
+
+  it('refreshes request IDs on cache hits and prevents downstream caching of request-scoped envelopes', async () => {
+    const cached = new Response(JSON.stringify({ data: 'cached', requestId: 'origin-request-id' }), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'public, max-age=0, s-maxage=30',
+      },
+    })
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-list-generation') ? generationResponse() : cached,
+    )
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+    const request = new Request('https://luckread.com/api/v1/contents')
+    const first = await cachedPublicGet(request, 'content-list', loader, 30)
+    const second = await cachedPublicGet(request.clone(), 'content-list', loader, 30)
+    const firstBody = await first.json() as { requestId: string }
+    const secondBody = await second.json() as { requestId: string }
+
+    expect(loader).not.toHaveBeenCalled()
+    expect(firstBody.requestId).toMatch(/^req_[A-Za-z0-9_-]{1,123}$/)
+    expect(secondBody.requestId).toMatch(/^req_[A-Za-z0-9_-]{1,123}$/)
+    expect(firstBody.requestId).not.toBe('origin-request-id')
+    expect(secondBody.requestId).not.toBe(firstBody.requestId)
+    expect(first.headers.get('x-request-id')).toBe(firstBody.requestId)
+    expect(first.headers.get('cache-control')).toBe('private, no-store')
+    expect(first.headers.get('x-luckread-cache')).toBe('HIT')
+  })
+
+  it('returns a fresh request ID on misses while storing the origin response unchanged', async () => {
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-list-generation') ? generationResponse() : undefined,
+    )
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const loader = vi.fn(async () => new Response(JSON.stringify({
+      data: 'origin',
+      requestId: 'origin-request-id',
+    }), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+      },
+    }))
+
+    const response = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/contents'),
+      'content-list',
+      loader,
+      30,
+    )
+    const body = await response.json() as { requestId: string }
+
+    expect(body.requestId).toMatch(/^req_[A-Za-z0-9_-]{1,123}$/)
+    expect(body.requestId).not.toBe('origin-request-id')
+    expect(response.headers.get('x-request-id')).toBe(body.requestId)
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
+    const stored = putCalls.find(([request]) => request.url.includes('__edge-cache'))
+    expect(stored).toBeDefined()
+    await expect(stored?.[1]?.clone().json()).resolves.toEqual({
+      data: 'origin',
+      requestId: 'origin-request-id',
+    })
+  })
+
+  it('coalesces concurrent misses into one origin request', async () => {
+    cache.match.mockResolvedValue(undefined)
+    cache.put.mockResolvedValue(undefined)
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    let releaseLoader: ((response: Response) => void) | null = null
+    const loader = vi.fn(() => new Promise<Response>((resolve) => { releaseLoader = resolve }))
+
+    const request = new Request('https://luckread.com/api/v1/users/u-coalesce')
+    const a = cachedPublicGet(request, 'user-profile', loader, 30)
+    await vi.waitFor(() => expect(loader).toHaveBeenCalledTimes(1))
+    const b = cachedPublicGet(request.clone(), 'user-profile', loader, 30)
+    releaseLoader?.(new Response(JSON.stringify({ data: 'origin' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+
+    const [first, second] = await Promise.all([a, b])
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(cache.put).toHaveBeenCalledTimes(1)
+    expect(first.headers.get('X-LuckRead-Cache')).toBe('MISS')
+    expect(second.headers.get('X-LuckRead-Cache')).toBe('MISS')
+  })
+
+  it('returns the successful origin response when cache storage rejects writes', async () => {
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-list-generation') ? generationResponse() : undefined,
+    )
+    cache.put.mockRejectedValueOnce(new Error('CACHE_WRITE_FAILED'))
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+
+    const response = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/contents'),
+      'content-list',
+      loader,
+      30,
+    )
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: 'origin',
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
+    expect(response.headers.get('X-LuckRead-Cache')).toBe('MISS')
+  })
+
+  it('reuses bounded memory fallback after an edge cache write failure', async () => {
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-list-generation') ? generationResponse() : undefined,
+    )
+    cache.put.mockRejectedValueOnce(new Error('CACHE_WRITE_FAILED'))
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+    const request = new Request('https://luckread.com/api/v1/contents?cursor=fallback')
+
+    const first = await cachedPublicGet(request, 'content-list', loader, 30)
+    expect(first.status).toBe(200)
+
+    const second = await cachedPublicGet(request.clone(), 'content-list', loader, 30)
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(second.headers.get('X-LuckRead-Cache')).toBe('HIT')
+    await expect(second.json()).resolves.toMatchObject({
+      data: 'origin',
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
+  })
+
+  it('uses the memory fallback when Cache API reads fail', async () => {
+    cache.match.mockResolvedValue(undefined)
+    cache.put.mockRejectedValueOnce(new Error('CACHE_WRITE_FAILED'))
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+    const request = new Request('https://luckread.com/api/v1/users/u-read-fallback')
+
+    await cachedPublicGet(request, 'user-profile', loader, 30)
+    cache.match
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('CACHE_READ_FAILED'))
+    const response = await cachedPublicGet(request.clone(), 'user-profile', loader, 30)
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
+    await expect(response.json()).resolves.toMatchObject({
+      data: 'origin',
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
+  })
+
+  it('bounds concurrent cache-miss origin work', async () => {
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-list-generation') ? generationResponse() : undefined,
+    )
+    cache.put.mockResolvedValue(undefined)
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    let active = 0
+    let peak = 0
+    const loader = vi.fn(async () => {
+      active += 1
+      peak = Math.max(peak, active)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      active -= 1
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+    await Promise.all(Array.from({ length: 24 }, (_, i) => cachedPublicGet(
+      new Request('https://luckread.com/api/v1/contents?cursor=' + i),
+      'content-list',
+      loader,
+      30,
+    )))
+    expect(peak).toBeLessThanOrEqual(16)
+  })
+
+  it('enforces a bounded origin budget when the cache repeatedly fails', async () => {
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-list-generation') ? generationResponse() : undefined,
+    )
+    cache.put.mockRejectedValue(new Error('CACHE_WRITE_FAILED'))
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    let now = 0
+    vi.spyOn(Date, 'now').mockImplementation(() => now)
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+
+    const results: Response[] = []
+    for (let i = 0; i < 6; i += 1) {
+      results.push(await cachedPublicGet(
+        new Request('https://luckread.com/api/v1/contents?cursor=fuse'),
+        'content-list',
+        loader,
+        1,
+      ))
+      now += 2000
+    }
+
+    expect(loader).toHaveBeenCalledTimes(5)
+    expect(results.slice(0, 5).every((response) => response.status === 200)).toBe(true)
+    expect(results[5]?.status).toBe(503)
+    expect(results[5]?.headers.get('x-luckread-cache')).toBe('OVERLOADED')
+  })
+
+  it('normalizes username profile cache keys without attacker-controlled query dimensions', () => {
+    const a = publicCacheKey(new Request('https://luckread.com/api/v1/users/by-username/alice?x=1'), 'user-profile-by-username')
+    const b = publicCacheKey(new Request('https://luckread.com/api/v1/users/by-username/alice?x=2'), 'user-profile-by-username')
+    expect(a.url).toBe(b.url)
+  })
+
+  it('supports the dedicated public media detail cache namespace', () => {
+    const a = publicCacheKey(new Request('https://luckread.com/api/v1/media/m1?x=1'), 'media-detail')
+    const b = publicCacheKey(new Request('https://luckread.com/api/v1/media/m1?x=2'), 'media-detail')
+    expect(a.url).toBe(b.url)
+  })
+
+  it('keeps language out of non-localized cache keys', () => {
+    const a = publicCacheKey(new Request('https://luckread.com/api/v1/users/u1', { headers: { 'accept-language': 'en-US' } }), 'user-profile')
+    const b = publicCacheKey(new Request('https://luckread.com/api/v1/users/u1', { headers: { 'accept-language': 'zh-CN' } }), 'user-profile')
+    expect(a.url).toBe(b.url)
+  })
+
+  it('ignores unknown query parameters for contracted public cache keys', () => {
+    const a = publicCacheKey(new Request('https://luckread.com/api/v1/contents/1?foo=a'), 'content-detail')
+    const b = publicCacheKey(new Request('https://luckread.com/api/v1/contents/1?foo=b'), 'content-detail')
+    expect(a.url).toBe(b.url)
+
+    const c = publicCacheKey(new Request('https://luckread.com/api/v1/contents?limit=20&foo=a'), 'content-list')
+    const d = publicCacheKey(new Request('https://luckread.com/api/v1/contents?limit=20&foo=b'), 'content-list')
+    expect(c.url).toBe(d.url)
+  })
+
+  it('separates content-list cache keys by generation', () => {
+    const a = publicCacheKey(
+      new Request('https://luckread.com/api/v1/contents?type=article'),
+      'content-list',
+      'generation-a',
+    )
+    const b = publicCacheKey(
+      new Request('https://luckread.com/api/v1/contents?type=article'),
+      'content-list',
+      'generation-b',
+    )
+    expect(a.url).not.toBe(b.url)
+  })
+
+  it('normalizes cache keys deterministically', () => {
+    const a = publicCacheKey(new Request('https://luckread.com/api/v1/contents?type=article&limit=20'), 'content-list')
+    const b = publicCacheKey(new Request('https://luckread.com/api/v1/contents?limit=20&type=article'), 'content-list')
+    expect(a.url).toBe(b.url)
+  })
+
+  it('can store a bounded negative cache response after origin lookup', async () => {
+    cache.match.mockResolvedValue(undefined)
+    cache.put.mockRejectedValueOnce(new Error('CACHE_WRITE_FAILED'))
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const loader = vi.fn(async () => new Response(JSON.stringify({ error: { code: 'RESOURCE_NOT_FOUND' } }), {
+      status: 404,
+      headers: { 'content-type': 'application/json' },
+    }))
+
+    const first = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/media/missing'),
+      'media-detail',
+      loader,
+      30,
+    )
+    const second = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/media/missing'),
+      'media-detail',
+      loader,
+      30,
+    )
+
+    expect(first.status).toBe(404)
+    expect(second.status).toBe(404)
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(second.headers.get('x-luckread-cache')).toBe('HIT')
+  })
+
+  it('uses a content visibility generation for share-detail cache keys', async () => {
+    const cached = new Response(JSON.stringify({ data: 'cached' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+    cache.match.mockImplementation(async (request: Request) => {
+      if (request.url.includes('__share-detail-content')) {
+        return Response.json({ contentId: 'content-1' })
+      }
+      if (request.url.includes('__content-visibility-generation')) {
+        return generationResponse('g0')
+      }
+      return cached
+    })
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const request = new Request('https://luckread.com/api/v1/shares/share-1')
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+    const response = await cachedPublicGet(request, 'share-detail', loader, 60)
+
+    expect(loader).not.toHaveBeenCalled()
+    expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
+    expect(cache.match).toHaveBeenCalledWith(
+      new Request('https://cache.luckread.internal/__share-detail-content?v=1&share=share-1'),
+    )
+    expect(cache.match).toHaveBeenCalledWith(
+      new Request('https://cache.luckread.internal/__content-visibility-generation?v=1&content=content-1'),
+    )
+    expect(cache.match).toHaveBeenCalledWith(publicCacheKey(request, 'share-detail', 'g0'))
+  })
+
+  it('requires share content mapping before using the shared share-detail cache', async () => {
+    cache.match.mockResolvedValue(undefined)
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+
+    const response = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/shares/legacy-share'),
+      'share-detail',
+      loader,
+      60,
+    )
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(response.headers.get('X-LuckRead-Cache')).toBeNull()
+  })
+
+  it('stores the immutable share-to-content mapping without deleting share cache pages', async () => {
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+    await rememberPublicShareContentId('share-1', 'content-1')
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
+    const mappingWrite = putCalls.find(([request]) => request.url.includes('__share-detail-content'))
+    expect(mappingWrite).toBeDefined()
+    expect(mappingWrite?.[0].url).toContain('share=share-1')
+    const body = await mappingWrite?.[1]?.clone().json() as { contentId?: unknown }
+    expect(body.contentId).toBe('content-1')
+  })
+
+  it('bumps content visibility generation for share cache invalidation', async () => {
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+    await invalidatePublicContentVisibility('content-1')
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
+    const generationWrite = putCalls.find(([request]) =>
+      request.url.includes('__content-visibility-generation') &&
+      request.url.includes('content=content-1'),
+    )
+    expect(generationWrite).toBeDefined()
+    expect(generationWrite?.[1]).toBeInstanceOf(Response)
+    const body = await generationWrite?.[1]?.clone().json() as { generation?: unknown }
+    expect(typeof body.generation).toBe('string')
+  })
+
+  it('uses a per-content generation for relationship-list cache keys', async () => {
+    const cached = new Response(JSON.stringify({ data: 'cached' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-relationships-generation') ? generationResponse('g0') : cached,
+    )
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const request = new Request('https://luckread.com/api/v1/contents/content-1/relationships?direction=out&limit=20')
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+    const response = await cachedPublicGet(request, 'content-relationships', loader, 30)
+
+    expect(loader).not.toHaveBeenCalled()
+    expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
+    expect(cache.match).toHaveBeenCalledWith(
+      new Request('https://cache.luckread.internal/__content-relationships-generation?v=1&content=content-1'),
+    )
+    expect(cache.match).toHaveBeenCalledWith(publicCacheKey(request, 'content-relationships', 'g0'))
+  })
+
+  it('bumps the requested content relationship generation', async () => {
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    await invalidatePublicContentRelationships('content-1')
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
+    const generationWrite = putCalls.find(([request]) =>
+      request.url.includes('__content-relationships-generation') &&
+      request.url.includes('content=content-1'),
+    )
+    expect(generationWrite).toBeDefined()
+    const body = await generationWrite?.[1]?.clone().json() as { generation?: unknown }
+    expect(typeof body.generation).toBe('string')
+    expect(cache.delete).not.toHaveBeenCalled()
+  })
+
+  it('uses one global generation for public thread cache keys', async () => {
+    const cached = new Response(JSON.stringify({ data: 'cached-thread' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-threads-generation') ? generationResponse('thread-g0') : cached,
+    )
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const request = new Request('https://luckread.com/api/v1/contents/post-1/thread')
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+    const response = await cachedPublicGet(request, 'content-threads', loader, 30)
+
+    expect(loader).not.toHaveBeenCalled()
+    expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
+    expect(cache.match).toHaveBeenCalledWith(
+      new Request('https://cache.luckread.internal/__content-threads-generation?v=1'),
+    )
+    expect(cache.match).toHaveBeenCalledWith(publicCacheKey(request, 'content-threads', 'thread-g0'))
+  })
+
+  it('bumps the global thread generation so every segment view becomes unreachable', async () => {
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    await invalidatePublicContentThreads()
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
+    const generationWrite = putCalls.find(([request]) =>
+      request.url.includes('__content-threads-generation'),
+    )
+    expect(generationWrite).toBeDefined()
+    const body = await generationWrite?.[1]?.clone().json() as { generation?: unknown }
+    expect(typeof body.generation).toBe('string')
+    expect(body.generation).not.toBe('thread-g0')
+    expect(cache.delete).not.toHaveBeenCalled()
+  })
+
+  it('uses a per-content generation for comment-list cache keys', async () => {
+    const cached = new Response(JSON.stringify({ data: 'cached' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-comments-generation') ? generationResponse('g0') : cached,
+    )
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const request = new Request('https://luckread.com/api/v1/contents/content-1/comments?limit=20')
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+    const response = await cachedPublicGet(request, 'content-comments', loader, 10)
+
+    expect(loader).not.toHaveBeenCalled()
+    expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
+    expect(cache.match).toHaveBeenCalledWith(
+      new Request('https://cache.luckread.internal/__content-comments-generation?v=1&content=content-1'),
+    )
+    expect(cache.match).toHaveBeenCalledWith(publicCacheKey(request, 'content-comments', 'g0'))
+  })
+
+  it('bumps the requested content comment generation', async () => {
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    await invalidatePublicContentComments('content-1')
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
+    const generationWrite = putCalls.find(([request]) =>
+      request.url.includes('__content-comments-generation') &&
+      request.url.includes('content=content-1'),
+    )
+    expect(generationWrite).toBeDefined()
+    expect(generationWrite?.[1]).toBeInstanceOf(Response)
+    const body = await generationWrite?.[1]?.clone().json() as { generation?: unknown }
+    expect(typeof body.generation).toBe('string')
+    expect(cache.delete).not.toHaveBeenCalled()
+  })
+
+  it('uses a per-user generation for follow-list cache keys', async () => {
+    const cached = new Response(JSON.stringify({ data: 'cached' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__follow-list-generation') ? generationResponse('g0') : cached,
+    )
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const request = new Request('https://luckread.com/api/v1/users/u1/followers?limit=20')
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+    const response = await cachedPublicGet(request, 'followers', loader, 15)
+
+    expect(loader).not.toHaveBeenCalled()
+    expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
+    expect(cache.match).toHaveBeenCalledWith(
+      new Request('https://cache.luckread.internal/__follow-list-generation?v=1&direction=followers&user=u1'),
+    )
+    expect(cache.match).toHaveBeenCalledWith(publicCacheKey(request, 'followers', 'g0'))
+  })
+
+  it('bumps the requested follow-list generation instead of deleting a single page', async () => {
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    await invalidatePublicFollowList('followers', 'u1')
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
+    const generationWrite = putCalls.find(([request]) =>
+      request.url.includes('__follow-list-generation') &&
+      request.url.includes('direction=followers') &&
+      request.url.includes('user=u1'),
+    )
+    expect(generationWrite).toBeDefined()
+    expect(generationWrite?.[1]).toBeInstanceOf(Response)
+    const body = await generationWrite?.[1]?.clone().json() as { generation?: unknown }
+    expect(typeof body.generation).toBe('string')
+    expect(body.generation).not.toBe('g0')
+    expect(cache.delete).not.toHaveBeenCalled()
+  })
+
+  it('invalidates the explicit username profile cache key', async () => {
+    cache.delete.mockResolvedValue(true)
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    await invalidatePublicUserProfileByUsername(
+      new Request('https://luckread.com/api/v1/users/by-username/alice'),
+      'alice',
+    )
+
+    expect(cache.delete).toHaveBeenCalledWith(
+      publicCacheKey(
+        new Request('https://luckread.com/api/v1/users/by-username/alice'),
+        'user-profile-by-username',
+      ),
+    )
+  })
+
+  it('bumps the content-list generation and invalidates the previous canonical key', async () => {
+    cache.delete.mockResolvedValue(true)
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    await invalidatePublicContentList(
+      new Request('https://luckread.com/api/v1/contents?limit=20', {
+        headers: { 'accept-language': 'en-US' },
+      }),
+    )
+
+    const urls = cache.delete.mock.calls.map(([request]) => request.url)
+    expect(urls).toContain(
+      publicCacheKey(
+        new Request('https://luckread.com/api/v1/contents'),
+        'content-list',
+        'g0',
+      ).url,
+    )
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response]>
+    const generationWrite = putCalls
+      .map(([request, response]) => ({ request, response }))
+      .find(({ request }) => request.url.includes('__content-list-generation'))
+    expect(generationWrite).toBeDefined()
+    const body = await generationWrite!.response.clone().json() as { generation?: unknown }
+    expect(typeof body.generation).toBe('string')
+    expect(body.generation).not.toBe('g0')
+  })
+
+  it('makes every filtered content-list variant unreachable after a generation bump', async () => {
+    const before = publicCacheKey(
+      new Request('https://luckread.com/api/v1/contents?creatorId=creator1&type=video&limit=50&cursor=c1'),
+      'content-list',
+      'g0',
+    ).url
+
+    cache.delete.mockResolvedValue(true)
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    await invalidatePublicContentList(new Request('https://luckread.com/api/v1/contents'))
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response]>
+    const generationWrite = putCalls
+      .map(([request, response]) => ({ request, response }))
+      .find(({ request }) => request.url.includes('__content-list-generation'))
+    const body = await generationWrite!.response.clone().json() as { generation: string }
+
+    const after = publicCacheKey(
+      new Request('https://luckread.com/api/v1/contents?creatorId=creator1&type=video&limit=50&cursor=c1'),
+      'content-list',
+      body.generation,
+    ).url
+
+    expect(after).not.toBe(before)
+  })
+
+  it('bypasses shared content-list cache when generation state is unavailable', async () => {
+    cache.match.mockRejectedValue(new Error('GENERATION_READ_FAILED'))
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+    }))
+
+    const response = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/contents'),
+      'content-list',
+      loader,
+      30,
+    )
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(response.headers.get('X-LuckRead-Cache')).toBeNull()
+    expect(response.headers.get('cache-control')).toBe('no-store')
+  })
+
+})

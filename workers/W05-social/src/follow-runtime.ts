@@ -1,0 +1,375 @@
+/// <reference types="@cloudflare/workers-types" />
+
+import {
+  FollowStoreError,
+  type FollowStore,
+} from './follow-store.js'
+import type { FollowRow } from './follow-store.js'
+import type {
+  FollowListCursor,
+  FollowListDirection,
+  FollowListReadStore,
+} from './follow-list-read-store.js'
+import {
+  FollowingAuthorIdsReadStoreError,
+  type FollowingAuthorIdsReadStore,
+} from './following-author-ids-read-store.js'
+import {
+  type FollowStatusReadRow,
+  type FollowStatusReadStore,
+} from './follow-status-read-store.js'
+export type { FollowRow } from './follow-store.js'
+
+export class FollowRuntimeError extends Error {
+  constructor(readonly code: string, readonly status: number) { super(code) }
+}
+
+export type { FollowListDirection } from './follow-list-read-store.js'
+
+export type FollowListItem = {
+  relationshipId: string
+  userId: string
+  followedAt: string
+}
+
+export type FollowListPage = {
+  items: FollowListItem[]
+  totalCount: number
+  nextCursor: string | null
+  hasMore: boolean
+}
+
+const DEFAULT_LIMIT = 20
+const MAX_LIMIT = 50
+const MAX_CURSOR_LENGTH = 2048
+
+const FOLLOW_COUNT_CACHE_TTL_SECONDS = 5
+
+const getDefaultCache = (): Cache | null => {
+  if (typeof globalThis.caches === 'undefined') return null
+  return (globalThis.caches as unknown as { default?: Cache }).default ?? null
+}
+
+const followCountCacheKey = (direction: FollowListDirection, userIdValue: string): Request =>
+  new Request(
+    'https://cache.luckread.internal/__social-follow-count?v=1&direction=' +
+      encodeURIComponent(direction) +
+      '&user=' + encodeURIComponent(userIdValue),
+    { method: 'GET' },
+  )
+
+const readCachedFollowCount = async (
+  direction: FollowListDirection,
+  userIdValue: string,
+): Promise<number | null> => {
+  const cache = getDefaultCache()
+  if (!cache) return null
+  try {
+    const hit = await cache.match(followCountCacheKey(direction, userIdValue))
+    if (!hit) return null
+    const value = await hit.json() as { totalCount?: unknown }
+    return typeof value.totalCount === 'number' &&
+      Number.isSafeInteger(value.totalCount) &&
+      value.totalCount >= 0
+      ? value.totalCount
+      : null
+  } catch {
+    return null
+  }
+}
+
+const writeCachedFollowCount = async (
+  direction: FollowListDirection,
+  userIdValue: string,
+  totalCount: number,
+): Promise<void> => {
+  const cache = getDefaultCache()
+  if (!cache) return
+  try {
+    await cache.put(
+      followCountCacheKey(direction, userIdValue),
+      Response.json(
+        { totalCount },
+        {
+          headers: {
+            'content-type': 'application/json; charset=utf-8',
+            'cache-control': 'public, max-age=0, s-maxage=' + FOLLOW_COUNT_CACHE_TTL_SECONDS,
+          },
+        },
+      ),
+    )
+  } catch {
+    // Cache failure must never make the authoritative social read fail.
+  }
+}
+
+export const invalidateFollowListCountCache = async (...userIds: string[]): Promise<void> => {
+  const cache = getDefaultCache()
+  if (!cache) return
+  const normalizedIds = [...new Set(userIds.map((value) => value.trim()).filter(Boolean))]
+  await Promise.all(normalizedIds.flatMap((id) => (
+    (['followers', 'following'] as FollowListDirection[]).map(async (direction) => {
+      try {
+        await cache.delete(followCountCacheKey(direction, id))
+      } catch {
+        // Best-effort invalidation; the Store remains authoritative.
+      }
+    })
+  )))
+}
+
+const userId = (v: string) => {
+  const id = v.trim()
+  if (!id || id.length > 256) throw new FollowRuntimeError('VALIDATION_FAILED', 400)
+  return id
+}
+
+export const parseFollowListLimit = (value: string | null): number => {
+  if (value === null || value.trim() === '') return DEFAULT_LIMIT
+  const normalized = value.trim()
+  if (!/^(?:[1-9]|[1-4][0-9]|50)$/.test(normalized)) {
+    throw new FollowRuntimeError('VALIDATION_FAILED', 400)
+  }
+  return Math.min(Number(normalized), MAX_LIMIT)
+}
+
+type CursorPayload = {
+  version: 1
+  userId: string
+  direction: FollowListDirection
+  createdAt: string
+  relationshipId: string
+}
+
+const encodeCursor = (payload: CursorPayload): string => {
+  const raw = JSON.stringify(payload)
+  return btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+const decodeCursor = (value: string | null, direction: FollowListDirection, userIdValue: string): CursorPayload | null => {
+  if (!value) return null
+  const normalized = value.trim()
+  if (!normalized || normalized.length > MAX_CURSOR_LENGTH) {
+    throw new FollowRuntimeError('INVALID_CURSOR', 400)
+  }
+  try {
+    const padded = normalized.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - normalized.length % 4) % 4)
+    const parsed = JSON.parse(atob(padded)) as Partial<CursorPayload>
+    if (
+      parsed.version !== 1 ||
+      parsed.userId !== userIdValue ||
+      parsed.direction !== direction ||
+      typeof parsed.createdAt !== 'string' ||
+      typeof parsed.relationshipId !== 'string' ||
+      !Number.isFinite(Date.parse(parsed.createdAt)) ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.relationshipId)
+    ) {
+      throw new Error('invalid cursor')
+    }
+    return {
+      version: 1,
+      userId: userIdValue,
+      direction,
+      createdAt: parsed.createdAt,
+      relationshipId: parsed.relationshipId,
+    }
+  } catch {
+    throw new FollowRuntimeError('INVALID_CURSOR', 400)
+  }
+}
+
+type FollowListDataSource = FollowListReadStore
+
+async function listFollowRelations(
+  source: FollowListDataSource,
+  userIdValue: string,
+  direction: FollowListDirection,
+  cursorValue: string | null,
+  limit: number,
+): Promise<FollowListPage> {
+  const ownerId = userId(userIdValue)
+  const decodedCursor = decodeCursor(cursorValue, direction, ownerId)
+  const cursor: FollowListCursor | null = decodedCursor
+    ? { createdAt: decodedCursor.createdAt, relationshipId: decodedCursor.relationshipId }
+    : null
+  const store = source
+
+  const [rows, cachedTotalCount] = await Promise.all([
+    store.list({ userId: ownerId, direction, cursor, limit })
+      .catch((error) => mapFollowStoreError(error)),
+    readCachedFollowCount(direction, ownerId),
+  ])
+  const hasMore = rows.length > limit
+  const visibleRows = hasMore ? rows.slice(0, limit) : rows
+
+  let totalCount = cachedTotalCount
+  if (totalCount === null) {
+    // Keep the aggregate separate from the page query so a hot relationship
+    // index is scanned once, not once per returned row.
+    try {
+      totalCount = await store.count({ userId: ownerId, direction })
+    } catch (error) {
+      mapFollowStoreError(error)
+    }
+    await writeCachedFollowCount(direction, ownerId, totalCount)
+  }
+
+  const last = visibleRows.at(-1)
+  return {
+    items: visibleRows.map(row => ({
+      relationshipId: row.relationship_id,
+      userId: row.user_id,
+      followedAt: row.followed_at,
+    })),
+    totalCount,
+    hasMore,
+    nextCursor: hasMore && last
+      ? encodeCursor({
+          version: 1,
+          userId: ownerId,
+          direction,
+          createdAt: last.cursor_created_at ?? last.followed_at,
+          relationshipId: last.relationship_id,
+        })
+      : null,
+  }
+}
+
+
+export type FollowingAuthorCandidates = {
+  items: Array<{ userId: string }>
+  candidateWindowTruncated: boolean
+}
+
+const MAX_FOLLOWING_FEED_AUTHORS = 500
+
+type FollowingAuthorIdsDataSource = FollowingAuthorIdsReadStore
+
+/**
+ * W05 owns follow/block/mute relationships. It deliberately returns author IDs
+ * only; W03 remains the authority that selects and projects published content.
+ * The candidate window is bounded to keep the W04 fan-out request predictable.
+ * Candidate selection uses the explicitly injected Neon PostgreSQL Store.
+ */
+export async function listFollowingAuthorIds(
+  source: FollowingAuthorIdsDataSource,
+  viewerUserId: string,
+): Promise<FollowingAuthorCandidates> {
+  const viewerId = userId(viewerUserId)
+  let rows
+  try {
+    rows = await source.list(
+      viewerId,
+      MAX_FOLLOWING_FEED_AUTHORS + 1,
+    )
+  } catch (error) {
+    if (error instanceof FollowingAuthorIdsReadStoreError) {
+      throw new FollowRuntimeError(error.code, error.status)
+    }
+    throw error
+  }
+
+  return {
+    items: rows.slice(0, MAX_FOLLOWING_FEED_AUTHORS)
+      .map((row) => ({ userId: row.user_id })),
+    candidateWindowTruncated: rows.length > MAX_FOLLOWING_FEED_AUTHORS,
+  }
+}
+
+type FollowDataSource = FollowStore
+
+function mapFollowStoreError(error: unknown): never {
+  if (error instanceof FollowStoreError) {
+    throw new FollowRuntimeError(error.code, error.status)
+  }
+  throw error
+}
+
+export async function follow(
+  source: FollowDataSource,
+  followerUserId: string,
+  targetUserId: string,
+): Promise<FollowRow> {
+  const follower = userId(followerUserId)
+  const target = userId(targetUserId)
+  if (follower === target) throw new FollowRuntimeError('CONFLICT', 409)
+
+  let row: FollowRow | null
+  try {
+    row = await source.follow({
+      followerUserId: follower,
+      targetUserId: target,
+      relationshipId: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    mapFollowStoreError(error)
+  }
+
+  if (!row) throw new FollowRuntimeError('CONFLICT', 409)
+  await invalidateFollowListCountCache(follower, target)
+  return row
+}
+
+export async function unfollow(
+  source: FollowDataSource,
+  followerUserId: string,
+  targetUserId: string,
+): Promise<void> {
+  const follower = userId(followerUserId)
+  const target = userId(targetUserId)
+  if (follower === target) throw new FollowRuntimeError('CONFLICT', 409)
+
+  try {
+    await source.unfollow(follower, target)
+  } catch (error) {
+    mapFollowStoreError(error)
+  }
+  await invalidateFollowListCountCache(follower, target)
+}
+
+type FollowStatusDataSource = FollowStatusReadStore
+
+export async function getFollowStatus(
+  source: FollowStatusDataSource,
+  followerUserId: string,
+  targetUserId: string,
+) {
+  const follower = userId(followerUserId)
+  const target = userId(targetUserId)
+  let row: FollowStatusReadRow | null
+  try {
+    row = await source.getStatus({
+      followerUserId: follower,
+      targetUserId: target,
+    })
+  } catch (error) {
+    mapFollowStoreError(error)
+  }
+  if (row?.blocked === true || Number(row?.blocked ?? 0) === 1) {
+    return { following: false, relationshipId: null, createdAt: null }
+  }
+  return {
+    following: Boolean(row),
+    relationshipId: row?.relationship_id ?? null,
+    createdAt: row?.created_at ?? null,
+  }
+}
+
+export async function listFollowers(
+  db: FollowListDataSource,
+  userIdValue: string,
+  cursor: string | null,
+  limit: number,
+): Promise<FollowListPage> {
+  return listFollowRelations(db, userIdValue, 'followers', cursor, limit)
+}
+
+export async function listFollowing(
+  db: FollowListDataSource,
+  userIdValue: string,
+  cursor: string | null,
+  limit: number,
+): Promise<FollowListPage> {
+  return listFollowRelations(db, userIdValue, 'following', cursor, limit)
+}

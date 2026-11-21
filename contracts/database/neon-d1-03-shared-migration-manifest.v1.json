@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-03-shared-migration-manifest.v1.json",
+  "title": "LuckRead D1-03 Shared PostgreSQL 18 Schema Migration Manifest",
+  "version": "1.0.0",
+  "status": "LOCAL_EXECUTOR_MANIFEST_READY_REMOTE_APPLY_BLOCKED",
+  "domainId": "D1-03",
+  "databaseName": "luckread_governance",
+  "cloudflareD1DatabaseUuid": "bda1d247-a371-4244-91ae-aef96034db7f",
+  "postgresMajor": 18,
+  "ledger": {
+    "table": "neon_schema_migration_ledger",
+    "ddlPath": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
+    "domainId": "D1-03",
+    "databaseName": "luckread_governance"
+  },
+  "localRehearsal": {
+    "allowed": true,
+    "databaseName": "luckread_d1_03_shared",
+    "postgresMajor": 18,
+    "environmentVariable": "D1_SHARED_LOCAL_DATABASE_URL"
+  },
+  "remoteApplyReady": false,
+  "businessDataImport": false,
+  "productionCutoverAuthorized": false,
+  "entries": [
+    {
+      "migrationId": "d1-03-w06-moderation-schema-v1",
+      "order": 100,
+      "ownerWorker": "W06",
+      "logicalOwnerWorker": "W06",
+      "kind": "POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql"
+      ],
+      "dependsOn": [],
+      "schemaContract": "contracts/database/neon-d1-03-w06-moderation-schema.v1.json",
+      "sourceMigrations": [
+        "workers/W06-governance/migrations/0002_moderation_queue_foundation.sql",
+        "workers/W06-governance/migrations/0003_moderation_report_v1.sql"
+      ],
+      "scope": "Seven admitted moderation and report persistence tables. Appeal and W09 AuditEvent are excluded."
+    },
+    {
+      "migrationId": "d1-03-w09-platform-schema-v1",
+      "order": 200,
+      "ownerWorker": "W09",
+      "logicalOwnerWorker": "W09",
+      "kind": "POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql"
+      ],
+      "dependsOn": [
+        "d1-03-w06-moderation-schema-v1"
+      ],
+      "schemaContract": "contracts/database/neon-d1-03-w09-platform-schema.v1.json",
+      "sourceMigrations": [
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql",
+        "workers/W06-governance/migrations/0001_audit_event.sql"
+      ],
+      "scope": "W09-owned AuditEvent and NotificationPushEndpoint schemas; W05 remains a scoped endpoint delegate."
+    },
+    {
+      "migrationId": "d1-03-w10-async-execution-schema-v1",
+      "order": 300,
+      "ownerWorker": "W09",
+      "logicalOwnerWorker": "W10",
+      "migrationConfigOwner": "W09",
+      "kind": "POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W10-async/src/neon-postgres-migrations/0001_w10_d1_03_async_execution.sql"
+      ],
+      "dependsOn": [
+        "d1-03-w09-platform-schema-v1"
+      ],
+      "schemaContract": "contracts/database/neon-d1-03-w10-execution-schema.v1.json",
+      "sourceMigrations": [
+        "workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql"
+      ],
+      "scope": "W10 logical execution-state schema translated from the W09-owned D1-03 migration configuration. Ledger owner_worker remains W09, matching the canonical D1 migration-config owner."
+    }
+  ],
+  "expected": {
+    "tables": 15,
+    "explicitIndexes": 22,
+    "triggers": 2,
+    "triggerFunctions": 1,
+    "foreignKeys": 2,
+    "businessRows": 0,
+    "controlSeedRows": 0
+  },
+  "remoteApplyBlockers": [
+    "W06 Appeal has no admitted persistence contract or source migration; no Appeal table is inferred.",
+    "D1-03 W11 Campaign/GrowthOperation remains logical-only and no W11 physical D1-03 table or runtime binding is admitted.",
+    "D1-03 requires a separate independent shared-runner review and release authorization."
+  ],
+  "safety": {
+    "newWorkers": 0,
+    "newD1Databases": 0,
+    "newQueues": 0,
+    "newServiceBindings": 0,
+    "runtimeBindingsChanged": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "seedRows": []
+}

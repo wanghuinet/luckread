@@ -1,0 +1,68 @@
+{
+  "version": "1.0.0",
+  "controlId": "CC-MAPPING-0-AUTH-003-LOGICAL-OWNERSHIP-RECONCILIATION-2026-09-27",
+  "sourceHead": "d7b370ee1bb6ae79944db09b46ed84aaa97976c3",
+  "backupBranch": "backup/pre-auth003-logical-ownership-reconcile-20260927",
+  "status": "PASS_VERIFIED_LOGICAL_AUTHORITY / PHYSICAL_RUNTIME_BLOCKED",
+  "featureId": "AUTH-003",
+  "logicalAuthority": {
+    "worker": "W02",
+    "workerBasis": "docs/04-WORKER-MASTER-v1.0.md and docs/03-WORKER-BINDING-MAPPING-v1.0.md",
+    "workerResponsibility": "Identity / Account / Authorization",
+    "d1Domain": "D1-01",
+    "d1Basis": "docs/09-D1-DOMAIN-MASTER-v1.0.md",
+    "entityOwnership": [
+      "ENT-IDENTITY",
+      "ENT-CREDENTIAL"
+    ],
+    "entityBasis": "D1-01 primary entities in D1 Domain Master; AUTH-003 entity contracts govern these entities"
+  },
+  "taskBoundary": {
+    "status": "UNRESOLVED",
+    "rule": "W02 owns T01/T02/T03, but the current canonical mapping does not explicitly bind AUTH-003 to one specific Task. No task assignment is inferred."
+  },
+  "physicalBoundary": {
+    "workerPhysicalBinding": "NOT_ESTABLISHED",
+    "physicalD1Identity": "NOT_ESTABLISHED_FOR_AUTH003",
+    "currentInventoryDisposition": "The existing luckread D1 inventory entry is explicitly bound to W01-PAYLOAD-D1-BINDING and must not be reassigned to W02/D1-01 by inference.",
+    "requiredNextEvidence": [
+      "canonical physical Worker name/ID for W02",
+      "approved Worker-to-D1 physical binding",
+      "exact controlled D1-01 database identity for AUTH-003 execution",
+      "field-by-field schema inspection",
+      "migration execution evidence"
+    ]
+  },
+  "authoritySources": [
+    "docs/04-WORKER-MASTER-v1.0.md",
+    "docs/03-WORKER-BINDING-MAPPING-v1.0.md",
+    "docs/09-D1-DOMAIN-MASTER-v1.0.md",
+    "contracts/entity/AUTH-003-identity-field-contract.v1.json",
+    "contracts/entity/AUTH-003-credential-field-contract.v1.json",
+    "artifacts/cloudflare/current-resource-inventory-2026-09-20.json"
+  ],
+  "decisions": [
+    "AUTH-003 logical Worker ownership is W02.",
+    "AUTH-003 logical D1 ownership is D1-01.",
+    "ENT-IDENTITY and ENT-CREDENTIAL remain contract-only/proposed; logical ownership does not promote implementation.",
+    "No specific Contract Task is assigned to AUTH-003 by inference.",
+    "No physical Worker or physical D1 resource is assigned by this control.",
+    "The existing W01-Payload physical D1 binding is not reused as W02/D1-01 physical authority."
+  ],
+  "downstreamEffect": {
+    "operationPolicy": "UNCHANGED / STILL AUTHORITY_INPUT_REQUIRED",
+    "persistenceMapping": "LOGICAL_DOMAIN_RESOLVED / PHYSICAL_MAPPING_REQUIRED",
+    "runtimeImplementation": "NOT_AUTHORIZED",
+    "migrationExecution": "NOT_AUTHORIZED",
+    "evidenceRegistryPromotion": "NOT_AUTHORIZED",
+    "mapping0Green": "NOT_AUTHORIZED"
+  },
+  "taskEdge": {
+    "featureId": "AUTH-003",
+    "taskId": "T01",
+    "workerId": "W02",
+    "d1Domain": "D1-01",
+    "authorityControl": "docs/change-control/CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27.md",
+    "status": "PASS_VERIFIED_LOGICAL_MAPPING"
+  }
+}

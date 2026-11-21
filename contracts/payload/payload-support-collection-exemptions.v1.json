@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "status": "CONTRACTED_NOT_RUNTIME",
+  "sourceOfTruth": "docs/change-control/MAPPING-0-AUTHORITY-DECISIONS-2026-09-20.md",
+  "purpose": "Explicit reconciliation exemptions for Payload support collections that are not canonical domain Entities.",
+  "rules": {
+    "noEntityPromotion": true,
+    "noUnrelatedEntityRemap": true,
+    "noPhysicalD1Inference": true,
+    "exemptionsAreCollectionSourceExact": true
+  },
+  "collections": [
+    {
+      "sourceRef": "workers/W01-payload/src/collections/Media.ts:Media",
+      "slug": "media",
+      "classification": "PAYLOAD_SUPPORT_COLLECTION",
+      "entityRequired": false,
+      "reason": "W01 Media is retained as Payload upload/asset support infrastructure at Mapping 0; canonical MEDIA domain features remain separately governed by the Blueprint and their own future entity/API/DTO contracts.",
+      "changeControl": "CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19"
+    }
+  ]
+}

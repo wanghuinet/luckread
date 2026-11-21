@@ -1,0 +1,209 @@
+name: W06 Governance Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source commit to deploy
+        required: true
+        type: string
+        default: 158a5221d87ce74123338bcf1f5a4a174ec55e33
+      confirm:
+        description: Type DEPLOY to permit this controlled W06 deployment
+        required: true
+        type: string
+        default: DEPLOY
+
+permissions:
+  actions: read
+  contents: read
+  deployments: read
+  pull-requests: read
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirm == 'DEPLOY' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
+    runs-on: ubuntu-latest
+    environment: auth-mfa-rollout
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact implementation commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify protected AUTH-007 rollout admission before W06 deployment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF_PROTECTED: ${{ github.ref_protected }}
+          AUTH007_ROLLOUT_ENVIRONMENT: auth-mfa-rollout
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: node scripts/verify-auth-007-rollout-admission.mjs
+
+      - name: Verify required admission gates for the source SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          PREVIOUS_ADMITTED_SOURCE_SHA: "fc560a42f7ab61b6e51a5b288d239430292d7e17"
+          PREVIOUS_PERSISTENCE_EVIDENCE_SOURCE_SHA: "eb9f33dda3e9892f1814d34bbe4c8327a1ba2dde"
+          CONTRACT_BASE_SHA: "367534dc07806a9b9f9a1b85ae8ecf42a7ae4afc"
+          CONTRACT_BASE_RUN: "35957666015"
+        run: |
+          set -euo pipefail
+
+          carry_forward_workflow() {
+            local workflow="$1"
+            local previous="$2"
+            local conclusion
+            conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --commit "$previous" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
+            test "$conclusion" = "success" || {
+              echo "Carry-forward baseline $workflow is not SUCCESS for $previous (observed: ${conclusion:-none})"
+              exit 1
+            }
+            echo "INHERITED_SUCCESS: $workflow from $previous"
+          }
+
+          for workflow in mapping-0-structural-ci.yml ensure-feature-inventory.yml; do
+            conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --commit "$SOURCE_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
+            test "$conclusion" = "success" || {
+              echo "Required workflow $workflow is not SUCCESS for $SOURCE_SHA (observed: ${conclusion:-none})"
+              exit 1
+            }
+          done
+
+          # The previous production-admitted W06 source is fc560... .
+          # This deployment admits the next W06 runtime slice only. Contract,
+          # Blueprint, Entity, and non-W06 authority-sensitive changes remain
+          # rejected by the explicit allowlist below.
+          changed_from_admitted="$(gh api "repos/$GITHUB_REPOSITORY/compare/$PREVIOUS_ADMITTED_SOURCE_SHA...$SOURCE_SHA" --jq '.files[]?.filename // empty')"
+          w06_delta="$(printf '%s\n' "$changed_from_admitted" | grep -E '^workers/W06-governance/|^workers/W09-platform/src/audit-event-postgres-adapter\.ts$|^\.github/workflows/w06-|^docs/change-control/CC-1\.8-MODERATION-IDEMPOTENCY-REPLAY-ORDER-2026-10-01\.md|^docs/change-control/CC-MAPPING-0-AUTH-013-W06-|^docs/MAPPING-0-CLOSURE-LEDGER\.md|^artifacts/mapping-0/w06-' || true)"
+          test -n "$w06_delta" || {
+            echo "No admitted W06 implementation/governance delta found between $PREVIOUS_ADMITTED_SOURCE_SHA and $SOURCE_SHA"
+            exit 1
+          }
+          echo "W06_DELTA_FILES:"
+          printf '%s\n' "$w06_delta"
+
+          carry_forward_workflow auth-013-persistence-schema-evidence.yml "$PREVIOUS_PERSISTENCE_EVIDENCE_SOURCE_SHA"
+
+          # W06 remains the deployed Worker entry. The one admitted W09 source file
+          # is an imported D1-03 AuditEvent SQL boundary, not a new Worker,
+          # endpoint, service binding, or independent deployment. Repository history
+          # may contain unrelated changes; authority-sensitive W06 paths are still
+          # checked below by source CI and physical binding assertions.
+      - name: Verify W06 Neon-only database binding and preserve existing topology
+        working-directory: workers/W06-governance
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const source = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          const config = JSON.parse(fs.readFileSync('wrangler.neon.jsonc', 'utf8'))
+          const sourceD1 = (source.d1_databases || []).find((item) => item.binding === 'D1_03')
+          if (!sourceD1 || sourceD1.database_name !== 'secondary' ||
+              sourceD1.database_id !== 'bda1d247-a371-4244-91ae-aef96034db7f' ||
+              sourceD1.migrations_dir !== 'migrations') {
+            throw new Error('W06 historical D1-03 migration source mapping drifted')
+          }
+          if ((config.d1_databases || []).length !== 0) throw new Error('W06 production Neon config must not bind Cloudflare D1')
+          const hyperdrive = (config.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE_D1_03')
+          const service = (config.services || []).find((item) => item.binding === 'W03_CONTENT_MODERATION')
+          const queue = (config.queues?.consumers || []).find((item) => item.queue === 'luckread-auth013-account-state')
+          const bootstrap = JSON.parse(fs.readFileSync('../../contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
+          const d103 = (bootstrap.domains || []).find((item) => item.domainId === 'D1-03')
+          const w06Admission = d103?.schemaProgress?.W06
+
+          if (config.name !== 'luckread-w06' || config.main !== 'src/index.ts') {
+            throw new Error('W06 worker identity or entrypoint changed')
+          }
+          if (config.vars?.W06_MODERATION_DATABASE_DRIVER !== undefined) {
+            throw new Error('W06 must not expose a legacy database driver switch')
+          }
+          if (!hyperdrive || hyperdrive.id !== '7c8831416c18494faee04b96aa551cb9') {
+            throw new Error('W06 must reuse the existing D1-03 Hyperdrive resource')
+          }
+          if (!(config.compatibility_flags || []).includes('nodejs_compat')) {
+            throw new Error('W06 PostgreSQL runtime requires nodejs_compat')
+          }
+          if (!service || service.service !== 'luckread-w03') {
+            throw new Error('W06 W03_CONTENT_MODERATION Service Binding must remain unchanged')
+          }
+          if (!queue || queue.dead_letter_queue !== 'luckread-auth013-account-state-dlq') {
+            throw new Error('W06 AUTH013 Queue consumer and DLQ must remain unchanged')
+          }
+          if (d103?.databaseName !== 'luckread_governance' ||
+              w06Admission?.admittedSliceRemoteApplied !== true) {
+            throw new Error('W06 admitted D1-03 Neon schema must be remotely applied before deployment')
+          }
+          console.log('W06_NEON_D1_03_RUNTIME_CONFIG=PASS')
+          console.log('W06_PRODUCTION_D1_BINDINGS=NONE')
+          console.log('W06_EXISTING_QUEUE_SERVICE_BINDINGS=PRESERVED')
+          console.log('W06_REMOTE_SCHEMA_ADMISSION=PASS')
+          NODE
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Install W06 PostgreSQL Worker runtime dependency
+        working-directory: workers/W06-governance
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
+      - name: TypeScript verification
+        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/index.ts
+
+      - name: Deploy W06 Neon runtime and promote the exact Worker version
+        working-directory: workers/W06-governance
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.156.0 deploy --config wrangler.neon.jsonc 2>&1 | tee "$RUNNER_TEMP/w06-neon-deploy.log"
+          version_id="$(sed -n 's/.*Current Version ID: //p' "$RUNNER_TEMP/w06-neon-deploy.log" | tail -n 1)"
+          if [ -z "$version_id" ]; then
+            echo "Wrangler did not return a W06 Worker Version ID; refusing to report a deployment."
+            exit 1
+          fi
+          echo "W06_UPLOADED_VERSION_ID=$version_id" >> "$GITHUB_ENV"
+          echo "W06_UPLOADED_VERSION_ID=$version_id"
+          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w06 --config wrangler.neon.jsonc --yes
+          npx --yes wrangler@4.156.0 deployments list --name luckread-w06 --config wrangler.neon.jsonc
+
+      - name: Capture exact W06 deployment provenance
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/moderation-runtime-deployment
+          cat > artifacts/mapping-0/moderation-runtime-deployment/provenance.txt <<EOF
+          workflow=W06 Governance Deploy
+          run_id=$GITHUB_RUN_ID
+          run_attempt=$GITHUB_RUN_ATTEMPT
+          source_sha=${{ inputs.source_sha }}
+          worker=luckread-w06
+          database_driver=neon
+          hyperdrive_binding=HYPERDRIVE_D1_03
+          hyperdrive_id=7c8831416c18494faee04b96aa551cb9
+          d1_bindings=none
+          worker_version_id=$W06_UPLOADED_VERSION_ID
+          traffic_percent=100
+          wrangler_version=4.156.0
+          deployed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          EOF
+          cat artifacts/mapping-0/moderation-runtime-deployment/provenance.txt
+
+      - name: Upload exact W06 deployment provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: moderation-runtime-deployment-${{ inputs.source_sha }}
+          path: artifacts/mapping-0/moderation-runtime-deployment/provenance.txt
+          if-no-files-found: error
+          retention-days: 14

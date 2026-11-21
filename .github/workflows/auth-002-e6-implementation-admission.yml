@@ -1,0 +1,30 @@
+name: AUTH-002 E6 Implementation Admission
+
+on:
+  push:
+    paths:
+      - "scripts/auth-002-e6-implementation-admission.mjs"
+      - "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21.md"
+      - "docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md"
+      - "workers/W01-payload/src/collections/Users.ts"
+      - "workers/W01-payload/src/**/auth*.ts"
+      - "workers/W01-payload/src/**/Auth*.ts"
+      - "workers/W01-payload/src/payload.config.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run E6 implementation admission guard
+        run: node scripts/auth-002-e6-implementation-admission.mjs

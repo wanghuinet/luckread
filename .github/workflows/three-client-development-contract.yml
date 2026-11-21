@@ -1,0 +1,36 @@
+name: Three Client Development Contract
+
+on:
+  pull_request:
+    paths:
+      - 'contracts/frontend/THREE-CLIENT-DEVELOPMENT-CONTRACT.v1.0.md'
+      - 'scripts/verify-three-client-development-contract.mjs'
+      - 'app/**'
+      - 'workers/**'
+      - '.github/workflows/three-client-development-contract.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'contracts/frontend/THREE-CLIENT-DEVELOPMENT-CONTRACT.v1.0.md'
+      - 'scripts/verify-three-client-development-contract.mjs'
+      - 'app/**'
+      - 'workers/**'
+      - '.github/workflows/three-client-development-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract-admission:
+    name: Enforce APP / H5 / PC contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify three-client development contract
+        run: node scripts/verify-three-client-development-contract.mjs

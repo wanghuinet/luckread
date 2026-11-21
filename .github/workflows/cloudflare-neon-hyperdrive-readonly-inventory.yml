@@ -1,0 +1,89 @@
+name: Cloudflare Neon Hyperdrive Read-only Inventory
+run-name: Verify live Neon Hyperdrive bindings @ ${{ github.sha }}
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/cloudflare-neon-hyperdrive-readonly-inventory.yml'
+      - 'scripts/cloudflare/inspect-neon-hyperdrive-live.mjs'
+      - 'scripts/cloudflare/inspect-neon-hyperdrive-live.test.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cloudflare-neon-hyperdrive-readonly-inventory.yml'
+      - 'scripts/cloudflare/inspect-neon-hyperdrive-live.mjs'
+      - 'scripts/cloudflare/inspect-neon-hyperdrive-live.test.mjs'
+  workflow_dispatch:
+    inputs:
+      confirm_read_only:
+        description: Explicitly confirm read-only Cloudflare Hyperdrive and Worker Settings inventory; no writes or deployment.
+        required: true
+        type: choice
+        options:
+          - VERIFY_NEON_HYPERDRIVE_LIVE_READONLY
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-neon-hyperdrive-readonly-inventory
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    name: Validate read-only inventory and output sanitization
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check syntax and run tests without Cloudflare credentials
+        run: |
+          set -euo pipefail
+          node --check scripts/cloudflare/inspect-neon-hyperdrive-live.mjs
+          node --check scripts/cloudflare/inspect-neon-hyperdrive-live.test.mjs
+          node --test scripts/cloudflare/inspect-neon-hyperdrive-live.test.mjs
+
+  inventory:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_read_only == 'VERIFY_NEON_HYPERDRIVE_LIVE_READONLY' }}
+    name: Read live Hyperdrive resources and Worker bindings (GET only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Guard exact main ref and explicit read-only confirmation
+        shell: bash
+        env:
+          CONFIRM_READ_ONLY: ${{ inputs.confirm_read_only }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "${CONFIRM_READ_ONLY}" = "VERIFY_NEON_HYPERDRIVE_LIVE_READONLY"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Collect sanitized live Cloudflare inventory
+        env:
+          GITHUB_ACTIONS: 'true'
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF: ${{ github.ref }}
+          CONFIRM_READ_ONLY: ${{ inputs.confirm_read_only }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_HYPERDRIVE_API_TOKEN }}
+        run: node scripts/cloudflare/inspect-neon-hyperdrive-live.mjs
+
+      - name: Publish sanitized inventory artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-neon-hyperdrive-live-inventory
+          path: artifacts/cloudflare-neon-hyperdrive-live-inventory.json
+          if-no-files-found: error

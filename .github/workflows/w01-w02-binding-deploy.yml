@@ -1,0 +1,414 @@
+name: W01 W02 Auth Binding Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source commit containing both W01 and W02 implementations
+        required: true
+        type: string
+      confirm:
+        description: Type this to deploy the coordinated W02, W08 Creator and W01 Neon D1-01 runtime set
+        required: true
+        type: choice
+        options:
+          - DEPLOY_BINDING_AND_W08_CREATOR
+        default: DEPLOY_BINDING_AND_W08_CREATOR
+
+permissions:
+  actions: read
+  contents: read
+  deployments: read
+  pull-requests: read
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
+    runs-on: ubuntu-latest
+    environment: auth-mfa-rollout
+    timeout-minutes: 25
+    steps:
+      - name: Checkout protected main for source validation
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Validate immutable source SHA is committed to main
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          if ! [[ "$SOURCE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "source_sha must be a full 40-character commit SHA"
+            exit 1
+          fi
+          git cat-file -e "$SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main || {
+            echo "source_sha must be an immutable commit already contained in protected main"
+            exit 1
+          }
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Verify protected AUTH-007 rollout admission before W01/W02 deployment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF_PROTECTED: ${{ github.ref_protected }}
+          AUTH007_ROLLOUT_ENVIRONMENT: auth-mfa-rollout
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: node scripts/verify-auth-007-rollout-admission.mjs
+
+      - name: Gate optional W08 Creator deployment before any production mutation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          if [ "$CONFIRM" = "DEPLOY_BINDING_AND_W08_CREATOR" ]; then
+            if [ ! -f workers/W08-creator/wrangler.jsonc ]; then
+              echo "W08 Creator deployment was confirmed, but source_sha does not contain W08 Creator files."
+              exit 1
+            fi
+            node --input-type=module -e 'import fs from "node:fs"; const w01=JSON.parse(fs.readFileSync("workers/W01-payload/wrangler.neon.jsonc","utf8")); const w08=JSON.parse(fs.readFileSync("workers/W08-creator/wrangler.jsonc","utf8")); const ingress=(w01.services||[]).find((x)=>x.binding==="W08_CREATOR"); const hyperdrive=(w08.hyperdrive||[]).find((x)=>x.binding==="HYPERDRIVE"); if(w08.name!=="luckread-w08-creator") throw new Error("W08 worker identity mismatch"); if((w08.d1_databases||[]).length!==0||w08.vars?.W08_DATABASE_DRIVER!=="neon") throw new Error("W08 production must be Neon-only"); if(!hyperdrive||hyperdrive.id!=="0c53a1bb9bc0484bac146e8ae2d3158b") throw new Error("W08 Neon Hyperdrive mismatch"); if(!ingress||ingress.service!=="luckread-w08-creator") throw new Error("W01 W08_CREATOR binding mismatch"); if(!fs.existsSync("workers/W08-creator/migrations/0001_creator_authorization.sql")) throw new Error("W08 source migration evidence missing"); console.log("W08_NEON_ONLY_RUNTIME=PASS"); console.log("W01_W08_BINDING=PASS");'
+          else
+            echo "W08 Creator deployment not requested; migration and deployment will be skipped."
+          fi
+
+      - name: Verify coordinated D1-01 Neon runtime selectors and the W08 D1-free production config
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'))
+          const w01Source = read('workers/W01-payload/wrangler.jsonc')
+          const w01 = read('workers/W01-payload/wrangler.neon.jsonc')
+          const w02Source = read('workers/W02-identity/wrangler.jsonc')
+          const w02 = read('workers/W02-identity/wrangler.neon.jsonc')
+          const w08 = read('workers/W08-creator/wrangler.jsonc')
+          const bootstrap = read('contracts/database/neon-five-domain-schema-bootstrap.v1.json')
+          const d101 = (bootstrap.domains || []).find((item) => item.domainId === 'D1-01')
+          if (d101?.databaseName !== 'luckread' ||
+              d101?.remoteSchemaApplied !== true ||
+              d101?.status !== 'D1_01_SCHEMA_ONLY_REMOTE_APPLIED_ALL_OWNER_POSTFLIGHT_PASSED_RUNTIME_CUTOVER_PENDING') {
+            throw new Error('D1-01 remote Neon schema and all-owner postflight admission must pass before runtime deployment')
+          }
+          const databaseId = '2f80471e-3756-49f9-8db1-7707a433ad64'
+          const hyperdriveId = '0c53a1bb9bc0484bac146e8ae2d3158b'
+          const assertBinding = (config, bindingName, worker) => {
+            const binding = (config.d1_databases || []).find((item) => item.binding === bindingName)
+            if (!binding || binding.database_name !== 'luckread' || binding.database_id !== databaseId) {
+              throw new Error(worker + ' D1-01 rollback binding mismatch')
+            }
+          }
+          const assertNeon = (config, worker, driverName) => {
+            if (config.vars?.[driverName] !== 'neon') {
+              throw new Error(worker + ' must select Neon for D1-01')
+            }
+            const hyperdrive = (config.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE')
+            if (!hyperdrive || hyperdrive.id !== hyperdriveId) {
+              throw new Error(worker + ' must bind the verified D1-01 Hyperdrive')
+            }
+            if ((config.d1_databases || []).length !== 0) {
+              throw new Error(worker + ' production Neon config must not bind Cloudflare D1')
+            }
+            if (!(config.compatibility_flags || []).includes('nodejs_compat')) {
+              throw new Error(worker + ' requires nodejs_compat for PostgreSQL runtime')
+            }
+          }
+          if (w01.name !== 'luckread-w01-payload' || w02.name !== 'luckread-w02' || w08.name !== 'luckread-w08-creator') {
+            throw new Error('D1-01 Worker identities changed')
+          }
+          assertBinding(w01Source, 'D1', 'W01')
+          const w02HistoricalD1 = (w02Source.d1_databases || []).find((item) => item.binding === 'D1_01')
+          if (!w02HistoricalD1 || w02HistoricalD1.database_name !== 'luckread' || w02HistoricalD1.database_id !== databaseId) {
+            throw new Error('W02 historical D1-01 migration source mapping drifted')
+          }
+          if ((w02.d1_databases || []).length !== 0) throw new Error('W02 production config must not bind Cloudflare D1')
+          if ((w08.d1_databases || []).length !== 0) throw new Error('W08 production config must not bind D1')
+          assertNeon(w01, 'W01', 'PAYLOAD_DATABASE_DRIVER')
+          assertNeon(w02, 'W02', 'W02_DATABASE_DRIVER')
+          assertNeon(w08, 'W08', 'W08_DATABASE_DRIVER')
+          if (!(w01.services || []).some(x => x.binding === 'W02_AUTH' && x.service === 'luckread-w02')) {
+            throw new Error('W01 W02_AUTH Service Binding mismatch')
+          }
+          if (!(w01.services || []).some(x => x.binding === 'W08_CREATOR' && x.service === 'luckread-w08-creator')) {
+            throw new Error('W01 W08_CREATOR Service Binding mismatch')
+          }
+          if (!(w08.services || []).some(x => x.binding === 'W02_AUTH' && x.service === 'luckread-w02')) {
+            throw new Error('W08 W02_AUTH Service Binding mismatch')
+          }
+          console.log('D1_01_W01_W02_W08_NEON_RUNTIME_CONFIG=PASS')
+          console.log('W01_D1_SOURCE_BINDING=PRESERVED; W02_PRODUCTION_D1_BINDINGS=NONE; W08_PRODUCTION_D1_BINDINGS=NONE')
+          NODE
+
+
+      - name: Gate creator lifecycle QA accounts before any production mutation
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        env:
+          LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL: ${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL }}
+          LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD: ${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD }}
+          LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL: ${{ secrets.LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL }}
+          LUCKREAD_CREATOR_E2E_REVIEWER_PASSWORD: ${{ secrets.LUCKREAD_CREATOR_E2E_REVIEWER_PASSWORD }}
+          LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
+        run: |
+          set -euo pipefail
+          for name in LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL LUCKREAD_CREATOR_E2E_REVIEWER_PASSWORD LUCKREAD_APP_AUTH_SMOKE_EMAIL; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required creator E2E secret: $name. No production mutation has run."
+              exit 1
+            fi
+          done
+          valid_email() { [[ "$1" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]; }
+          if ! valid_email "$LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL" || ! valid_email "$LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL" || ! valid_email "$LUCKREAD_APP_AUTH_SMOKE_EMAIL"; then
+            echo "Creator E2E and session smoke credentials must use valid email addresses. No production mutation has run."
+            exit 1
+          fi
+          normalize_email() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+          applicant="$(normalize_email "$LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL")"
+          reviewer="$(normalize_email "$LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL")"
+          smoke="$(normalize_email "$LUCKREAD_APP_AUTH_SMOKE_EMAIL")"
+          if [ "$applicant" = "$reviewer" ] || [ "$applicant" = "$smoke" ] || [ "$reviewer" = "$smoke" ]; then
+            echo "Applicant, reviewer and APP session-smoke accounts must be three different accounts. No production mutation has run."
+            exit 1
+          fi
+          echo "Creator lifecycle QA secret names and distinct-account preflight: PASS."
+          echo "Applicant account must be a fresh, active, email-verified L2 account with no creator application."
+          echo "Reviewer account must be active, email-verified and L7/L8. A successful test promotes the applicant to L3."
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install W02 runtime dependencies before deployment
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify Better Auth package and runtime imports before deployment
+        working-directory: workers/W02-identity
+        run: |
+          node --input-type=module -e "import { readFile } from 'node:fs/promises'; const pkg = JSON.parse(await readFile('./node_modules/better-auth/package.json', 'utf8')); if (pkg.version !== '1.7.8') throw new Error('Expected better-auth 1.7.8, got ' + pkg.version); await import('better-auth'); await import('better-auth/plugins'); console.log('better-auth ' + pkg.version + ' and plugin imports: OK')"
+
+      - name: Install root toolchain for creator preflight
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        run: npm ci
+
+      - name: Install W08 CASL runtime dependency before checks
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        working-directory: workers/W08-creator
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
+      - name: Run creator authorization runtime and UI contract tests before production changes
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        run: npx --no-install vitest run workers/W02-identity/src/authz/role-assignment-command.test.ts workers/W08-creator/src/policy.test.ts workers/W08-creator/src/authz/casl-policy.test.ts workers/W08-creator/src/authz/handler.test.ts workers/W08-creator/src/authz/role-layer.test.ts workers/W08-creator/src/index.runtime.test.ts workers/W01-payload/tests/int/creator-application-page.int.spec.ts
+
+      - name: Verify creator authorization/catalog and terminal routing gates
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        run: |
+          node scripts/verify-creator-authorization-path.mjs
+          node scripts/verify-worker-terminal-routing.mjs
+
+      - name: Typecheck W08 Creator Worker before production changes
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        run: npx --no-install tsc --noEmit -p workers/W08-creator/tsconfig.json
+
+      - name: Typecheck W02 creator grant path before production changes
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        working-directory: workers/W02-identity
+        run: |
+          node --input-type=module -e "import('better-auth').then(() => console.log('better-auth runtime import: OK'))"
+          npx --no-install tsc --noEmit -p tsconfig.json
+
+      - name: Validate post-deploy session E2E harness before production changes
+        run: node --check scripts/auth-session-live-e2e.mjs
+
+      - name: Require verified QA credentials before production deployment
+        env:
+          LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
+          LUCKREAD_APP_AUTH_SMOKE_PASSWORD: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$LUCKREAD_APP_AUTH_SMOKE_EMAIL" ] || [ -z "$LUCKREAD_APP_AUTH_SMOKE_PASSWORD" ]; then
+            echo "Configure LUCKREAD_APP_AUTH_SMOKE_EMAIL and LUCKREAD_APP_AUTH_SMOKE_PASSWORD repository Actions secrets before deploying; the post-deploy login/session acceptance is mandatory."
+            exit 1
+          fi
+          echo "Verified QA credential secret names are present; values were not printed."
+
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0
+          run_install: false
+
+      - name: Install locked W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck W01 API and creator routes before production changes
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit
+
+      - name: Install Chromium and validate creator lifecycle browser suite before production changes
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        working-directory: workers/W01-payload
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright test --config playwright.production.config.ts --list
+
+      - name: Verify W01 W02_AUTH binding
+        working-directory: workers/W01-payload
+        run: |
+          node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('wrangler.neon.jsonc','utf8')); const b=(c.services||[]).find(x=>x.binding==='W02_AUTH'); if(!b || b.service!=='luckread-w02') throw new Error('W02_AUTH binding mismatch'); console.log(JSON.stringify(b));"
+
+      - name: Verify W01 traffic guard bindings
+        working-directory: workers/W01-payload
+        run: |
+          node -e 'const fs=require("fs"); const c=JSON.parse(fs.readFileSync("wrangler.neon.jsonc","utf8")); const required=["PUBLIC_ORIGIN_GLOBAL_LIMITER","PUBLIC_READ_LIMITER","AUTH_ORIGIN_GLOBAL_LIMITER","AUTH_REGISTER_LIMITER","AUTH_LOGIN_LIMITER","AUTH_REFRESH_LIMITER"]; const names=new Set((c.ratelimits||[]).map(x=>x.name)); for(const name of required) if(!names.has(name)) throw new Error("missing rate limiter: "+name); console.log(JSON.stringify({rateLimitBindings:[...names].sort()}));'
+      - name: Ensure W01 PAYLOAD_SECRET runtime secret
+        working-directory: workers/W01-payload
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/mapping-0
+          secret_list="$(npx --yes wrangler@4.156.0 secret list --name luckread-w01-payload --config wrangler.neon.jsonc --format json)"
+          has_payload_secret="$(printf '%s' "$secret_list" | node --input-type=module -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => { const parsed=JSON.parse(data); const names=new Set(Array.isArray(parsed) ? parsed.map(item => item?.name) : []); process.stdout.write(names.has("PAYLOAD_SECRET") ? "true" : "false"); })')"
+          if [ "$has_payload_secret" != "true" ]; then
+            openssl rand -hex 32 | npx --yes wrangler@4.156.0 secret put PAYLOAD_SECRET --name luckread-w01-payload --config wrangler.neon.jsonc >/dev/null
+            action="generated_and_put"
+          else
+            action="already_present"
+          fi
+          verify_list="$(npx --yes wrangler@4.156.0 secret list --name luckread-w01-payload --config wrangler.neon.jsonc --format json)"
+          verified="$(printf '%s' "$verify_list" | node --input-type=module -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => { const parsed=JSON.parse(data); const names=new Set(Array.isArray(parsed) ? parsed.map(item => item?.name) : []); process.stdout.write(names.has("PAYLOAD_SECRET") ? "true" : "false"); })')"
+          test "$verified" = "true"
+          ACTION="$action" node -e "const fs=require('fs'); fs.writeFileSync('../../artifacts/mapping-0/w01-payload-secret-provenance.json', JSON.stringify({worker:'luckread-w01-payload',secretName:'PAYLOAD_SECRET',action:process.env.ACTION,verified:true,secretValueExposed:false}, null, 2)+'\\n')"
+          cat ../../artifacts/mapping-0/w01-payload-secret-provenance.json
+
+      - name: Build W01 application without database migration
+        working-directory: workers/W01-payload
+        run: pnpm exec opennextjs-cloudflare build --config=wrangler.neon.jsonc
+
+      - name: Verify W02 migration artifacts are committed
+        run: |
+          node scripts/generate-role-assignment-migration.mjs
+          node scripts/generate-role-version-migration.mjs
+          git diff --exit-code -- workers/W02-identity/migrations/0001_role_assignments.sql
+          git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
+
+      - name: Deploy W02 first with pinned Wrangler
+        working-directory: workers/W02-identity
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/mapping-0
+          npx --yes wrangler@4.156.0 deploy --config wrangler.neon.jsonc 2>&1 | tee ../../artifacts/mapping-0/w02-email-auth-deploy.log
+          version_id="$(sed -n 's/.*Current Version ID: //p' ../../artifacts/mapping-0/w02-email-auth-deploy.log | tail -n 1)"
+          if [ -z "$version_id" ]; then
+            echo "Wrangler did not return a W02 Worker Version ID; refusing to report a deployment."
+            exit 1
+          fi
+          echo "W02_UPLOADED_VERSION_ID=$version_id"
+          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w02 --config wrangler.neon.jsonc --yes
+          npx --yes wrangler@4.156.0 deployments list --name luckread-w02 --config wrangler.neon.jsonc
+
+      - name: Deploy W08 Creator Worker
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        working-directory: workers/W08-creator
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/mapping-0
+          npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w08-creator-deploy.log
+          version_id="$(sed -n 's/.*Current Version ID: //p' ../../artifacts/mapping-0/w08-creator-deploy.log | tail -n 1)"
+          if [ -z "$version_id" ]; then
+            echo "Wrangler did not return a W08 Worker Version ID; refusing to report a deployment."
+            exit 1
+          fi
+          echo "W08_UPLOADED_VERSION_ID=$version_id"
+          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w08-creator --config wrangler.jsonc --yes
+          npx --yes wrangler@4.156.0 deployments list --name luckread-w08-creator --config wrangler.jsonc
+
+      - name: Deploy W01 application with Service Binding
+        working-directory: workers/W01-payload
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/mapping-0
+          npx --yes wrangler@4.156.0 deploy --config wrangler.neon.jsonc 2>&1 | tee ../../artifacts/mapping-0/w01-w02-binding-deploy.log
+          version_id="$(sed -n 's/.*Current Version ID: //p' ../../artifacts/mapping-0/w01-w02-binding-deploy.log | tail -n 1)"
+          if [ -z "$version_id" ]; then
+            echo "Wrangler did not return a W01 Worker Version ID; refusing to report a deployment."
+            exit 1
+          fi
+          echo "W01_UPLOADED_VERSION_ID=$version_id"
+          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w01-payload --config wrangler.neon.jsonc --yes
+          npx --yes wrangler@4.156.0 deployments list --name luckread-w01-payload --config wrangler.neon.jsonc
+
+      - name: Write deployment provenance
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          node -e 'const fs=require("node:fs"); const creator=process.env.CONFIRM==="DEPLOY_BINDING_AND_W08_CREATOR"; const values=["workflow=W01 W02 Auth Binding Deploy","source_sha="+process.env.SOURCE_SHA,"confirmation="+process.env.CONFIRM,"creator_confirmation="+(creator?"DEPLOY_W08_CREATOR":"not_requested"),"workers="+(creator?"luckread-w02,luckread-w08-creator,luckread-w01-payload":"luckread-w02,luckread-w01-payload"),"deployment_order="+(creator?"W02 then W08 then W01":"W02 then W01"),"binding=W02_AUTH","creator_binding=W08_CREATOR","target=luckread-w02","database_mutation=false","creator_migration="+(creator?"already_applied_to_neon_luckread;schema_postflight_run=42558978832":"not_applied"),"new_worker=false","new_database=false"]; fs.writeFileSync("artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt",values.join("\n")+"\n");'
+          cat artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt
+
+      - name: Upload deployment evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: w01-w02-binding-deployment-${{ inputs.source_sha }}
+          path: |
+            artifacts/mapping-0/w02-email-auth-deploy.log
+            artifacts/mapping-0/w08-creator-deploy.log
+            artifacts/mapping-0/w01-w02-binding-deploy.log
+            artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt
+
+      - name: Verify real APP login and session behavior after deployment
+        env:
+          LUCKREAD_API_BASE_URL: https://api.luckread.com
+          LUCKREAD_SOURCE_SHA: ${{ inputs.source_sha }}
+          LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
+          LUCKREAD_APP_AUTH_SMOKE_PASSWORD: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}
+        run: node scripts/auth-session-live-e2e.mjs
+
+      - name: Upload sanitized APP session acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-auth-session-live-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/api-auth-session-live-e2e/*.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Run real L2-to-L3 creator qualification browser acceptance
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        working-directory: workers/W01-payload
+        env:
+          LUCKREAD_SOURCE_SHA: ${{ inputs.source_sha }}
+          LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL: ${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL }}
+          LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD: ${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD }}
+          LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL: ${{ secrets.LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL }}
+          LUCKREAD_CREATOR_E2E_REVIEWER_PASSWORD: ${{ secrets.LUCKREAD_CREATOR_E2E_REVIEWER_PASSWORD }}
+        run: pnpm exec playwright test --config playwright.production.config.ts
+
+      - name: Upload sanitized creator authorization E2E evidence
+        if: ${{ always() && inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: creator-authorization-live-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: workers/W01-payload/artifacts/creator-authorization-live-e2e/*.json
+          if-no-files-found: warn
+          retention-days: 30

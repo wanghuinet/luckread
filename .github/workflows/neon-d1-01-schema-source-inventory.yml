@@ -1,0 +1,46 @@
+name: Neon D1-01 Schema Source Inventory
+
+on:
+  pull_request:
+    paths:
+      - 'contracts/database/neon-d1-01-schema-sources.v1.json'
+      - 'scripts/neon/verify-d1-01-schema-sources.mjs'
+      - '.github/workflows/neon-d1-01-schema-source-inventory.yml'
+      - 'workers/W01-payload/src/payload.config.ts'
+      - 'workers/W01-payload/src/collections/**'
+      - 'workers/W01-payload/src/migrations/**'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/W01-payload/package.json'
+      - 'workers/W02-identity/src/**'
+      - 'workers/W02-identity/migrations/**'
+      - 'workers/W02-identity/wrangler.jsonc'
+      - 'workers/W02-identity/package.json'
+      - 'workers/W07-subscription-commerce/src/**'
+      - 'workers/W07-subscription-commerce/migrations/**'
+      - 'workers/W07-subscription-commerce/wrangler.jsonc'
+      - 'workers/W08-creator/src/**'
+      - 'workers/W08-creator/migrations/**'
+      - 'workers/W08-creator/wrangler.jsonc'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    name: Verify D1-01 schema and runtime source inventory
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build source inventory and SQLite portability report
+        run: node scripts/neon/verify-d1-01-schema-sources.mjs --report artifacts/neon/d1-01-schema-source-inventory.json
+      - name: Upload D1-01 source inventory evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-01-source-inventory-${{ github.sha }}
+          path: artifacts/neon/d1-01-schema-source-inventory.json
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,96 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-09-19",
+  "purpose": "USER-001/USER-006 blocker precision audit. Detects whether current canonical blocker wording remains consistent with explicit evidence-bound delta.",
+  "sourceRefs": [
+    "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
+    "contracts/alignment/mapping-batches/USER-001-006-evidence-bound-mapping-delta-2026-09-17.v1.json",
+    "contracts/alignment/cross-system-mapping.v1.json"
+  ],
+  "noInference": true,
+  "findings": [
+    {
+      "featureId": "USER-001",
+      "status": "UNRESOLVED",
+      "currentCanonicalEdges": {
+        "api": [
+          "getMe",
+          "updateMe"
+        ],
+        "entity": [
+          "ENT-USER"
+        ],
+        "payload": [],
+        "code": []
+      },
+      "evidenceDeltaVerified": {
+        "api": [
+          "getMe",
+          "updateMe"
+        ],
+        "entity": [
+          "ENT-USER"
+        ],
+        "fields": [
+          "username",
+          "displayName",
+          "bio",
+          "avatar",
+          "locale",
+          "timezone"
+        ]
+      },
+      "currentBlocker": [
+        "B02 mapping not yet evidence-bound beyond Blueprint"
+      ],
+      "precision": "STALE_BLOCKER_WORDING",
+      "verifiedRemainingBlockers": [
+        "canonical API->DTO->entity->field->persistence->Payload->code->security->lifecycle->test->Evidence Registry binding",
+        "cache evidence",
+        "anti-abuse evidence",
+        "integration/security E2E evidence"
+      ],
+      "disposition": "CHANGE_CONTROL_REQUIRED_BEFORE_SOURCE_BLOCKER_EDIT"
+    },
+    {
+      "featureId": "USER-006",
+      "status": "UNRESOLVED",
+      "currentCanonicalEdges": {
+        "api": [
+          "blockUser",
+          "unblockUser",
+          "muteUser",
+          "unmuteUser"
+        ],
+        "entity": [],
+        "payload": [],
+        "code": []
+      },
+      "evidenceDeltaVerified": {
+        "api": [
+          "blockUser",
+          "unblockUser",
+          "muteUser",
+          "unmuteUser"
+        ],
+        "entity": []
+      },
+      "currentBlocker": [
+        "block/mute authority and interaction mapping missing"
+      ],
+      "precision": "SUBSTANTIALLY_VALID_BUT_TOO_BROAD",
+      "verifiedRemainingBlockers": [
+        "feature-bound entity/field authority",
+        "canonical API->DTO->entity->field->persistence->Payload->code->security->lifecycle->test->Evidence Registry binding",
+        "executed integration/security evidence"
+      ],
+      "disposition": "PRECISION_REFINEMENT_RECOMMENDED"
+    }
+  ],
+  "rules": [
+    "No Feature status promotion.",
+    "No new API, DTO, Entity, Field, Payload collection or persistence mapping inferred.",
+    "Evidence-bound delta is treated as existing explicit evidence, not implementation proof."
+  ],
+  "status": "NOT_GREEN"
+}

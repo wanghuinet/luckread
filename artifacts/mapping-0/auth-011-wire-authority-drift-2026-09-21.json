@@ -1,0 +1,36 @@
+{
+  "version": "1.1.0",
+  "generatedAt": "2026-09-21",
+  "sourceHead": "f45fc4b096a1e2bede7b62cf5d987b66e18bbf4d",
+  "sourceRefs": {
+    "openapi": "contracts/openapi/v1/openapi.yaml",
+    "apiInventory": "contracts/api/api-inventory.v1.json",
+    "staleCrosscheck": "artifacts/mapping-0/api-dto-four-layer-crosscheck-2026-09-19.json",
+    "auditScript": "scripts/auth-011-wire-authority-consistency-audit.mjs"
+  },
+  "status": "DRIFT_CONFIRMED",
+  "current": {
+    "apiInventoryRequiredPath": "POST /v1/auth/refresh",
+    "canonicalOpenApiContainsRefreshPath": true,
+    "canonicalOpenApiContainsRefreshOperationId": true,
+    "canonicalOpenApiRefreshContractStatus": "DISCOVERY_DRAFT",
+    "canonicalOpenApiRefreshSummary": "Discovery draft for POST undefined",
+    "canonicalOpenApiRefreshHasConcreteRequestBody": false,
+    "canonicalOpenApiRefreshHasConcreteSuccessResponse": false,
+    "canonicalOpenApiRefreshWireSchemaComplete": false,
+    "canonicalOpenApiRefreshRouteAdmitted": false
+  },
+  "staleEvidence": {
+    "historicalCrosscheck": "artifacts/mapping-0/api-dto-four-layer-crosscheck-2026-09-19.json",
+    "claimedOpenApiExactlyOnceForAuthRefresh": true,
+    "conclusion": "Historical occurrence evidence must not be treated as current canonical Wire admission. The current OpenAPI shell is a Discovery Draft only."
+  },
+  "impact": {
+    "AUTH011": "BLOCKED_NOT_GREEN",
+    "E6Wire001": "OPEN",
+    "implementationAuthorized": false,
+    "noContractPromotion": true,
+    "noRuntimeCodeChange": true
+  },
+  "reconciliationAction": "Resolve authRefresh through the existing AUTH-011/AUTH-010 Contract-First wire/DTO chain. Do not infer the request/response/error schema, credential carrier semantics, or route admission from the Discovery Draft or historical crosscheck."
+}

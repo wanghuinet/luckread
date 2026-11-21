@@ -1,0 +1,126 @@
+{
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "promotion": "NOT_GREEN",
+  "purpose": "Canonical AUTH-013 persistence contract for account_state and account_state_version on the existing D1-01 User record. This contract distinguishes observed remote schema from target migration state.",
+  "featureId": "AUTH-013",
+  "entityId": "ENT-USER",
+  "authoritativeWriter": "W02",
+  "persistenceDomain": "D1-01",
+  "observedPreSchemaEvidence": {
+    "workflowRun": 35657959095,
+    "testedCommitSha": "48575b4a2b86bf317e4e4ccac6c6ec17739cf2eb",
+    "environment": "CONTROLLED_REMOTE_D1",
+    "databaseName": "luckread",
+    "table": "users",
+    "result": "OBSERVED",
+    "observedColumns": [
+      "id",
+      "updated_at",
+      "created_at",
+      "email",
+      "reset_password_token",
+      "reset_password_expiration",
+      "salt",
+      "hash",
+      "login_attempts",
+      "lock_until"
+    ],
+    "accountStateColumnsPresent": false,
+    "writesDuringCapture": 0,
+    "note": "The captured remote schema proves the target columns were absent at the tested pre-schema snapshot. It does not prove a current-head post-migration state."
+  },
+  "fieldMappings": [
+    {
+      "fieldId": "ENT-USER-F-ACCOUNT-STATE",
+      "canonicalName": "account_state",
+      "targetTable": "users",
+      "targetColumn": "account_state",
+      "dbType": "TEXT",
+      "finalNullable": false,
+      "finalRequired": true,
+      "observedCurrently": true,
+      "mappingStatus": "VERIFIED_CURRENT_ZERO_ROW_TARGET"
+    },
+    {
+      "fieldId": "ENT-USER-F-ACCOUNT-STATE-VERSION",
+      "canonicalName": "account_state_version",
+      "targetTable": "users",
+      "targetColumn": "account_state_version",
+      "dbType": "INTEGER",
+      "finalNullable": false,
+      "finalRequired": true,
+      "observedCurrently": true,
+      "mappingStatus": "VERIFIED_CURRENT_ZERO_ROW_TARGET"
+    }
+  ],
+  "migration": {
+    "migrationId": "MIG-AUTH-013-ACCOUNT-STATE-V1",
+    "status": "CONTRACTED_NOT_VERIFIED",
+    "finalSchemaRequired": true,
+    "transitionalNullableColumnsAllowed": true,
+    "backfillRequiredForExistingRows": true,
+    "backfillDecisionStatus": "CURRENT_TARGET_ZERO_ROWS_VERIFIED / FUTURE_NON_ZERO_TARGET_BLOCKED",
+    "executionStatus": "REMOTE_DDL_APPLIED_POSTMIGRATION_READONLY_EVIDENCE_VERIFIED",
+    "executionWorkflow": ".github/workflows/auth-013-account-state-migration.yml",
+    "authorizedScope": "CONTROLLED_REMOTE_D1_ZERO_ROW_TARGET_ONLY",
+    "executionEvidence": {
+      "workflowRun": 35937873769,
+      "sourceCommitSha": "b40ae46fe5862c77f935a54adf4bd7e91c69159a",
+      "evidenceArtifact": "10784305258",
+      "evidenceDigest": "sha256:72c7b323a3a4713a74776a4560980178f8db4eb1691de722729039506d37cf1c",
+      "environment": "CONTROLLED_REMOTE_D1",
+      "databaseName": "luckread",
+      "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+      "usersCount": 0,
+      "accountStateColumnsPresent": true,
+      "accountState": "TEXT NOT NULL DEFAULT 'PENDING_VERIFICATION'",
+      "accountStateVersion": "INTEGER NOT NULL DEFAULT 1",
+      "migrationApplied": "0002_auth_013_account_state.sql",
+      "cleanupVerified": true
+    }
+  },
+  "rules": {
+    "existingUsersMustNotBeSilentlyAssignedState": true,
+    "existingUsersMustNotBeSilentlyAssignedVersion": true,
+    "noW01PayloadCollectionMutationForThisContract": true,
+    "noPayloadGeneratedColumnInference": true,
+    "noRemoteMutationWithoutApprovedMigrationAdmission": true,
+    "postSchemaMustBeCapturedAgainstExactTestedCommitSha": true,
+    "runtimeWritesMustUseW02Authority": true
+  },
+  "finalPostconditions": [
+    "users.account_state exists as TEXT NOT NULL",
+    "users.account_state_version exists as INTEGER NOT NULL",
+    "every existing user row has an explicitly authorized account_state value",
+    "every existing user row has an explicitly authorized account_state_version value",
+    "state/version mutation authority is W02",
+    "final schema is verified on the controlled D1-01 target"
+  ],
+  "remainingGaps": [
+    "non-zero pre-existing-user targets require separate authoritative classification policy before any future migration/backfill",
+    "feature-wide lifecycle transition coverage and security/E2E evidence remain incomplete beyond the verified tested scopes",
+    "cache/deindex/feed/search convergence and full lifecycle side-effect evidence remain incomplete",
+    "final Mapping 0 and Evidence Registry global GREEN admission remain pending"
+  ],
+  "observedCurrentTargetRowCoverageEvidence": {
+    "workflowRun": 35852723250,
+    "testedCommitSha": "29c2e77e8393bec6f9f21183d40e3f2b1b07c28f",
+    "evidenceArtifact": "10746087117",
+    "evidenceDigest": "sha256:9ea5048d252d0006665925387cfabed0116f4a0bc8841b884bc9ecff72a2d001",
+    "environment": "CONTROLLED_REMOTE_D1",
+    "databaseName": "luckread",
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "table": "users",
+    "usersCount": 0,
+    "accountStateColumnsPresent": false,
+    "writesDuringCapture": 0,
+    "disposition": "PASS_VERIFIED_ZERO_ROW_TARGET"
+  },
+  "initializationSemantics": {
+    "firstPersistedAccountState": "PENDING_VERIFICATION",
+    "firstPersistedAccountStateVersion": 1,
+    "successfulTransitionVersionRule": "previous_version + 1",
+    "unsuccessfulTransitionMutatesVersion": false
+  }
+}

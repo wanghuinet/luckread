@@ -1,0 +1,67 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "luckread-w05",
+  "main": "src/entry.ts",
+  "compatibility_date": "2026-09-30",
+  "workers_dev": false,
+  "ratelimits": [
+    {
+      "name": "SOCIAL_ORIGIN_GLOBAL_LIMITER",
+      "namespace_id": "2026100309",
+      "simple": {
+        "limit": 10000,
+        "period": 60
+      }
+    },
+    {
+      "name": "SOCIAL_READ_LIMITER",
+      "namespace_id": "2026100303",
+      "simple": {
+        "limit": 300,
+        "period": 60
+      }
+    },
+    {
+      "name": "SOCIAL_WRITE_LIMITER",
+      "namespace_id": "2026100304",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    }
+  ],
+  "services": [
+    {
+      "binding": "W03_CONTENT",
+      "service": "luckread-w03"
+    }
+  ],
+  "vars": {
+    "PUSH_DELIVERY_ENABLED": "false",
+    "W05_DATABASE_DRIVER": "neon",
+    "W05_PUSH_ENDPOINT_DATABASE_DRIVER": "neon"
+  },
+  "workflows": [
+    {
+      "name": "luckread-w05-notification-push",
+      "binding": "NOTIFICATION_PUSH_WORKFLOW",
+      "class_name": "NotificationPushWorkflow",
+      "schedules": [
+        "* * * * *"
+      ]
+    }
+  ],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE_D1_02",
+      "id": "c55183e1cc3446409c9c1075832c6615"
+    },
+    {
+      "binding": "HYPERDRIVE_D1_03",
+      "id": "7c8831416c18494faee04b96aa551cb9"
+    }
+  ]
+}

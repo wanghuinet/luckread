@@ -1,0 +1,71 @@
+{
+  "version": "1.0.0",
+  "evidenceType": "MAPPING_0_AUTH_003_WIRE_PROJECTION_AUTHORITY",
+  "generatedAt": "2026-09-26",
+  "repository": "wanghuinet/luckread",
+  "sourceHead": "2622d92a0dc15cac103aacbc8d2e89ccac7057f5",
+  "controlId": "CC-MAPPING-0-AUTH-003-WIRE-PROJECTION-AUTHORITY-2026-09-26",
+  "status": "PASS_VERIFIED",
+  "decision": {
+    "credentialId": {
+      "shape": "ResourceId",
+      "opaque": true,
+      "directInternalIdExposure": false
+    },
+    "publicProjection": [
+      "credentialId",
+      "kind",
+      "active"
+    ],
+    "addRequest": {
+      "required": [
+        "kind",
+        "value"
+      ],
+      "unknownProperties": "REJECT"
+    },
+    "replaceRequest": {
+      "required": [
+        "value"
+      ],
+      "kindChange": "FORBIDDEN",
+      "unknownProperties": "REJECT"
+    },
+    "list": {
+      "pagination": "canonical_cursor",
+      "defaultLimit": 50,
+      "maxLimit": 100,
+      "ordering": "createdAt DESC, credentialId DESC",
+      "emptyResult": "200"
+    },
+    "success": {
+      "list": 200,
+      "add": 201,
+      "replace": 200,
+      "remove": 204
+    },
+    "errors": {
+      "envelope": "canonical ErrorResponse",
+      "auth": 401,
+      "permission": 403,
+      "notFound": 404,
+      "conflict": 409,
+      "validation": 422,
+      "rateLimit": 429
+    },
+    "idempotency": [
+      "authCredentialAdd",
+      "authCredentialReplace",
+      "authCredentialRemove"
+    ]
+  },
+  "gates": {
+    "wireAuthority": "PASS_VERIFIED",
+    "openapi": "NOT_YET_ENCODED",
+    "dto": "NOT_YET_PROMOTED",
+    "runtime": "NOT_ADMITTED",
+    "persistence": "NOT_VERIFIED",
+    "mapping0": "NOT_GREEN"
+  },
+  "nextAction": "M0-AUTH-003-WIRE-SCHEMA-ENCODING-001"
+}

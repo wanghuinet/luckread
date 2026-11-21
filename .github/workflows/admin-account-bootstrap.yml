@@ -1,0 +1,25 @@
+name: Admin Account Bootstrap Readiness Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout selected revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify privileged bootstrap prerequisites without production access
+        run: node scripts/verify-admin-account-bootstrap-readiness.mjs

@@ -1,0 +1,32 @@
+{
+  "version": "1.1",
+  "status": "ACTIVE_PATH_AMENDMENT",
+  "supersedesPathFieldOf": "contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json",
+  "featureIds": [
+    "SOCIAL-001",
+    "SOCIAL-002"
+  ],
+  "entityId": "ENT-SOCIAL-FOLLOW",
+  "authority": {
+    "primaryTask": "T11",
+    "primaryWorker": "W05",
+    "workerName": "luckread-w05",
+    "domainId": "D1-02"
+  },
+  "repositoryPathChange": {
+    "from": "workers/W05-transaction/migrations/20260930_001_social_001_follow_v1.sql",
+    "to": "workers/W05-social/migrations/20260930_001_social_001_follow_v1.sql",
+    "contentIdentity": "UNCHANGED_BLOB_SHA",
+    "contentBlobSha": "effa0a6ca934d9b995611d7612baa1255379c0a7",
+    "runtimeBehaviorChange": false,
+    "databaseSchemaChange": false
+  },
+  "rule": "The former path is historical provenance only. All current source checkout, validation and execution paths must use the canonical W05 directory.",
+  "nonGoals": [
+    "No D1 schema change.",
+    "No migration re-execution.",
+    "No Worker identity change.",
+    "No Mapping 0 GREEN promotion.",
+    "No runtime handler admission."
+  ]
+}

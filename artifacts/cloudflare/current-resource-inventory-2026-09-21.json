@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "CLOUDFLARE_RESOURCE_INVENTORY",
+  "mode": "READ_ONLY",
+  "capturedAt": "2026-09-21T12:15:54Z",
+  "repository": "wanghuinet/luckread",
+  "commit": "75e5a25fba48d95c432476cda6b0b6d6d4c70b06",
+  "workflow": {
+    "path": ".github/workflows/cloudflare-resource-inventory.yml",
+    "runId": 35598525409,
+    "conclusion": "success",
+    "artifactId": 10637318432,
+    "artifactDigest": "sha256:8767fe564ab8f11b8ded8b63ab8577487fb609e579ff15243e639cb0dd2a046"
+  },
+  "cloudflare": {
+    "d1": {
+      "count": 2,
+      "resources": [
+        {
+          "name": "luckreadpro",
+          "uuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+          "createdAt": "2026-09-12T14:23:18.331Z",
+          "repositoryBinding": "NONE_FOUND"
+        },
+        {
+          "name": "luckread",
+          "uuid": "2f80471e-3756-49f9-8db1-7707a433ad64",
+          "createdAt": "2026-09-12T14:18:14.770Z",
+          "repositoryBinding": "W01-PAYLOAD-D1-BINDING"
+        }
+      ]
+    },
+    "workers": {
+      "uploadedScriptCount": 0,
+      "resources": []
+    }
+  },
+  "canonicalArchitecture": {
+    "logicalD1Domains": 4,
+    "canonicalWorkers": 12,
+    "physicalToLogicalMapping": "NOT_ESTABLISHED",
+    "workerProvisioningStatus": "NO_UPLOADED_SCRIPTS_CONFIRMED"
+  },
+  "safetyDecision": {
+    "existingLuckreadD1": "DO_NOT_TOUCH",
+    "unmappedLuckreadproD1": "DO_NOT_ASSIGN_BY_INFERENCE",
+    "createAdditionalD1": "BLOCKED_UNTIL_AUTHORITATIVE_PHYSICAL_NAMING",
+    "createWorkers": "BLOCKED_UNTIL_CANONICAL_PHYSICAL_NAMES_AND_IMPLEMENTATION_ADMISSION",
+    "remoteMigration": "PROHIBITED_UNTIL_EXPLICIT_GREEN_EXECUTION_ADMISSION"
+  },
+  "conclusion": "Fresh read-only Cloudflare API inventory confirms zero uploaded Worker scripts at capture time. This establishes absence of current deployed Worker evidence; it does not assign physical names or authorize resource creation."
+}

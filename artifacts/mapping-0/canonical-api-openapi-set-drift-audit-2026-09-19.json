@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-09-19",
+  "purpose": "Global Canonical API Inventory ↔ OpenAPI operationId set-drift audit. Read-only; no API admission or mapping status promotion.",
+  "sourceRefs": {
+    "apiInventory": "contracts/alignment/api-inventory.v1.json",
+    "openapi": "contracts/openapi/v1/openapi.yaml"
+  },
+  "noInference": true,
+  "summary": {
+    "apiInventoryOperationCount": 151,
+    "uniqueApiInventoryOperationCount": 150,
+    "openapiOperationCount": 151,
+    "uniqueOpenapiOperationCount": 150,
+    "missingFromOpenapiCount": 0,
+    "extraOpenapiCount": 0,
+    "duplicateApiInventoryCount": 1,
+    "duplicateOpenapiCount": 1
+  },
+  "missingFromOpenapi": [],
+  "extraOpenapi": [],
+  "duplicateApiInventory": [
+    {
+      "id": "getEntitlements",
+      "count": 2
+    }
+  ],
+  "duplicateOpenapi": [
+    {
+      "id": "getEntitlements",
+      "count": 2
+    }
+  ],
+  "interpretation": [
+    "OperationId presence in both sources is necessary for admission, not sufficient for DTO/runtime/security evidence.",
+    "AUTH-003..006 and AUTH-010 operation IDs remain outside API Inventory and therefore do not become admitted operations through this audit.",
+    "authRefresh is present in the API Inventory/OpenAPI sets but remains contract-status DISCOVERY_DRAFT."
+  ],
+  "status": "NOT_GREEN"
+}

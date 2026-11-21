@@ -1,0 +1,248 @@
+name: W03 Neon Runtime Validation and Controlled Deployment
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/neon-runtime-cutover-w03.yml'
+      - 'workers/W03-content/wrangler.jsonc'
+      - 'workers/W03-content/src/content-collections.ts'
+      - 'workers/W03-content/src/content-create-store-postgres.ts'
+      - 'workers/W03-content/src/content-create-postgres.test.ts'
+      - 'workers/W03-content/src/content-mutation-store-postgres.ts'
+      - 'workers/W03-content/src/content-mutation-postgres.test.ts'
+      - 'workers/W03-content/src/content-relationship-mutation-store-postgres.ts'
+      - 'workers/W03-content/src/content-relationship-mutation-store-postgres.test.ts'
+      - 'workers/W03-content/src/content-relationships.ts'
+      - 'workers/W03-content/src/index.ts'
+      - 'workers/W03-content/src/neon/runtime.test.ts'
+      - 'workers/W03-content/src/content-collections-read-store-postgres.ts'
+      - 'workers/W03-content/src/content-collections-create-store-postgres.ts'
+      - 'workers/W03-content/src/content-collections-update-store-postgres.ts'
+      - 'workers/W03-content/src/content-collections-delete-store-postgres.ts'
+      - 'workers/W03-content/src/content-series-create-store-postgres.ts'
+      - 'workers/W03-content/src/content-series-update-store-postgres.ts'
+      - 'workers/W03-content/src/content-series-delete-store-postgres.ts'
+      - 'workers/W03-content/src/content-collection-member-attach-store-postgres.ts'
+      - 'workers/W03-content/src/content-collection-member-attach-postgres.test.ts'
+      - 'workers/W03-content/src/content-collection-member-remove-store-postgres.ts'
+      - 'workers/W03-content/src/content-collection-member-remove-postgres.test.ts'
+      - 'workers/W03-content/src/content-collection-member-reorder-store-postgres.ts'
+      - 'workers/W03-content/src/content-collection-member-reorder-postgres.test.ts'
+      - 'workers/W03-content/src/content-series-member-attach-store-postgres.ts'
+      - 'workers/W03-content/src/content-series-member-remove-store-postgres.ts'
+      - 'workers/W03-content/src/content-series-member-reorder-store-postgres.ts'
+      - 'workers/W03-content/src/content-series-member-reorder-postgres.test.ts'
+      - 'workers/W03-content/src/content-series.ts'
+      - 'workers/W03-content/src/content-series-read-store-postgres.ts'
+      - 'workers/W03-content/src/content-series-members.ts'
+      - 'workers/W03-content/src/content-collection-members.ts'
+      - 'workers/W03-content/src/content-members-read-store-postgres.ts'
+      - 'workers/W03-content/src/content-runtime.ts'
+      - 'workers/W03-content/src/content-detail-read-store-postgres.ts'
+      - 'workers/W03-content/src/creator-contents-read-store-postgres.ts'
+      - 'workers/W03-content/src/content-revision-read-store-postgres.ts'
+      - 'workers/W03-content/src/entry.ts'
+      - 'workers/W03-content/src/neon/runtime.ts'
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact W03 source commit to deploy from protected main
+        required: true
+        type: string
+      confirm:
+        description: Type DEPLOY to permit the controlled W03 Neon deployment
+        required: true
+        default: NO
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-runtime-cutover-w03
+  cancel-in-progress: false
+
+jobs:
+  w03-neon-runtime:
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY' && github.ref == 'refs/heads/main' && github.ref_protected == true) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact validation or deployment source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Require the dispatched source SHA to belong to protected main
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REF_PROTECTED" = "true"
+          git fetch origin main --no-tags
+          git cat-file -e "$SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          echo "W03_DEPLOY_SOURCE_IS_PROTECTED_MAIN=PASS"
+
+      - name: Validate W03 Neon-only runtime and admitted provider wiring
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs')
+          const config = JSON.parse(fs.readFileSync('workers/W03-content/wrangler.jsonc', 'utf8'))
+          const entry = fs.readFileSync('workers/W03-content/src/entry.ts', 'utf8')
+          const runtime = fs.readFileSync('workers/W03-content/src/neon/runtime.ts', 'utf8')
+          const contentRuntime = fs.readFileSync('workers/W03-content/src/content-runtime.ts', 'utf8')
+          const router = fs.readFileSync('workers/W03-content/src/index.ts', 'utf8')
+          const relationships = fs.readFileSync('workers/W03-content/src/content-relationships.ts', 'utf8')
+          const bootstrap = JSON.parse(fs.readFileSync('contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
+          const domain = (bootstrap.domains || []).find(x => x.domainId === 'D1-02')
+          const hyperdrive = (config.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_CONTENT_PG')
+          if (config.name !== 'luckread-w03' || config.main !== 'src/entry.ts') {
+            throw new Error('W03 worker identity or deployment entrypoint changed')
+          }
+          if (config.vars?.W03_CONTENT_READ_DRIVER !== 'neon') {
+            throw new Error('W03 content read driver must select Neon')
+          }
+          if ((config.d1_databases || []).length !== 0) {
+            throw new Error('W03 Neon production config must not declare any Cloudflare D1 runtime binding')
+          }
+          if (!hyperdrive || hyperdrive.id !== 'c55183e1cc3446409c9c1075832c6615') {
+            throw new Error('W03 existing D1-02 Hyperdrive binding identity changed')
+          }
+          if (domain?.databaseName !== 'luckreadpro' ||
+              domain?.remoteSchemaApplied !== true ||
+              !String(domain?.status ?? '').includes('D1_02_SCHEMA_ONLY_REMOTE_APPLIED')) {
+            throw new Error('D1-02 remote Neon schema admission is not recorded')
+          }
+          const providers = [
+            ['publishedMediaReferenceReadStoreProvider', 'getW03PublishedMediaReferenceReadStore'],
+            ['publishedContentsByIdsReadStoreProvider', 'getW03PublishedContentsByIdsReadStore'],
+            ['followingOwnerContentsReadStoreProvider', 'getW03FollowingOwnerContentsReadStore'],
+            ['postThreadReadStoreProvider', 'getW03PostThreadReadStore'],
+            ['contentRelationshipMutationStoreProvider', 'getW03ContentRelationshipMutationStore'],
+            ['contentContextReadStoreProvider', 'getW03ContentContextReadStore'],
+            ['collectionListReadStoreProvider', 'getW03CollectionListReadStore'],
+            ['contentCreateStoreProvider', 'getW03ContentCreateStore'],
+            ['contentMutationStoreProvider', 'getW03ContentMutationStore'],
+            ['collectionCreateStoreProvider', 'getW03CollectionCreateStore'],
+            ['collectionUpdateStoreProvider', 'getW03CollectionUpdateStore'],
+            ['collectionDeleteStoreProvider', 'getW03CollectionDeleteStore'],
+            ['seriesReadStoreProvider', 'getW03SeriesReadStore'],
+            ['seriesCreateStoreProvider', 'getW03SeriesCreateStore'],
+            ['seriesUpdateStoreProvider', 'getW03SeriesUpdateStore'],
+            ['seriesDeleteStoreProvider', 'getW03SeriesDeleteStore'],
+            ['collectionMemberAttachStoreProvider', 'getW03CollectionMemberAttachStore'],
+            ['collectionMemberRemoveStoreProvider', 'getW03CollectionMemberRemoveStore'],
+            ['collectionMemberReorderStoreProvider', 'getW03CollectionMemberReorderStore'],
+            ['seriesMemberAttachStoreProvider', 'getW03SeriesMemberAttachStore'],
+            ['seriesMemberRemoveStoreProvider', 'getW03SeriesMemberRemoveStore'],
+            ['seriesMemberReorderStoreProvider', 'getW03SeriesMemberReorderStore'],
+            ['membersReadStoreProvider', 'getW03MembersReadStore'],
+            ['contentDetailReadStoreProvider', 'getW03ContentDetailReadStore'],
+            ['creatorContentsReadStoreProvider', 'getW03CreatorContentsReadStore'],
+            ['contentRevisionReadStoreProvider', 'getW03ContentRevisionReadStore'],
+          ]
+          for (const [provider, factory] of providers) {
+            if (!entry.includes(provider) || !entry.includes(factory) || !runtime.includes(factory)) {
+              throw new Error('W03 Neon provider wiring is incomplete: ' + provider)
+            }
+          }
+          const productionRuntime = [entry, runtime, contentRuntime, router, relationships].join('\n')
+          if (/\b(?:env|context\.env)\.D1_02\b/.test(productionRuntime)) {
+            throw new Error('W03 production entrypoint still directly accesses the removed D1_02 binding')
+          }
+          if (!entry.includes('contentRevisionReadStoreProvider') ||
+              !runtime.includes('getW03ContentRevisionReadStore') ||
+              !router.includes('const revisionReadStore = dependencies.contentRevisionReadStoreProvider?.(env)') ||
+              !router.includes("if (!revisionReadStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)") ||
+              !router.includes('          revisionReadStore,') ||
+              !contentRuntime.includes('readStore.list(principalUserId, contentId, decoded, pageSize + 1)') ||
+              !contentRuntime.includes('const revision = await readStore.get(principalUserId, contentId, revisionId)')) {
+            throw new Error('W03 Neon content revision history read wiring is incomplete')
+          }
+          if (!entry.includes('contentDetailReadStoreProvider') ||
+              !runtime.includes('getW03ContentDetailReadStore') ||
+              !router.includes('const contentDetailReadStore = dependencies.contentDetailReadStoreProvider?.(env)') ||
+              !router.includes("if (!contentDetailReadStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)") ||
+              !router.includes('          contentDetailReadStore,') ||
+              !contentRuntime.includes('await readStore.getContent(contentId, principalUserId)')) {
+            throw new Error('W03 Neon canonical content detail read wiring is incomplete')
+          }
+          if (!router.includes('const mutationStore = dependencies.contentMutationStoreProvider?.(env)') ||
+              !router.includes("if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)") ||
+              !contentRuntime.includes('await mutationStore.loadRevision(contentId, revisionId)') ||
+              !contentRuntime.includes('await mutationStore.rollback({')) {
+            throw new Error('W03 Neon revision restore wiring is incomplete')
+          }
+          if (!contentRuntime.includes('mutationStore.transition({') ||
+              !router.includes('const mutationStore = dependencies.contentMutationStoreProvider?.(env)') ||
+              !router.includes("if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)") ||
+              !router.includes('transitionContentState(\n          mutationStore,')) {
+            throw new Error('W03 Neon owner-authorized content state transition wiring is incomplete')
+          }
+          if (!contentRuntime.includes('mutationStore.moderationTransition({') ||
+              !router.includes('applyModerationContentTransition(mutationStore, {') ||
+              !runtime.includes('getW03ContentMutationStore') ||
+              !router.includes("if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)")) {
+            throw new Error('W03 Neon W06 moderation transition wiring is incomplete')
+          }
+          if (!contentRuntime.includes('mutationStore.rollback({') ||
+              !router.includes('rollbackContentRevision(\n          mutationStore,') ||
+              !router.includes("if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)")) {
+            throw new Error('W03 Neon revision rollback wiring is incomplete')
+          }
+          if (!relationships.includes('mutationStore.create({') ||
+              !relationships.includes('mutationStore.revoke({') ||
+              !relationships.includes('mutationStore.appendThread({') ||
+              !router.includes('dependencies.contentRelationshipMutationStoreProvider?.(env),')) {
+            throw new Error('W03 Neon content relationship and post-thread mutation wiring is incomplete')
+          }
+          if (!contentRuntime.includes('mutationStore.listDueScheduled(nowIso, limit)') ||
+              !contentRuntime.includes('mutationStore.publishScheduled(authorizedCandidates, nowIso)')) {
+            throw new Error('W03 Neon scheduled publication read/commit wiring is incomplete')
+          }
+          console.log('W03_NEON_SCHEDULED_PUBLICATION_CUTOVER=PASS')
+          console.log('W03_NEON_MODERATION_TRANSITION_CUTOVER=PASS')
+          console.log('W03_NEON_REVISION_ROLLBACK_CUTOVER=PASS')
+          console.log('W03_NEON_CONTENT_RELATIONSHIP_CUTOVER=PASS')
+          console.log('W03_NEON_POST_THREAD_APPEND_CUTOVER=PASS')
+          console.log('W03_NEON_CONTENT_STATE_TRANSITION_CUTOVER=PASS')
+          console.log('W03_NEON_READ_PROJECTION_CUTOVER_CONFIG=PASS')
+          NODE
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Install W03 PostgreSQL Worker runtime dependency
+        working-directory: workers/W03-content
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
+      - name: Deploy W03 Content with the exact reviewed Neon source
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
+        working-directory: workers/W03-content
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc 2>&1 | tee "$RUNNER_TEMP/w03-neon-deploy.log"
+          version_id="$(sed -n 's/.*Current Version ID: //p' "$RUNNER_TEMP/w03-neon-deploy.log" | tail -n 1)"
+          if [ -z "$version_id" ]; then
+            echo "Wrangler did not return a W03 Worker Version ID; refusing to report a deployment."
+            exit 1
+          fi
+          echo "W03_UPLOADED_VERSION_ID=$version_id"
+          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w03 --config wrangler.jsonc --yes
+          npx --yes wrangler@4.156.0 deployments list --name luckread-w03 --config wrangler.jsonc

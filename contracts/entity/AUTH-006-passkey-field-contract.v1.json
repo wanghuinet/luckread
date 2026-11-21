@@ -1,0 +1,27 @@
+{
+  "version":"1.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "featureId":"AUTH-006",
+  "entityAuthority":{"credentialEntityId":"ENT-CREDENTIAL","verificationEntityId":"ENT-VERIFICATION","identityEntityId":"ENT-IDENTITY"},
+  "rules":{"privateKeyNeverPersisted":true,"rpIdDeploymentAuthoritative":true,"originDeploymentAuthoritative":true,"challengeSingleUse":true,"challengeTimeBound":true,"credentialOwnershipRequired":true},
+  "fields":[
+    {"fieldId":"ENT-CREDENTIAL-F-PASSKEY-ID","name":"passkeyId","type":"text","nullable":false,"required":true,"unique":true,"indexed":true,"classification":"WEBAUTHN_CREDENTIAL_IDENTIFIER","lifecycle":"immutable"},
+    {"fieldId":"ENT-CREDENTIAL-F-PASSKEY-IDENTITY-ID","name":"identityId","type":"text","nullable":false,"required":true,"unique":false,"indexed":true,"classification":"INTERNAL_RELATION","lifecycle":"immutable"},
+    {"fieldId":"ENT-CREDENTIAL-F-PUBLIC-KEY","name":"publicKey","type":"text","nullable":false,"required":true,"unique":false,"indexed":false,"classification":"PUBLIC_CRYPTOGRAPHIC_MATERIAL","lifecycle":"immutable"},
+    {"fieldId":"ENT-CREDENTIAL-F-RP-ID","name":"rpId","type":"text","nullable":false,"required":true,"unique":false,"indexed":true,"classification":"WEBAUTHN_METADATA","lifecycle":"immutable"},
+    {"fieldId":"ENT-CREDENTIAL-F-SIGN-COUNT","name":"signCount","type":"integer","nullable":false,"required":true,"defaultValue":0,"unique":false,"indexed":false,"classification":"AUTHENTICATOR_STATE","lifecycle":"monotonic"},
+    {"fieldId":"ENT-CREDENTIAL-F-AUTHENTICATOR-STATE","name":"authenticatorState","type":"text","nullable":true,"required":false,"unique":false,"indexed":false,"classification":"AUTHENTICATOR_STATE","lifecycle":"mutable"},
+    {"fieldId":"ENT-CREDENTIAL-F-LABEL","name":"label","type":"text","nullable":true,"required":false,"unique":false,"indexed":false,"classification":"USER_METADATA","lifecycle":"mutable"},
+    {"fieldId":"ENT-CREDENTIAL-F-REVOKED-AT","name":"revokedAt","type":"datetime","nullable":true,"required":false,"unique":false,"indexed":true,"classification":"SECURITY_STATE","lifecycle":"write-once"},
+    {"fieldId":"ENT-CREDENTIAL-F-CREATED-AT","name":"createdAt","type":"datetime","nullable":false,"required":true,"unique":false,"indexed":true,"classification":"AUDIT_METADATA","lifecycle":"immutable"},
+    {"fieldId":"ENT-CREDENTIAL-F-UPDATED-AT","name":"updatedAt","type":"datetime","nullable":false,"required":true,"unique":false,"indexed":true,"classification":"AUDIT_METADATA","lifecycle":"mutable"}
+  ],
+  "challengeBinding":{
+    "challengeEntityId":"ENT-VERIFICATION",
+    "requiredBindings":["identityId","purpose","challengeHash","issuedAt","expiresAt","consumedAt"],
+    "purposeValues":["passkey_registration","passkey_assertion"]
+  },
+  "persistenceConstraints":["passkeyId unique", "credential owner identityId required", "private key absent", "cross-account remove/update denied", "RP ID bound to deployment authority"],
+  "verificationRequired":["real-D1-schema","migration","registration-verification-test","assertion-signature-test","challenge-replay-negative-test","cross-account-negative-test","private-key-absence-test","mapping0"],
+  "greenGate":"NOT_GREEN_UNTIL_EXECUTABLE_EVIDENCE"
+}

@@ -1,0 +1,94 @@
+name: Neon D1-01 W07 Membership PostgreSQL Schema
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/neon-d1-01-w07-membership-schema.yml'
+      - 'contracts/database/neon-five-domain-schema-bootstrap.v1.json'
+      - 'contracts/database/neon-d1-01-schema-sources.v1.json'
+      - 'contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json'
+      - 'contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json'
+      - 'workers/W07-subscription-commerce/migrations/**'
+      - 'workers/W07-subscription-commerce/scripts/neon/**'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations/**'
+      - 'workers/W07-subscription-commerce/README-neon-postgres-schema.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-01-w07-membership-schema-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  postgres-schema:
+    name: Generate and verify W07 D1-01 membership schema on PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: schema_generator
+          POSTGRES_PASSWORD: schema_generator_local_only
+          POSTGRES_DB: luckread_schema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schema_generator -d luckread_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Generate PostgreSQL migration from canonical W07 migrations and contracts
+        working-directory: workers/W07-subscription-commerce
+        run: |
+          set -euo pipefail
+          node scripts/neon/generate-d1-01-membership-postgres-migration.mjs
+          git diff --exit-code -- src/neon-postgres-migrations/0001_w07_d1_01_membership_schema.sql
+
+      - name: Reject SQLite-only SQL constructs
+        working-directory: workers/W07-subscription-commerce
+        run: |
+          set -euo pipefail
+          test -s src/neon-postgres-migrations/0001_w07_d1_01_membership_schema.sql
+          if grep -Eiq '(^|[^[:alnum:]_])(PRAGMA|AUTOINCREMENT|strftime|julianday|GLOB|RAISE[[:space:]]*\([[:space:]]*ABORT)([^[:alnum:]_]|$)' src/neon-postgres-migrations/0001_w07_d1_01_membership_schema.sql; then
+            echo "Generated W07 PostgreSQL migration contains SQLite-only SQL"
+            exit 1
+          fi
+
+      - name: Apply W07 schema only to disposable PostgreSQL 18
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          set -euo pipefail
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file workers/W07-subscription-commerce/src/neon-postgres-migrations/0001_w07_d1_01_membership_schema.sql
+
+      - name: Verify W07 constraints, indexes, triggers, transaction rollback and empty tables
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          set -euo pipefail
+          mkdir -p workers/W07-subscription-commerce/artifacts/neon
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W07-subscription-commerce/scripts/neon/verify-d1-01-membership-postgres-schema.sql \
+            > workers/W07-subscription-commerce/artifacts/neon/w07-d1-01-membership-postgres-schema-postflight.json
+
+      - name: Upload W07 PostgreSQL schema evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-01-w07-membership-postgres-schema-${{ github.sha }}
+          path: workers/W07-subscription-commerce/artifacts/neon/w07-d1-01-membership-postgres-schema-postflight.json
+          if-no-files-found: error
+          retention-days: 90

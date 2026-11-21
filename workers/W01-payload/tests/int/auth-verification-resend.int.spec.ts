@@ -1,0 +1,126 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const mocks = vi.hoisted(() => ({
+  proxyBetterAuth: vi.fn(),
+  enforceAuthRateLimit: vi.fn(),
+  TrafficLimitError: class extends Error {},
+}))
+
+vi.mock('../../src/auth/w02-session-client.js', () => ({
+  proxyBetterAuth: mocks.proxyBetterAuth,
+}))
+
+vi.mock('../../src/auth/traffic-limit.js', () => ({
+  enforceAuthRateLimit: mocks.enforceAuthRateLimit,
+  TrafficLimitError: mocks.TrafficLimitError,
+  rateLimitResponse: vi.fn(() => new Response(null, { status: 429 })),
+}))
+
+import { POST } from '../../src/app/api/v1/auth/verification/send/route.js'
+
+const request = (body: unknown, extraHeaders: HeadersInit = {}) => new Request('https://luckread.test/api/v1/auth/verification/send', {
+  method: 'POST',
+  headers: {
+    'content-type': 'application/json',
+    'cf-connecting-ip': '203.0.113.10',
+    ...Object.fromEntries(new Headers(extraHeaders).entries()),
+  },
+  body: JSON.stringify(body),
+})
+
+describe('public email verification resend API', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.enforceAuthRateLimit.mockResolvedValue(undefined)
+    mocks.proxyBetterAuth.mockResolvedValue(new Response(null, { status: 200 }))
+  })
+
+  it('normalizes email and keeps identity behind the W02 service binding', async () => {
+    const response = await POST(request({ identity: ' Reader@Example.com ' }))
+
+    expect(response.status).toBe(202)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(mocks.enforceAuthRateLimit).toHaveBeenCalledWith(
+      expect.any(Request),
+      'AUTH_REGISTER_LIMITER',
+      ['ip:203.0.113.10'],
+    )
+    expect(mocks.proxyBetterAuth).toHaveBeenCalledWith(
+      expect.any(Request),
+      '/send-verification-email',
+      {
+        body: {
+          email: 'reader@example.com',
+          callbackURL: 'https://luckread.com/login?verified=1',
+        },
+      },
+    )
+  })
+
+  it('does not forward a stale browser session cookie but preserves the origin', async () => {
+    const response = await POST(request(
+      { identity: 'reader@example.com' },
+      {
+        cookie: 'better-auth.session_token=stale-session',
+        origin: 'https://luckread.com',
+      },
+    ))
+
+    expect(response.status).toBe(202)
+    const proxiedRequest = mocks.proxyBetterAuth.mock.calls[0]?.[0] as Request | undefined
+    expect(proxiedRequest).toBeInstanceOf(Request)
+    expect(proxiedRequest?.headers.has('cookie')).toBe(false)
+    expect(proxiedRequest?.headers.get('origin')).toBe('https://luckread.com')
+    expect(proxiedRequest?.headers.get('cf-connecting-ip')).toBe('203.0.113.10')
+  })
+
+  it('does not reveal account existence for Better Auth validation outcomes', async () => {
+    mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({
+      error: { code: 'USER_NOT_FOUND' },
+    }), { status: 400 }))
+
+    const response = await POST(request({ identity: 'unknown@example.com' }))
+    expect(response.status).toBe(202)
+    expect(await response.text()).toBe('')
+  })
+
+  it('does not report unexpected upstream 4xx responses as accepted mail requests', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({
+      error: { code: 'INVALID_ORIGIN' },
+    }), { status: 400 }))
+
+    const response = await POST(request({ identity: 'reader@example.com' }))
+    expect(response.status).toBe(503)
+    const serializedLogs = warning.mock.calls.flat().join(' ')
+    expect(serializedLogs).toContain('AUTH_EMAIL_VERIFICATION_UPSTREAM_REJECTION')
+    expect(serializedLogs).toContain('INVALID_ORIGIN')
+    expect(serializedLogs).not.toContain('reader@example.com')
+    warning.mockRestore()
+  })
+
+  it('keeps expected no-op outcomes private while reporting server failures', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({
+      error: { code: 'EMAIL_PROVIDER_UNAVAILABLE' },
+    }), { status: 500 }))
+
+    const response = await POST(request({ identity: 'reader@example.com' }))
+    expect(response.status).toBe(503)
+    expect(error.mock.calls.flat().join(' ')).toContain('AUTH_EMAIL_VERIFICATION_UPSTREAM_FAILURE')
+    error.mockRestore()
+  })
+
+  it('rejects malformed requests before invoking Better Auth', async () => {
+    const response = await POST(request({ identity: 'not-an-email' }))
+    expect(response.status).toBe(422)
+    expect(mocks.proxyBetterAuth).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when the identity service is unavailable', async () => {
+    mocks.proxyBetterAuth.mockRejectedValue(new Error('W02 unavailable'))
+
+    const response = await POST(request({ identity: 'reader@example.com' }))
+    expect(response.status).toBe(503)
+  })
+})

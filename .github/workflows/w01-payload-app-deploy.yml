@@ -1,0 +1,153 @@
+name: W01 Payload Application Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source commit already contained in protected main
+        required: true
+        type: string
+      confirm:
+        description: Type DEPLOY to publish W01 to the configured production routes
+        required: true
+        default: NO
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  deployments: read
+  pull-requests: read
+
+concurrency:
+  group: w01-payload-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirm == 'DEPLOY' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
+    runs-on: ubuntu-latest
+    environment: auth-mfa-rollout
+    timeout-minutes: 30
+    steps:
+      - name: Checkout protected main for source validation
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate immutable source SHA is committed to protected main
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$SOURCE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "source_sha must be a full 40-character commit SHA"
+            exit 1
+          fi
+          git cat-file -e "$SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main || {
+            echo "source_sha must be an immutable commit already contained in protected main"
+            exit 1
+          }
+
+      - name: Checkout exact approved source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Record deployment source
+        id: source
+        run: |
+          set -euo pipefail
+          source_sha="$(git rev-parse HEAD)"
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+          {
+            echo "### W01 production application deployment"
+            echo
+            echo "- Source commit: `$source_sha`"
+            echo "- Target Worker: `luckread-w01-payload`"
+            echo "- Production route includes: `mp.luckread.com`"
+            echo "- Runtime database: Neon D1-01 (`luckread`)"
+            echo "- Production database bindings: Neon Hyperdrive only (zero D1 bindings)"
+            echo "- D1 migrations: not run"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Verify D1-free Neon production Worker config
+        working-directory: workers/W01-payload
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const config = JSON.parse(fs.readFileSync('wrangler.neon.jsonc', 'utf8'))
+          if (config.name !== 'luckread-w01-payload') throw new Error('W01 Worker identity mismatch')
+          if (config.vars?.PAYLOAD_DATABASE_DRIVER !== 'neon') throw new Error('W01 production runtime must select Neon')
+          if ((config.d1_databases || []).length !== 0) throw new Error('W01 production config must not declare Cloudflare D1 bindings')
+          const hyperdrive = (config.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE')
+          if (!hyperdrive || hyperdrive.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') {
+            throw new Error('W01 must bind the verified D1-01 Neon Hyperdrive resource')
+          }
+          console.log('W01_PRODUCTION_DATABASE=NEON_D1_01; PRODUCTION_D1_BINDINGS=NONE; HYPERDRIVE=VERIFIED')
+          NODE
+
+      - name: Typecheck W01
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit
+
+      - name: Run W01 unit and security tests
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run --passWithNoTests --config ./vitest.config.mts
+
+      - name: Lint W01
+        working-directory: workers/W01-payload
+        run: pnpm run lint
+
+      - name: Deploy W01 application only
+        working-directory: workers/W01-payload
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm run deploy:app
+
+      - name: Record W01-only deployment provenance
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          mkdir -p artifacts/mapping-0/w01-payload-app-deployment
+          cat > artifacts/mapping-0/w01-payload-app-deployment/provenance.json <<EOF
+          {
+            "workflow": "W01 Payload Application Deploy",
+            "sourceSha": "$SOURCE_SHA",
+            "worker": "luckread-w01-payload",
+            "deploymentScope": "W01_ONLY",
+            "runtimeDatabaseDriver": "neon",
+            "neonDatabase": "D1-01/luckread",
+            "productionD1Bindings": [],
+            "historicalD1SourceConfigRetained": true,
+            "databaseMutation": false,
+            "newWorker": false,
+            "newDatabase": false
+          }
+          EOF
+          cat artifacts/mapping-0/w01-payload-app-deployment/provenance.json
+
+      - name: Upload W01-only deployment evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: w01-payload-app-deployment-${{ inputs.source_sha }}
+          path: artifacts/mapping-0/w01-payload-app-deployment/provenance.json
+          retention-days: 30

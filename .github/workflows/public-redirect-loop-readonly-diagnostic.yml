@@ -1,0 +1,256 @@
+name: Public Redirect Loop Read-only Diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/public-redirect-loop-readonly-diagnostic.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-redirect-loop-readonly-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    if: ${{ github.ref == 'refs/heads/main' && github.ref_protected == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout protected main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Run read-only Cloudflare configuration and redirect-chain probes
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/public-redirect-loop-diagnostic
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+
+          const token = process.env.CLOUDFLARE_API_TOKEN;
+          const report = {
+            result: 'DIAGNOSTIC_COMPLETE',
+            sourceSha: process.env.GITHUB_SHA,
+            readOnly: true,
+            checkedAt: new Date().toISOString(),
+            cloudflare: {
+              zone: { found: false, status: null },
+              settings: {},
+              redirectRules: { status: null, rules: [] },
+              pageRules: { status: null, rules: [] },
+              workerRoutes: { status: null, routes: [] },
+            },
+            probes: [],
+          };
+
+          const cloudflareGet = async (path) => {
+            if (!token) return { status: null, payload: null, error: 'CLOUDFLARE_API_TOKEN_MISSING' };
+            try {
+              const response = await fetch('https://api.cloudflare.com/client/v4' + path, {
+                method: 'GET',
+                headers: { authorization: 'Bearer ' + token, accept: 'application/json' },
+                signal: AbortSignal.timeout(10000),
+              });
+              const payload = await response.json().catch(() => null);
+              return { status: response.status, payload, error: null };
+            } catch (error) {
+              return {
+                status: null,
+                payload: null,
+                error: error?.cause?.code || error?.name || 'FETCH_FAILED',
+              };
+            }
+          };
+
+          const zoneLookup = await cloudflareGet('/zones?name=luckread.com&status=active');
+          report.cloudflare.zone.status = zoneLookup.status;
+          const zones = zoneLookup.payload?.success && Array.isArray(zoneLookup.payload.result)
+            ? zoneLookup.payload.result : [];
+          const zone = zones.find((item) => item.name === 'luckread.com');
+          if (zone?.id) {
+            report.cloudflare.zone = { found: true, status: zoneLookup.status, name: zone.name, id: zone.id };
+
+            for (const setting of ['ssl', 'always_use_https', 'automatic_https_rewrites', 'security_header']) {
+              const result = await cloudflareGet('/zones/' + zone.id + '/settings/' + setting);
+              const value = result.payload?.success ? result.payload.result?.value : undefined;
+              report.cloudflare.settings[setting] = {
+                status: result.status,
+                value: value === undefined ? null : value,
+                error: result.error || (result.payload?.success ? null : 'API_REQUEST_FAILED'),
+              };
+            }
+
+            const rulesetsResult = await cloudflareGet('/zones/' + zone.id + '/rulesets');
+            report.cloudflare.redirectRules.status = rulesetsResult.status;
+            if (rulesetsResult.payload?.success && Array.isArray(rulesetsResult.payload.result)) {
+              const candidates = rulesetsResult.payload.result.filter((item) =>
+                typeof item.id === 'string' &&
+                ['http_request_dynamic_redirect', 'http_request_redirect'].includes(item.phase),
+              );
+              for (const item of candidates) {
+                const detail = await cloudflareGet('/zones/' + zone.id + '/rulesets/' + item.id);
+                const rules = detail.payload?.success && Array.isArray(detail.payload.result?.rules)
+                  ? detail.payload.result.rules : [];
+                for (const rule of rules) {
+                  if (rule.action !== 'redirect' && rule.action !== 'rewrite') continue;
+                  const params = rule.action_parameters || {};
+                  const target = params.from_value?.target_url?.value || params.from_value?.target_url ||
+                    params.url || null;
+                  let safeTarget = null;
+                  if (typeof target === 'string') {
+                    try {
+                      const parsed = new URL(target);
+                      safeTarget = { origin: parsed.origin, pathname: parsed.pathname };
+                    } catch { safeTarget = '[non-literal target]'; }
+                  }
+                  report.cloudflare.redirectRules.rules.push({
+                    ruleset: item.name || item.id,
+                    phase: item.phase,
+                    enabled: rule.enabled !== false,
+                    action: rule.action,
+                    expression: typeof rule.expression === 'string' ? rule.expression : null,
+                    target: safeTarget,
+                    status: detail.status,
+                  });
+                }
+              }
+            } else {
+              report.cloudflare.redirectRules.error =
+                rulesetsResult.error || 'RULESETS_READ_UNAVAILABLE';
+            }
+
+            const pageRules = await cloudflareGet('/zones/' + zone.id + '/pagerules?status=active&per_page=100');
+            report.cloudflare.pageRules.status = pageRules.status;
+            if (pageRules.payload?.success && Array.isArray(pageRules.payload.result)) {
+              report.cloudflare.pageRules.rules = pageRules.payload.result.map((rule) => ({
+                status: rule.status,
+                priority: rule.priority,
+                targets: Array.isArray(rule.targets)
+                  ? rule.targets.map((target) => ({ target: target.target, constraint: target.constraint }))
+                  : [],
+                actions: Array.isArray(rule.actions)
+                  ? rule.actions.map((action) => ({
+                      id: action.id,
+                      value: action.id === 'forwarding_url' && action.value?.url
+                        ? (() => {
+                            try {
+                              const u = new URL(action.value.url);
+                              return { origin: u.origin, pathname: u.pathname, statusCode: action.value.status_code };
+                            } catch { return '[invalid target]'; }
+                          })()
+                        : action.value,
+                    }))
+                  : [],
+              }));
+            }
+
+            const workerRoutes = await cloudflareGet('/zones/' + zone.id + '/workers/routes');
+            report.cloudflare.workerRoutes.status = workerRoutes.status;
+            if (workerRoutes.payload?.success && Array.isArray(workerRoutes.payload.result)) {
+              report.cloudflare.workerRoutes.routes = workerRoutes.payload.result.map((route) => ({
+                pattern: route.pattern,
+                script: route.script || null,
+              }));
+            }
+          } else {
+            report.cloudflare.zone.error =
+              zoneLookup.error || (zoneLookup.payload?.success ? 'ZONE_NOT_FOUND' : 'ZONE_READ_UNAVAILABLE');
+          }
+
+          const inspectUrl = async (startUrl) => {
+            const chain = [];
+            const seen = new Set();
+            let current = new URL(startUrl);
+            let loop = false;
+            let terminal = null;
+
+            for (let hop = 0; hop < 12; hop += 1) {
+              const key = current.origin + current.pathname + current.search;
+              if (seen.has(key)) {
+                loop = true;
+                terminal = 'REPEATED_URL';
+                break;
+              }
+              seen.add(key);
+              try {
+                const response = await fetch(current, {
+                  method: 'GET',
+                  redirect: 'manual',
+                  headers: { accept: 'text/html,application/xhtml+xml', 'cache-control': 'no-cache' },
+                  signal: AbortSignal.timeout(12000),
+                });
+                const location = response.headers.get('location');
+                let next = null;
+                if (location && response.status >= 300 && response.status < 400) {
+                  try {
+                    const parsed = new URL(location, current);
+                    next = { origin: parsed.origin, pathname: parsed.pathname };
+                  } catch { next = '[invalid location]'; }
+                }
+                chain.push({
+                  status: response.status,
+                  origin: current.origin,
+                  pathname: current.pathname,
+                  location: next,
+                  cfRay: response.headers.get('cf-ray'),
+                  server: response.headers.get('server'),
+                });
+                if (!location || response.status < 300 || response.status >= 400) {
+                  terminal = 'HTTP_' + response.status;
+                  break;
+                }
+                current = new URL(location, current);
+              } catch (error) {
+                chain.push({
+                  status: null,
+                  origin: current.origin,
+                  pathname: current.pathname,
+                  error: error?.cause?.code || error?.name || 'FETCH_FAILED',
+                });
+                terminal = 'FETCH_ERROR';
+                break;
+              }
+            }
+
+            if (!terminal) terminal = 'HOP_LIMIT_REACHED';
+            return { start: { origin: new URL(startUrl).origin, pathname: new URL(startUrl).pathname },
+              loop, terminal, chain };
+          };
+
+          const targets = [
+            'https://luckread.com/',
+            'https://www.luckread.com/',
+            'https://luckread.com/@huihui',
+            'https://luckread.com/@huihui/post/2116861177622433792',
+            'https://www.luckread.com/@huihui/post/2116861177622433792',
+            'https://luckread.com/content/2116861177622433792',
+          ];
+          for (const url of targets) report.probes.push(await inspectUrl(url));
+
+          report.classification = report.probes.some((probe) => probe.loop)
+            ? 'PUBLIC_REDIRECT_LOOP_REPRODUCED'
+            : report.probes.some((probe) => probe.terminal === 'FETCH_ERROR')
+              ? 'PUBLIC_PROBE_NETWORK_ERROR'
+              : 'NO_REDIRECT_LOOP_IN_PROBES';
+
+          const outputPath = 'artifacts/public-redirect-loop-diagnostic/report.json';
+          writeFileSync(outputPath, JSON.stringify(report, null, 2) + '\n');
+          console.log(JSON.stringify(report, null, 2));
+          NODE
+
+      - name: Upload sanitized diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-redirect-loop-diagnostic-${{ github.run_id }}
+          path: artifacts/public-redirect-loop-diagnostic/report.json
+          if-no-files-found: warn
+          retention-days: 7

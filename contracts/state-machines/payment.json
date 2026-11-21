@@ -1,0 +1,559 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/state-machines/payment.json",
+  "title": "D1-04 Payment State Machine Candidate",
+  "type": "object",
+  "x-luckread": {
+    "entity": "Payment",
+    "domain": "D1-04",
+    "state-field": "status",
+    "version-field": "version",
+    "requires-optimistic-lock": true,
+    "initial-state": "INITIATING",
+    "states": [
+      "INITIATING",
+      "requires_payment_method",
+      "requires_confirmation",
+      "requires_customer_action",
+      "requires_merchant_action",
+      "requires_capture",
+      "processing",
+      "succeeded",
+      "failed",
+      "cancelled",
+      "cancelled_post_capture",
+      "partially_captured",
+      "partially_captured_and_capturable",
+      "expired"
+    ],
+    "terminal-states": [
+      "succeeded",
+      "failed",
+      "cancelled",
+      "cancelled_post_capture",
+      "expired"
+    ],
+    "admissionStatus": "CANDIDATE_NOT_GREEN",
+    "note": "Provider resource.updated, not envelope timestamp, orders provider state. Unknown statuses and unsupported event semantics require reconciliation."
+  },
+  "x-transitions": [
+    {
+      "from": "INITIATING",
+      "to": "requires_payment_method",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "INITIATING",
+      "to": "requires_confirmation",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "INITIATING",
+      "to": "requires_customer_action",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "INITIATING",
+      "to": "requires_merchant_action",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "INITIATING",
+      "to": "requires_capture",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "INITIATING",
+      "to": "processing",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "INITIATING",
+      "to": "succeeded",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "INITIATING",
+      "to": "failed",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "INITIATING",
+      "to": "cancelled",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "INITIATING",
+      "to": "cancelled_post_capture",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "INITIATING",
+      "to": "partially_captured",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "INITIATING",
+      "to": "partially_captured_and_capturable",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "INITIATING",
+      "to": "expired",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_payment_method",
+      "to": "requires_confirmation",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_payment_method",
+      "to": "requires_customer_action",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_payment_method",
+      "to": "processing",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_payment_method",
+      "to": "succeeded",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_payment_method",
+      "to": "failed",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_payment_method",
+      "to": "cancelled",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_payment_method",
+      "to": "expired",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_confirmation",
+      "to": "requires_customer_action",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_confirmation",
+      "to": "requires_merchant_action",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_confirmation",
+      "to": "requires_capture",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_confirmation",
+      "to": "processing",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_confirmation",
+      "to": "succeeded",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_confirmation",
+      "to": "failed",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_confirmation",
+      "to": "cancelled",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_confirmation",
+      "to": "expired",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_customer_action",
+      "to": "requires_confirmation",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_customer_action",
+      "to": "processing",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_customer_action",
+      "to": "succeeded",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_customer_action",
+      "to": "failed",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_customer_action",
+      "to": "cancelled",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_customer_action",
+      "to": "expired",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_merchant_action",
+      "to": "requires_confirmation",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_merchant_action",
+      "to": "requires_capture",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_merchant_action",
+      "to": "processing",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_merchant_action",
+      "to": "succeeded",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_merchant_action",
+      "to": "failed",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_merchant_action",
+      "to": "cancelled",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_merchant_action",
+      "to": "expired",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_capture",
+      "to": "processing",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_capture",
+      "to": "succeeded",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_capture",
+      "to": "failed",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_capture",
+      "to": "cancelled_post_capture",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_capture",
+      "to": "partially_captured",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_capture",
+      "to": "partially_captured_and_capturable",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "requires_capture",
+      "to": "expired",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "processing",
+      "to": "succeeded",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "processing",
+      "to": "failed",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "processing",
+      "to": "cancelled",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "processing",
+      "to": "cancelled_post_capture",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "processing",
+      "to": "partially_captured",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "processing",
+      "to": "partially_captured_and_capturable",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "processing",
+      "to": "expired",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "partially_captured",
+      "to": "processing",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "partially_captured",
+      "to": "partially_captured_and_capturable",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "partially_captured",
+      "to": "failed",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "partially_captured",
+      "to": "cancelled_post_capture",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "partially_captured",
+      "to": "expired",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "partially_captured_and_capturable",
+      "to": "processing",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "partially_captured_and_capturable",
+      "to": "partially_captured",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "partially_captured_and_capturable",
+      "to": "succeeded",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "partially_captured_and_capturable",
+      "to": "failed",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "partially_captured_and_capturable",
+      "to": "cancelled_post_capture",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    },
+    {
+      "from": "partially_captured_and_capturable",
+      "to": "expired",
+      "actor": "system|payment-provider",
+      "precondition": "Signed provider evidence is bound to the local payment identity, merchant, amount and currency; content.object.updated is strictly newer than the stored provider timestamp; local version CAS succeeds."
+    }
+  ],
+  "x-forbidden": [
+    {
+      "from": "succeeded",
+      "to": "failed",
+      "reason": "Successful Payment is immutable; refunds, reversals and chargebacks are separate financial facts."
+    },
+    {
+      "from": "succeeded",
+      "to": "cancelled",
+      "reason": "Successful Payment is immutable; refunds, reversals and chargebacks are separate financial facts."
+    },
+    {
+      "from": "succeeded",
+      "to": "cancelled_post_capture",
+      "reason": "Successful Payment is immutable; refunds, reversals and chargebacks are separate financial facts."
+    },
+    {
+      "from": "succeeded",
+      "to": "processing",
+      "reason": "Successful Payment is immutable; refunds, reversals and chargebacks are separate financial facts."
+    },
+    {
+      "from": "succeeded",
+      "to": "requires_payment_method",
+      "reason": "Successful Payment is immutable; refunds, reversals and chargebacks are separate financial facts."
+    },
+    {
+      "from": "failed",
+      "to": "succeeded",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled",
+      "to": "succeeded",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled_post_capture",
+      "to": "succeeded",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "expired",
+      "to": "succeeded",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "failed",
+      "to": "processing",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled",
+      "to": "processing",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled_post_capture",
+      "to": "processing",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "expired",
+      "to": "processing",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "failed",
+      "to": "requires_payment_method",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled",
+      "to": "requires_payment_method",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled_post_capture",
+      "to": "requires_payment_method",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "expired",
+      "to": "requires_payment_method",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "failed",
+      "to": "requires_confirmation",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled",
+      "to": "requires_confirmation",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled_post_capture",
+      "to": "requires_confirmation",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "expired",
+      "to": "requires_confirmation",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "partially_captured",
+      "to": "succeeded",
+      "reason": "Partial capture does not imply final capture settlement; reconcile remaining captures and final provider state."
+    }
+  ],
+  "reconciliation": {
+    "changeControl": "CC-PAY-001-PAYMENT-ENTITY-MODEL-2026-10-28",
+    "sourceRefs": [
+      "docs/09-D1-DOMAIN-MASTER-v1.0.md",
+      "docs/65-MONETIZATION-COMMERCE-SYSTEM-CONTRACT-v1.0.md",
+      "docs/68-WALLET-LEDGER-AND-SETTLEMENT-CONTRACT-v1.0.md",
+      "docs/change-control/CC-PAY-001-PAYMENT-ENTITY-MODEL-2026-10-28.md"
+    ],
+    "note": "Candidate state machine only; it does not authorize payment confirmation, ledger posting, refund processing or entitlement grant."
+  }
+}

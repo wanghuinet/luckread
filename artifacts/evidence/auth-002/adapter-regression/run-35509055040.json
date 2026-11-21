@@ -1,0 +1,35 @@
+{
+  "evidenceType": "AUTH_002_E4_5_D1_ADAPTER_REGRESSION_RESULT",
+  "version": "1.0.0",
+  "repository": "wanghuinet/luckread",
+  "workflowRunId": 35509055040,
+  "workflowJobId": 106073661985,
+  "testedCommitSha": "3c1ed995477be05340f3941be9eaf14c10681948",
+  "workerPath": "workers/W01-payload",
+  "environmentClass": "CONTROLLED_REMOTE_D1",
+  "databaseName": "luckread",
+  "payloadVersion": "3.87.1",
+  "d1AdapterVersion": "3.87.1",
+  "operation": "payload.db.upsert(payload-preferences)",
+  "probeKey": "w01-e45-35509055040",
+  "syntheticUserId": "e45-probe-35509055040",
+  "expected": "missing preference row is inserted and can be read back",
+  "observed": {
+    "upsertReturnedDocument": false,
+    "upsertError": null,
+    "storedRowPresent": false,
+    "storedValueMatches": false,
+    "persistedAfterUpsert": false,
+    "cleanedUp": true,
+    "adapterUpsertAliasesUpdateOne": true
+  },
+  "result": "FAIL",
+  "classification": "VERIFIED_ADAPTER_REGRESSION",
+  "scope": "E4.5 only",
+  "promotionEffect": "AUTH-002 remains NOT_GREEN; E6 runtime promotion and Mapping-0 promotion remain blocked until the adapter regression is resolved through Change Control and re-proven.",
+  "safety": {
+    "remoteDatabaseWrite": "test write attempt only; no persistent probe row remained",
+    "credentialsRecorded": false,
+    "rawTokensRecorded": false
+  }
+}

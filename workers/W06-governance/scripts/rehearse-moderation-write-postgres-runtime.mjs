@@ -1,0 +1,420 @@
+import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
+
+import { decideModerationCase, drainModerationOutbox, getModerationCase } from '../src/moderation-runtime.ts'
+import { createReport } from '../src/report-runtime.ts'
+import { createPostgresModerationDecisionWriteStore } from '../src/moderation-decision-write-store-postgres.ts'
+import { createPostgresModerationCaseDetailReadStore } from '../src/moderation-case-detail-read-store-postgres.ts'
+import { createPostgresModerationReportWriteStore } from '../src/moderation-report-write-store-postgres.ts'
+import { consumeAccountStateChanged } from '../src/auth-013-queue-consumer.ts'
+import { consumeMfaAuditEvent } from '../src/mfa-audit-queue-consumer.ts'
+import { consumeSessionRevokedAuditEvent } from '../src/session-revocation-audit-queue-consumer.ts'
+import { createPostgresAuditEventStore } from '../src/audit-event-store-postgres.ts'
+
+const requireFromW02 = createRequire(new URL('../../W02-identity/package.json', import.meta.url))
+const { Pool } = requireFromW02('pg')
+
+const connectionString = process.env.D1_03_W06_LOCAL_DATABASE_URL
+if (!connectionString) throw new Error('D1_03_W06_LOCAL_DATABASE_URL is required')
+
+const target = new URL(connectionString)
+if (
+  !['127.0.0.1', 'localhost', 'postgres'].includes(target.hostname) ||
+  target.port !== '5432' ||
+  target.pathname !== '/luckread_d1_03_w06_rehearsal'
+) {
+  throw new Error('Refusing to run W06 moderation write rehearsal outside disposable local PostgreSQL luckread_d1_03_w06_rehearsal')
+}
+
+const marker = 'w06-pg-moderation-write-' + randomUUID()
+const reportPath = process.env.D1_03_W06_WRITE_POSTGRES_REPORT ||
+  'artifacts/neon/d1-03-w06-moderation-write-postgres-runtime-postflight.json'
+const pool = new Pool({ connectionString, max: 2, connectionTimeoutMillis: 5_000 })
+const client = await pool.connect()
+let runtimePassed = false
+const checks = {
+  usesSharedD1_03PostgresPool: false,
+  usesNativeModerationDecisionWriteStore: false,
+  decisionBatchCommittedAtomically: false,
+  moderationTransactionGuardAcceptedSuccessfulCas: false,
+  auditEventWrittenWithDecision: false,
+  enforcementOutboxDelivered: false,
+  sameKeyReplayReturnedStoredDecision: false,
+  sameKeyDifferentPayloadReturns422: false,
+  nativeOutboxDrainHandlesMissingActorRetry: false,
+  nativeOutboxDrainDeliversDueRetry: false,
+  moderationReportUsesNativePostgresStore: false,
+  moderationReportWrittenWithAudit: false,
+  moderationReportReplayReturnedStoredResponse: false,
+  nativeAuthAuditQueuesPersisted: false,
+  nativeAuthAuditQueueReplaysDeduplicated: false,
+  staleVersionGuardRolledBackAllWrites: false,
+  cleanupVerified: false,
+}
+
+const tables = [
+  'moderation_cases',
+  'moderation_decisions',
+  'moderation_decision_idempotency',
+  'moderation_reports',
+  'moderation_report_idempotency',
+  'moderation_txn_guard',
+  'moderation_enforcement_outbox',
+  'audit_events',
+]
+
+try {
+  await client.query('SET search_path TO pg_temp, public')
+  // Temp shadow tables retain the real D1-03 PostgreSQL columns and constraints,
+  // while keeping this rehearsal rollback-safe despite W09's immutable audit trigger.
+  for (const table of tables) {
+    await client.query(`CREATE TEMP TABLE ${table} (LIKE public.${table} INCLUDING ALL) ON COMMIT PRESERVE ROWS`)
+  }
+
+  const executor = {
+    query: (sql, values) => client.query(sql, values),
+    async connect() {
+      return {
+        query: (sql, values) => client.query(sql, values),
+        release() {},
+      }
+    },
+  }
+  const query = (sql, values = []) => client.query(sql, values)
+  const decisionStore = createPostgresModerationDecisionWriteStore(executor)
+  const caseDetailStore = createPostgresModerationCaseDetailReadStore(executor)
+  checks.usesSharedD1_03PostgresPool = true
+  checks.usesNativeModerationDecisionWriteStore = true
+  const reportStore = createPostgresModerationReportWriteStore(executor)
+  const auditEventStore = createPostgresAuditEventStore(executor)
+
+  const reviewerId = marker + '-reviewer'
+  const successfulCaseId = marker + '-success'
+  const staleCaseId = marker + '-stale'
+  const successfulTargetId = marker + '-content-success'
+  const staleTargetId = marker + '-content-stale'
+  const idempotencyKey = marker + '-idempotency'
+  const now = new Date().toISOString()
+  const insertCase = async (caseId, targetId) => {
+    await query(
+      `INSERT INTO moderation_cases (
+        case_id,target_type,target_id,target_version,policy_version,state,priority,
+        assigned_reviewer_id,current_decision_id,evidence_bundle_ref,version,created_at,updated_at
+      ) VALUES ($1,'content',$2,1,'moderation-v1','OPEN',10,NULL,NULL,NULL,1,$3::timestamptz,$3::timestamptz)`,
+      [caseId, targetId, now],
+    )
+  }
+  await insertCase(successfulCaseId, successfulTargetId)
+  await insertCase(staleCaseId, staleTargetId)
+
+  const w03 = {
+    async fetch() {
+      return new Response(JSON.stringify({
+        from: 'PENDING_REVIEW',
+        to: 'APPROVED',
+        version: 2,
+        etag: 'W/"2"',
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+      })
+    },
+  }
+
+  const successfulInput = {
+    reviewerId,
+    reviewerLayer: 'L6',
+    caseId: successfulCaseId,
+    ifMatch: 'W/"1"',
+    idempotencyKey,
+    expectedVersion: 1,
+    correlationId: marker + '-correlation',
+    requestId: 'req_' + randomUUID().replaceAll('-', ''),
+    decision: 'APPROVED',
+    policyVersion: 'moderation-v1',
+    reasonCode: 'POLICY_MATCH',
+    severity: 'LOW',
+    scope: 'content',
+    effectiveAt: now,
+    expiresAt: null,
+  }
+
+  const first = await decideModerationCase(decisionStore, w03, successfulInput)
+  assert.equal(first.caseId, successfulCaseId)
+  assert.equal(first.version, 2)
+  checks.decisionBatchCommittedAtomically = true
+  checks.moderationTransactionGuardAcceptedSuccessfulCas = true
+
+  const persisted = await getModerationCase(caseDetailStore, reviewerId, successfulCaseId)
+  assert.equal(persisted.status, 'ACTION_TAKEN')
+  assert.equal(persisted.version, 2)
+  assert.equal(persisted.currentDecision?.decisionId, first.decisionId)
+  const outbox = (await query('SELECT outbox_id,status,attempts FROM moderation_enforcement_outbox WHERE decision_id = $1', [first.decisionId])).rows[0]
+  assert.ok(outbox)
+  assert.equal(outbox.status, 'DELIVERED')
+  assert.equal(outbox.attempts, 1)
+  const audit = (await query('SELECT event_id,action FROM audit_events WHERE target_id = $1', [successfulCaseId])).rows[0]
+  assert.ok(audit)
+  assert.equal(audit.action, 'moderation.decide')
+  checks.auditEventWrittenWithDecision = true
+  checks.enforcementOutboxDelivered = true
+
+  const replay = await decideModerationCase(decisionStore, w03, successfulInput)
+  assert.deepEqual(replay, first)
+  const decisionCount = (await query('SELECT count(*)::int AS count FROM moderation_decisions WHERE case_id = $1', [successfulCaseId])).rows[0]
+  assert.equal(Number(decisionCount?.count), 1)
+  checks.sameKeyReplayReturnedStoredDecision = true
+
+  await assert.rejects(
+    decideModerationCase(decisionStore, w03, { ...successfulInput, reasonCode: 'DIFFERENT_REASON' }),
+    (error) => error?.code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' && error?.status === 422,
+  )
+  checks.sameKeyDifferentPayloadReturns422 = true
+
+  await query("UPDATE moderation_enforcement_outbox SET status='PENDING', attempts=0, next_attempt_at=$1::timestamptz, delivered_at=NULL WHERE decision_id=$2", [now, first.decisionId])
+  await query('UPDATE moderation_decisions SET reviewer_id=NULL, reviewer_layer=NULL WHERE decision_id=$1', [first.decisionId])
+  const missingActorDrain = await drainModerationOutbox(decisionStore, w03, 10)
+  assert.deepEqual(missingActorDrain, { attempted: 1, delivered: 0, retry: 1 })
+  const missingActorOutbox = (await query('SELECT status, attempts, last_error FROM moderation_enforcement_outbox WHERE decision_id=$1', [first.decisionId])).rows[0]
+  assert.equal(missingActorOutbox.status, 'RETRY')
+  assert.equal(missingActorOutbox.attempts, 1)
+  assert.equal(missingActorOutbox.last_error, 'MISSING_DECISION_ACTOR')
+  checks.nativeOutboxDrainHandlesMissingActorRetry = true
+
+  await query('UPDATE moderation_decisions SET reviewer_id=$1, reviewer_layer=$2 WHERE decision_id=$3', [reviewerId, 'L6', first.decisionId])
+  await query("UPDATE moderation_enforcement_outbox SET next_attempt_at=$1::timestamptz WHERE decision_id=$2", [now, first.decisionId])
+  const deliveredRetryDrain = await drainModerationOutbox(decisionStore, w03, 10)
+  assert.deepEqual(deliveredRetryDrain, { attempted: 1, delivered: 1, retry: 0 })
+  const redeliveredOutbox = (await query('SELECT status, attempts, last_error FROM moderation_enforcement_outbox WHERE decision_id=$1', [first.decisionId])).rows[0]
+  assert.equal(redeliveredOutbox.status, 'DELIVERED')
+  assert.equal(redeliveredOutbox.attempts, 2)
+  assert.equal(redeliveredOutbox.last_error, null)
+  checks.nativeOutboxDrainDeliversDueRetry = true
+
+  const reportInput = {
+    actorUserId: reviewerId,
+    targetType: 'content',
+    targetId: successfulTargetId,
+    reasonCode: 'SPAM',
+    description: 'PostgreSQL moderation rehearsal fixture',
+    evidenceRefs: ['evidence://w06-postgres-rehearsal'],
+    idempotencyKey: marker + '-report-idempotency',
+    requestId: 'req_' + randomUUID().replaceAll('-', ''),
+    correlationId: marker + '-report-correlation',
+  }
+  const report = await createReport(reportStore, reportInput)
+  checks.moderationReportUsesNativePostgresStore = true
+  assert.equal(report.status, 'CREATED')
+  const storedReport = (await query('SELECT report_id,target_type,target_id,reason_code FROM moderation_reports WHERE report_id = $1', [report.reportId])).rows[0]
+  assert.ok(storedReport)
+  assert.equal(storedReport.target_type, 'content')
+  const reportAudit = (await query('SELECT event_id,action FROM audit_events WHERE target_id = $1', [report.reportId])).rows[0]
+  assert.ok(reportAudit)
+  assert.equal(reportAudit.action, 'moderation.report.created')
+  checks.moderationReportWrittenWithAudit = true
+
+  const reportReplay = await createReport(reportStore, reportInput)
+  assert.deepEqual(reportReplay, report)
+  const reportRows = (await query('SELECT count(*)::int AS count FROM moderation_reports WHERE report_id = $1', [report.reportId])).rows[0]
+  const reportAuditRows = (await query("SELECT count(*)::int AS count FROM audit_events WHERE target_id = $1 AND action = 'moderation.report.created'", [report.reportId])).rows[0]
+  assert.equal(Number(reportRows?.count), 1)
+  assert.equal(Number(reportAuditRows?.count), 1)
+  checks.moderationReportReplayReturnedStoredResponse = true
+
+  const authUserId = marker + '-auth-user'
+  const authEventId = 'evt_' + randomUUID().replaceAll('-', '')
+  const authEvent = {
+    eventId: authEventId,
+    eventType: 'identity.account_state_changed',
+    schemaVersion: '1.0',
+    producer: 'W02',
+    resourceType: 'User',
+    resourceId: authUserId,
+    occurredAt: now,
+    publishedAt: now,
+    correlationId: 'corr-' + randomUUID(),
+    causationId: 'cause-' + randomUUID(),
+    idempotencyKey: 'auth013-' + randomUUID(),
+    attempt: 1,
+    sourceVersion: 2,
+    actor: {
+      actorId: marker + '-operator',
+      actorType: 'user',
+      operationalRole: 'PLATFORM_OPERATOR',
+    },
+    before: { accountState: 'ACTIVE', accountStateVersion: 1 },
+    after: { accountState: 'RESTRICTED', accountStateVersion: 2 },
+    reason: 'native PostgreSQL rehearsal',
+  }
+
+  assert.equal(await consumeAccountStateChanged(auditEventStore, authEvent), 'persisted')
+  const storedAuthEvent = await auditEventStore.findByEventId(authEventId)
+  assert.ok(storedAuthEvent)
+  assert.equal(storedAuthEvent.action, 'identity.account_state_changed')
+  assert.equal(storedAuthEvent.targetId, authUserId)
+  assert.equal(storedAuthEvent.actor.operationalRole, 'PLATFORM_OPERATOR')
+  assert.equal(await consumeAccountStateChanged(auditEventStore, authEvent), 'duplicate')
+
+  const mfaEventId = 'evt_' + randomUUID().replaceAll('-', '')
+  const mfaEvent = {
+    eventId: mfaEventId,
+    eventType: 'auth.mfa.enrollment_started',
+    schemaVersion: '1.0',
+    producer: 'W02',
+    resourceType: 'User',
+    resourceId: marker + '-mfa-user',
+    occurredAt: now,
+    publishedAt: now,
+    correlationId: 'req_' + randomUUID().replaceAll('-', ''),
+    causationId: 'trace-' + randomUUID(),
+    idempotencyKey: 'mfa-' + mfaEventId,
+    attempt: 1,
+    sourceVersion: 1,
+    actor: { actorId: marker + '-mfa-user', actorType: 'user' },
+    payload: {
+      operationId: 'authMfaEnrollmentStart',
+      result: 'started',
+      factorState: 'PENDING_VERIFICATION',
+    },
+  }
+
+  assert.equal(await consumeMfaAuditEvent(auditEventStore, mfaEvent), 'persisted')
+  const storedMfaEvent = await auditEventStore.findByEventId(mfaEventId)
+  assert.ok(storedMfaEvent)
+  assert.equal(storedMfaEvent.action, 'auth.mfa.enrollment_started')
+  assert.equal(storedMfaEvent.targetType, 'User')
+  assert.equal(await consumeMfaAuditEvent(auditEventStore, mfaEvent), 'duplicate')
+
+  const sessionActorId = marker + '-session-user'
+  const sessionId = marker + '-session'
+  const sessionEventId = 'evt_' + createHash('sha256')
+    .update('AUTH010_SESSION_REVOKE:' + sessionActorId + ':' + sessionId)
+    .digest('hex')
+    .slice(0, 32)
+  const sessionEvent = {
+    eventId: sessionEventId,
+    eventType: 'user.session.revoked',
+    schemaVersion: '1.0',
+    producer: 'W02',
+    resourceType: 'Session',
+    resourceId: sessionId,
+    occurredAt: now,
+    publishedAt: now,
+    correlationId: 'req_' + randomUUID().replaceAll('-', ''),
+    causationId: 'trace-' + randomUUID(),
+    idempotencyKey: 'AUTH010_SESSION_REVOKE_' + sessionEventId.slice(4),
+    attempt: 1,
+    sourceVersion: 1,
+    actor: { actorId: sessionActorId, actorType: 'user' },
+    payload: {
+      operationId: 'authSessionRevoke',
+      result: 'succeeded',
+      reasonCode: 'USER_INITIATED',
+    },
+  }
+
+  assert.equal(await consumeSessionRevokedAuditEvent(auditEventStore, sessionEvent), 'persisted')
+  const storedSessionEvent = await auditEventStore.findByEventId(sessionEventId)
+  assert.ok(storedSessionEvent)
+  assert.equal(storedSessionEvent.action, 'user.session.revoked')
+  assert.equal(storedSessionEvent.targetType, 'Session')
+  assert.equal(storedSessionEvent.targetId, sessionId)
+  assert.equal(await consumeSessionRevokedAuditEvent(auditEventStore, sessionEvent), 'duplicate')
+
+  checks.nativeAuthAuditQueuesPersisted = true
+  checks.nativeAuthAuditQueueReplaysDeduplicated = true
+
+  // Simulate a concurrent version change that causes the CAS UPDATE to affect 0 rows.
+  await client.query(`
+    CREATE FUNCTION pg_temp.w06_skip_stale_case_update()
+    RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF OLD.case_id = '${staleCaseId}' THEN RETURN NULL; END IF;
+      RETURN NEW;
+    END;
+    $$
+  `)
+  await client.query(`
+    CREATE TRIGGER w06_skip_stale_case_update
+    BEFORE UPDATE ON pg_temp.moderation_cases
+    FOR EACH ROW EXECUTE FUNCTION pg_temp.w06_skip_stale_case_update()
+  `)
+
+  const staleInput = {
+    ...successfulInput,
+    caseId: staleCaseId,
+    idempotencyKey: marker + '-stale-idempotency',
+    requestId: 'req_' + randomUUID().replaceAll('-', ''),
+  }
+  await assert.rejects(
+    decideModerationCase(decisionStore, w03, staleInput),
+    (error) => error?.code === 'SERVICE_UNAVAILABLE' && error?.status === 503,
+  )
+  const staleCase = (await query('SELECT state,version FROM moderation_cases WHERE case_id = $1', [staleCaseId])).rows[0]
+  assert.equal(staleCase?.state, 'OPEN')
+  assert.equal(staleCase?.version, 1)
+  const rolledBackDecision = (await query('SELECT count(*)::int AS count FROM moderation_decisions WHERE case_id = $1', [staleCaseId])).rows[0]
+  const rolledBackOutbox = (await query('SELECT count(*)::int AS count FROM moderation_enforcement_outbox WHERE case_id = $1', [staleCaseId])).rows[0]
+  const rolledBackAudit = (await query('SELECT count(*)::int AS count FROM audit_events WHERE target_id = $1', [staleCaseId])).rows[0]
+  assert.equal(Number(rolledBackDecision?.count), 0)
+  assert.equal(Number(rolledBackOutbox?.count), 0)
+  assert.equal(Number(rolledBackAudit?.count), 0)
+  checks.staleVersionGuardRolledBackAllWrites = true
+
+  runtimePassed = true
+} finally {
+  try {
+    const existingTables = []
+    for (const table of tables) {
+      const exists = await client.query(
+        'SELECT to_regclass($1) IS NOT NULL AS present',
+        [`pg_temp.${table}`],
+      )
+      if (exists.rows[0]?.present === true) {
+        await client.query(`TRUNCATE TABLE pg_temp.${table}`)
+        existingTables.push(table)
+      }
+    }
+    const residualSql = existingTables.length
+      ? 'SELECT ' + existingTables.map((table) => `(SELECT count(*) FROM pg_temp.${table})`).join(' + ') + ' AS remaining'
+      : 'SELECT 0::bigint AS remaining'
+    const residual = await client.query(residualSql)
+    for (const table of tables) {
+      await client.query(`DROP TABLE IF EXISTS pg_temp.${table} CASCADE`)
+    }
+    await client.query('DROP FUNCTION IF EXISTS pg_temp.w06_skip_stale_case_update() CASCADE')
+    const remainingTemporaryTables = await client.query(
+      'SELECT count(*)::int AS remaining FROM pg_class WHERE relnamespace = pg_my_temp_schema() AND relname = ANY($1::text[])',
+      [tables],
+    )
+    assert.equal(Number(residual.rows[0]?.remaining ?? -1), 0, 'All temporary fixtures must be empty before drop')
+    assert.equal(Number(remainingTemporaryTables.rows[0]?.remaining ?? -1), 0, 'All temporary fixture tables must be dropped')
+    checks.cleanupVerified = true
+
+    const report = {
+      status: runtimePassed
+        ? 'W06_MODERATION_POSTGRES_ATOMIC_RUNTIME_PASS'
+        : 'W06_MODERATION_POSTGRES_ATOMIC_RUNTIME_FAILED',
+      postgresDatabase: target.pathname.slice(1),
+      ...checks,
+      temporaryTablesDropped: true,
+      remoteNeonTouched: false,
+      cloudflareD1Touched: false,
+      businessDataImported: false,
+      workerBindingsChanged: false,
+      productionCutoverAuthorized: false,
+    }
+    await mkdir(dirname(reportPath), { recursive: true })
+    await writeFile(reportPath, JSON.stringify(report, null, 2) + '\n')
+    console.log(
+      (runtimePassed ? 'W06_MODERATION_POSTGRES_ATOMIC_RUNTIME_PASS ' : 'W06_MODERATION_POSTGRES_ATOMIC_RUNTIME_FAILED ') +
+      JSON.stringify(report),
+    )
+  } finally {
+    client.release()
+    await pool.end()
+  }
+}

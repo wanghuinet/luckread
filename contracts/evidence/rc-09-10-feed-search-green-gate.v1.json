@@ -1,0 +1,16 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/v1/evidence/rc-09-10-feed-search-green-gate.json",
+  "title":"RC-09 RC-10 Feed/Search Production Green Gate",
+  "version":"1.0.0",
+  "contract":"contracts/api/feed-delivery.v1.json + contracts/api/search-feed-consistency.v1.json",
+  "requiredEvidence":[
+    {"id":"API-01","requirement":"Canonical OpenAPI exposes feed and search operations with exact paths, auth and response/error contracts.","status":"PENDING"},
+    {"id":"FEED-01","requirement":"Feed pagination has deterministic ordering, stable opaque cursor binding and no duplicate content across traversal.","status":"PENDING"},
+    {"id":"FEED-02","requirement":"Visibility, moderation and entitlement checks are enforced before feed delivery and cannot be bypassed by cache.","status":"PENDING"},
+    {"id":"SEARCH-01","requirement":"Search index is derived state and serving rechecks authorization/visibility/moderation as required.","status":"PENDING"},
+    {"id":"SEARCH-02","requirement":"Projection replay/reconciliation is idempotent, observable and auditable.","status":"PENDING"},
+    {"id":"E2E-01","requirement":"Unit, integration and security E2E evidence passes for feed/search consistency invariants.","status":"PENDING"}
+  ],
+  "status":"BLOCKED_ON_IMPLEMENTATION_BASELINE"
+}

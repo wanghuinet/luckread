@@ -1,0 +1,37 @@
+{
+  "repository": "wanghuinet/luckread",
+  "evaluatedAt": "2026-09-20",
+  "currentHead": "d5263f5933055c4bb008f8e95c296c2b2383a549",
+  "historicalEvidence": {
+    "manifest": "artifacts/evidence/auth-002-local/manifest.json",
+    "schemaEvidenceCommit": "62aecc7a9343b9b4b6e374bacbd68381c46baa1c",
+    "runtimeEvidenceCommit": "75fe380951ffbd7e5e045e7157df5cf6b58ef669",
+    "environmentClass": "LOCAL_MINIFLARE_D1"
+  },
+  "currentW01SchemaChange": {
+    "laterCommit": "5a3e138c9cab8f10878ac29b8ee5066c59a7dda4",
+    "source": "workers/W01-payload/src/collections/Users.ts",
+    "fields": [
+      "username",
+      "displayName",
+      "bio",
+      "avatar",
+      "locale",
+      "timezone"
+    ],
+    "status": "current-code-active"
+  },
+  "inheritanceDecision": "INVALID_FOR_CURRENT_SCHEMA",
+  "reasons": [
+    "Historical local schema evidence predates the approved W01 Users field addition.",
+    "It therefore cannot prove the current users schema or current migration delta.",
+    "It is LOCAL_MINIFLARE_D1 evidence and cannot prove the controlled remote D1 migration baseline.",
+    "Historical local runtime evidence also predates the current W01 source head and cannot be promoted to current runtime evidence."
+  ],
+  "migrationSafety": {
+    "existingBaseline": "workers/W01-payload/src/migrations/20250929_111647.ts",
+    "generatedArtifactStatus": "NOT_PROMOTED",
+    "rule": "Do not infer remote baseline from local evidence and do not treat a full-schema snapshot as an additive migration."
+  },
+  "currentConclusion": "Historical local evidence remains retained for provenance but is excluded from current-head inheritance. Controlled remote D1 evidence remains required."
+}

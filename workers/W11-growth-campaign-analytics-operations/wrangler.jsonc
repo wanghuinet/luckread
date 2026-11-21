@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "luckread-w11",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-14",
+  "workers_dev": false,
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  },
+  "d1_databases": [
+    {
+      "binding": "D1_05",
+      "database_name": "allluck",
+      "database_id": "77d82be2-d12e-4a17-b410-9aa7d376bc11",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

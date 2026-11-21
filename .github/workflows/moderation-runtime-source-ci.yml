@@ -1,0 +1,153 @@
+name: Moderation Runtime Source CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W01-payload/src/app/api/v1/admin/moderation/**'
+      - 'workers/W01-payload/src/moderation/**'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/W06-governance/src/**'
+      - 'workers/W09-platform/src/audit-event-postgres-adapter.ts'
+      - 'workers/W09-platform/src/audit-event-postgres-adapter.test.ts'
+      - 'workers/W09-platform/src/audit-event-postgres-adapter.ts'
+      - 'workers/W09-platform/src/audit-event-postgres-adapter.test.ts'
+      - 'workers/W09-platform/src/audit-event-postgres-adapter.ts'
+      - 'workers/W09-platform/src/audit-event-postgres-adapter.test.ts'
+      - '.github/workflows/report-appeal-d1-03-migration.yml'
+      - 'workers/W01-payload/tests/int/content-detail.int.spec.ts'
+      - 'workers/W01-payload/tests/int/social-report-v1-adapter.int.spec.ts'
+      - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/page.tsx'
+      - 'workers/W01-payload/src/app/(twitter-clone)/content/[contentId]/page.tsx'
+      - 'workers/W01-payload/src/app/api/v1/reports/**'
+      - 'workers/W06-governance/migrations/0003_moderation_report_v1.sql'
+      - 'workers/W06-governance/wrangler.jsonc'
+      - 'workers/W06-governance/wrangler.neon.jsonc'
+      - 'workers/W06-governance/package.json'
+      - 'workers/W06-governance/migrations/**'
+      - 'workers/W03-content/src/content-runtime.ts'
+      - 'workers/W03-content/src/index.ts'
+      - 'contracts/api/moderation-operation-policy.v1.json'
+      - 'contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json'
+      - 'contracts/transport/W01-W06-moderation-http-binding.v1.json'
+      - 'contracts/transport/W06-W03-content-moderation-http-binding.v1.json'
+      - '.github/workflows/moderation-runtime-source-ci.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    paths:
+      - 'workers/W01-payload/src/app/api/v1/admin/moderation/**'
+      - 'workers/W01-payload/src/moderation/**'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/W06-governance/src/**'
+      - 'workers/W09-platform/src/audit-event-postgres-adapter.ts'
+      - 'workers/W09-platform/src/audit-event-postgres-adapter.test.ts'
+      - 'workers/W06-governance/wrangler.jsonc'
+      - 'workers/W06-governance/wrangler.neon.jsonc'
+      - 'workers/W06-governance/package.json'
+      - 'workers/W06-governance/migrations/**'
+      - 'workers/W03-content/src/content-runtime.ts'
+      - 'workers/W03-content/src/index.ts'
+      - 'contracts/api/moderation-operation-policy.v1.json'
+      - 'contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json'
+      - 'contracts/transport/W01-W06-moderation-http-binding.v1.json'
+      - 'contracts/transport/W06-W03-content-moderation-http-binding.v1.json'
+      - '.github/workflows/moderation-runtime-source-ci.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  moderation-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install W06 PostgreSQL Worker runtime dependency
+        working-directory: workers/W06-governance
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
+      - name: Bundle W06 Worker with Hyperdrive PostgreSQL runtime dependency
+        working-directory: workers/W06-governance
+        run: npx --yes wrangler@4.116.0 deploy --dry-run --config wrangler.neon.jsonc --compatibility-flags nodejs_compat
+
+      - name: Typecheck W06 moderation runtime
+        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/moderation-runtime.ts workers/W06-governance/src/moderation-decision-write-store-postgres.ts workers/W06-governance/src/moderation-decision-write-store-postgres.test.ts workers/W06-governance/src/moderation-queue-read-store-postgres.ts workers/W06-governance/src/moderation-case-detail-read-store-postgres.ts workers/W09-platform/src/audit-event-postgres-adapter.ts workers/W09-platform/src/audit-event-postgres-adapter.test.ts workers/W06-governance/src/neon/moderation-database-runtime.ts workers/W06-governance/src/neon/moderation-database-runtime.test.ts workers/W06-governance/src/index.ts
+
+      - name: Typecheck W03 moderation boundary
+        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W03-content/src/content-runtime.ts workers/W03-content/src/index.ts
+
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0
+          run_install: false
+
+      - name: Install W01 locked dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck W01 moderation gateway and host application
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit --project tsconfig.json --pretty false
+
+      - name: Run W06 moderation tests
+        run: npx vitest@3.2.4 run workers/W06-governance/src/index.test.ts workers/W06-governance/src/moderation-runtime.test.ts workers/W06-governance/src/moderation-decision-write-store-postgres.test.ts workers/W06-governance/src/moderation-case-detail-read-store-postgres.test.ts workers/W09-platform/src/audit-event-postgres-adapter.test.ts workers/W06-governance/src/audit-event-store-postgres.test.ts workers/W06-governance/src/auth-013-queue-consumer.test.ts workers/W06-governance/src/mfa-audit-queue-consumer.test.ts workers/W06-governance/src/session-revocation-audit-queue-consumer.test.ts workers/W06-governance/src/w10-queue-consumer.test.ts workers/W06-governance/src/neon/moderation-database-runtime.test.ts workers/W06-governance/src/moderation-report-write-store-postgres.test.ts workers/W06-governance/src/neon-traffic-guard.test.ts
+
+      - name: Validate migration locally
+        working-directory: workers/W06-governance
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sqlite3
+          rm -f /tmp/luckread-moderation.sqlite
+          sqlite3 /tmp/luckread-moderation.sqlite < migrations/0001_audit_event.sql
+          sqlite3 /tmp/luckread-moderation.sqlite < migrations/0002_moderation_queue_foundation.sql
+          sqlite3 -json /tmp/luckread-moderation.sqlite 'PRAGMA table_info("moderation_cases");'
+          sqlite3 -json /tmp/luckread-moderation.sqlite 'PRAGMA table_info("moderation_decisions");'
+          sqlite3 -json /tmp/luckread-moderation.sqlite 'PRAGMA table_info("moderation_decision_idempotency");'
+          sqlite3 -json /tmp/luckread-moderation.sqlite 'PRAGMA table_info("moderation_txn_guard");'
+          sqlite3 -json /tmp/luckread-moderation.sqlite 'PRAGMA table_info("moderation_enforcement_outbox");'
+          echo "MODERATION_D1_03_MIGRATION_STATIC=PASS"
+
+      - name: Verify frozen topology and admitted transport
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const w01 = JSON.parse(fs.readFileSync('workers/W01-payload/wrangler.jsonc','utf8'));
+          const w06Source = JSON.parse(fs.readFileSync('workers/W06-governance/wrangler.jsonc','utf8'));
+          const w06 = JSON.parse(fs.readFileSync('workers/W06-governance/wrangler.neon.jsonc','utf8'));
+          const w03 = JSON.parse(fs.readFileSync('workers/W03-content/wrangler.jsonc','utf8'));
+          const d102Inventory = JSON.parse(fs.readFileSync('contracts/database/neon-d1-02-schema-sources.v1.json','utf8'));
+          const w03Source = d102Inventory.owners?.find(x => x.worker === 'W03');
+          const w03D1Source = w03Source?.physicalBindings?.find(x =>
+            x.binding === 'D1_02' && x.databaseUuid === '6c342634-97f6-4248-9f4a-85772af4f22c' && x.included === true);
+          const w01m = w01.services?.find(x => x.binding === 'W06_MODERATION');
+          const w06m = w06.services?.find(x => x.binding === 'W03_CONTENT_MODERATION');
+          const sourceD1 = w06Source.d1_databases?.find(x => x.binding === 'D1_03');
+          const hyperdrive = w06.hyperdrive?.find(x => x.binding === 'HYPERDRIVE_D1_03');
+          if (!w01m || w01m.service !== 'luckread-w06') throw new Error('W01 W06_MODERATION binding mismatch');
+          if (!w06m || w06m.service !== 'luckread-w03') throw new Error('W06 W03_CONTENT_MODERATION binding mismatch');
+          if (!sourceD1 || sourceD1.database_id !== 'bda1d247-a371-4244-91ae-aef96034db7f') throw new Error('W06 historical D1-03 schema source mapping mismatch');
+          if ((w06.d1_databases || []).length !== 0 || w06.vars?.W06_MODERATION_DATABASE_DRIVER !== undefined) throw new Error('W06 production must be Neon-only with no legacy driver switch');
+          if (!hyperdrive || hyperdrive.id !== '7c8831416c18494faee04b96aa551cb9') throw new Error('W06 D1-03 Hyperdrive binding mismatch');
+          if ((w03.d1_databases || []).length !== 0 || w03.vars?.W03_CONTENT_READ_DRIVER !== 'neon' ||
+              !w03.hyperdrive?.some(x => x.binding === 'HYPERDRIVE_CONTENT_PG' && x.id === 'c55183e1cc3446409c9c1075832c6615')) {
+            throw new Error('W03 content production must use Neon with no D1 bindings');
+          }
+          if (!w03D1Source) throw new Error('W03 historical D1-02 schema source identity mismatch');
+          console.log('MODERATION_TOPOLOGY=PASS; W03_W06_PRODUCTION_D1_BINDINGS=NONE');
+          NODE

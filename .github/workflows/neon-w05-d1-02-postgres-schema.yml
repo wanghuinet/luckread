@@ -1,0 +1,528 @@
+name: Neon W05 D1-02 PostgreSQL 18 Local Schema Rehearsal
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-w05-d1-02-postgres-schema.yml'
+      - 'contracts/database/neon-d1-02-schema-sources.v1.json'
+      - 'contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json'
+      - 'contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json'
+      - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'workers/W05-social/src/follow-runtime.ts'
+      - 'workers/W05-social/src/social-closure-runtime.ts'
+      - 'workers/W05-social/src/notification-enqueue-store.ts'
+      - 'workers/W05-social/src/notification-enqueue-store-postgres.ts'
+      - 'workers/W05-social/src/notification-enqueue-store.test.ts'
+      - 'workers/W05-social/src/notification-enqueue-store-postgres.test.ts'
+      - 'workers/W05-social/src/notification-enqueue-runtime.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-notification-enqueue-postgres-runtime.mjs'
+      - 'workers/W05-social/src/social-closure-runtime.test.ts'
+      - 'workers/W05-social/src/social-closure-read-store.ts'
+      - 'workers/W05-social/src/social-closure-read-store-postgres.ts'
+      - 'workers/W05-social/src/social-closure-read-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-social-closure-read-postgres-runtime.mjs'
+      - 'workers/W05-social/src/social-targets-read-store.ts'
+      - 'workers/W05-social/src/social-targets-read-store-postgres.ts'
+      - 'workers/W05-social/src/social-targets-read-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-social-targets-read-postgres-runtime.mjs'
+      - 'workers/W05-social/src/follow-runtime.test.ts'
+      - 'workers/W05-social/src/follow-status-read-store.ts'
+      - 'workers/W05-social/src/follow-status-read-store-postgres.ts'
+      - 'workers/W05-social/src/follow-status-read-store-postgres.test.ts'
+      - 'workers/W05-social/src/follow-list-read-store.ts'
+      - 'workers/W05-social/src/follow-list-read-store-postgres.ts'
+      - 'workers/W05-social/src/follow-list-read-store-postgres.test.ts'
+      - 'workers/W05-social/src/relationship-graph-runtime.ts'
+      - 'workers/W05-social/src/relationship-graph-store.ts'
+      - 'workers/W05-social/src/relationship-graph-store-postgres.ts'
+      - 'workers/W05-social/src/relationship-graph-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-relationship-graph-postgres-runtime.mjs'
+      - 'workers/W05-social/src/block-mute-runtime.ts'
+      - 'workers/W05-social/src/block-mute-list-read-store.ts'
+      - 'workers/W05-social/src/block-mute-list-read-store-postgres.ts'
+      - 'workers/W05-social/src/block-mute-list-read-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-block-mute-list-postgres-runtime.mjs'
+      - 'workers/W05-social/src/block-mute-relation-store.ts'
+      - 'workers/W05-social/src/block-mute-relation-store-postgres.ts'
+      - 'workers/W05-social/src/block-mute-relation-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-block-mute-relation-postgres-runtime.mjs'
+      - 'workers/W05-social/src/follow-store.ts'
+      - 'workers/W05-social/src/follow-store-postgres.ts'
+      - 'workers/W05-social/src/follow-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-follow-postgres-runtime.mjs'
+      - 'workers/W05-social/migrations/**'
+      - 'workers/W05-social/scripts/neon/**'
+      - 'workers/W05-social/src/notification-push-fanout-runtime.ts'
+      - 'workers/W05-social/src/notification-push-delivery-runtime.ts'
+      - 'workers/W05-social/src/notification-push-delivery-runtime.test.ts'
+      - 'workers/W05-social/src/notification-push-endpoint-access-store.ts'
+      - 'workers/W05-social/src/notification-push-endpoint-access-runtime.ts'
+      - 'workers/W05-social/src/notification-push-endpoint-access-store-d1.ts'
+      - 'workers/W05-social/src/notification-push-endpoint-access-store-postgres.ts'
+      - 'workers/W05-social/src/notification-push-endpoint-access-store-postgres.test.ts'
+      - 'workers/W05-social/src/notification-push-send-result-store.ts'
+      - 'workers/W05-social/src/notification-push-send-result-store-postgres.ts'
+      - 'workers/W05-social/src/notification-push-send-result-store.test.ts'
+      - 'workers/W05-social/src/notification-push-send-result-store-postgres.test.ts'
+      - 'workers/W05-social/src/notification-push-delivery-claim-store.ts'
+      - 'workers/W05-social/src/notification-push-delivery-claim-store-d1.ts'
+      - 'workers/W05-social/src/notification-push-delivery-claim-store-postgres.ts'
+      - 'workers/W05-social/src/notification-push-delivery-claim-store-d1.test.ts'
+      - 'workers/W05-social/src/notification-push-delivery-claim-store-postgres.test.ts'
+      - 'workers/W05-social/src/notification-push-receipt-store.ts'
+      - 'workers/W05-social/src/notification-push-receipt-store-d1.ts'
+      - 'workers/W05-social/src/notification-push-receipt-store-postgres.ts'
+      - 'workers/W05-social/src/notification-push-receipt-store-d1.test.ts'
+      - 'workers/W05-social/src/notification-push-receipt-store-postgres.test.ts'
+      - 'workers/W05-social/src/neon-postgres-migrations/**'
+      - 'workers/W05-social/src/following-author-ids-read-store.ts'
+      - 'workers/W05-social/src/following-author-ids-read-store-postgres.ts'
+      - 'workers/W05-social/src/following-feed.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-following-author-ids-postgres-runtime.mjs'
+      - 'workers/W05-social/src/like-list-runtime.ts'
+      - 'workers/W05-social/src/like-list-runtime.test.ts'
+      - 'workers/W05-social/src/like-list-read-store.ts'
+      - 'workers/W05-social/src/like-list-read-store-postgres.ts'
+      - 'workers/W05-social/src/like-list-read-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-content-likers-postgres-runtime.mjs'
+      - 'workers/W05-social/src/profile-channel-runtime.ts'
+      - 'workers/W05-social/src/profile-channel-runtime.test.ts'
+      - 'workers/W05-social/src/profile-channel-read-store.ts'
+      - 'workers/W05-social/src/profile-channel-read-store-postgres.ts'
+      - 'workers/W05-social/src/profile-channel-read-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-profile-channel-postgres-runtime.mjs'
+      - 'workers/W05-social/src/favorite-runtime.ts'
+      - 'workers/W05-social/src/favorite-runtime.test.ts'
+      - 'workers/W05-social/src/favorite-mutation-store.ts'
+      - 'workers/W05-social/src/favorite-mutation-store-postgres.ts'
+      - 'workers/W05-social/src/favorite-mutation-store.test.ts'
+      - 'workers/W05-social/src/favorite-mutation-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-favorite-mutation-postgres-runtime.mjs'
+      - 'workers/W05-social/src/favorite-list-read-store.ts'
+      - 'workers/W05-social/src/favorite-list-read-store-postgres.ts'
+      - 'workers/W05-social/src/favorite-list-read-store-postgres.test.ts'
+      - 'workers/W05-social/src/favorite-status-read-store.ts'
+      - 'workers/W05-social/src/favorite-status-read-store-postgres.ts'
+      - 'workers/W05-social/src/favorite-status-read-store-postgres.test.ts'
+      - 'workers/W05-social/src/like-status-read-store.ts'
+      - 'workers/W05-social/src/like-status-read-store-postgres.ts'
+      - 'workers/W05-social/src/like-status-read-store-postgres.test.ts'
+      - 'workers/W05-social/src/like-runtime.ts'
+      - 'workers/W05-social/src/like-runtime.test.ts'
+      - 'workers/W05-social/src/like-target-context-read-store.ts'
+      - 'workers/W05-social/src/like-target-context-read-store-postgres.ts'
+      - 'workers/W05-social/src/like-target-context-read-store.test.ts'
+      - 'workers/W05-social/src/like-target-context-read-store-postgres.test.ts'
+      - 'workers/W05-social/src/like-mutation-store.ts'
+      - 'workers/W05-social/src/like-mutation-store-postgres.ts'
+      - 'workers/W05-social/src/like-mutation-store-postgres.test.ts'
+      - 'workers/W05-social/src/notification-preferences-store.ts'
+      - 'workers/W05-social/src/notification-preferences-store-postgres.ts'
+      - 'workers/W05-social/src/notification-preferences-store-postgres.test.ts'
+      - 'workers/W05-social/src/profile-pin-store.ts'
+      - 'workers/W05-social/src/profile-pin-store-postgres.ts'
+      - 'workers/W05-social/src/profile-pin-store-postgres.test.ts'
+      - 'workers/W05-social/src/repost-store.ts'
+      - 'workers/W05-social/src/repost-store-postgres.ts'
+      - 'workers/W05-social/src/repost-store-postgres.test.ts'
+      - 'workers/W05-social/src/share-store.ts'
+      - 'workers/W05-social/src/share-store-postgres.ts'
+      - 'workers/W05-social/src/share-store-postgres.test.ts'
+      - 'workers/W05-social/src/reply-audience-runtime.ts'
+      - 'workers/W05-social/src/reply-audience-store.ts'
+      - 'workers/W05-social/src/reply-audience-store.test.ts'
+      - 'workers/W05-social/src/reply-audience-store-postgres.ts'
+      - 'workers/W05-social/src/reply-audience-store-postgres.test.ts'
+      - 'workers/W05-social/src/reply-audience-runtime.test.ts'
+      - 'workers/W05-social/src/comment-create-store.ts'
+      - 'workers/W05-social/src/comment-create-store-postgres.ts'
+      - 'workers/W05-social/src/comment-create-store-postgres.test.ts'
+      - 'workers/W05-social/src/comment-mutation-store.ts'
+      - 'workers/W05-social/src/comment-mutation-store-postgres.ts'
+      - 'workers/W05-social/src/comment-mutation-store-postgres.test.ts'
+      - 'workers/W05-social/src/comment-notification-context-store.ts'
+      - 'workers/W05-social/src/comment-notification-context-store-postgres.ts'
+      - 'workers/W05-social/src/comment-notification-context-store.test.ts'
+      - 'workers/W05-social/src/comment-notification-context-store-postgres.test.ts'
+      - 'workers/W05-social/src/comment-notification-context-runtime.ts'
+      - 'workers/W05-social/src/comment-notification-context-runtime.test.ts'
+      - 'workers/W05-social/src/comment-list-read-store.ts'
+      - 'workers/W05-social/src/comment-list-read-store-postgres.ts'
+      - 'workers/W05-social/src/comment-list-read-store.test.ts'
+      - 'workers/W05-social/src/comment-list-read-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-comment-list-read-postgres-runtime.mjs'
+      - 'workers/W05-social/scripts/neon/rehearse-comment-notification-context-postgres-runtime.mjs'
+      - 'workers/W05-social/scripts/neon/rehearse-comment-mutation-postgres-runtime.mjs'
+      - 'workers/W05-social/src/poll-runtime.ts'
+      - 'workers/W05-social/src/poll-read-store.ts'
+      - 'workers/W05-social/src/poll-read-store-postgres.ts'
+      - 'workers/W05-social/src/poll-read-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-poll-read-postgres-runtime.mjs'
+      - 'workers/W05-social/src/poll-delete-store.ts'
+      - 'workers/W05-social/src/poll-delete-store-postgres.ts'
+      - 'workers/W05-social/src/poll-delete-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-poll-delete-postgres-runtime.mjs'
+      - 'workers/W05-social/src/poll-configuration-store.ts'
+      - 'workers/W05-social/src/poll-configuration-store-postgres.ts'
+      - 'workers/W05-social/src/poll-configuration-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-poll-configuration-postgres-runtime.mjs'
+      - 'workers/W05-social/src/poll-vote-store.ts'
+      - 'workers/W05-social/src/poll-vote-store-postgres.ts'
+      - 'workers/W05-social/src/poll-vote-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-poll-vote-postgres-runtime.mjs'
+      - 'workers/W05-social/src/comment-runtime.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-comment-create-postgres-runtime.mjs'
+      - 'workers/W05-social/scripts/neon/rehearse-reply-audience-postgres-runtime.mjs'
+      - 'workers/W05-social/src/profile-pin-runtime.ts'
+      - 'workers/W05-social/src/repost-runtime.ts'
+      - 'workers/W05-social/src/share-runtime.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-favorite-list-postgres-runtime.mjs'
+      - 'workers/W05-social/scripts/neon/rehearse-notification-preferences-postgres-runtime.mjs'
+      - 'workers/W05-social/scripts/neon/rehearse-like-status-postgres-runtime.mjs'
+      - 'workers/W05-social/scripts/neon/rehearse-publication-relations-postgres-runtime.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-w05-d1-02-postgres-schema-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  local-postgres18:
+    name: Rehearse W05 D1-02 schema on disposable PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_local_only
+          POSTGRES_DB: luckread_w05_d1_02_schema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d luckread_w05_d1_02_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run generator and source/contract unit tests
+        run: |
+          set -euo pipefail
+          node --check workers/W05-social/scripts/neon/rehearse-content-likers-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-push-fanout-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-push-send-result-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-push-delivery-claim-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-push-receipt-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-profile-channel-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-social-targets-read-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-social-closure-read-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-notification-enqueue-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-favorite-list-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-favorite-mutation-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-like-status-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-like-mutation-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-notification-preferences-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-publication-relations-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-reply-audience-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-comment-create-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-comment-mutation-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-comment-notification-context-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-comment-list-read-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-poll-read-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-poll-delete-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-poll-configuration-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-poll-vote-postgres-runtime.mjs
+          node --test workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.test.mjs
+          node workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.mjs --report artifacts/neon/w05-d1-02-source-hashes.json
+          git diff --exit-code -- workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql
+      - name: Apply only the PostgreSQL-native W05 artifact to disposable PostgreSQL 18
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql
+      - name: Verify schema, trigger semantics and rollback of synthetic rows
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W05-social/scripts/neon/verify-d1-02-social-postgres-schema.sql
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process'
+          import { mkdir, writeFile } from 'node:fs/promises'
+          const url = 'postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema'
+          const sql = [
+            "SELECT json_build_object(",
+            "'database', current_database(),",
+            "'postgresMajor', current_setting('server_version_num')::int / 10000,",
+            "'tables', (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'),",
+            "'userTriggers', (SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND NOT t.tgisinternal),",
+            "'businessRows', (SELECT count(*) FROM social_follow_relationships) + (SELECT count(*) FROM interaction_likes) + (SELECT count(*) FROM social_comments) + (SELECT count(*) FROM interaction_favorites) + (SELECT count(*) FROM social_share_links) + (SELECT count(*) FROM social_user_interactions) + (SELECT count(*) FROM social_topics) + (SELECT count(*) FROM social_target_topics) + (SELECT count(*) FROM social_mentions) + (SELECT count(*) FROM social_notifications) + (SELECT count(*) FROM social_notification_preferences) + (SELECT count(*) FROM social_reposts) + (SELECT count(*) FROM social_profile_pins) + (SELECT count(*) FROM social_polls) + (SELECT count(*) FROM social_poll_options) + (SELECT count(*) FROM social_poll_votes) + (SELECT count(*) FROM social_content_reply_policies) + (SELECT count(*) FROM social_notification_push_outbox) + (SELECT count(*) FROM social_notification_push_deliveries),",
+            "'d1_03EndpointTablePresent', to_regclass('public.notification_push_endpoints') IS NOT NULL,",
+            "'remoteNeonTouched', false, 'cloudflareD1Touched', false, 'businessDataImported', false",
+            ")::text;"
+          ].join(' ')
+          const report = JSON.parse(execFileSync('psql', [url, '-A', '-t', '-q', '-c', sql], { encoding:'utf8' }).trim())
+          if (report.database !== 'luckread_w05_d1_02_schema' || report.postgresMajor !== 18 ||
+              report.tables !== 19 || report.userTriggers !== 1 || report.businessRows !== 0 ||
+              report.d1_03EndpointTablePresent || report.remoteNeonTouched ||
+              report.cloudflareD1Touched || report.businessDataImported) {
+            throw new Error('W05 local PostgreSQL 18 postflight mismatch: ' + JSON.stringify(report))
+          }
+          await mkdir('artifacts/neon', { recursive:true })
+          await writeFile('artifacts/neon/w05-d1-02-postgres-schema-postflight.json', JSON.stringify(report,null,2)+'\n')
+          console.log('W05_D1_02_POSTGRES18_REHEARSAL_PASS ' + JSON.stringify(report))
+          NODE
+      - name: Install the pinned W02 PostgreSQL driver and TS runner for W05 runtime rehearsal
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Rehearse W05 Follow and Unfollow writes against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_FOLLOW_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_FOLLOW_POSTGRES_REPORT: ../../artifacts/neon/w05-follow-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-follow-postgres-runtime.mjs
+      - name: Rehearse W05 RelationshipGraph reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_RELATIONSHIP_GRAPH_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_RELATIONSHIP_GRAPH_POSTGRES_REPORT: ../../artifacts/neon/w05-relationship-graph-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-relationship-graph-postgres-runtime.mjs
+
+      - name: Rehearse W05 Following author ID reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_FOLLOWING_AUTHOR_IDS_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_FOLLOWING_AUTHOR_IDS_POSTGRES_REPORT: ../../artifacts/neon/w05-following-author-ids-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-following-author-ids-postgres-runtime.mjs
+
+      - name: Rehearse W05 Block/Mute list reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_BLOCK_MUTE_LIST_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_BLOCK_MUTE_LIST_POSTGRES_REPORT: ../../artifacts/neon/w05-block-mute-list-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-block-mute-list-postgres-runtime.mjs
+
+      - name: Rehearse W05 Block/Mute writes against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_BLOCK_MUTE_RELATION_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_BLOCK_MUTE_RELATION_POSTGRES_REPORT: ../../artifacts/neon/w05-block-mute-relation-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-block-mute-relation-postgres-runtime.mjs
+
+      - name: Rehearse W05 notification push fan-out against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_PUSH_FANOUT_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_PUSH_FANOUT_POSTGRES_REPORT: ../../artifacts/neon/w05-push-fanout-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-push-fanout-postgres-runtime.mjs
+
+      - name: Rehearse W05 push send-result lease transitions against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_PUSH_SEND_RESULT_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_PUSH_SEND_RESULT_POSTGRES_REPORT: ../../artifacts/neon/w05-push-send-result-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-push-send-result-postgres-runtime.mjs
+
+      - name: Rehearse W05 push delivery claims and lease recovery against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_PUSH_DELIVERY_CLAIM_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_PUSH_DELIVERY_CLAIM_POSTGRES_REPORT: ../../artifacts/neon/w05-push-delivery-claim-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-push-delivery-claim-postgres-runtime.mjs
+
+      - name: Rehearse W05 push receipt claim and result lifecycle against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_PUSH_RECEIPT_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_PUSH_RECEIPT_POSTGRES_REPORT: ../../artifacts/neon/w05-push-receipt-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-push-receipt-postgres-runtime.mjs
+
+      - name: Rehearse W05 content liker reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_CONTENT_LIKERS_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_CONTENT_LIKERS_POSTGRES_REPORT: ../../artifacts/neon/w05-content-likers-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-content-likers-postgres-runtime.mjs
+
+      - name: Rehearse W05 Profile Channel reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_PROFILE_CHANNEL_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_PROFILE_CHANNEL_POSTGRES_REPORT: ../../artifacts/neon/w05-profile-channel-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-profile-channel-postgres-runtime.mjs
+
+      - name: Rehearse W05 favorite list reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_FAVORITE_LIST_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_FAVORITE_LIST_POSTGRES_REPORT: ../../artifacts/neon/w05-favorite-list-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-favorite-list-postgres-runtime.mjs
+      - name: Rehearse W05 favorite mutations against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_FAVORITE_MUTATION_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_FAVORITE_MUTATION_POSTGRES_REPORT: ../../artifacts/neon/w05-favorite-mutation-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-favorite-mutation-postgres-runtime.mjs
+
+      - name: Rehearse W05 comment notification context against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_COMMENT_NOTIFICATION_CONTEXT_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_COMMENT_NOTIFICATION_CONTEXT_POSTGRES_REPORT: ../../artifacts/neon/w05-comment-notification-context-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-comment-notification-context-postgres-runtime.mjs
+
+      - name: Rehearse W05 like status reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_LIKE_STATUS_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_LIKE_STATUS_POSTGRES_REPORT: ../../artifacts/neon/w05-like-status-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-like-status-postgres-runtime.mjs
+
+      - name: Rehearse W05 like and unlike writes against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_LIKE_MUTATION_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_LIKE_MUTATION_POSTGRES_REPORT: ../../artifacts/neon/w05-like-mutation-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-like-mutation-postgres-runtime.mjs
+
+      - name: Rehearse W05 social targets against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_SOCIAL_TARGETS_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_SOCIAL_TARGETS_POSTGRES_REPORT: ../../artifacts/neon/w05-social-targets-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-social-targets-read-postgres-runtime.mjs
+
+      - name: Rehearse W05 social closure topic, notification inbox and content summary reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_SOCIAL_CLOSURE_READ_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_SOCIAL_CLOSURE_READ_POSTGRES_REPORT: ../../artifacts/neon/w05-social-closure-read-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-social-closure-read-postgres-runtime.mjs
+
+      - name: Rehearse W05 notification inbox enqueue and atomic outbox against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_NOTIFICATION_ENQUEUE_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_NOTIFICATION_ENQUEUE_POSTGRES_REPORT: ../../artifacts/neon/w05-notification-enqueue-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-notification-enqueue-postgres-runtime.mjs
+
+      - name: Rehearse W05 notification preferences against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_NOTIFICATION_PREFERENCES_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_NOTIFICATION_PREFERENCES_POSTGRES_REPORT: ../../artifacts/neon/w05-notification-preferences-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-notification-preferences-postgres-runtime.mjs
+
+      - name: Rehearse W05 profile pins, reposts and share links against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_PUBLICATION_RELATIONS_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_PUBLICATION_RELATIONS_POSTGRES_REPORT: ../../artifacts/neon/w05-publication-relations-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-publication-relations-postgres-runtime.mjs
+
+      - name: Rehearse W05 reply-audience policies against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_REPLY_AUDIENCE_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_REPLY_AUDIENCE_POSTGRES_REPORT: ../../artifacts/neon/w05-reply-audience-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-reply-audience-postgres-runtime.mjs
+
+      - name: Rehearse W05 comment creation against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_COMMENT_CREATE_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_COMMENT_CREATE_POSTGRES_REPORT: ../../artifacts/neon/w05-comment-create-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-comment-create-postgres-runtime.mjs
+
+      - name: Rehearse W05 comment edit and delete against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_COMMENT_MUTATION_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_COMMENT_MUTATION_POSTGRES_REPORT: ../../artifacts/neon/w05-comment-mutation-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-comment-mutation-postgres-runtime.mjs
+
+      - name: Rehearse W05 comment list reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_COMMENT_LIST_READ_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_COMMENT_LIST_READ_POSTGRES_REPORT: ../../artifacts/neon/w05-comment-list-read-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-comment-list-read-postgres-runtime.mjs
+
+      - name: Rehearse W05 poll reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_POLL_READ_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_POLL_READ_POSTGRES_REPORT: ../../artifacts/neon/w05-poll-read-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-poll-read-postgres-runtime.mjs
+
+      - name: Rehearse W05 poll deletion against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_POLL_DELETE_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_POLL_DELETE_POSTGRES_REPORT: ../../artifacts/neon/w05-poll-delete-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-poll-delete-postgres-runtime.mjs
+
+      - name: Rehearse W05 poll configuration writes against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_POLL_CONFIGURATION_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_POLL_CONFIGURATION_POSTGRES_REPORT: ../../artifacts/neon/w05-poll-configuration-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-poll-configuration-postgres-runtime.mjs
+
+      - name: Rehearse W05 poll vote writes against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_POLL_VOTE_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_POLL_VOTE_POSTGRES_REPORT: ../../artifacts/neon/w05-poll-vote-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-poll-vote-postgres-runtime.mjs
+
+      - name: Upload W05 D1-02 PostgreSQL 18 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-w05-d1-02-postgres18-${{ github.sha }}
+          path: |
+            workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql
+            artifacts/neon/w05-d1-02-source-hashes.json
+            artifacts/neon/w05-d1-02-postgres-schema-postflight.json
+            artifacts/neon/w05-follow-postgres-runtime-postflight.json
+            artifacts/neon/w05-relationship-graph-postgres-runtime-postflight.json
+            artifacts/neon/w05-following-author-ids-postgres-runtime-postflight.json
+            artifacts/neon/w05-block-mute-list-postgres-runtime-postflight.json
+            artifacts/neon/w05-block-mute-relation-postgres-runtime-postflight.json
+            artifacts/neon/w05-content-likers-postgres-runtime-postflight.json
+            artifacts/neon/w05-push-fanout-postgres-runtime-postflight.json
+            artifacts/neon/w05-push-send-result-postgres-runtime-postflight.json
+            artifacts/neon/w05-push-delivery-claim-postgres-runtime-postflight.json
+            artifacts/neon/w05-push-receipt-postgres-runtime-postflight.json
+            artifacts/neon/w05-profile-channel-postgres-runtime-postflight.json
+            artifacts/neon/w05-favorite-list-postgres-runtime-postflight.json
+            artifacts/neon/w05-favorite-mutation-postgres-runtime-postflight.json
+            artifacts/neon/w05-comment-notification-context-postgres-runtime-postflight.json
+            artifacts/neon/w05-like-status-postgres-runtime-postflight.json
+            artifacts/neon/w05-like-mutation-postgres-runtime-postflight.json
+            artifacts/neon/w05-social-targets-postgres-runtime-postflight.json
+            artifacts/neon/w05-social-closure-read-postgres-runtime-postflight.json
+            artifacts/neon/w05-notification-enqueue-postgres-runtime-postflight.json
+            artifacts/neon/w05-notification-preferences-postgres-runtime-postflight.json
+            artifacts/neon/w05-publication-relations-postgres-runtime-postflight.json
+            artifacts/neon/w05-reply-audience-postgres-runtime-postflight.json
+            artifacts/neon/w05-comment-create-postgres-runtime-postflight.json
+            artifacts/neon/w05-comment-mutation-postgres-runtime-postflight.json
+            artifacts/neon/w05-comment-list-read-postgres-runtime-postflight.json
+            artifacts/neon/w05-poll-read-postgres-runtime-postflight.json
+            artifacts/neon/w05-poll-delete-postgres-runtime-postflight.json
+            artifacts/neon/w05-poll-configuration-postgres-runtime-postflight.json
+            artifacts/neon/w05-poll-vote-postgres-runtime-postflight.json
+          if-no-files-found: error
+          retention-days: 90

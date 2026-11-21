@@ -1,0 +1,16 @@
+{
+  "name": "luckread-w03-content",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "pg": "8.20.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260914.1",
+    "@types/pg": "8.23.1"
+  }
+}

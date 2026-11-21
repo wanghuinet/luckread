@@ -1,0 +1,141 @@
+import {
+  invalidatePublicContentComments,
+  invalidatePublicContentDetail,
+  invalidatePublicContentList,
+  invalidatePublicContentVisibility,
+  invalidatePublicContentRelationships,
+  invalidatePublicContentThreads,
+} from '../../../../../lib/public-response-cache.js'
+
+import { TrafficLimitError, rateLimitResponse } from '../../../../../auth/traffic-limit.js'
+import { getPublicContentDetailResponse } from '../../../../../content/public-content-detail-reader.js'
+
+import { mediaReferenceValidationResponse, validateOwnedPostMediaReferences } from '../../../../../content/validate-owned-post-media-references.js'
+
+import {
+  callW03Content,
+  resolveContentPrincipal,
+  resolveVerifiedContentCreatorId,
+  W03ContentClientError,
+} from '../../../../../content/w03-content-client.js'
+
+const errorResponse = (status: number, code: string, message: string) =>
+  Response.json(
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
+    { status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status, headers: { 'cache-control': 'no-store' } },
+  )
+
+const contentPath = (contentId: string) =>
+  `/internal/content/contents/${encodeURIComponent(contentId)}`
+
+const requireMutationHeaders = (request: Request): Response | null => {
+  const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+  const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
+
+  if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+  if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
+  if (!ifMatch) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match required')
+  if (ifMatch.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid If-Match header')
+  if (ifMatch === '*') {
+    return errorResponse(412, 'PRECONDITION_FAILED', 'If-Match precondition failed')
+  }
+  return null
+}
+
+export async function GET(
+  request: Request,
+  context: { params: Promise<{ contentId: string }> },
+): Promise<Response> {
+  try {
+    const { contentId } = await context.params
+    return await getPublicContentDetailResponse(request, contentId)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ contentId: string }> },
+): Promise<Response> {
+  try {
+    const { contentId } = await context.params
+    const principal = await resolveContentPrincipal(request)
+    if (principal instanceof Response) return principal
+    const mutationError = requireMutationHeaders(request)
+    if (mutationError) return mutationError
+    const body: unknown = await request.json()
+    const mediaValidation = await validateOwnedPostMediaReferences(principal.userId, body, new URL(request.url).origin)
+    if ('status' in mediaValidation) return mediaReferenceValidationResponse(mediaValidation)
+
+    const changesAccessMode = body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body, 'accessMode')
+    const changesMediaWarning = body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body, 'mediaWarning')
+    let verifiedCreatorId: string | undefined
+    if (changesAccessMode) {
+      const resolved = await resolveVerifiedContentCreatorId(request, principal)
+      if (resolved instanceof Response) return resolved
+      verifiedCreatorId = resolved
+    }
+
+    const response = await callW03Content({
+      request,
+      pathname: contentPath(contentId),
+      method: 'PATCH',
+      body,
+      principal,
+      verifiedCreatorId,
+    })
+    if (response.ok) {
+      await invalidatePublicContentThreads()
+      if (changesAccessMode) await invalidatePublicContentVisibility(contentId)
+      if (changesAccessMode || changesMediaWarning) {
+        const updatedValue: unknown = await response.clone().json().catch((): null => null)
+        const updatedState = updatedValue && typeof updatedValue === 'object' && !Array.isArray(updatedValue)
+          ? (updatedValue as { state?: unknown }).state
+          : undefined
+        // Drafts are not part of anonymous public lists; only published warning or visibility changes
+        // require a public-list generation bump.
+        if (updatedState === 'PUBLISHED') await invalidatePublicContentList(request)
+      }
+      await invalidatePublicContentDetail(request, contentId)
+    }
+    return response
+  } catch (error) {
+    if (error instanceof SyntaxError) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content request')
+    if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ contentId: string }> },
+): Promise<Response> {
+  try {
+    const { contentId } = await context.params
+    const principal = await resolveContentPrincipal(request)
+    if (principal instanceof Response) return principal
+    const mutationError = requireMutationHeaders(request)
+    if (mutationError) return mutationError
+    const response = await callW03Content({
+      request,
+      pathname: contentPath(contentId),
+      method: 'DELETE',
+      principal,
+    })
+    if (response.ok) {
+      await invalidatePublicContentComments(contentId)
+      await invalidatePublicContentVisibility(contentId)
+      await invalidatePublicContentRelationships(contentId)
+      await invalidatePublicContentThreads()
+      await invalidatePublicContentDetail(request, contentId)
+      await invalidatePublicContentList(request)
+    }
+    return response
+  } catch (error) {
+    if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
+  }
+}

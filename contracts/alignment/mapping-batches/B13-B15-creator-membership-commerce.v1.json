@@ -1,0 +1,360 @@
+{
+  "schemaVersion": "1.0",
+  "batchId": "B13-B15-creator-membership-commerce",
+  "status": "NOT_GREEN",
+  "mode": "evidence-only-inventory",
+  "sourceOfTruth": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "domains": [
+    {
+      "domain": "B14",
+      "name": "Membership / Paywall / Entitlement",
+      "featureIds": [
+        "MON-001",
+        "MON-002",
+        "MON-003",
+        "MON-004",
+        "MON-005",
+        "MON-006",
+        "MON-007",
+        "MON-008",
+        "MON-009",
+        "MON-010",
+        "MON-011"
+      ]
+    },
+    {
+      "domain": "B15",
+      "name": "Commerce / Payment / Digital Product",
+      "featureIds": [
+        "PAY-001",
+        "PAY-002",
+        "PAY-003",
+        "PAY-004",
+        "PAY-005",
+        "PAY-006",
+        "PAY-007",
+        "PAY-008",
+        "PAY-009",
+        "PAY-010",
+        "PAY-011",
+        "PAY-012",
+        "PAY-013"
+      ]
+    }
+  ],
+  "records": [
+    {
+      "featureId": "MON-001",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Membership plan/API/entitlement persistence mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "MON-002",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Creator membership API/entitlement mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "MON-003",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Membership plan lifecycle/API/data mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "MON-004",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Subscription lifecycle and entitlement mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "MON-005",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "contracts/alignment/api-inventory.v1.json",
+        "contracts/alignment/code-evidence-inventory.v1.json",
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+        "contracts/authz/permissions.json",
+        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json",
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/openapi/v1/operation-policy.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "contracts/state-machines/subscription.json",
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md",
+        "docs/111-MEMBERSHIP-API-CONTRACT-v1.0.md",
+        "docs/change-control/CC-MON-SUBSCRIPTION-DATA-MODEL-ADMISSION-2026-10-02.md",
+        "docs/change-control/CC-MON-SUBSCRIPTION-VERSION-CAS-2026-10-02.md",
+        "docs/change-control/CC-SUBSCRIPTION-STATE-API-RECONCILIATION-2026-10-02.md",
+        "https://github.com/wanghuinet/luckread/actions/runs/38544516790",
+        "https://github.com/wanghuinet/luckread/actions/runs/38549292251",
+        "workers/W01-payload/src/app/(frontend)/me/subscriptions/page.tsx",
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql",
+        "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
+        "docs/change-control/CC-MON-SUBSCRIPTION-VERSION-CAS-IMPLEMENTATION-2026-10-27.md",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts"
+      ],
+      "blockers": [
+        "The existing subscription list route is now declared in OpenAPI, the source endpoint registry, operation policy and the canonical membership API contract; the implementation/test are being checked on this PR.",
+        "Renewal is part of MON-005 but has no execution path or verified payment-renewal transition.",
+        "Migration 0001 remains the historical baseline; candidate migration 0002 adds the required version column with DEFAULT 1. Production D1-01 migration history/schema evidence remains absent, and migration 0002 has not been executed remotely.",
+        "The implementation candidate changes runtime writes to monotonic version CAS; PR CI and concurrency E2E remain pending, and production deployment verification is absent.",
+        "This record remains UNRESOLVED; source traceability does not constitute production Evidence Registry admission."
+      ]
+    },
+    {
+      "featureId": "MON-006",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Entitlement authority/API/security mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "MON-007",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Full paywall delivery/API/entitlement enforcement mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "MON-008",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Partial paywall/preview boundary/API mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "MON-009",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Video/series paywall and playback entitlement mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "MON-010",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Single purchase/bundle API/order/entitlement mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "MON-011",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Purchased-content library API/entitlement persistence mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "PAY-001",
+      "status": "PARTIAL",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/api-inventory.v1.json",
+        "contracts/alignment/code-evidence-inventory.v1.json",
+        "contracts/transport/W01-W07-membership-commerce-http-binding.v1.json",
+        "workers/W01-payload/src/app/api/v1/payments/intents/route.ts",
+        "workers/W01-payload/src/commerce/w07-commerce-client.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W01-payload/tests/int/payments-intent-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.test.ts",
+        "workers/W07-subscription-commerce/src/hyperswitch-client.ts",
+        "workers/W07-subscription-commerce/src/hyperswitch-client.test.ts"
+      ],
+      "blockers": [
+        "The postPaymentsIntents public adapter and W07 payment-intent/Hyperswitch source plus automated tests are now linked; these establish code traceability only.",
+        "OpenAPI still marks this flow source-only pending the D1-04 migration and production secrets; live Hyperswitch payment E2E and postflight evidence are not admitted.",
+        "Provider-event, mandate, reconciliation, and successful-payment evidence remain separate acceptance gates. A payment intent or browser callback does not grant subscription entitlement."
+      ]
+    },
+    {
+      "featureId": "PAY-002",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/entity/ORDER-ENTITY-CONTRACT.v1.json",
+        "contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+        "contracts/state-machines/order.json",
+        "docs/change-control/CC-PAY-002-ORDER-ENTITY-MODEL-2026-10-27.md",
+        "docs/09-D1-DOMAIN-MASTER-v1.0.md",
+        "docs/65-MONETIZATION-COMMERCE-SYSTEM-CONTRACT-v1.0.md",
+        "docs/68-WALLET-LEDGER-AND-SETTLEMENT-CONTRACT-v1.0.md",
+        "docs/191-L5-L6-MEMBERSHIP-COMMERCE-ADVERTISING-WALLET-LEDGER-INSTANCE-REGISTRY-v1.0.md",
+        "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md",
+        "workers/W07-subscription-commerce/src/order-request-validation.ts",
+        "workers/W07-subscription-commerce/src/order-request-validation.test.ts",
+        "contracts/candidates/PAY-002/order-commerce-api.v1.json",
+        "contracts/candidates/PAY-002/order-api-admission.v1.json"
+      ],
+      "blockers": [
+        "The membership-plan resolver currently supports only active/public immutable-version MembershipPlan offers; CONTENT, DIGITAL_GOOD and BUNDLE remain fail-closed until their authoritative owner/price adapters are separately admitted.",
+        "The exact D1-04 UUID/display name and read-only schema snapshot are verified on main commit 115c7165f3a618fb9527be8030db378476d3740d. The isolated D1-04 order schema is only a source candidate; remote migration and post-migration schema evidence remain pending.",
+        "D1-04 Order/OrderLine persistence runtime and atomic order-create idempotency replay/key-conflict behavior are not implemented; public order runtime handlers remain disabled.",
+        "Exact-commit runtime evidence is still missing for positive/negative create/read, owner isolation, price spoofing, idempotency replay/conflict, concurrent duplicate requests, stale in-progress recovery, and failure handling.",
+        "PAY-002 remains UNRESOLVED until persistence, security, reconciliation and Evidence Registry evidence pass; no payment confirmation or entitlement grant may be inferred from order state."
+      ]
+    },
+    {
+      "featureId": "PAY-003",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Invoice API/entity/financial-record mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "PAY-004",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Refund lifecycle/provider event/idempotency mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "PAY-005",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Wallet API/ledger authority mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "PAY-006",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Ledger authority/persistence mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "PAY-007",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Creator revenue attribution/settlement mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "PAY-008",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Platform revenue authority/ledger mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "PAY-009",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "MCN revenue split/settlement mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "PAY-010",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Payout/withdrawal provider and ledger mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "PAY-011",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Settlement lifecycle and financial authority mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "PAY-012",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Tax/financial records persistence and compliance mapping not evidence-bound"
+      ]
+    },
+    {
+      "featureId": "PAY-013",
+      "status": "UNRESOLVED",
+      "evidenceRefs": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+      ],
+      "blockers": [
+        "Currency support/data/API mapping not evidence-bound"
+      ]
+    }
+  ],
+  "batchBlockers": [
+    "B13-B15 remain mapping inventory only; no Contract GREEN claim is permitted.",
+    "CREATOR-001..007 are canonically owned by B04-B06 and are intentionally not duplicated here.",
+    "The Blueprint confirms MON and PAY identifiers; further identifiers require exact canonical-ID discovery before addition.",
+    "All records remain UNRESOLVED until repository evidence binds the complete five-way contract graph and security/lifecycle/test evidence."
+  ]
+}

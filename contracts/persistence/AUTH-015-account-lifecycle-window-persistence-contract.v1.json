@@ -1,0 +1,118 @@
+{
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "promotion": "NOT_GREEN",
+  "purpose": "Define W02-owned trusted 15-day deletion cooling-off and 30-day post-deletion reactivation-window timestamps on the existing Better Auth User record in D1-01.",
+  "featureId": "AUTH-015",
+  "entityId": "ENT-USER",
+  "authoritativeWriter": "W02",
+  "persistenceDomain": "D1-01",
+  "physicalTarget": {
+    "databaseBinding": "workers/W02-identity/wrangler.jsonc:D1_01",
+    "databaseName": "luckread",
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "table": "user",
+    "tableAuthority": "workers/W02-identity/migrations/0005_better_auth_identity_core.sql",
+    "notPayloadCollection": true
+  },
+  "fieldMappings": [
+    {
+      "fieldId": "ENT-USER-F-DELETION-REQUESTED-AT",
+      "canonicalName": "deletion_requested_at",
+      "targetTable": "user",
+      "targetColumn": "deletion_requested_at",
+      "dbType": "TEXT",
+      "nullable": true,
+      "required": false,
+      "writer": "W02",
+      "meaning": "UTC timestamp set only on ACTIVE -> DELETION_REQUESTED; retained while request advances to DELETION_PENDING or DELETED; cleared on cooling-off cancellation or REACTIVATED -> ACTIVE."
+    },
+    {
+      "fieldId": "ENT-USER-F-DELETED-AT",
+      "canonicalName": "deleted_at",
+      "targetTable": "user",
+      "targetColumn": "deleted_at",
+      "dbType": "TEXT",
+      "nullable": true,
+      "required": false,
+      "writer": "W02",
+      "meaning": "UTC timestamp set only on DELETION_PENDING -> DELETED; retained through DELETED -> REACTIVATED while eligibility is recorded; cleared on cooling-off cancellation or REACTIVATED -> ACTIVE."
+    }
+  ],
+  "lifecycleWindows": {
+    "coolingOff": {
+      "durationDays": 15,
+      "startsOn": "ACTIVE -> DELETION_REQUESTED",
+      "timestampField": "ENT-USER-F-DELETION-REQUESTED-AT",
+      "cancellationAllowed": "server_now < deletion_requested_at + 15 days",
+      "deletionMayProgress": "server_now >= deletion_requested_at + 15 days",
+      "exactBoundary": "cancellation denied; cooling-off elapsed"
+    },
+    "reactivation": {
+      "durationDays": 30,
+      "startsOn": "DELETION_PENDING -> DELETED",
+      "timestampField": "ENT-USER-F-DELETED-AT",
+      "selfReactivationAllowed": "server_now < deleted_at + 30 days",
+      "exactBoundary": "self-reactivation denied"
+    }
+  },
+  "trustedEvaluation": {
+    "authority": "W02 only",
+    "clock": "W02 server clock; UTC ISO-8601 timestamps",
+    "timestampValidation": "timestamp must parse and round-trip exactly as canonical UTC ISO-8601; future, missing, malformed or non-canonical values fail closed",
+    "callerSuppliedPreconditionBooleanAccepted": false,
+    "accountStateVersionCompareAndSetRequired": true,
+    "timestampAndStateMutationSameSqlUpdate": true,
+    "eventJournalSameD1Batch": true,
+    "publicationJournalIsNotLifecycleTimestampAuthority": true
+  },
+  "migration": {
+    "migrationId": "MIG-AUTH-015-LIFECYCLE-WINDOWS-V1",
+    "migrationFile": "workers/W02-identity/migrations/0011_auth_015_lifecycle_windows.sql",
+    "executionStatus": "NOT_EXECUTED",
+    "targetBinding": "D1_01",
+    "authorizedScope": "existing D1-01 only; additive nullable columns on Better Auth user table",
+    "preflight": {
+      "requireExistingUserTable": true,
+      "requireAccountStateColumns": true,
+      "requireTargetColumnsAbsent": true,
+      "blockRowsInStates": [
+        "DELETION_REQUESTED",
+        "DELETION_PENDING",
+        "DELETED",
+        "REACTIVATED"
+      ],
+      "noTimestampBackfill": true
+    },
+    "postconditions": [
+      "user.deletion_requested_at exists as nullable TEXT",
+      "user.deleted_at exists as nullable TEXT",
+      "existing non-deletion user rows are unchanged",
+      "migration is recorded in d1_migrations",
+      "only migration 0011 is applied by the controlled workflow",
+      "no new table, Worker, D1, Queue or Service Binding is created"
+    ],
+    "remoteMutationRequiresControlledWorkflow": true
+  },
+  "rules": {
+    "w02IsSoleLifecycleTimestampWriter": true,
+    "w01RemainsPublicApiIngressOnly": true,
+    "noPayloadCoreChange": true,
+    "noClientTimestampAccepted": true,
+    "noClientPreconditionAccepted": true,
+    "noEventJournalTimestampSubstitution": true,
+    "nullHistoricalTimestampsMustNotBeGuessed": true,
+    "missingOrInvalidTimestampFailsClosed": true,
+    "accountStateAndVersionRemainCanonicalAuthority": true
+  },
+  "evidenceRequirements": [
+    "local SQLite migration positive and fail-closed tests",
+    "controlled D1-01 migration execution and same-source-SHA schema/ledger read-back",
+    "real account authenticated end-to-end evidence before exposing a public deletion/restoration feature"
+  ],
+  "remainingGaps": [
+    "controlled remote D1-01 migration and post-schema evidence are not yet executed",
+    "request/cancel dedicated API operations remain MISSING",
+    "AUTH-015 and B01 remain NOT_GREEN"
+  ]
+}

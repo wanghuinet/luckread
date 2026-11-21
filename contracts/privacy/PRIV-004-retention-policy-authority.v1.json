@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/privacy/PRIV-004-retention-policy-authority.v1.json",
+  "title": "PRIV-004 Retention Policy Authority Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureId": "PRIV-004",
+  "sourceOfTruth": "docs/175-FEATURE-FLAG-CONFIG-POLICY-VERSIONING-CONTRACT-v1.0.md",
+  "lifecycleSource": "docs/160-DATA-LIFECYCLE-RETENTION-ERASURE-CONTRACT-v1.0.md",
+  "purpose": "Define the minimum versioned policy authority required to deterministically resolve server-controlled retentionUntil without choosing any concrete legal retention duration in this contract.",
+  "authorityModel": {
+    "configClass": "POLICY_CONFIG",
+    "businessAuthority": "PRIV-004",
+    "noSecondBusinessAuthority": true,
+    "clientSelectable": false
+  },
+  "requiredPolicyRecord": {
+    "policyId": "string",
+    "policyVersion": "string",
+    "owner": "string",
+    "scope": "object",
+    "environment": "string",
+    "status": {
+      "enum": [
+        "DRAFT",
+        "REVIEWING",
+        "APPROVED",
+        "ACTIVE",
+        "PAUSED",
+        "RETIRED"
+      ]
+    },
+    "effectiveFrom": "date-time",
+    "effectiveTo": "date-time|null",
+    "retentionClass": {
+      "const": "LEGAL_AUDIT"
+    },
+    "rule": {
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "DURATION",
+            "FIXED_UNTIL"
+          ]
+        },
+        "durationSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "fixedUntil": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "rules": [
+        "DURATION requires durationSeconds and forbids fixedUntil.",
+        "FIXED_UNTIL requires fixedUntil and forbids durationSeconds.",
+        "Exactly one rule mode is active for an approved policy instance."
+      ]
+    },
+    "sourceAuthority": "string",
+    "approvalRef": "string"
+  },
+  "evaluationRules": [
+    "Resolve policy by authoritative scope and effective time.",
+    "Validate policyVersion and require an APPROVED or ACTIVE policy state before runtime use.",
+    "A consent record stores the selected policyVersion immutably.",
+    "Compute retentionUntil deterministically from the admitted policy rule and server clock.",
+    "The client cannot select retentionClass, duration, fixedUntil, or any other retention rule.",
+    "If no applicable approved policy instance exists, runtime MUST fail closed and MUST NOT persist a consent record whose retentionUntil is unresolved.",
+    "Policy changes require version increment under the global policy/config contract.",
+    "Historical consent records remain interpretable using their recorded policyVersion."
+  ],
+  "minimumAdmissionEvidence": [
+    "policy instance with version and scope",
+    "approval evidence",
+    "effective period evidence",
+    "deterministic rule evaluation evidence",
+    "rollbackVersion or retirement path evidence",
+    "current-commit provenance"
+  ],
+  "nonAuthorizations": [
+    "No concrete retention duration is selected here.",
+    "No jurisdiction-specific legal conclusion is selected here.",
+    "No new Worker/D1/Queue is introduced.",
+    "No runtime implementation is authorized by this contract alone.",
+    "No Mapping 0 GREEN is implied."
+  ]
+}

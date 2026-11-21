@@ -1,0 +1,1815 @@
+import { buildAccountStateChangedAuditEvent, type AccountStateChangedAuditInput, type AuditEvent } from './audit-event'
+import type { AuditEventStore } from './audit-event-store.js'
+import { consumeAccountStateChanged } from './auth-013-queue-consumer'
+import { consumeMfaAuditEvent } from './mfa-audit-queue-consumer'
+import { consumeSessionRevokedAuditEvent } from './session-revocation-audit-queue-consumer'
+import { parseEventEnvelopeMetadata } from '../../W10-async/src/event-envelope.js'
+import { processQueueBatch } from '../../W10-async/src/queue-batch.js'
+import { QueueTaskFailure } from '../../W10-async/src/retry-policy.js'
+import {
+  ModerationRuntimeError,
+  decideModerationCase,
+  deliverModerationOutbox,
+  drainModerationOutbox,
+  getModerationCase,
+  listModerationQueue,
+} from './moderation-runtime'
+import { createReport, ReportRuntimeError } from './report-runtime'
+import {
+  getW06AuditEventStore,
+  getW06ModerationQueueReadStore,
+  getW06ModerationReportWriteStore,
+  getW06ModerationCaseDetailReadStore,
+  getW06ModerationDecisionWriteStore,
+  type W06ModerationDatabaseRuntimeEnv,
+} from './neon/moderation-database-runtime.js'
+
+interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
+interface Env extends W06ModerationDatabaseRuntimeEnv {
+  W03_CONTENT_MODERATION: Fetcher
+  GOVERNANCE_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
+  GOVERNANCE_READ_LIMITER?: RateLimitBinding
+  GOVERNANCE_WRITE_LIMITER?: RateLimitBinding
+}
+
+const getRateKey = (request: Request): string =>
+  request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ||
+  request.headers.get('X-LuckRead-Client-IP')?.trim() ||
+  'transport:W01'
+
+const enforceRateLimit = async (request: Request, env: Env): Promise<void> => {
+  const operation = request.method === 'GET' ? 'read' : 'write'
+  if (env.GOVERNANCE_ORIGIN_GLOBAL_LIMITER) {
+    const result = await env.GOVERNANCE_ORIGIN_GLOBAL_LIMITER.limit({ key: 'origin:' + operation })
+    if (!result.success) throw new ModerationRuntimeError('RATE_LIMITED', 429)
+  }
+  const actorLimiter = operation === 'read' ? env.GOVERNANCE_READ_LIMITER : env.GOVERNANCE_WRITE_LIMITER
+  if (actorLimiter) {
+    const result = await actorLimiter.limit({ key: operation + ':' + getRateKey(request) })
+    if (!result.success) throw new ModerationRuntimeError('RATE_LIMITED', 429)
+  }
+}
+
+const json = (body: unknown, status = 200) =>
+  Response.json(body, {
+    status,
+    headers: {
+      'cache-control': 'no-store',
+      'content-type': 'application/json; charset=utf-8',
+    },
+  })
+
+const canonicalRequestId = (value?: string): string =>
+  value && /^req_[A-Za-z0-9_-]{1,123}$/.test(value)
+    ? value
+    : 'req_' + crypto.randomUUID().replaceAll('-', '')
+
+const CANONICAL_ERROR_CODES = new Set([
+  'UNAUTHENTICATED',
+  'PERMISSION_DENIED',
+  'INVALID_STATE',
+  'PRECONDITION_FAILED',
+  'PRECONDITION_REQUIRED',
+  'CONFLICT',
+  'NOT_FOUND',
+  'VALIDATION_FAILED',
+  'IDEMPOTENCY_KEY_REQUIRED',
+  'IDEMPOTENCY_IN_PROGRESS',
+  'IDEMPOTENCY_KEY_REUSE_CONFLICT',
+  'RATE_LIMITED',
+  'QUOTA_EXCEEDED',
+  'PAYLOAD_TOO_LARGE',
+  'UNSUPPORTED_MEDIA_TYPE',
+  'UPLOAD_REJECTED',
+  'RESOURCE_LOCKED',
+  'INVALID_CURSOR',
+  'CURSOR_EXPIRED',
+  'DEPENDENCY_FAILED',
+  'INTERNAL_ERROR',
+  'SERVICE_UNAVAILABLE',
+])
+
+export const canonicalErrorCode = (code: string): string => {
+  if (CANONICAL_ERROR_CODES.has(code)) return code
+  if (code === 'REPORT_WRITE_FAILED' || code.endsWith('_WRITE_FAILED')) return 'INTERNAL_ERROR'
+  if (code === 'RELATIONSHIP_BLOCKED' || code === 'SELF_FOLLOW_NOT_ALLOWED') return 'CONFLICT'
+  if (code.startsWith('INVALID_')) return 'VALIDATION_FAILED'
+  return code
+}
+
+const actorTypes = new Set(['user', 'service', 'admin', 'system', 'job'])
+const resourceIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
+const requestIdPattern = /^req_[A-Za-z0-9_-]{1,123}$/
+const traceIdPattern = /^[A-Za-z0-9._:-]{1,128}$/
+
+function parseAccountStateChangedInput(value: unknown): AccountStateChangedAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_AUDIT_EVENT')
+
+  const input = value as Record<string, unknown>
+  const actor = input.actor
+  if (!actor || typeof actor !== 'object' || Array.isArray(actor)) throw new Error('INVALID_AUDIT_EVENT')
+
+  const actorRecord = actor as Record<string, unknown>
+  if (
+    typeof actorRecord.actorId !== 'string' ||
+    !resourceIdPattern.test(actorRecord.actorId) ||
+    typeof actorRecord.actorType !== 'string' ||
+    !actorTypes.has(actorRecord.actorType)
+  ) throw new Error('INVALID_AUDIT_EVENT')
+
+  if (actorRecord.layer !== undefined && (typeof actorRecord.layer !== 'string' || !/^L[0-8]$/.test(actorRecord.layer))) {
+    throw new Error('INVALID_AUDIT_EVENT')
+  }
+  if (actorRecord.sessionId !== undefined && (typeof actorRecord.sessionId !== 'string' || !resourceIdPattern.test(actorRecord.sessionId))) {
+    throw new Error('INVALID_AUDIT_EVENT')
+  }
+  if (actorRecord.impersonatingActorId !== undefined && (typeof actorRecord.impersonatingActorId !== 'string' || !resourceIdPattern.test(actorRecord.impersonatingActorId))) {
+    throw new Error('INVALID_AUDIT_EVENT')
+  }
+
+  if (
+    typeof input.eventId !== 'string' ||
+    !resourceIdPattern.test(input.eventId) ||
+    typeof input.userId !== 'string' ||
+    !resourceIdPattern.test(input.userId) ||
+    typeof input.beforeState !== 'string' ||
+    typeof input.afterState !== 'string' ||
+    typeof input.occurredAt !== 'string' ||
+    !Number.isInteger(input.beforeVersion) ||
+    !Number.isInteger(input.afterVersion)
+  ) throw new Error('INVALID_AUDIT_EVENT')
+
+  if (
+    input.requestId !== undefined &&
+    (typeof input.requestId !== 'string' || !requestIdPattern.test(input.requestId)) ||
+    input.traceId !== undefined &&
+    (typeof input.traceId !== 'string' || !traceIdPattern.test(input.traceId)) ||
+    input.reason !== undefined &&
+    (typeof input.reason !== 'string' || input.reason.length > 2048) ||
+    input.ip !== undefined && typeof input.ip !== 'string' ||
+    input.userAgent !== undefined &&
+    (typeof input.userAgent !== 'string' || input.userAgent.length > 1024) ||
+    Number.isNaN(Date.parse(input.occurredAt as string))
+  ) throw new Error('INVALID_AUDIT_EVENT')
+
+  return {
+    eventId: input.eventId,
+    requestId: input.requestId as string | undefined,
+    traceId: input.traceId as string | undefined,
+    actor: {
+      actorId: actorRecord.actorId,
+      actorType: actorRecord.actorType as AccountStateChangedAuditInput['actor']['actorType'],
+      ...(actorRecord.layer ? { layer: actorRecord.layer as AccountStateChangedAuditInput['actor']['layer'] } : {}),
+      ...(actorRecord.sessionId ? { sessionId: actorRecord.sessionId } : {}),
+      ...(actorRecord.impersonatingActorId ? { impersonatingActorId: actorRecord.impersonatingActorId } : {}),
+    },
+    userId: input.userId,
+    beforeState: input.beforeState,
+    beforeVersion: input.beforeVersion as number,
+    afterState: input.afterState,
+    afterVersion: input.afterVersion as number,
+    occurredAt: input.occurredAt,
+    reason: input.reason as string | undefined,
+    ip: input.ip as string | undefined,
+    userAgent: input.userAgent as string | undefined,
+  }
+}
+
+const MODERATION_OPERATION_PERMISSIONS = {
+  listModerationQueue: { permission: 'moderation.queue.read', resourceType: 'ModerationQueue' },
+  getModerationCase: { permission: 'moderation.case.read', resourceType: 'ModerationCase' },
+  decideModerationCase: { permission: 'moderation.decide', resourceType: 'ModerationCase' },
+} as const
+
+type ModerationOperationId = keyof typeof MODERATION_OPERATION_PERMISSIONS
+const MODERATION_CASL_POLICY_VERSION = 'casl-l0-l8-v1'
+
+const requireModerationPermission = (
+  operationId: ModerationOperationId,
+  principal: { userId: string; layer: string },
+  request: Request,
+): void => {
+  const required = MODERATION_OPERATION_PERMISSIONS[operationId]
+  if (
+    !/^L[0-8]$/.test(principal.layer) ||
+    Number(principal.layer.slice(1)) < 6 ||
+    !required ||
+    request.headers.get('X-LuckRead-Authz-Decision') !== 'ALLOW' ||
+    request.headers.get('X-LuckRead-Authz-Permission') !== required.permission ||
+    request.headers.get('X-LuckRead-Authz-Resource-Type') !== required.resourceType ||
+    request.headers.get('X-LuckRead-Authz-Policy-Version') !== MODERATION_CASL_POLICY_VERSION ||
+    request.headers.get('X-LuckRead-Authz-Subject-Id') !== principal.userId ||
+    request.headers.get('X-LuckRead-Authz-Layer') !== principal.layer
+  ) {
+    throw new ModerationRuntimeError('PERMISSION_DENIED', 403)
+  }
+}
+
+const requireW01Transport = (request: Request): { userId: string; layer: string; correlationId: string; requestId: string } => {
+  if (
+    request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+    request.headers.get('X-LuckRead-Transport-Version') !== '1.0'
+  ) throw new ModerationRuntimeError('PERMISSION_DENIED', 403)
+
+  const userId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
+  const layer = request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? ''
+  const correlationId = request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
+  const requestId = request.headers.get('X-LuckRead-Request-Id')?.trim() ?? ''
+  if (!userId || !layer || !correlationId || !requestId) throw new ModerationRuntimeError('UNAUTHENTICATED', 401)
+  return { userId, layer, correlationId, requestId }
+}
+
+const requireW07Transport = (request: Request): { userId: string; correlationId: string; requestId: string } => {
+  if (
+    request.headers.get('X-LuckRead-Caller') !== 'W07' ||
+    request.headers.get('X-LuckRead-Transport-Version') !== '1.0'
+  ) throw new ModerationRuntimeError('PERMISSION_DENIED', 403)
+  const userId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
+  const correlationId = request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
+  const requestId = request.headers.get('X-LuckRead-Request-Id')?.trim() ?? ''
+  if (!userId || userId.length > 256 || /[\u0000-\u001f\u007f]/.test(userId) ||
+      !correlationId || correlationId.length > 256 || !requestId || requestId.length > 256) {
+    throw new ModerationRuntimeError('UNAUTHENTICATED', 401)
+  }
+  return { userId, correlationId, requestId }
+}
+
+const parseDecision = (value: unknown): {
+  decision: 'APPROVED' | 'REJECTED'
+  expectedVersion: number
+  policyVersion: string
+  reasonCode: string
+  severity: string
+  scope: string
+  effectiveAt: string
+  expiresAt: string | null
+} => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
+  const body = value as Record<string, unknown>
+  if (
+    (body.decision !== 'APPROVED' && body.decision !== 'REJECTED') ||
+    !Number.isInteger(body.expectedVersion) ||
+    typeof body.policyVersion !== 'string' ||
+    typeof body.reasonCode !== 'string' ||
+    typeof body.severity !== 'string' ||
+    typeof body.scope !== 'string' ||
+    typeof body.effectiveAt !== 'string' ||
+    (body.expiresAt !== null && body.expiresAt !== undefined && typeof body.expiresAt !== 'string')
+  ) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
+  const expectedVersion = body.expectedVersion as number
+  return {
+    decision: body.decision as 'APPROVED' | 'REJECTED',
+    expectedVersion,
+    policyVersion: body.policyVersion,
+    reasonCode: body.reasonCode,
+    severity: body.severity,
+    scope: body.scope,
+    effectiveAt: body.effectiveAt,
+    expiresAt: body.expiresAt === undefined ? null : body.expiresAt as string | null,
+  }
+}
+
+const errorResponse = (error: unknown, requestId?: string): Response => {
+  if (error instanceof ReportRuntimeError) {
+    const code = canonicalErrorCode(error.code)
+    const message =
+      error.code === 'UNAUTHENTICATED' ? 'Authentication required' :
+      error.code === 'PERMISSION_DENIED' ? 'Permission denied' :
+      error.code === 'NOT_FOUND' ? 'Reported resource not found' :
+      error.code === 'PRECONDITION_REQUIRED' ? 'Idempotency-Key is required' :
+      code === 'CONFLICT' ? 'Conflicting report request' :
+      error.code === 'RATE_LIMITED' ? 'Too many reports' :
+      error.code === 'REPORT_WRITE_FAILED' ? 'Report could not be created' :
+      code === 'INTERNAL_ERROR' ? 'Report could not be created' :
+      'Invalid report request'
+    const status = code === 'VALIDATION_FAILED' && error.status === 400 ? 422 : code === 'INTERNAL_ERROR' && error.status < 500 ? 500 : error.status
+    return json({ error: { code, message, details: {} }, requestId: canonicalRequestId(requestId) }, status)
+  }
+  if (error instanceof ModerationRuntimeError) {
+    const code = canonicalErrorCode(error.code)
+    const message =
+      error.code === 'UNAUTHENTICATED' ? 'Authentication required' :
+      error.code === 'PERMISSION_DENIED' ? 'Permission denied' :
+      error.code === 'NOT_FOUND' ? 'Moderation case not found' :
+      error.code === 'PRECONDITION_REQUIRED' ? 'If-Match and Idempotency-Key are required' :
+      error.code === 'PRECONDITION_FAILED' ? 'Moderation case has changed' :
+      error.code === 'INVALID_STATE' ? 'Invalid moderation case state' :
+      error.code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' ? 'Idempotency-Key cannot be reused with different input' :
+      error.code === 'REPORT_WRITE_FAILED' ? 'Report could not be created' :
+      code === 'CONFLICT' ? 'Conflicting moderation request' :
+      code === 'INTERNAL_ERROR' ? 'Moderation service unavailable' :
+      error.code === 'SERVICE_UNAVAILABLE' ? 'Moderation service unavailable' :
+      'Invalid moderation request'
+    const status = code === 'VALIDATION_FAILED' && error.status === 400 ? 422 : code === 'INTERNAL_ERROR' && error.status < 500 ? 500 : error.status
+    return json({ error: { code, message, details: {} }, requestId: canonicalRequestId(requestId) }, status)
+  }
+  return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Moderation service unavailable', details: {} }, requestId: canonicalRequestId(requestId) }, 503)
+}
+
+type MembershipPlanAuditInput = {
+  eventId: string
+  planId: string
+  creatorId: string
+  planVersion: 1
+  status: 'DRAFT'
+  visibility: 'PRIVATE'
+  occurredAt: string
+  name: string
+  tier: string
+  billingInterval: 'MONTHLY' | 'YEARLY'
+  priceMinor: number
+  currency: string
+}
+
+
+
+
+type MembershipPlanPublishRequestAuditInput = {
+  eventId: string
+  planId: string
+  creatorId: string
+  expectedVersion: number
+  requestedStatus: 'ACTIVE'
+  requestedVisibility: 'PUBLIC'
+}
+
+type MembershipPlanPublishAuditInput = {
+  eventId: string
+  planId: string
+  creatorId: string
+  planVersion: number
+  status: 'ACTIVE'
+  visibility: 'PUBLIC'
+  version: number
+  occurredAt: string
+  name: string
+  tier: string
+  billingInterval: 'MONTHLY' | 'YEARLY'
+  priceMinor: number
+  currency: string
+}
+
+
+type MembershipPlanUpdateRequestAuditInput = {
+  eventId: string
+  planId: string
+  creatorId: string
+  expectedVersion: number
+  idempotencyKey: string
+  name: string
+  tier: string
+  billingInterval: 'MONTHLY' | 'YEARLY'
+  priceMinor: number
+  currency: string
+  benefits: string[]
+}
+
+type MembershipPlanUpdateAuditInput = {
+  eventId: string
+  planId: string
+  creatorId: string
+  expectedVersion: number
+  planVersion: number
+  status: 'DRAFT' | 'ACTIVE' | 'PAUSED'
+  visibility: 'PRIVATE' | 'PUBLIC'
+  version: number
+  occurredAt: string
+  name: string
+  tier: string
+  billingInterval: 'MONTHLY' | 'YEARLY'
+  priceMinor: number
+  currency: string
+  benefits: string[]
+}
+
+type MembershipPlanLifecycleRequestAuditInput = {
+  eventId: string; planId: string; creatorId: string; expectedVersion: number
+  action: 'pause' | 'resume' | 'retire'; requestedStatus: 'PAUSED' | 'ACTIVE' | 'RETIRED'; requestedVisibility: 'PRIVATE' | 'PUBLIC'
+}
+type MembershipPlanLifecycleAuditInput = {
+  eventId: string; planId: string; creatorId: string; expectedVersion: number
+  planVersion: number; action: 'pause' | 'resume' | 'retire'; status: 'PAUSED' | 'ACTIVE' | 'RETIRED'
+  visibility: 'PRIVATE' | 'PUBLIC'; version: number; occurredAt: string
+}
+
+type CommerceOrderAuditInput = {
+  eventId: string
+  orderId: string
+  occurredAt: string
+  status: 'CREATED'
+  version: number
+  currency: string
+  subtotalMinor: number
+  discountMinor: number
+  taxMinor: number
+  totalMinor: number
+}
+
+type PaymentMethodRevocationRequestAuditInput = {
+  eventId: string
+  savedPaymentMethodId: string
+  idempotencyKey: string
+}
+
+type PushEndpointMutationAuditInput = {
+  eventId: string
+  installationId: string
+  operation: 'REGISTER' | 'REMOVE'
+  idempotencyKey: string
+  platform: 'ios' | 'android' | null
+  permissionStatus: 'granted' | 'denied' | 'undetermined' | null
+}
+
+type NotificationPreferencesMutationAuditInput = {
+  eventId: string
+  preferences: Partial<{ follow: boolean; like: boolean; comment: boolean; mention: boolean }>
+}
+
+type SubscriptionPlanChangeRequestAuditInput = {
+  eventId: string
+  attemptId: string
+  subscriberId: string
+  subscriptionId: string
+  targetPlanId: string
+  changeType: 'UPGRADE' | 'DOWNGRADE_SCHEDULE' | 'BILLING_INTERVAL_CHANGE_SCHEDULE'
+  expectedEtag: string
+  requestedAt: string
+}
+
+type SubscriptionPlanUpgradeAppliedAuditInput = {
+  eventId: string
+  attemptId: string
+  subscriberId: string
+  subscriptionId: string
+  orderId: string
+  fromPlanId: string
+  fromPlanVersion: number
+  toPlanId: string
+  toPlanVersion: number
+  expectedSubscriptionVersion: number
+  appliedSubscriptionVersion: number
+  occurredAt: string
+}
+
+type SubscriptionPlanChangeAppliedAuditInput = {
+  eventId: string
+  changeId: string
+  changeType: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE'
+  subscriberId: string
+  subscriptionId: string
+  fromPlanId: string
+  fromPlanVersion: number
+  toPlanId: string
+  toPlanVersion: number
+  expectedSubscriptionVersion: number
+  appliedSubscriptionVersion: number
+  effectiveAt: string
+  occurredAt: string
+}
+
+
+type SubscriptionTrialStartedAuditInput = {
+  eventId: string
+  subscriptionId: string
+  subscriberId: string
+  creatorId: string
+  planId: string
+  planVersion: number
+  trialStartedAt: string
+  trialEndsAt: string
+  trialPeriodDays: number
+  occurredAt: string
+}
+
+type SubscriptionTrialConvertedAuditInput = {
+  eventId: string
+  subscriptionId: string
+  subscriberId: string
+  creatorId: string
+  planId: string
+  planVersion: number
+  trialStartedAt: string
+  trialEndsAt: string
+  convertedAt: string
+  paidPeriodStartedAt: string
+  paidPeriodEndsAt: string
+  orderId: string
+  paymentId: string
+  cycleId: string
+}
+
+async function readBoundedAuditJson(request: Request, maxBytes: number): Promise<unknown> {
+  const declaredLength = request.headers.get('content-length')
+  if (declaredLength !== null && (!/^\d+$/.test(declaredLength) || Number(declaredLength) > maxBytes)) {
+    throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+  }
+  if (!request.body) throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let length = 0
+  try {
+    while (true) {
+      const part = await reader.read()
+      if (part.done) break
+      length += part.value.byteLength
+      if (length > maxBytes) {
+        await reader.cancel()
+        throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+      }
+      chunks.push(part.value)
+    }
+  } catch {
+    throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+  }
+
+  const bytes = new Uint8Array(length)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown
+  } catch {
+    throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+  }
+}
+
+
+function parseSubscriptionTrialStartedAuditInput(value: unknown): SubscriptionTrialStartedAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('INVALID_SUBSCRIPTION_TRIAL_STARTED_AUDIT')
+  }
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'subscriptionId', 'subscriberId', 'creatorId', 'planId', 'planVersion', 'trialStartedAt', 'trialEndsAt', 'trialPeriodDays', 'occurredAt'])
+  if (Object.keys(body).length !== allowed.size || Object.keys(body).some((key) => !allowed.has(key))) {
+    throw new Error('INVALID_SUBSCRIPTION_TRIAL_STARTED_AUDIT')
+  }
+  const validId = (input: unknown): input is string =>
+    typeof input === 'string' && input.length >= 1 && input.length <= 256 &&
+    input.trim() === input && !(/[\u0000-\u001f\u007f]/.test(input))
+  const canonicalIso = (input: unknown): input is string =>
+    typeof input === 'string' && !Number.isNaN(Date.parse(input)) && new Date(input).toISOString() === input
+  if (
+    typeof body.subscriptionId !== 'string' || !/^sub_[a-f0-9]{64}$/.test(body.subscriptionId) ||
+    body.eventId !== 'evt_subscription_trial_started_' + body.subscriptionId ||
+    !validId(body.subscriberId) || !validId(body.creatorId) ||
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    !Number.isSafeInteger(body.planVersion) || (body.planVersion as number) < 1 ||
+    !Number.isSafeInteger(body.trialPeriodDays) || (body.trialPeriodDays as number) < 1 || (body.trialPeriodDays as number) > 30 ||
+    !canonicalIso(body.trialStartedAt) || !canonicalIso(body.trialEndsAt) ||
+    Date.parse(body.trialEndsAt) - Date.parse(body.trialStartedAt) !== (body.trialPeriodDays as number) * 86_400_000 ||
+    body.occurredAt !== body.trialStartedAt
+  ) throw new Error('INVALID_SUBSCRIPTION_TRIAL_STARTED_AUDIT')
+  return body as SubscriptionTrialStartedAuditInput
+}
+
+function parseSubscriptionTrialConvertedAuditInput(value: unknown): SubscriptionTrialConvertedAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('INVALID_SUBSCRIPTION_TRIAL_CONVERTED_AUDIT')
+  }
+  const body = value as Record<string, unknown>
+  const allowed = new Set([
+    'eventId', 'subscriptionId', 'subscriberId', 'creatorId', 'planId', 'planVersion',
+    'trialStartedAt', 'trialEndsAt', 'convertedAt', 'paidPeriodStartedAt', 'paidPeriodEndsAt',
+    'orderId', 'paymentId', 'cycleId',
+  ])
+  if (Object.keys(body).length !== allowed.size || Object.keys(body).some((key) => !allowed.has(key))) {
+    throw new Error('INVALID_SUBSCRIPTION_TRIAL_CONVERTED_AUDIT')
+  }
+  const validId = (input: unknown): input is string =>
+    typeof input === 'string' && input.length >= 1 && input.length <= 256 &&
+    input.trim() === input && !(/[\u0000-\u001f\u007f]/.test(input))
+  const canonicalIso = (input: unknown): input is string =>
+    typeof input === 'string' && !Number.isNaN(Date.parse(input)) && new Date(input).toISOString() === input
+  if (
+    typeof body.subscriptionId !== 'string' || !/^sub_[a-f0-9]{64}$/.test(body.subscriptionId) ||
+    body.eventId !== 'evt_subscription_trial_converted_' + body.subscriptionId ||
+    !validId(body.subscriberId) || !validId(body.creatorId) ||
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    !Number.isSafeInteger(body.planVersion) || (body.planVersion as number) < 1 ||
+    !canonicalIso(body.trialStartedAt) || !canonicalIso(body.trialEndsAt) ||
+    !canonicalIso(body.convertedAt) || !canonicalIso(body.paidPeriodStartedAt) ||
+    !canonicalIso(body.paidPeriodEndsAt) ||
+    body.trialStartedAt >= body.trialEndsAt ||
+    body.trialEndsAt !== body.convertedAt || body.convertedAt !== body.paidPeriodStartedAt ||
+    body.paidPeriodEndsAt <= body.paidPeriodStartedAt ||
+    typeof body.orderId !== 'string' || !/^ord_[A-Za-z0-9_-]{1,90}$/.test(body.orderId) ||
+    typeof body.paymentId !== 'string' || !/^pay_[A-Za-z0-9]{26}$/.test(body.paymentId) ||
+    typeof body.cycleId !== 'string' || !/^rcy_[A-Za-z0-9]{26}$/.test(body.cycleId)
+  ) throw new Error('INVALID_SUBSCRIPTION_TRIAL_CONVERTED_AUDIT')
+  return body as SubscriptionTrialConvertedAuditInput
+}
+
+function parseSubscriptionPlanChangeRequestAuditInput(value: unknown): SubscriptionPlanChangeRequestAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_SUBSCRIPTION_PLAN_CHANGE_REQUEST_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'attemptId', 'subscriberId', 'subscriptionId', 'targetPlanId', 'changeType', 'expectedEtag', 'requestedAt'])
+  if (Object.keys(body).length !== allowed.size || Object.keys(body).some((key) => !allowed.has(key))) {
+    throw new Error('INVALID_SUBSCRIPTION_PLAN_CHANGE_REQUEST_AUDIT')
+  }
+  if (
+    typeof body.attemptId !== 'string' ||
+    (body.changeType === 'UPGRADE' && !/^suca_[a-f0-9]{64}$/.test(body.attemptId)) ||
+    ((body.changeType === 'DOWNGRADE_SCHEDULE' || body.changeType === 'BILLING_INTERVAL_CHANGE_SCHEDULE') &&
+      !/^sudc_[a-f0-9]{64}$/.test(body.attemptId)) ||
+    (body.changeType !== 'UPGRADE' && body.changeType !== 'DOWNGRADE_SCHEDULE' &&
+      body.changeType !== 'BILLING_INTERVAL_CHANGE_SCHEDULE') ||
+    body.eventId !== (body.changeType === 'UPGRADE'
+      ? 'evt_subscription_plan_upgrade_requested_' + body.attemptId
+      : body.changeType === 'DOWNGRADE_SCHEDULE'
+        ? 'evt_subscription_plan_downgrade_scheduled_' + body.attemptId
+        : 'evt_subscription_billing_interval_change_requested_' + body.attemptId) ||
+    typeof body.subscriberId !== 'string' || body.subscriberId.length < 1 || body.subscriberId.length > 256 ||
+    body.subscriberId.trim() !== body.subscriberId || /[\u0000-\u001f\u007f]/.test(body.subscriberId) ||
+    typeof body.subscriptionId !== 'string' || body.subscriptionId.length < 1 || body.subscriptionId.length > 256 ||
+    body.subscriptionId.trim() !== body.subscriptionId || /[\u0000-\u001f\u007f]/.test(body.subscriptionId) ||
+    typeof body.targetPlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.targetPlanId) ||
+    typeof body.expectedEtag !== 'string' || !/^"lr-v([1-9]\d*)"$/.test(body.expectedEtag) ||
+    typeof body.requestedAt !== 'string' || Number.isNaN(Date.parse(body.requestedAt)) ||
+    new Date(body.requestedAt).toISOString() !== body.requestedAt
+  ) throw new Error('INVALID_SUBSCRIPTION_PLAN_CHANGE_REQUEST_AUDIT')
+  return body as SubscriptionPlanChangeRequestAuditInput
+}
+
+function parseSubscriptionPlanUpgradeAppliedAuditInput(value: unknown): SubscriptionPlanUpgradeAppliedAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_SUBSCRIPTION_PLAN_UPGRADE_APPLIED_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'attemptId', 'subscriberId', 'subscriptionId', 'orderId', 'fromPlanId', 'fromPlanVersion', 'toPlanId', 'toPlanVersion', 'expectedSubscriptionVersion', 'appliedSubscriptionVersion', 'occurredAt'])
+  if (Object.keys(body).length !== allowed.size || Object.keys(body).some((key) => !allowed.has(key))) {
+    throw new Error('INVALID_SUBSCRIPTION_PLAN_UPGRADE_APPLIED_AUDIT')
+  }
+  if (
+    typeof body.attemptId !== 'string' || !/^suca_[a-f0-9]{64}$/.test(body.attemptId) ||
+    body.eventId !== 'evt_subscription_plan_upgraded_' + body.attemptId ||
+    typeof body.subscriberId !== 'string' || body.subscriberId.length < 1 || body.subscriberId.length > 256 ||
+    body.subscriberId.trim() !== body.subscriberId || /[\u0000-\u001f\u007f]/.test(body.subscriberId) ||
+    typeof body.subscriptionId !== 'string' || body.subscriptionId.length < 1 || body.subscriptionId.length > 256 ||
+    body.subscriptionId.trim() !== body.subscriptionId || /[\u0000-\u001f\u007f]/.test(body.subscriptionId) ||
+    typeof body.orderId !== 'string' || !/^ord_[A-Za-z0-9_-]{1,90}$/.test(body.orderId) ||
+    typeof body.fromPlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.fromPlanId) ||
+    !Number.isSafeInteger(body.fromPlanVersion) || (body.fromPlanVersion as number) < 1 ||
+    typeof body.toPlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.toPlanId) ||
+    !Number.isSafeInteger(body.toPlanVersion) || (body.toPlanVersion as number) < 1 ||
+    !Number.isSafeInteger(body.expectedSubscriptionVersion) || (body.expectedSubscriptionVersion as number) < 1 ||
+    !Number.isSafeInteger(body.appliedSubscriptionVersion) ||
+    body.appliedSubscriptionVersion !== (body.expectedSubscriptionVersion as number) + 1 ||
+    typeof body.occurredAt !== 'string' || Number.isNaN(Date.parse(body.occurredAt)) ||
+    new Date(body.occurredAt).toISOString() !== body.occurredAt
+  ) throw new Error('INVALID_SUBSCRIPTION_PLAN_UPGRADE_APPLIED_AUDIT')
+  return body as SubscriptionPlanUpgradeAppliedAuditInput
+}
+function parseSubscriptionPlanChangeAppliedAuditInput(value: unknown): SubscriptionPlanChangeAppliedAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_SUBSCRIPTION_PLAN_DOWNGRADE_APPLIED_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'changeId', 'changeType', 'subscriberId', 'subscriptionId', 'fromPlanId', 'fromPlanVersion', 'toPlanId', 'toPlanVersion', 'expectedSubscriptionVersion', 'appliedSubscriptionVersion', 'effectiveAt', 'occurredAt'])
+  const legacyAllowed = new Set(['eventId', 'changeId', 'subscriberId', 'subscriptionId', 'fromPlanId', 'fromPlanVersion', 'toPlanId', 'toPlanVersion', 'expectedSubscriptionVersion', 'appliedSubscriptionVersion', 'effectiveAt', 'occurredAt'])
+  const keys = Object.keys(body)
+  if (!((keys.length === allowed.size && keys.every((key) => allowed.has(key))) ||
+        (keys.length === legacyAllowed.size && keys.every((key) => legacyAllowed.has(key))))) {
+    throw new Error('INVALID_SUBSCRIPTION_PLAN_DOWNGRADE_APPLIED_AUDIT')
+  }
+  const changeType = body.changeType ?? 'DOWNGRADE'
+  if (
+    typeof body.changeId !== 'string' || !/^sudc_[a-f0-9]{64}$/.test(body.changeId) ||
+    (changeType !== 'DOWNGRADE' && changeType !== 'BILLING_INTERVAL_CHANGE') ||
+    body.eventId !== (changeType === 'DOWNGRADE'
+      ? 'evt_subscription_plan_downgrade_applied_' + body.changeId
+      : 'evt_subscription_billing_interval_changed_' + body.changeId) ||
+    typeof body.subscriberId !== 'string' || body.subscriberId.length < 1 || body.subscriberId.length > 256 ||
+    body.subscriberId.trim() !== body.subscriberId || /[\u0000-\u001f\u007f]/.test(body.subscriberId) ||
+    typeof body.subscriptionId !== 'string' || body.subscriptionId.length < 1 || body.subscriptionId.length > 256 ||
+    body.subscriptionId.trim() !== body.subscriptionId || /[\u0000-\u001f\u007f]/.test(body.subscriptionId) ||
+    typeof body.fromPlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.fromPlanId) ||
+    !Number.isSafeInteger(body.fromPlanVersion) || (body.fromPlanVersion as number) < 1 ||
+    typeof body.toPlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.toPlanId) ||
+    !Number.isSafeInteger(body.toPlanVersion) || (body.toPlanVersion as number) < 1 ||
+    !Number.isSafeInteger(body.expectedSubscriptionVersion) || (body.expectedSubscriptionVersion as number) < 1 ||
+    !Number.isSafeInteger(body.appliedSubscriptionVersion) ||
+    body.appliedSubscriptionVersion !== (body.expectedSubscriptionVersion as number) + 1 ||
+    typeof body.effectiveAt !== 'string' || Number.isNaN(Date.parse(body.effectiveAt)) ||
+    new Date(body.effectiveAt).toISOString() !== body.effectiveAt ||
+    typeof body.occurredAt !== 'string' || Number.isNaN(Date.parse(body.occurredAt)) ||
+    new Date(body.occurredAt).toISOString() !== body.occurredAt
+  ) throw new Error('INVALID_SUBSCRIPTION_PLAN_DOWNGRADE_APPLIED_AUDIT')
+  return { ...body, changeType } as SubscriptionPlanChangeAppliedAuditInput
+}
+
+
+function parsePaymentMethodRevocationRequestAuditInput(value: unknown): PaymentMethodRevocationRequestAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_PAYMENT_METHOD_REVOCATION_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'savedPaymentMethodId', 'idempotencyKey'])
+  if (Object.keys(body).length !== allowed.size || Object.keys(body).some((key) => !allowed.has(key)) ||
+      typeof body.eventId !== 'string' || !/^evt_pm_revoke_requested_[a-f0-9]{64}$/.test(body.eventId) ||
+      typeof body.savedPaymentMethodId !== 'string' || !/^spm_[A-Za-z0-9]{26}$/.test(body.savedPaymentMethodId) ||
+      typeof body.idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.idempotencyKey)) {
+    throw new Error('INVALID_PAYMENT_METHOD_REVOCATION_AUDIT')
+  }
+  return body as PaymentMethodRevocationRequestAuditInput
+}
+
+function parsePushEndpointMutationAuditInput(value: unknown): PushEndpointMutationAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_PUSH_ENDPOINT_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'installationId', 'operation', 'idempotencyKey', 'platform', 'permissionStatus'])
+  if (
+    Object.keys(body).length !== allowed.size ||
+    Object.keys(body).some((key) => !allowed.has(key)) ||
+    typeof body.eventId !== 'string' || !/^evt_push_endpoint_[a-f0-9]{64}$/.test(body.eventId) ||
+    typeof body.installationId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.installationId) ||
+    (body.operation !== 'REGISTER' && body.operation !== 'REMOVE') ||
+    typeof body.idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.idempotencyKey)
+  ) throw new Error('INVALID_PUSH_ENDPOINT_AUDIT')
+
+  if (body.operation === 'REGISTER') {
+    if (
+      (body.platform !== 'ios' && body.platform !== 'android') ||
+      !['granted', 'denied', 'undetermined'].includes(String(body.permissionStatus))
+    ) throw new Error('INVALID_PUSH_ENDPOINT_AUDIT')
+  } else if (body.platform !== null || body.permissionStatus !== null) {
+    throw new Error('INVALID_PUSH_ENDPOINT_AUDIT')
+  }
+  return body as PushEndpointMutationAuditInput
+}
+
+function parseNotificationPreferencesMutationAuditInput(value: unknown): NotificationPreferencesMutationAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_NOTIFICATION_PREFERENCES_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'preferences'])
+  if (
+    Object.keys(body).length !== allowed.size ||
+    Object.keys(body).some(key => !allowed.has(key)) ||
+    typeof body.eventId !== 'string' ||
+    !/^evt_notification_preferences_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.eventId) ||
+    !body.preferences || typeof body.preferences !== 'object' || Array.isArray(body.preferences)
+  ) throw new Error('INVALID_NOTIFICATION_PREFERENCES_AUDIT')
+  const preferences = body.preferences as Record<string, unknown>
+  const keys = Object.keys(preferences)
+  const allowedPreferences = new Set(['follow', 'like', 'comment', 'mention'])
+  if (keys.length === 0 || keys.some(key => !allowedPreferences.has(key)) || keys.some(key => typeof preferences[key] !== 'boolean')) {
+    throw new Error('INVALID_NOTIFICATION_PREFERENCES_AUDIT')
+  }
+  return body as NotificationPreferencesMutationAuditInput
+}
+
+function parseCommerceOrderAuditInput(value: unknown): CommerceOrderAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'orderId', 'occurredAt', 'status', 'version', 'currency', 'subtotalMinor', 'discountMinor', 'taxMinor', 'totalMinor'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
+    throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+  }
+  const safeMinor = (input: unknown): input is number =>
+    typeof input === 'number' && Number.isSafeInteger(input) && input >= 0
+  if (
+    typeof body.orderId !== 'string' || !/^ord_[A-Za-z0-9_-]{1,90}$/.test(body.orderId) ||
+    body.eventId !== 'evt_order_created_' + body.orderId ||
+    typeof body.occurredAt !== 'string' || Number.isNaN(Date.parse(body.occurredAt)) ||
+    body.status !== 'CREATED' ||
+    typeof body.version !== 'number' || !Number.isSafeInteger(body.version) || body.version < 1 ||
+    typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency) ||
+    !safeMinor(body.subtotalMinor) || !safeMinor(body.discountMinor) ||
+    !safeMinor(body.taxMinor) || !safeMinor(body.totalMinor) ||
+    body.discountMinor > body.subtotalMinor ||
+    !Number.isSafeInteger(body.subtotalMinor - body.discountMinor + body.taxMinor) ||
+    body.totalMinor !== body.subtotalMinor - body.discountMinor + body.taxMinor
+  ) throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+  return body as CommerceOrderAuditInput
+}
+
+function parseMembershipPlanAuditInput(value: unknown): MembershipPlanAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'planVersion', 'status', 'visibility', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
+    throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
+  }
+  if (
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    body.eventId !== 'evt_mpl_created_' + body.planId ||
+    typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
+    body.planVersion !== 1 || body.status !== 'DRAFT' || body.visibility !== 'PRIVATE' ||
+    typeof body.occurredAt !== 'string' || !body.occurredAt || Number.isNaN(Date.parse(body.occurredAt)) ||
+    typeof body.name !== 'string' || body.name.trim().length < 1 || body.name.length > 120 ||
+    typeof body.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(body.tier) ||
+    (body.billingInterval !== 'MONTHLY' && body.billingInterval !== 'YEARLY') ||
+    typeof body.priceMinor !== 'number' || !Number.isSafeInteger(body.priceMinor) || body.priceMinor < 0 || body.priceMinor > 2_147_483_647 ||
+    typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency)
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
+  return body as MembershipPlanAuditInput
+}
+
+
+
+function parseMembershipPlanUpdateTerms(body: Record<string, unknown>): void {
+  if (
+    typeof body.name !== 'string' || body.name.trim().length < 1 || body.name.length > 120 ||
+    typeof body.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(body.tier) ||
+    (body.billingInterval !== 'MONTHLY' && body.billingInterval !== 'YEARLY') ||
+    typeof body.priceMinor !== 'number' || !Number.isSafeInteger(body.priceMinor) ||
+    body.priceMinor < 0 || body.priceMinor > 2_147_483_647 ||
+    typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency) ||
+    !Array.isArray(body.benefits) || body.benefits.length > 20 ||
+    body.benefits.some((item) => typeof item !== 'string' || item.trim() !== item || item.length < 1 || item.length > 180) ||
+    new Set(body.benefits).size !== body.benefits.length ||
+    JSON.stringify(body.benefits).length > 8192
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
+}
+
+function parseMembershipPlanUpdateRequestAuditInput(value: unknown): MembershipPlanUpdateRequestAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'idempotencyKey', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
+    throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT')
+  }
+  if (
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
+    typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
+    typeof body.idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.idempotencyKey) ||
+    body.eventId !== 'evt_mpl_update_requested_' + body.planId + '_' + body.idempotencyKey
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT')
+  parseMembershipPlanUpdateTerms(body)
+  return body as MembershipPlanUpdateRequestAuditInput
+}
+
+function parseMembershipPlanLifecycleRequestAuditInput(value: unknown): MembershipPlanLifecycleRequestAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_LIFECYCLE_REQUEST_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'action', 'requestedStatus', 'requestedVisibility'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) throw new Error('INVALID_MEMBERSHIP_PLAN_LIFECYCLE_REQUEST_AUDIT')
+  if (
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
+    typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
+    (body.action !== 'pause' && body.action !== 'resume' && body.action !== 'retire') ||
+    body.requestedStatus !== (body.action === 'pause' ? 'PAUSED' : body.action === 'resume' ? 'ACTIVE' : 'RETIRED') ||
+    body.requestedVisibility !== (body.action === 'resume' ? 'PUBLIC' : 'PRIVATE') ||
+    body.eventId !== 'evt_mpl_lifecycle_requested_' + body.action + '_' + body.planId + '_v' + body.expectedVersion
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_LIFECYCLE_REQUEST_AUDIT')
+  return body as MembershipPlanLifecycleRequestAuditInput
+}
+
+function parseMembershipPlanLifecycleAuditInput(value: unknown): MembershipPlanLifecycleAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_LIFECYCLE_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'planVersion', 'action', 'status', 'visibility', 'version', 'occurredAt'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) throw new Error('INVALID_MEMBERSHIP_PLAN_LIFECYCLE_AUDIT')
+  if (
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
+    typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
+    typeof body.planVersion !== 'number' || !Number.isSafeInteger(body.planVersion) || body.planVersion < 1 ||
+    (body.action !== 'pause' && body.action !== 'resume' && body.action !== 'retire') ||
+    body.status !== (body.action === 'pause' ? 'PAUSED' : body.action === 'resume' ? 'ACTIVE' : 'RETIRED') ||
+    body.visibility !== (body.action === 'resume' ? 'PUBLIC' : 'PRIVATE') ||
+    typeof body.version !== 'number' || !Number.isSafeInteger(body.version) || body.version !== body.expectedVersion + 1 ||
+    body.eventId !== 'evt_mpl_plan_' + (body.action === 'pause' ? 'paused' : body.action === 'resume' ? 'activated' : 'retired') + '_' + body.planId + '_v' + body.version ||
+    typeof body.occurredAt !== 'string' || !body.occurredAt || Number.isNaN(Date.parse(body.occurredAt))
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_LIFECYCLE_AUDIT')
+  return body as MembershipPlanLifecycleAuditInput
+}
+
+function parseMembershipPlanUpdateAuditInput(value: unknown): MembershipPlanUpdateAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'planVersion', 'status', 'visibility', 'version', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
+    throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
+  }
+  if (
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
+    typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
+    typeof body.planVersion !== 'number' || !Number.isSafeInteger(body.planVersion) || body.planVersion < 2 ||
+    (body.status !== 'DRAFT' && body.status !== 'ACTIVE' && body.status !== 'PAUSED') ||
+    (body.visibility !== 'PRIVATE' && body.visibility !== 'PUBLIC') ||
+    typeof body.version !== 'number' || !Number.isSafeInteger(body.version) || body.version !== body.expectedVersion + 1 ||
+    body.eventId !== 'evt_mpl_updated_' + body.planId + '_v' + body.version ||
+    typeof body.occurredAt !== 'string' || !body.occurredAt || Number.isNaN(Date.parse(body.occurredAt))
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
+  parseMembershipPlanUpdateTerms(body)
+  return body as MembershipPlanUpdateAuditInput
+}
+
+function parseMembershipPlanPublishAuditInput(value: unknown): MembershipPlanPublishAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'planVersion', 'status', 'visibility', 'version', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
+    throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_AUDIT')
+  }
+  if (
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
+    typeof body.planVersion !== 'number' || !Number.isSafeInteger(body.planVersion) || body.planVersion < 1 ||
+    body.status !== 'ACTIVE' || body.visibility !== 'PUBLIC' ||
+    typeof body.version !== 'number' || !Number.isSafeInteger(body.version) || body.version < 2 ||
+    body.eventId !== 'evt_mpl_published_' + body.planId + '_v' + body.version ||
+    typeof body.occurredAt !== 'string' || !body.occurredAt || Number.isNaN(Date.parse(body.occurredAt)) ||
+    typeof body.name !== 'string' || body.name.trim().length < 1 || body.name.length > 120 ||
+    typeof body.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(body.tier) ||
+    (body.billingInterval !== 'MONTHLY' && body.billingInterval !== 'YEARLY') ||
+    typeof body.priceMinor !== 'number' || !Number.isSafeInteger(body.priceMinor) || body.priceMinor < 0 || body.priceMinor > 2_147_483_647 ||
+    typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency)
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_AUDIT')
+  return body as MembershipPlanPublishAuditInput
+}
+
+
+function parseMembershipPlanPublishRequestAuditInput(value: unknown): MembershipPlanPublishRequestAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_REQUEST_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'requestedStatus', 'requestedVisibility'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
+    throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_REQUEST_AUDIT')
+  }
+  if (
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
+    typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
+    body.requestedStatus !== 'ACTIVE' || body.requestedVisibility !== 'PUBLIC' ||
+    body.eventId !== 'evt_mpl_publish_requested_' + body.planId + '_v' + body.expectedVersion
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_REQUEST_AUDIT')
+  return body as MembershipPlanPublishRequestAuditInput
+}
+
+function canonicalAuditJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return '[' + value.map(canonicalAuditJson).join(',') + ']'
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right))
+    return '{' + entries.map(([key, entry]) => JSON.stringify(key) + ':' + canonicalAuditJson(entry)).join(',') + '}'
+  }
+  return JSON.stringify(value)
+}
+
+function matchesMembershipPlanMutationRequestAudit(existing: AuditEvent, expected: AuditEvent): boolean {
+  const storedActor = existing.actor as unknown as Record<string, unknown>
+  const expectedActor = expected.actor as unknown as Record<string, unknown>
+  return existing.eventId === expected.eventId &&
+    storedActor.actorId === expectedActor.actorId &&
+    storedActor.actorType === expectedActor.actorType &&
+    storedActor.layer === expectedActor.layer &&
+    existing.action === expected.action &&
+    existing.targetType === expected.targetType &&
+    existing.targetId === expected.targetId &&
+    canonicalAuditJson(existing.before) === canonicalAuditJson(expected.before) &&
+    canonicalAuditJson(existing.after) === canonicalAuditJson(expected.after)
+}
+
+/**
+ * The event time is assigned by W06, not sent by W01. An exact semantic retry
+ * therefore ignores only the newly generated timestamp and confirms that the
+ * first immutable request-intent event is already durable.
+ */
+async function persistMembershipPlanMutationRequestAudit(env: Env, event: AuditEvent): Promise<Response> {
+  let store: AuditEventStore
+  let existing: AuditEvent | null
+  try {
+    store = getW06AuditEventStore(env)
+    existing = await store.findByEventId(event.eventId)
+  } catch {
+    return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
+  }
+  if (existing) {
+    if (!matchesMembershipPlanMutationRequestAudit(existing, event)) return json({ error: 'AUDIT_EVENT_CONFLICT' }, 409)
+    return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
+  }
+  try {
+    await store.append(event)
+    return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: false }, 201)
+  } catch {
+    try {
+      const raced = await store.findByEventId(event.eventId)
+      if (raced && matchesMembershipPlanMutationRequestAudit(raced, event)) {
+        return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
+      }
+    } catch {
+      // Keep the mutation closed if the durable result remains uncertain.
+    }
+    return json({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' }, 503)
+  }
+}
+
+async function findAuditEvent(store: AuditEventStore, eventId: string): Promise<AuditEvent | null> {
+  return store.findByEventId(eventId)
+}
+
+function sameTimestampAtPostgresDriverPrecision(left: string, right: string): boolean {
+  const leftMilliseconds = Date.parse(left)
+  const rightMilliseconds = Date.parse(right)
+  return Number.isFinite(leftMilliseconds) && leftMilliseconds === rightMilliseconds
+}
+
+function matchesImmutableAuditEvent(existing: AuditEvent, expected: AuditEvent): boolean {
+  const storedActor = existing.actor as unknown as Record<string, unknown>
+  const expectedActor = expected.actor as unknown as Record<string, unknown>
+  return existing.eventId === expected.eventId &&
+    storedActor.actorId === expectedActor.actorId &&
+    storedActor.actorType === expectedActor.actorType &&
+    storedActor.layer === expectedActor.layer &&
+    existing.action === expected.action &&
+    existing.targetType === expected.targetType &&
+    existing.targetId === expected.targetId &&
+    canonicalAuditJson(existing.before) === canonicalAuditJson(expected.before) &&
+    canonicalAuditJson(existing.after) === canonicalAuditJson(expected.after) &&
+    sameTimestampAtPostgresDriverPrecision(existing.occurredAt, expected.occurredAt)
+}
+
+async function persistImmutableAuditEvent(env: Env, event: AuditEvent): Promise<Response> {
+  let store: AuditEventStore
+  let existing: AuditEvent | null
+  try {
+    store = getW06AuditEventStore(env)
+    existing = await findAuditEvent(store, event.eventId)
+  } catch {
+    return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
+  }
+  if (existing) {
+    if (!matchesImmutableAuditEvent(existing, event)) return json({ error: 'AUDIT_EVENT_CONFLICT' }, 409)
+    return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
+  }
+
+  try {
+    await store.append(event)
+    return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: false }, 201)
+  } catch {
+    // A concurrent retry may have won the unique event_id insert. Confirm the
+    // durable row before treating this request as an idempotent success.
+    try {
+      const raced = await findAuditEvent(store, event.eventId)
+      if (raced && matchesImmutableAuditEvent(raced, event)) {
+        return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
+      }
+    } catch {
+      // Keep the response closed if the durable outcome cannot be confirmed.
+    }
+    return json({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' }, 503)
+  }
+}
+
+/**
+ * The request audit is keyed by the caller's idempotency-derived attempt ID.
+ * Retries may arrive with a later wall-clock timestamp; preserve the first
+ * durable timestamp while requiring every business field and actor to match.
+ */
+async function persistIdempotentSubscriptionPlanChangeRequestAudit(
+  env: Env,
+  event: AuditEvent,
+): Promise<Response> {
+  let store: AuditEventStore
+  let existing: AuditEvent | null
+  try {
+    store = getW06AuditEventStore(env)
+    existing = await findAuditEvent(store, event.eventId)
+  } catch {
+    return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
+  }
+  if (!existing) return persistImmutableAuditEvent(env, event)
+  const stable = { ...event, occurredAt: existing.occurredAt }
+  if (!matchesImmutableAuditEvent(existing, stable)) {
+    return json({ error: 'AUDIT_EVENT_CONFLICT' }, 409)
+  }
+  return json({
+    eventId: event.eventId,
+    action: event.action,
+    targetType: event.targetType,
+    targetId: event.targetId,
+    replayed: true,
+  }, 200)
+}
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    try {
+      await enforceRateLimit(request, env)
+    } catch (error) {
+      if (error instanceof ModerationRuntimeError && error.code === 'RATE_LIMITED') {
+        return json({ error: { code: 'RATE_LIMITED', message: 'Too many requests', details: { retryAfter: 60 } }, requestId: canonicalRequestId() }, 429)
+      }
+      throw error
+    }
+    const url = new URL(request.url)
+
+    if (url.pathname === '/health' && request.method === 'GET') {
+      return json({ service: 'W06', status: 'ok', auditPersistence: 'enabled', moderationRuntime: 'enabled' })
+    }
+
+    if (request.method === 'POST' && url.pathname === '/reports') {
+      try {
+        const principal = requireW01Transport(request)
+        const permission = principal.layer
+        if (!/^L[0-8]$/.test(permission) || Number(permission.slice(1)) < 2) {
+          throw new ReportRuntimeError('PERMISSION_DENIED', 403)
+        }
+        const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+        if (!idempotencyKey) throw new ReportRuntimeError('PRECONDITION_REQUIRED', 428)
+        let body: unknown
+        try { body = await request.json() } catch { throw new ReportRuntimeError('VALIDATION_FAILED', 400) }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) throw new ReportRuntimeError('VALIDATION_FAILED', 400)
+        const input = body as Record<string, unknown>
+        const targetType = input.targetType
+        const targetId = input.targetId
+        const reasonCode = input.reasonCode
+        const description = input.description
+        const evidenceRefs = input.evidenceRefs
+        if (
+          (targetType !== 'content' && targetType !== 'comment' && targetType !== 'creator' && targetType !== 'media' && targetType !== 'profile') ||
+          typeof targetId !== 'string' ||
+          typeof reasonCode !== 'string' ||
+          (description !== undefined && typeof description !== 'string') ||
+          (evidenceRefs !== undefined && (!Array.isArray(evidenceRefs) || evidenceRefs.some((value) => typeof value !== 'string')))
+        ) throw new ReportRuntimeError('VALIDATION_FAILED', 400)
+        const result = await createReport(getW06ModerationReportWriteStore(env), {
+          actorUserId: principal.userId,
+          targetType,
+          targetId,
+          reasonCode,
+          ...(description !== undefined ? { description } : {}),
+          ...(evidenceRefs !== undefined ? { evidenceRefs: evidenceRefs as string[] } : {}),
+          idempotencyKey,
+          requestId: principal.requestId,
+          correlationId: principal.correlationId,
+        })
+        return json({ data: result, requestId: principal.requestId }, 201)
+      } catch (error) {
+        return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim())
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/admin/moderation/queue') {
+      try {
+        const principal = requireW01Transport(request)
+        requireModerationPermission('listModerationQueue', principal, request)
+        return json({
+          ...(await listModerationQueue(
+            getW06ModerationQueueReadStore(env),
+            principal.userId,
+            url.searchParams.get('cursor'),
+            url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : null,
+          )),
+          requestId: principal.requestId,
+        })
+      } catch (error) {
+        return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim())
+      }
+    }
+
+    const caseMatch = /^\/admin\/moderation\/cases\/([^/]+)$/.exec(url.pathname)
+    if (request.method === 'GET' && caseMatch) {
+      try {
+        const principal = requireW01Transport(request)
+        requireModerationPermission('getModerationCase', principal, request)
+        return json({
+          ...(await getModerationCase(getW06ModerationCaseDetailReadStore(env), principal.userId, decodeURIComponent(caseMatch[1]))),
+          requestId: principal.requestId,
+        })
+      } catch (error) {
+        return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim())
+      }
+    }
+
+    const decisionMatch = /^\/admin\/moderation\/cases\/([^/]+)\/decision$/.exec(url.pathname)
+    if (request.method === 'POST' && decisionMatch) {
+      try {
+        const principal = requireW01Transport(request)
+        requireModerationPermission('decideModerationCase', principal, request)
+        const body = parseDecision(await request.json())
+        const result = await decideModerationCase(getW06ModerationDecisionWriteStore(env), env.W03_CONTENT_MODERATION, {
+          reviewerId: principal.userId,
+          reviewerLayer: principal.layer,
+          caseId: decodeURIComponent(decisionMatch[1]),
+          ifMatch: request.headers.get('If-Match'),
+          idempotencyKey: request.headers.get('Idempotency-Key'),
+          correlationId: principal.correlationId,
+          requestId: principal.requestId,
+          ...body,
+        })
+        return json(result, 200)
+      } catch (error) {
+        return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim())
+      }
+    }
+
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-trial-started') {
+      let transport: ReturnType<typeof requireW07Transport>
+      try { transport = requireW07Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      let input: SubscriptionTrialStartedAuditInput
+      try { input = parseSubscriptionTrialStartedAuditInput(await readBoundedAuditJson(request, 4096)) }
+      catch { return json({ error: 'INVALID_SUBSCRIPTION_TRIAL_STARTED_AUDIT' }, 400) }
+      if (input.subscriberId !== transport.userId) return json({ error: 'PERMISSION_DENIED' }, 403)
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: transport.requestId,
+        traceId: transport.correlationId,
+        actor: { actorId: 'W07', actorType: 'service' },
+        action: 'subscription.trial_started',
+        targetType: 'Subscription',
+        targetId: input.subscriptionId,
+        before: { status: 'NONE' },
+        after: {
+          subscriberId: input.subscriberId,
+          creatorId: input.creatorId,
+          planId: input.planId,
+          planVersion: input.planVersion,
+          status: 'TRIALING',
+          trialStartedAt: input.trialStartedAt,
+          trialEndsAt: input.trialEndsAt,
+          trialPeriodDays: input.trialPeriodDays,
+        },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-trial-converted') {
+      let transport: ReturnType<typeof requireW07Transport>
+      try { transport = requireW07Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      let input: SubscriptionTrialConvertedAuditInput
+      try { input = parseSubscriptionTrialConvertedAuditInput(await readBoundedAuditJson(request, 4096)) }
+      catch { return json({ error: 'INVALID_SUBSCRIPTION_TRIAL_CONVERTED_AUDIT' }, 400) }
+      if (input.subscriberId !== transport.userId) return json({ error: 'PERMISSION_DENIED' }, 403)
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: transport.requestId,
+        traceId: transport.correlationId,
+        actor: { actorId: 'W07', actorType: 'service' },
+        action: 'subscription.trial_converted',
+        targetType: 'Subscription',
+        targetId: input.subscriptionId,
+        before: {
+          subscriberId: input.subscriberId,
+          creatorId: input.creatorId,
+          planId: input.planId,
+          planVersion: input.planVersion,
+          status: 'TRIALING',
+          trialStartedAt: input.trialStartedAt,
+          trialEndsAt: input.trialEndsAt,
+        },
+        after: {
+          subscriberId: input.subscriberId,
+          creatorId: input.creatorId,
+          planId: input.planId,
+          planVersion: input.planVersion,
+          status: 'ACTIVE',
+          convertedAt: input.convertedAt,
+          paidPeriodStartedAt: input.paidPeriodStartedAt,
+          paidPeriodEndsAt: input.paidPeriodEndsAt,
+          orderId: input.orderId,
+          paymentId: input.paymentId,
+          cycleId: input.cycleId,
+        },
+        occurredAt: input.convertedAt,
+      }
+      return persistImmutableAuditEvent(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-plan-change-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: SubscriptionPlanChangeRequestAuditInput
+      try { input = parseSubscriptionPlanChangeRequestAuditInput(await readBoundedAuditJson(request, 4096)) }
+      catch { return json({ error: 'INVALID_SUBSCRIPTION_PLAN_CHANGE_REQUEST_AUDIT' }, 400) }
+      if (input.subscriberId !== principal.userId) return json({ error: 'PERMISSION_DENIED' }, 403)
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: input.changeType === 'UPGRADE'
+          ? 'subscription.plan_upgrade.requested'
+          : input.changeType === 'DOWNGRADE_SCHEDULE'
+            ? 'subscription.plan_downgrade.requested'
+            : 'subscription.billing_interval_change.requested',
+        targetType: 'Subscription',
+        targetId: input.subscriptionId,
+        before: { expectedEtag: input.expectedEtag },
+        after: {
+          changeId: input.attemptId,
+          targetPlanId: input.targetPlanId,
+          changeType: input.changeType,
+        },
+        occurredAt: input.requestedAt,
+      }
+      return persistIdempotentSubscriptionPlanChangeRequestAudit(env, event)
+    }
+
+    if (request.method === 'POST' && (
+      url.pathname === '/internal/audit-events/subscription-plan-change-applied' ||
+      url.pathname === '/internal/audit-events/subscription-plan-downgrade-applied'
+    )) {
+      let transport: ReturnType<typeof requireW07Transport>
+      try { transport = requireW07Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      let input: SubscriptionPlanChangeAppliedAuditInput
+      try { input = parseSubscriptionPlanChangeAppliedAuditInput(await readBoundedAuditJson(request, 4096)) }
+      catch { return json({ error: 'INVALID_SUBSCRIPTION_PLAN_CHANGE_APPLIED_AUDIT' }, 400) }
+      if (input.subscriberId !== transport.userId) return json({ error: 'PERMISSION_DENIED' }, 403)
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: transport.requestId,
+        traceId: transport.correlationId,
+        actor: { actorId: 'W07', actorType: 'service' },
+        action: input.changeType === 'DOWNGRADE'
+          ? 'subscription.plan_downgraded'
+          : 'subscription.billing_interval_changed',
+        targetType: 'Subscription',
+        targetId: input.subscriptionId,
+        before: {
+          subscriberId: input.subscriberId,
+          planId: input.fromPlanId,
+          planVersion: input.fromPlanVersion,
+          subscriptionVersion: input.expectedSubscriptionVersion,
+        },
+        after: {
+          subscriberId: input.subscriberId,
+          planId: input.toPlanId,
+          planVersion: input.toPlanVersion,
+          subscriptionVersion: input.appliedSubscriptionVersion,
+          changeId: input.changeId,
+          changeType: input.changeType,
+          effectiveAt: input.effectiveAt,
+        },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-plan-upgraded') {
+      let transport: ReturnType<typeof requireW07Transport>
+      try { transport = requireW07Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      let input: SubscriptionPlanUpgradeAppliedAuditInput
+      try { input = parseSubscriptionPlanUpgradeAppliedAuditInput(await readBoundedAuditJson(request, 4096)) }
+      catch { return json({ error: 'INVALID_SUBSCRIPTION_PLAN_UPGRADE_APPLIED_AUDIT' }, 400) }
+      if (input.subscriberId !== transport.userId) return json({ error: 'PERMISSION_DENIED' }, 403)
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: transport.requestId,
+        traceId: transport.correlationId,
+        actor: { actorId: 'W07', actorType: 'service' },
+        action: 'subscription.plan_upgraded',
+        targetType: 'Subscription',
+        targetId: input.subscriptionId,
+        before: {
+          subscriberId: input.subscriberId,
+          planId: input.fromPlanId,
+          planVersion: input.fromPlanVersion,
+          subscriptionVersion: input.expectedSubscriptionVersion,
+        },
+        after: {
+          subscriberId: input.subscriberId,
+          planId: input.toPlanId,
+          planVersion: input.toPlanVersion,
+          subscriptionVersion: input.appliedSubscriptionVersion,
+          orderId: input.orderId,
+          attemptId: input.attemptId,
+        },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/commerce-order-created') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) {
+        return json({ error: 'PERMISSION_DENIED' }, 403)
+      }
+
+      let input: CommerceOrderAuditInput
+      try {
+        input = parseCommerceOrderAuditInput(await readBoundedAuditJson(request, 4096))
+      } catch {
+        return json({ error: 'INVALID_COMMERCE_ORDER_AUDIT' }, 400)
+      }
+
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: {
+          actorId: principal.userId,
+          actorType: 'user',
+          layer: principal.layer as AuditEvent['actor']['layer'],
+        },
+        action: 'commerce.order.created',
+        targetType: 'Order',
+        targetId: input.orderId,
+        before: {},
+        after: {
+          status: input.status,
+          version: input.version,
+          currency: input.currency,
+          subtotalMinor: input.subtotalMinor,
+          discountMinor: input.discountMinor,
+          taxMinor: input.taxMinor,
+          totalMinor: input.totalMinor,
+        },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/push-endpoint-mutation-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: PushEndpointMutationAuditInput
+      try { input = parsePushEndpointMutationAuditInput(await readBoundedAuditJson(request, 2048)) }
+      catch { return json({ error: 'INVALID_PUSH_ENDPOINT_AUDIT' }, 400) }
+      if (request.headers.get('Idempotency-Key') !== input.idempotencyKey) return json({ error: 'IDEMPOTENCY_KEY_MISMATCH' }, 409)
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: 'notification.push_endpoint.mutation_requested',
+        targetType: 'NotificationPushEndpoint',
+        targetId: input.installationId,
+        before: {},
+        after: {
+          operation: input.operation,
+          provider: 'expo',
+          platform: input.platform,
+          permissionStatus: input.permissionStatus,
+        },
+        occurredAt: new Date().toISOString(),
+      }
+      return persistMembershipPlanMutationRequestAudit(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/notification-preferences-update-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: NotificationPreferencesMutationAuditInput
+      try { input = parseNotificationPreferencesMutationAuditInput(await readBoundedAuditJson(request, 2048)) }
+      catch { return json({ error: 'INVALID_NOTIFICATION_PREFERENCES_AUDIT' }, 400) }
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: 'notification.preferences.update_requested',
+        targetType: 'Notification',
+        targetId: principal.userId,
+        before: {},
+        after: { preferences: input.preferences },
+        occurredAt: new Date().toISOString(),
+      }
+      return persistImmutableAuditEvent(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/payment-method-revocation-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: PaymentMethodRevocationRequestAuditInput
+      try { input = parsePaymentMethodRevocationRequestAuditInput(await readBoundedAuditJson(request, 1024)) }
+      catch { return json({ error: 'INVALID_PAYMENT_METHOD_REVOCATION_AUDIT' }, 400) }
+      if (request.headers.get('Idempotency-Key') !== input.idempotencyKey) return json({ error: 'IDEMPOTENCY_KEY_MISMATCH' }, 409)
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: 'payment_method.revocation_requested',
+        targetType: 'PaymentMethod',
+        targetId: input.savedPaymentMethodId,
+        before: {},
+        after: { operation: 'remove_saved_payment_method' },
+        occurredAt: new Date().toISOString(),
+      }
+      return persistMembershipPlanMutationRequestAudit(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-created') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[3-8]$/.test(principal.layer)) {
+        return json({ error: 'PERMISSION_DENIED' }, 403)
+      }
+
+      const declaredLength = Number(request.headers.get('content-length') ?? '0')
+      if (Number.isFinite(declaredLength) && declaredLength > 4096) {
+        return json({ error: 'INVALID_MEMBERSHIP_PLAN_AUDIT' }, 400)
+      }
+      let input: MembershipPlanAuditInput
+      try {
+        const bodyText = await request.text()
+        if (new TextEncoder().encode(bodyText).byteLength > 4096) throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
+        input = parseMembershipPlanAuditInput(JSON.parse(bodyText) as unknown)
+      } catch {
+        return json({ error: 'INVALID_MEMBERSHIP_PLAN_AUDIT' }, 400)
+      }
+
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: {
+          actorId: principal.userId,
+          actorType: 'user',
+          layer: principal.layer as AuditEvent['actor']['layer'],
+        },
+        action: 'membership.plan.created',
+        targetType: 'MembershipPlan',
+        targetId: input.planId,
+        before: {},
+        after: {
+          creatorId: input.creatorId,
+          planVersion: input.planVersion,
+          status: input.status,
+          visibility: input.visibility,
+          name: input.name,
+          tier: input.tier,
+          billingInterval: input.billingInterval,
+          priceMinor: input.priceMinor,
+          currency: input.currency,
+        },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
+    }
+
+
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-publish-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[3-8]$/.test(principal.layer)) {
+        return json({ error: 'PERMISSION_DENIED' }, 403)
+      }
+      let input: MembershipPlanPublishRequestAuditInput
+      try {
+        input = parseMembershipPlanPublishRequestAuditInput(await readBoundedAuditJson(request, 2048))
+      } catch {
+        return json({ error: 'INVALID_MEMBERSHIP_PLAN_PUBLISH_REQUEST_AUDIT' }, 400)
+      }
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: {
+          actorId: principal.userId,
+          actorType: 'user',
+          layer: principal.layer as AuditEvent['actor']['layer'],
+        },
+        action: 'membership.plan.publish_requested',
+        targetType: 'MembershipPlan',
+        targetId: input.planId,
+        before: {
+          creatorId: input.creatorId,
+          expectedVersion: input.expectedVersion,
+        },
+        after: {
+          creatorId: input.creatorId,
+          expectedVersion: input.expectedVersion,
+          requestedStatus: input.requestedStatus,
+          requestedVisibility: input.requestedVisibility,
+        },
+        occurredAt: new Date().toISOString(),
+      }
+      return persistMembershipPlanMutationRequestAudit(env, event)
+    }
+
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-lifecycle-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[3-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: MembershipPlanLifecycleRequestAuditInput
+      try { input = parseMembershipPlanLifecycleRequestAuditInput(await readBoundedAuditJson(request, 2048)) }
+      catch { return json({ error: 'INVALID_MEMBERSHIP_PLAN_LIFECYCLE_REQUEST_AUDIT' }, 400) }
+      const event: AuditEvent = {
+        eventId: input.eventId, requestId: principal.requestId, traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: 'membership.plan.lifecycle_requested', targetType: 'MembershipPlan', targetId: input.planId,
+        before: { creatorId: input.creatorId, expectedVersion: input.expectedVersion },
+        after: { creatorId: input.creatorId, expectedVersion: input.expectedVersion, action: input.action,
+          requestedStatus: input.requestedStatus, requestedVisibility: input.requestedVisibility },
+        occurredAt: new Date().toISOString(),
+      }
+      return persistMembershipPlanMutationRequestAudit(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-update-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[3-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: MembershipPlanUpdateRequestAuditInput
+      try { input = parseMembershipPlanUpdateRequestAuditInput(await readBoundedAuditJson(request, 4096)) }
+      catch { return json({ error: 'INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT' }, 400) }
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: 'membership.plan.update_requested',
+        targetType: 'MembershipPlan',
+        targetId: input.planId,
+        before: { creatorId: input.creatorId, expectedVersion: input.expectedVersion },
+        after: {
+          creatorId: input.creatorId,
+          expectedVersion: input.expectedVersion,
+          idempotencyKey: input.idempotencyKey,
+          name: input.name,
+          tier: input.tier,
+          billingInterval: input.billingInterval,
+          priceMinor: input.priceMinor,
+          currency: input.currency,
+          benefits: input.benefits,
+        },
+        occurredAt: new Date().toISOString(),
+      }
+      return persistMembershipPlanMutationRequestAudit(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-lifecycle-changed') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[3-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: MembershipPlanLifecycleAuditInput
+      try { input = parseMembershipPlanLifecycleAuditInput(await readBoundedAuditJson(request, 2048)) }
+      catch { return json({ error: 'INVALID_MEMBERSHIP_PLAN_LIFECYCLE_AUDIT' }, 400) }
+      const event: AuditEvent = {
+        eventId: input.eventId, requestId: principal.requestId, traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: input.action === 'pause' ? 'membership.plan.paused' : input.action === 'resume' ? 'membership.plan.activated' : 'membership.plan.retired',
+        targetType: 'MembershipPlan', targetId: input.planId,
+        before: { creatorId: input.creatorId, planVersion: input.planVersion,
+          status: input.action === 'pause' ? 'ACTIVE' : 'PAUSED',
+          visibility: input.action === 'pause' ? 'PUBLIC' : 'PRIVATE', version: input.expectedVersion },
+        after: { creatorId: input.creatorId, planVersion: input.planVersion,
+          status: input.status, visibility: input.visibility, version: input.version },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-updated') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[3-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: MembershipPlanUpdateAuditInput
+      try { input = parseMembershipPlanUpdateAuditInput(await readBoundedAuditJson(request, 6144)) }
+      catch { return json({ error: 'INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT' }, 400) }
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: 'membership.plan.updated',
+        targetType: 'MembershipPlan',
+        targetId: input.planId,
+        before: {
+          creatorId: input.creatorId,
+          expectedVersion: input.expectedVersion,
+          planVersion: input.planVersion - 1,
+        },
+        after: {
+          creatorId: input.creatorId,
+          expectedVersion: input.expectedVersion,
+          planVersion: input.planVersion,
+          version: input.version,
+          status: input.status,
+          visibility: input.visibility,
+          name: input.name,
+          tier: input.tier,
+          billingInterval: input.billingInterval,
+          priceMinor: input.priceMinor,
+          currency: input.currency,
+          benefits: input.benefits,
+        },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-published') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[3-8]$/.test(principal.layer)) {
+        return json({ error: 'PERMISSION_DENIED' }, 403)
+      }
+
+      let input: MembershipPlanPublishAuditInput
+      try {
+        input = parseMembershipPlanPublishAuditInput(await readBoundedAuditJson(request, 4096))
+      } catch {
+        return json({ error: 'INVALID_MEMBERSHIP_PLAN_PUBLISH_AUDIT' }, 400)
+      }
+
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: {
+          actorId: principal.userId,
+          actorType: 'user',
+          layer: principal.layer as AuditEvent['actor']['layer'],
+        },
+        action: 'membership.plan.published',
+        targetType: 'MembershipPlan',
+        targetId: input.planId,
+        before: {
+          creatorId: input.creatorId,
+          planVersion: input.planVersion,
+          status: 'DRAFT',
+          visibility: 'PRIVATE',
+          version: input.version - 1,
+        },
+        after: {
+          creatorId: input.creatorId,
+          planVersion: input.planVersion,
+          status: input.status,
+          visibility: input.visibility,
+          version: input.version,
+          name: input.name,
+          tier: input.tier,
+          billingInterval: input.billingInterval,
+          priceMinor: input.priceMinor,
+          currency: input.currency,
+        },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/account-state-changed') {
+      let input: AccountStateChangedAuditInput
+      try { input = parseAccountStateChangedInput(await request.json()) }
+      catch { return json({ error: 'INVALID_AUDIT_EVENT' }, 400) }
+      try {
+        const event = buildAccountStateChangedAuditEvent(input)
+        await getW06AuditEventStore(env).append(event)
+        return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId }, 201)
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith('INVALID_AUDIT_EVENT:')) return json({ error: 'INVALID_AUDIT_EVENT' }, 400)
+        return json({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' }, 503)
+      }
+    }
+
+    return new Response(null, { status: 404 })
+  },
+
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    try {
+      await drainModerationOutbox(getW06ModerationDecisionWriteStore(env), env.W03_CONTENT_MODERATION, 10)
+    } catch {
+      // The next scheduled run retries durable outbox records.
+    }
+  },
+
+  async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
+    await processQueueBatch(batch, async (raw) => {
+      try {
+        parseEventEnvelopeMetadata(raw)
+        const body = raw && typeof raw === 'object'
+          ? raw as Record<string, unknown>
+          : null
+        const auditEventStore = getW06AuditEventStore(env)
+        if (body?.eventType === 'user.session.revoked') {
+          await consumeSessionRevokedAuditEvent(auditEventStore, raw)
+        } else if (typeof body?.eventType === 'string' && body.eventType.startsWith('auth.mfa.')) {
+          await consumeMfaAuditEvent(auditEventStore, raw)
+        } else {
+          await consumeAccountStateChanged(auditEventStore, raw)
+        }
+      } catch (error) {
+        if (error instanceof Error &&
+            (error.message === 'INVALID_AUTH_013_EVENT' || error.message === 'INVALID_AUTH_007_MFA_EVENT' || error.message === 'INVALID_AUTH_010_SESSION_EVENT')) {
+          throw new QueueTaskFailure('Invalid W06 audit queue event', 'poison', error.message)
+        }
+        if (error instanceof Error &&
+            (error.message === 'MFA_AUDIT_EVENT_IDENTITY_CONFLICT' || error.message === 'SESSION_AUDIT_EVENT_IDENTITY_CONFLICT')) {
+          throw new QueueTaskFailure('Conflicting W06 audit event identity', 'permanent', error.message)
+        }
+        // Unknown/storage failures remain transient; event consumers own validation and idempotency.
+        throw error
+      }
+    })
+  },
+}

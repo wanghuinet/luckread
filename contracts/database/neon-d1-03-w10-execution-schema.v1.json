@@ -1,0 +1,323 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-03-w10-execution-schema.v1.json",
+  "title": "LuckRead D1-03 W10 Async Execution PostgreSQL Schema",
+  "version": "1.0.0",
+  "status": "SOURCE_ADMITTED_LOCAL_POSTGRES18_REHEARSAL_PASSED_RUNTIME_BINDING_NOT_ADMITTED",
+  "target": {
+    "domainId": "D1-03",
+    "databaseName": "luckread_governance",
+    "cloudflareD1DatabaseName": "secondary",
+    "cloudflareD1DatabaseUuid": "bda1d247-a371-4244-91ae-aef96034db7f",
+    "postgresMajor": 18,
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "primaryOwner": {
+    "worker": "W10",
+    "primaryTask": null,
+    "entities": [
+      "Job",
+      "Retry",
+      "DLQ",
+      "ExecutionInbox",
+      "ExecutionOutbox",
+      "OperationalIdempotency"
+    ],
+    "migrationSource": "workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql",
+    "migrationConfigOwner": "W09",
+    "postgresArtifact": "workers/W10-async/src/neon-postgres-migrations/0001_w10_d1_03_async_execution.sql",
+    "template": "workers/W10-async/scripts/neon/templates/d1-03-w10-execution-postgres.sql",
+    "generator": "workers/W10-async/scripts/neon/generate-d1-03-w10-postgres-migration.mjs"
+  },
+  "authority": {
+    "rule": "W10 owns only async execution metadata. The original owner Worker retains every business-state mutation and authorization decision.",
+    "execution": "A job is admitted only under an explicitly approved owner Worker, Task, operation and Workflow/Job contract.",
+    "idempotency": "OperationalIdempotency covers W10 async-operation submission only. Domain-local idempotency remains in the source D1 and is not copied here.",
+    "inbox": "ExecutionInbox records W10 consumer delivery identity and dedupe metadata only.",
+    "outbox": "ExecutionOutbox records W10-owned execution events only. Producer-local business outboxes remain with their authoritative Worker.",
+    "deadLetter": "D1-03 dead-letter metadata is a searchable quarantine/evidence record, not a replacement for the native Queue DLQ or its retry configuration."
+  },
+  "schema": {
+    "tables": {
+      "jobs": {
+        "entity": "Job",
+        "operationContract": "docs/165-UNIFIED-ASYNC-OPERATION-CONTRACT-v1.0.md",
+        "columns": [
+          "job_id",
+          "operation_id",
+          "operation_type",
+          "owner_worker",
+          "owner_task_id",
+          "resource_type",
+          "resource_id",
+          "actor_id",
+          "subject_id",
+          "scope",
+          "state",
+          "progress_current",
+          "progress_total",
+          "created_at",
+          "started_at",
+          "updated_at",
+          "completed_at",
+          "expires_at",
+          "idempotency_key",
+          "correlation_id",
+          "request_id",
+          "trace_id",
+          "error_code",
+          "result_ref"
+        ],
+        "states": [
+          "ACCEPTED",
+          "QUEUED",
+          "RUNNING",
+          "SUCCEEDED",
+          "FAILED",
+          "CANCEL_REQUESTED",
+          "STOPPING",
+          "CANCELLED",
+          "EXPIRED",
+          "PARTIALLY_COMPLETED",
+          "REQUIRES_ACTION",
+          "UNKNOWN"
+        ],
+        "payloadRule": "No raw job payload, credential, payment data or private message is stored. Result data is referenced by an opaque result_ref."
+      },
+      "job_retries": {
+        "entity": "Retry",
+        "contract": "docs/163-EVENT-SEMANTICS-DELIVERY-ORDERING-REPLAY-DLQ-CONTRACT-v1.0.md",
+        "columns": [
+          "retry_id",
+          "job_id",
+          "attempt_number",
+          "failure_class",
+          "error_code",
+          "error_summary",
+          "scheduled_at",
+          "started_at",
+          "completed_at",
+          "next_attempt_at",
+          "created_at"
+        ],
+        "failureClasses": [
+          "transient",
+          "permanent",
+          "poison"
+        ],
+        "sameOwnerForeignKeys": 1
+      },
+      "execution_dead_letters": {
+        "entity": "DLQ",
+        "contract": "docs/163-EVENT-SEMANTICS-DELIVERY-ORDERING-REPLAY-DLQ-CONTRACT-v1.0.md",
+        "columns": [
+          "dlq_id",
+          "event_id",
+          "consumer_name",
+          "event_type",
+          "schema_version",
+          "producer",
+          "resource_type",
+          "resource_id",
+          "occurred_at",
+          "published_at",
+          "idempotency_key",
+          "source_version",
+          "correlation_id",
+          "causation_id",
+          "payload_sha256",
+          "attempt_count",
+          "last_error_class",
+          "last_error_summary",
+          "first_seen_at",
+          "last_seen_at",
+          "resolution_status",
+          "replay_id",
+          "resolved_at"
+        ],
+        "metadataRule": "Only allowlisted event-envelope metadata columns are stored with a payload SHA-256; no arbitrary JSON metadata or raw event payload is persisted.",
+        "resolutionStates": [
+          "OPEN",
+          "REPLAYED",
+          "DISCARDED"
+        ]
+      },
+      "execution_inbox": {
+        "entity": "ExecutionInbox",
+        "contract": "docs/163-EVENT-SEMANTICS-DELIVERY-ORDERING-REPLAY-DLQ-CONTRACT-v1.0.md",
+        "columns": [
+          "consumer_name",
+          "event_id",
+          "event_type",
+          "schema_version",
+          "producer",
+          "resource_type",
+          "resource_id",
+          "idempotency_key",
+          "source_version",
+          "correlation_id",
+          "causation_id",
+          "payload_sha256",
+          "status",
+          "received_at",
+          "processed_at",
+          "last_error_code"
+        ],
+        "states": [
+          "RECEIVED",
+          "PROCESSING",
+          "APPLIED",
+          "STALE",
+          "REJECTED",
+          "QUARANTINED"
+        ]
+      },
+      "execution_outbox": {
+        "entity": "ExecutionOutbox",
+        "contract": "docs/163-EVENT-SEMANTICS-DELIVERY-ORDERING-REPLAY-DLQ-CONTRACT-v1.0.md",
+        "columns": [
+          "outbox_id",
+          "event_id",
+          "event_type",
+          "schema_version",
+          "producer",
+          "resource_type",
+          "resource_id",
+          "occurred_at",
+          "correlation_id",
+          "causation_id",
+          "idempotency_key",
+          "source_version",
+          "payload_ref",
+          "payload_sha256",
+          "status",
+          "attempts",
+          "next_attempt_at",
+          "last_error",
+          "created_at",
+          "published_at"
+        ],
+        "payloadRule": "Only opaque payload references and hashes are persisted; raw payload remains with its owning domain or approved object storage."
+      },
+      "operational_idempotency": {
+        "entity": "OperationalIdempotency",
+        "contract": "docs/165-UNIFIED-ASYNC-OPERATION-CONTRACT-v1.0.md",
+        "columns": [
+          "idempotency_id",
+          "owner_worker",
+          "operation_type",
+          "scope",
+          "idempotency_key",
+          "request_hash",
+          "operation_id",
+          "created_at",
+          "expires_at"
+        ],
+        "scopeRule": "Unique by owner Worker, operation type, scope and idempotency key. This table cannot replace source-domain idempotency."
+      }
+    },
+    "explicitIndexes": [
+      "idx_jobs_owner_state_updated",
+      "idx_jobs_expires_at",
+      "idx_job_retries_next_attempt",
+      "idx_execution_dead_letters_state_first_seen",
+      "idx_execution_inbox_state_received",
+      "idx_execution_outbox_delivery",
+      "idx_operational_idempotency_expires_at"
+    ],
+    "totals": {
+      "tables": 6,
+      "explicitIndexes": 7,
+      "triggers": 0,
+      "triggerFunctions": 0,
+      "foreignKeys": 2
+    }
+  },
+  "sourceInventory": [
+    {
+      "path": "docs/165-UNIFIED-ASYNC-OPERATION-CONTRACT-v1.0.md",
+      "role": "Canonical durable operation identity, lifecycle, query, retry and recovery fields."
+    },
+    {
+      "path": "docs/163-EVENT-SEMANTICS-DELIVERY-ORDERING-REPLAY-DLQ-CONTRACT-v1.0.md",
+      "role": "Event envelope, at-least-once, retry failure classes, DLQ metadata and replay semantics."
+    },
+    {
+      "path": "workers/W10-async/src/event-envelope.ts",
+      "role": "Existing W10 metadata validation implementation."
+    },
+    {
+      "path": "workers/W10-async/src/retry-policy.ts",
+      "role": "Existing W10 transient/permanent/poison retry classification."
+    },
+    {
+      "path": "workers/W10-async/src/canonical-json-idempotency.ts",
+      "role": "Existing W10 deterministic idempotency payload hashing primitive."
+    },
+    {
+      "path": "contracts/transport/d1-03-entity-owner-boundary.v1.json",
+      "role": "Frozen sole-primary-owner map for D1-03 W10 entities."
+    },
+    {
+      "path": "workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql",
+      "role": "D1 SQLite schema source executed only through the existing W09-owned D1-03 migration configuration."
+    }
+  ],
+  "migrationRules": {
+    "sourceOfTruth": "The D1 source migration and admitted async/event contracts; PostgreSQL SQL is a provider-specific translation.",
+    "foreignKeys": "Only two same-owner references are used: Retry to Job and OperationalIdempotency to Job. No cross-Worker or cross-D1 foreign key is introduced.",
+    "rawPayloads": false,
+    "businessRowsImported": false,
+    "w10RuntimeD1BindingAdded": false,
+    "newWorker": false,
+    "newD1": false,
+    "newQueue": false,
+    "newServiceBinding": false,
+    "remoteNeonDdlExecuted": false,
+    "productionCutoverAuthorized": false,
+    "dlqMetadata": "Column allowlist only: event identity/type/version/producer/resource, timestamps, idempotency/version/correlation/causation fields. No arbitrary JSON or payload content."
+  },
+  "verification": {
+    "postgresImage": "postgres:18.6",
+    "sourceMigration": "workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql",
+    "postgresMigration": "workers/W10-async/src/neon-postgres-migrations/0001_w10_d1_03_async_execution.sql",
+    "verificationScript": "workers/W10-async/scripts/neon/verify-d1-03-w10-postgres-schema.sql",
+    "expectedTables": 6,
+    "expectedExplicitIndexes": 7,
+    "expectedForeignKeys": 2,
+    "businessFixtureRowsAfterRollback": 0,
+    "localRehearsalEvidence": {
+      "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+      "workflowRunId": 42502891564,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42502891564",
+      "verifiedHeadSha": "b6dca4fc21b52eb6169d1b4a7a64577fd038d590",
+      "postgresVersion": "18.6",
+      "database": "luckread_d1_03_w10_rehearsal",
+      "tables": 6,
+      "explicitIndexes": 7,
+      "foreignKeys": 2,
+      "triggerCount": 0,
+      "triggerFunctionCount": 0,
+      "businessFixtureRowsAfterRollback": 0,
+      "generatorAndAdmissionTests": "PASSED",
+      "dlqAllowlistedMetadataVerification": "PASSED",
+      "catalogAndRollbackVerification": "PASSED",
+      "d1MigrationSha256": "4e2aadf03989417379a27ae8dc1e7260bdf9cc5ed771ef22ed304e145d477b41",
+      "ownerBoundarySha256": "5c911b56d31b3b078941f01f5bc7800c7082c1c5e02191d933b78054f0befe52",
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "w10RuntimeBindingAdded": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false,
+      "evidenceArtifactId": 13625774522,
+      "evidenceArtifactSha256": "sha256:e24a8c63b3d0c295e35c156baa423b20e123c217f8f3fa308276780e73d8be72"
+    }
+  },
+  "runtimeAdmission": {
+    "status": "NOT_ADMITTED",
+    "reason": "This slice admits only the W10 persistence schema source. Queue bindings, W10 D1_03 runtime binding, task execution handlers and deployment require separate task-specific admission and evidence."
+  }
+}

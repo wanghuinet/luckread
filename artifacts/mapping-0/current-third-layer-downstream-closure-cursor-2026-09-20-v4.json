@@ -1,0 +1,68 @@
+{
+  "version": "4.0.0",
+  "evidenceType": "MAPPING_0_THIRD_LAYER_DOWNSTREAM_CLOSURE_CURSOR",
+  "generatedAt": "2026-09-20",
+  "repository": "wanghuinet/luckread",
+  "sourceHead": "6747007147920fa2b9d19b976fe1525bd5d19435",
+  "previousCursor": "artifacts/mapping-0/current-third-layer-downstream-closure-cursor-2026-09-20-v3.json",
+  "completedBatch": {
+    "id": "M0-AUTH-002-REMOTE-E45-002",
+    "result": "ADAPTER_REGRESSION_VERIFIED_PASS",
+    "workflowRunId": 35535570923,
+    "workflowJobId": 106143870080,
+    "testedCommitSha": "cd2f5a79321806ec81b0c261b3f8deb40e809b0e",
+    "evidenceArtifactId": 10612971115,
+    "evidenceManifest": "artifacts/evidence/auth-002/adapter-regression/run-35535570923.json",
+    "mappingEvidenceBoundFeature": "AUTH-002",
+    "validationMarker": "AUTH-002_E4_5_REMOTE_ADAPTER_REGRESSION_PASS"
+  },
+  "currentState": {
+    "canonicalMapping": {
+      "total": 449,
+      "status": "NOT_GREEN",
+      "partial": 17,
+      "unresolved": 431,
+      "missing": 1,
+      "missingFeature": "AUTH-007"
+    },
+    "fiveWay": "NOT_GREEN",
+    "r4": {
+      "total": 449,
+      "ready": 0,
+      "blocked": 449
+    },
+    "evidenceRegistry": "NOT_GREEN",
+    "auth002": {
+      "e4_5": "PASS_VERIFIED",
+      "overall": "NOT_GREEN",
+      "remainingRuntimeGaps": [
+        "GAP-07-01",
+        "GAP-07-02",
+        "GAP-07-03"
+      ]
+    }
+  },
+  "nextItem": {
+    "id": "M0-AUTH-002-E6-RUNTIME-EVIDENCE-001",
+    "state": "TODO_VERIFY",
+    "objective": "Execute the existing AUTH-002 runtime-session evidence gate against the controlled remote D1 and close the three pre-existing runtime gaps without inventing a second session authority.",
+    "requiredArtifacts": "contracts/persistence/AUTH-002-runtime-session-evidence-gate.v1.json",
+    "executionRunbook": "contracts/persistence/AUTH-002-runtime-evidence-execution-runbook.v1.md"
+  },
+  "governance": {
+    "contractChanges": 0,
+    "blueprintChanges": 0,
+    "architectureChanges": 0,
+    "payloadCoreChanges": 0,
+    "d1SchemaChanges": 0,
+    "remoteMigrationByE45": false,
+    "evidenceRegistryChange": true,
+    "failedEvidencePreserved": true
+  },
+  "antiLoop": {
+    "structuralGateInherited": true,
+    "e45FailureHistoryPreserved": true,
+    "e45PassReusableUntilRelevantInputsChange": true,
+    "doNotRepeatEmptyTargetProbe": true
+  }
+}

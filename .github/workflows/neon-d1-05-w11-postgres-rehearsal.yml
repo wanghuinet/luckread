@@ -1,0 +1,98 @@
+name: Neon D1-05 W11 Analytics PostgreSQL 18 Local Rehearsal
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-05-w11-postgres-rehearsal.yml'
+      - 'contracts/database/neon-d1-05-w11-analytics-schema.v1.json'
+      - 'contracts/transport/d1-05-analytics-owner-boundary.v1.json'
+      - 'workers/W11-growth-campaign-analytics-operations/README.md'
+      - 'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc'
+      - 'workers/W11-growth-campaign-analytics-operations/migrations/**'
+      - 'workers/W11-growth-campaign-analytics-operations/scripts/neon/**'
+      - 'workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-05-w11-postgres-rehearsal.yml'
+      - 'contracts/database/neon-d1-05-w11-analytics-schema.v1.json'
+      - 'contracts/transport/d1-05-analytics-owner-boundary.v1.json'
+      - 'workers/W11-growth-campaign-analytics-operations/README.md'
+      - 'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc'
+      - 'workers/W11-growth-campaign-analytics-operations/migrations/**'
+      - 'workers/W11-growth-campaign-analytics-operations/scripts/neon/**'
+      - 'workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-05-w11-postgres-rehearsal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  w11-analytics-local-rehearsal:
+    name: Rehearse W11 analytics schema on disposable PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_local_only
+          POSTGRES_DB: alluck_d1_05_w11_rehearsal
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d alluck_d1_05_w11_rehearsal"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Check source pins and deterministic PostgreSQL artifact
+        run: |
+          set -euo pipefail
+          node --check workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.mjs
+          node --test workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.test.mjs
+          node workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.mjs
+          git diff --exit-code -- workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/0001_w11_d1_05_analytics_schema.sql
+
+      - name: Apply schema to disposable PostgreSQL 18
+        env:
+          D1_05_W11_LOCAL_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/alluck_d1_05_w11_rehearsal
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/neon
+          psql "$D1_05_W11_LOCAL_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/0001_w11_d1_05_analytics_schema.sql
+
+      - name: Verify exact catalog, ownership constraints, privacy boundary and rollback
+        env:
+          D1_05_W11_LOCAL_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/alluck_d1_05_w11_rehearsal
+        run: |
+          set -euo pipefail
+          psql "$D1_05_W11_LOCAL_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-05-w11-postgres-schema.sql \
+            | tee artifacts/neon/d1-05-w11-analytics-postflight.txt
+
+      - name: Upload W11 D1-05 PostgreSQL 18 rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-05-w11-analytics-postgres18-${{ github.sha }}
+          path: artifacts/neon/d1-05-w11-analytics-postflight.txt
+          if-no-files-found: error
+          retention-days: 90

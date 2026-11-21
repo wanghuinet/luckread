@@ -1,0 +1,34 @@
+name: Worker Directory Drift Gate
+
+on:
+  push:
+    paths:
+      - 'workers/**'
+      - '.github/workflows/worker-directory-drift-gate.yml'
+      - 'scripts/verify-worker-directory-alignment.mjs'
+  pull_request:
+    paths:
+      - 'workers/**'
+      - '.github/workflows/worker-directory-drift-gate.yml'
+      - 'scripts/verify-worker-directory-alignment.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify canonical Worker directories
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify exact Worker directory set
+        run: node scripts/verify-worker-directory-alignment.mjs

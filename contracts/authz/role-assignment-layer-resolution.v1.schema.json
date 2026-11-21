@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/authz/role-assignment-layer-resolution.v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "$id",
+    "version",
+    "status",
+    "purpose",
+    "authorityRefs",
+    "input",
+    "algorithm",
+    "outputs",
+    "securityInvariants",
+    "implementationBoundary",
+    "verificationRequirements"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "$id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "status": {
+      "enum": [
+        "CONTRACTED_NOT_VERIFIED",
+        "GREEN"
+      ]
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authorityRefs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subjectId",
+        "accountState",
+        "now",
+        "roleAssignments"
+      ],
+      "properties": {
+        "subjectId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "accountState": {
+          "type": "string",
+          "minLength": 1
+        },
+        "now": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roleAssignments": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "algorithm": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "step",
+          "name",
+          "rule"
+        ],
+        "properties": {
+          "step": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rule": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "success",
+        "failure"
+      ],
+      "properties": {
+        "success": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "layerPattern",
+            "source"
+          ],
+          "properties": {
+            "layerPattern": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            }
+          }
+        },
+        "failure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "decision",
+            "errorAuthority",
+            "newErrorEnum"
+          ],
+          "properties": {
+            "decision": {
+              "const": "DENY"
+            },
+            "errorAuthority": {
+              "type": "string"
+            },
+            "newErrorEnum": {
+              "const": false
+            }
+          }
+        }
+      }
+    },
+    "securityInvariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "implementationBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed",
+        "forbidden"
+      ],
+      "properties": {
+        "allowed": {
+          "type": "string"
+        },
+        "forbidden": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "verificationRequirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

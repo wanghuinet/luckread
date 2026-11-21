@@ -1,0 +1,253 @@
+name: AUTH-007 MFA Live Security E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact implementation commit already contained in protected main
+        required: true
+        type: string
+      confirm:
+        description: Type RUN_MFA_E2E to mutate only the dedicated MFA QA account
+        required: true
+        type: string
+        default: NO
+
+permissions:
+  actions: read
+  contents: read
+  deployments: read
+  pull-requests: read
+
+concurrency:
+  group: auth-007-mfa-live-security-e2e
+  cancel-in-progress: false
+
+jobs:
+  live-security-e2e:
+    if: ${{ inputs.confirm == 'RUN_MFA_E2E' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: auth-mfa-rollout
+    steps:
+      - name: Checkout protected main for source validation
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate immutable source SHA is committed to protected main
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$SOURCE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::source_sha must be a full 40-character commit SHA"
+            exit 1
+          fi
+          git cat-file -e "$SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main || {
+            echo "::error::source_sha must already be committed to protected main"
+            exit 1
+          }
+
+      - name: Checkout exact tested source SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify protected AUTH-007 rollout admission before live MFA checks
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF_PROTECTED: ${{ github.ref_protected }}
+          AUTH007_ROLLOUT_ENVIRONMENT: auth-mfa-rollout
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: node scripts/verify-auth-007-rollout-admission.mjs
+
+      - name: Check MFA E2E harness syntax
+        run: node --check scripts/auth-007-mfa-live-security-e2e.mjs
+      - name: Check and unit test MFA audit evidence reconciliation
+        run: |
+          node --check scripts/auth-007-mfa-audit-delivery-e2e.mjs
+          node --check scripts/auth-007-mfa-audit-evidence.mjs
+          node --check scripts/auth-007-sanitize-w02-runtime-tail.mjs
+          node --check scripts/auth-007-classify-wrangler-tail-stderr.mjs
+          node --check scripts/auth-007-probe-w02-tail-access.mjs
+          node --check scripts/auth-007-probe-w02-cron-schedule.mjs
+          node --check scripts/auth-007-probe-w02-observability.mjs
+          node --check scripts/auth-007-probe-w02-scheduled-analytics.mjs
+          node --test scripts/auth-007-probe-w02-scheduled-analytics.test.mjs
+          node --test scripts/auth-007-probe-w02-cron-schedule.test.mjs
+          node --test scripts/auth-007-probe-w02-observability.test.mjs
+          node --test scripts/auth-007-classify-wrangler-tail-stderr.test.mjs
+          node --test scripts/auth-007-mfa-audit-evidence.test.mjs
+          node --test scripts/auth-007-sanitize-w02-runtime-tail.test.mjs
+          node --test scripts/auth-007-probe-w02-tail-access.test.mjs
+
+      - name: Probe read-only W02 Tail API access
+        id: w02_preflight
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set +e
+          node scripts/auth-007-probe-w02-tail-access.mjs
+          tail_probe_status=$?
+          node scripts/auth-007-probe-w02-cron-schedule.mjs
+          cron_probe_status=$?
+          observability_output="$(node scripts/auth-007-probe-w02-observability.mjs 2>&1)"
+          observability_probe_status=$?
+          printf '%s\n' "$observability_output"
+          scheduler_observed="$(printf '%s\n' "$observability_output" | sed -n 's/.*scheduledExecutionObserved=\(true\|false\).*/\1/p' | tail -n 1)"
+          observability_status="$(printf '%s\n' "$observability_output" | sed -n 's/^W02_OBSERVABILITY_CRON_DIAGNOSTIC status=\([A-Z]*\).*/\1/p' | head -n 1)"
+          printf 'W02_PREFLIGHT_RESULT tail_probe_exit=%s cron_probe_exit=%s observability_probe_exit=%s scheduled_observed=%s\n' "${tail_probe_status:-0}" "${cron_probe_status:-0}" "${observability_probe_status:-0}" "${scheduler_observed:-false}"
+          echo "scheduler_observed=${scheduler_observed:-false}" >> "$GITHUB_OUTPUT"
+          echo "observability_status=${observability_status:-FAIL}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Require observed W02 scheduled execution before live MFA mutations
+        env:
+          SCHEDULED_EXECUTION_OBSERVED: ${{ steps.w02_preflight.outputs.scheduler_observed }}
+          OBSERVABILITY_STATUS: ${{ steps.w02_preflight.outputs.observability_status }}
+        run: |
+          if [[ "$OBSERVABILITY_STATUS" != "PASS" ]]; then
+            echo "::error::W02 Observability query failed; skipping live MFA mutations because scheduled execution cannot be verified."
+            exit 1
+          fi
+          if [[ "$SCHEDULED_EXECUTION_OBSERVED" != "true" ]]; then
+            echo "::error::No W02 scheduled/Cron invocation was observed in the bounded telemetry window. Fix Cron execution/evidence before rerunning MFA E2E; do not generate another batch of pending audit events."
+            exit 1
+          fi
+          echo "W02_SCHEDULED_EXECUTION_OBSERVED=true"
+
+      - name: Start sanitized W02 scheduled publication runtime capture
+        id: w02_tail_capture
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          capture_dir="$RUNNER_TEMP/auth007-w02-tail"
+          artifact_dir="artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e"
+          mkdir -p "$capture_dir" "$artifact_dir"
+          output_file="$GITHUB_WORKSPACE/$artifact_dir/w02-runtime-sanitized-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.jsonl"
+          stderr_file="$capture_dir/wrangler.stderr"
+          status_file="$capture_dir/pipeline-status"
+          stats_file="$capture_dir/w02-tail-live-stats-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.json"
+          pid_file="$capture_dir/tail.pid"
+          rm -f "$stats_file" "$capture_dir/intentional-stop"
+          export AUTH007_TAIL_STATS_FILE="$stats_file"
+          setsid bash -c '
+            set -uo pipefail
+            cd "$GITHUB_WORKSPACE/workers/W02-identity"
+            # W02 markers use console.info; --search is documented as filtering console.log messages.
+            # Keep the raw stream in-memory only and persist output only after strict allowlist sanitization.
+            npx --yes wrangler@4.116.0 tail luckread-w02 --format json --sampling-rate 1 \
+              2>"$RUNNER_TEMP/auth007-w02-tail/wrangler.stderr" |
+              node "$GITHUB_WORKSPACE/scripts/auth-007-sanitize-w02-runtime-tail.mjs" \
+                > "$GITHUB_WORKSPACE/artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/w02-runtime-sanitized-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.jsonl"
+            pipeline_status=( "${PIPESTATUS[@]}" )
+            printf "wrangler=%s sanitizer=%s\n" "${pipeline_status[0]}" "${pipeline_status[1]}" > "$RUNNER_TEMP/auth007-w02-tail/pipeline-status"
+            exit "${pipeline_status[0]}"
+          ' </dev/null >/dev/null 2>&1 &
+          echo "$!" > "$pid_file"
+          for attempt in $(seq 1 90); do
+            pid="$(cat "$pid_file")"
+            if ! kill -0 "$pid" 2>/dev/null; then
+              echo "::warning::W02 runtime tail process exited before a scheduled publication marker was observed"
+              node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file" "$status_file"
+              exit 0
+            fi
+            if [[ -s "$stats_file" ]] && grep -Eq '"tick":[1-9][0-9]*' "$stats_file"; then
+              echo "W02 Tail received a scheduled publication tick marker; only aggregate telemetry is persisted."
+              exit 0
+            fi
+            sleep 1
+          done
+          if [[ -s "$stats_file" ]]; then
+            echo "::warning::W02 Tail remained alive but no scheduled publication tick marker was observed within 90 seconds"
+            echo "Sanitized W02 live aggregate telemetry:"
+            cat "$stats_file"
+          else
+            echo "::warning::W02 Tail remained alive but no structured stream telemetry was observed within 90 seconds"
+          fi
+          exit 0
+
+      - name: Run production MFA enrollment, challenge rejection, recovery rotation, replay and disable acceptance
+        env:
+          LUCKREAD_API_BASE_URL: https://api.luckread.com
+          LUCKREAD_BROWSER_ORIGIN: https://luckread.com
+          LUCKREAD_SOURCE_SHA: ${{ inputs.source_sha }}
+          LUCKREAD_AUTH007_MFA_E2E_EMAIL: ${{ secrets.LUCKREAD_AUTH007_MFA_E2E_EMAIL }}
+          LUCKREAD_AUTH007_MFA_E2E_PASSWORD: ${{ secrets.LUCKREAD_AUTH007_MFA_E2E_PASSWORD }}
+        run: node scripts/auth-007-mfa-live-security-e2e.mjs
+      - name: Verify production MFA outbox to W06 AuditEvent delivery (read-only D1 queries)
+        if: success()
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          LUCKREAD_AUTH007_MFA_E2E_EMAIL: ${{ secrets.LUCKREAD_AUTH007_MFA_E2E_EMAIL }}
+          LUCKREAD_SOURCE_SHA: ${{ inputs.source_sha }}
+        run: node scripts/auth-007-mfa-audit-delivery-e2e.mjs
+
+      - name: Stop sanitized W02 scheduled publication runtime capture
+        if: always() && steps.w02_tail_capture.outcome != 'skipped'
+        run: |
+          set +e
+          capture_dir="$RUNNER_TEMP/auth007-w02-tail"
+          artifact_dir="artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e"
+          pid_file="$capture_dir/tail.pid"
+          intentional_stop="$capture_dir/intentional-stop"
+          if [[ -f "$pid_file" ]]; then
+            pid="$(cat "$pid_file")"
+            if kill -0 "$pid" 2>/dev/null; then
+              printf 'INTENTIONAL_STOP\n' > "$intentional_stop"
+              kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+              for attempt in $(seq 1 5); do
+                kill -0 "$pid" 2>/dev/null || break
+                sleep 1
+              done
+            fi
+          fi
+          output_file="$artifact_dir/w02-runtime-sanitized-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.jsonl"
+          stats_file="$capture_dir/w02-tail-live-stats-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.json"
+          if [[ -s "$stats_file" ]]; then
+            cp "$stats_file" "$GITHUB_WORKSPACE/$artifact_dir/"
+          fi
+          stderr_file="$capture_dir/wrangler.stderr"
+          status_file="$capture_dir/pipeline-status"
+          node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file" "$status_file" "$intentional_stop"
+          if [[ -s "$output_file" ]]; then
+            echo "Sanitized W02 runtime diagnostics:"
+            cat "$output_file"
+          else
+            echo "::warning::No sanitized W02 runtime summary was captured"
+          fi
+
+      - name: Upload sanitized MFA security E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-007-mfa-live-security-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/mapping-0/auth-007-mfa-live-security-e2e/*.json
+            artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/*.json
+            artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/w02-runtime-sanitized-*.jsonl
+            artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/w02-tail-live-stats-*.json
+          if-no-files-found: warn
+          retention-days: 30
+

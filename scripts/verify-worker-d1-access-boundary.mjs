@@ -1,0 +1,170 @@
+#!/usr/bin/env node
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, resolve, extname } from 'node:path'
+
+const root = process.cwd()
+const contract = JSON.parse(
+  readFileSync(resolve(root, 'contracts/transport/worker-d1-access-boundary.v1.json'), 'utf8'),
+)
+
+const jsonc = (path) => {
+  let text = readFileSync(path, 'utf8')
+  text = text.replace(/(^|\n)\s*\/\/.*(?=\n|$)/g, '$1')
+  text = text.replace(/,\s*([}\]])/g, '$1')
+  return JSON.parse(text)
+}
+
+const workersRoot = resolve(root, 'workers')
+const dirs = readdirSync(workersRoot, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && /^W\d\d-/.test(entry.name))
+  .map((entry) => entry.name)
+  .sort()
+
+const domainById = Object.fromEntries(
+  Object.entries(contract.physicalD1Registry)
+    .filter(([, id]) => typeof id === 'string' && id.length > 0)
+    .map(([domain, id]) => [id, domain]),
+)
+
+// Scan runtime binding syntax only; comments and quoted literals are removed before matching.
+const bindingPattern = /\.\s*(D1(?:_0[1-5])?|DB)\b/g
+const destructuredBindingPattern = /\{\s*(D1(?:_0[1-5])?|DB)\s*(?:,|\})/g
+const stripCommentsAndStrings = (source) =>
+  source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1')
+    .replace(/'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"/g, '')
+
+const extractBindings = (source) => {
+  const code = stripCommentsAndStrings(source)
+  const bindings = new Set()
+  for (const match of code.matchAll(bindingPattern)) bindings.add(match[1])
+  for (const match of code.matchAll(destructuredBindingPattern)) bindings.add(match[1])
+  return bindings
+}
+const codeExts = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs'])
+const runtimeFile = (name) => !name.includes('.test.') && !name.includes('.spec.')
+if (!runtimeFile('example.ts') || runtimeFile('example.test.ts') || runtimeFile('example.spec.ts')) throw new Error('Runtime file filter self-check failed')
+if (JSON.stringify([...extractBindings('env.D1_01; context.env.DB; const { D1_02, DB } = env')].sort()) !== JSON.stringify(['D1_01','D1_02','DB'])) throw new Error('D1 binding detector self-check failed')
+if (extractBindings(`// env.D1_01\nconst x = 'D1_02'\nconst path = ".DB"\ntype T = D1Database`).size !== 0) throw new Error('D1 binding detector false-positive self-check failed')
+
+let checkedConfigs = 0
+let checkedCodeFiles = 0
+
+for (const dir of dirs) {
+  const workerId = dir.slice(0, 3)
+  const workerPolicy = contract.workers[workerId]
+  if (!workerPolicy) throw new Error(`Missing D1 policy for ${workerId}`)
+
+  const workerDir = join(workersRoot, dir)
+  const wranglerPath = join(workerDir, 'wrangler.jsonc')
+  const configExists = statSync(workerDir).isDirectory() && (() => {
+    try { return statSync(wranglerPath).isFile() } catch { return false }
+  })()
+
+  let config = null
+  if (configExists) {
+    checkedConfigs += 1
+    config = jsonc(wranglerPath)
+    for (const entry of config.d1_databases ?? []) {
+      const domain = domainById[entry.database_id]
+      if (!domain) {
+        throw new Error(`${workerId}: unregistered D1 id ${String(entry.database_id)}`)
+      }
+      const expectedDatabaseName = contract.physicalD1Names?.[domain]
+      if (expectedDatabaseName && entry.database_name !== expectedDatabaseName) {
+        throw new Error(
+          `${workerId}: D1 ${domain} database_name mismatch (expected ${expectedDatabaseName}, got ${String(entry.database_name)})`,
+        )
+      }
+      if (!workerPolicy.allowedDomains.includes(domain)) {
+        throw new Error(`${workerId}: D1 ${domain} is outside its allowed domain set`)
+      }
+    }
+  }
+
+  // W05 D1-02 social routes require Neon Store injection. The separately scoped
+  // D1-03 Hyperdrive is a PostgreSQL connection to W09-owned endpoint state, not
+  // a Cloudflare D1 binding. Production Wrangler must bind neither D1 database.
+  const w05NeonProduction = workerId === 'W05' &&
+    config?.name === 'luckread-w05' &&
+    (config?.d1_databases ?? []).length === 0 &&
+    config.vars?.W05_DATABASE_DRIVER === 'neon' &&
+    config.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER === 'neon' &&
+    (config.hyperdrive ?? []).some((entry) =>
+      entry.binding === 'HYPERDRIVE_D1_02' && entry.id === 'c55183e1cc3446409c9c1075832c6615') &&
+    (config.hyperdrive ?? []).some((entry) =>
+      entry.binding === 'HYPERDRIVE_D1_03' && entry.id === '7c8831416c18494faee04b96aa551cb9')
+  if (workerId === 'W05' && !w05NeonProduction) {
+    throw new Error('W05 production must use both approved Neon Hyperdrive resources and no D1 bindings')
+  }
+  const w03NeonProduction = workerId === 'W03' &&
+    config?.name === 'luckread-w03' &&
+    (config?.d1_databases ?? []).length === 0 &&
+    config.vars?.W03_CONTENT_READ_DRIVER === 'neon' &&
+    (config.hyperdrive ?? []).some((entry) =>
+      entry.binding === 'HYPERDRIVE_CONTENT_PG' && entry.id === 'c55183e1cc3446409c9c1075832c6615')
+  if (workerId === 'W03' && !w03NeonProduction) {
+    throw new Error('W03 production must use the approved Neon content PostgreSQL Hyperdrive and no D1 bindings')
+  }
+  const w08NeonProduction = workerId === 'W08' &&
+    config?.name === 'luckread-w08-creator' &&
+    (config?.d1_databases ?? []).length === 0 &&
+    config.vars?.W08_DATABASE_DRIVER === 'neon' &&
+    (config.hyperdrive ?? []).some((entry) =>
+      entry.binding === 'HYPERDRIVE' && entry.id === '0c53a1bb9bc0484bac146e8ae2d3158b')
+  if (workerId === 'W08' && !w08NeonProduction) {
+    throw new Error('W08 production must use the approved Neon D1-01 Hyperdrive and no D1 bindings')
+  }
+  const w02ProductionPath = join(workerDir, 'wrangler.neon.jsonc')
+  const w02NeonProduction = workerId === 'W02' && existsSync(w02ProductionPath) &&
+    (() => {
+      const production = jsonc(w02ProductionPath)
+      return production?.name === 'luckread-w02' &&
+        (production.d1_databases ?? []).length === 0 &&
+        production.vars?.W02_DATABASE_DRIVER === 'neon' &&
+        (production.hyperdrive ?? []).some((entry) =>
+          entry.binding === 'HYPERDRIVE' && entry.id === '0c53a1bb9bc0484bac146e8ae2d3158b')
+    })()
+  if (workerId === 'W02' && !w02NeonProduction) {
+    throw new Error('W02 production must use the approved Neon D1-01 Hyperdrive and no D1 bindings')
+  }
+
+  const files = []
+  const walk = (dirPath) => {
+    for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+      const path = join(dirPath, entry.name)
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules' && entry.name !== '.git') walk(path)
+      } else if (codeExts.has(extname(entry.name)) && runtimeFile(entry.name)) {
+        files.push(path)
+      }
+    }
+  }
+  walk(workerDir)
+
+  for (const path of files) {
+    checkedCodeFiles += 1
+    const source = readFileSync(path, 'utf8')
+    const bindings = extractBindings(source)
+    for (const binding of bindings) {
+      const declaredBindings = new Set(
+        (configExists ? (jsonc(wranglerPath).d1_databases ?? []) : []).map((x) => x.binding),
+      )
+      if (!declaredBindings.has(binding)) {
+        const compatibilityOnly = w05NeonProduction && ['DB', 'D1_03'].includes(binding)
+        if (compatibilityOnly) continue
+        const relative = path.slice(root.length + 1)
+        throw new Error(`${workerId}: raw D1 binding ${binding} used by ${relative} but not declared in wrangler.jsonc`)
+      }
+    }
+  }
+}
+
+console.log('WORKER_D1_ACCESS_BOUNDARY=PASS')
+console.log(JSON.stringify({
+  workerDirectories: dirs.length,
+  checkedConfigs,
+  checkedCodeFiles,
+  physicalD1Registry: domainById,
+}, null, 2))

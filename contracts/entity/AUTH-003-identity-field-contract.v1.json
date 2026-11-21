@@ -1,0 +1,21 @@
+{
+  "version":"1.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "featureId":"AUTH-003",
+  "entityId":"ENT-IDENTITY",
+  "purpose":"Freeze the canonical identity-side fields required by username/email/phone credential management without claiming runtime or persistence verification.",
+  "fields":[
+    {"fieldId":"ENT-IDENTITY-F-ID","name":"id","type":"text","nullable":false,"required":true,"unique":true,"indexed":true,"classification":"INTERNAL_IDENTIFIER","lifecycle":"immutable"},
+    {"fieldId":"ENT-IDENTITY-F-USER-ID","name":"userId","type":"text","nullable":false,"required":true,"unique":true,"indexed":true,"classification":"INTERNAL_RELATION","lifecycle":"immutable"},
+    {"fieldId":"ENT-IDENTITY-F-USERNAME","name":"username","type":"text","nullable":true,"required":false,"unique":false,"indexed":false,"classification":"AUTHENTICATION_IDENTIFIER","lifecycle":"mutable"},
+    {"fieldId":"ENT-IDENTITY-F-USERNAME-NORMALIZED","name":"usernameNormalized","type":"text","nullable":true,"required":false,"unique":true,"indexed":true,"classification":"AUTHENTICATION_IDENTIFIER","lifecycle":"derived"},
+    {"fieldId":"ENT-IDENTITY-F-EMAIL","name":"email","type":"text","nullable":true,"required":false,"unique":false,"indexed":false,"classification":"AUTHENTICATION_IDENTIFIER","lifecycle":"mutable"},
+    {"fieldId":"ENT-IDENTITY-F-EMAIL-NORMALIZED","name":"emailNormalized","type":"text","nullable":true,"required":false,"unique":true,"indexed":true,"classification":"AUTHENTICATION_IDENTIFIER","lifecycle":"derived"},
+    {"fieldId":"ENT-IDENTITY-F-PHONE","name":"phone","type":"text","nullable":true,"required":false,"unique":false,"indexed":false,"classification":"AUTHENTICATION_IDENTIFIER","lifecycle":"mutable"},
+    {"fieldId":"ENT-IDENTITY-F-PHONE-NORMALIZED","name":"phoneNormalized","type":"text","nullable":true,"required":false,"unique":true,"indexed":true,"classification":"AUTHENTICATION_IDENTIFIER","lifecycle":"derived"},
+    {"fieldId":"ENT-IDENTITY-F-NORMALIZATION-VERSION","name":"normalizationVersion","type":"text","nullable":false,"required":true,"unique":false,"indexed":false,"classification":"SCHEMA_METADATA","lifecycle":"versioned"}
+  ],
+  "rules":{"deterministicNormalization":true,"normalizationVersionRequired":true,"uniquenessAuthoritativeAtPersistence":true,"rawPasswordAbsent":true,"rawRecoveryTokenAbsent":true,"rawVerificationTokenAbsent":true,"publicProjectionMustNotExposeNormalizedValues":true,"schemaChangesRequireMigration":true},
+  "verificationRequired":["real-D1-schema","migration","normalization-tests","uniqueness-negative-tests","enumeration-resistance","mapping0"],
+  "greenGate":"NOT_GREEN_UNTIL_EXECUTABLE_EVIDENCE"
+}

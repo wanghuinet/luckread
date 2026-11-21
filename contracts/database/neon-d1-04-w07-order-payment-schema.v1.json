@@ -1,0 +1,736 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
+  "title": "LuckRead D1-04 W07 Cumulative Finance PostgreSQL Schema",
+  "version": "1.0.0",
+  "status": "W07_D1_04_ALL_SEVEN_SOURCE_SLICES_LOCAL_POSTGRES18_REHEARSAL_PASSED",
+  "target": {
+    "domainId": "D1-04",
+    "databaseName": "luckread_finance",
+    "cloudflareD1DatabaseName": "unimportant",
+    "cloudflareD1DatabaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
+    "binding": "D1_04",
+    "postgresMajor": 18,
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false,
+    "remoteSchemaApplied": false
+  },
+  "primaryOwner": {
+    "worker": "W07",
+    "entities": [
+      "Order",
+      "OrderLine",
+      "OrderCreateIdempotency",
+      "Payment",
+      "PaymentProviderEvent",
+      "PaymentProviderEventConflict"
+    ],
+    "migrationArtifact": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql",
+    "template": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-order-payment-postgres.sql",
+    "generator": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.mjs"
+  },
+  "scope": {
+    "includedSourceMigrations": [
+      "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql",
+      "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql",
+      "workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql",
+      "workers/W07-subscription-commerce/migrations-d1-04/0004_subscription_renewal_cycles.sql",
+      "workers/W07-subscription-commerce/migrations-d1-04/0005_revenuecat_webhook_inbox.sql",
+      "workers/W07-subscription-commerce/migrations-d1-04/0006_refunds_billing_documents.sql",
+      "workers/W07-subscription-commerce/migrations-d1-04/0007_payment_method_revocation_requests.sql"
+    ],
+    "includedTables": [
+      "orders",
+      "order_lines",
+      "order_create_idempotency",
+      "payments",
+      "payment_provider_events",
+      "payment_provider_event_conflicts",
+      "saved_payment_methods",
+      "payment_mandates",
+      "subscription_renewal_cycles",
+      "subscription_renewal_scheduler_state",
+      "revenuecat_webhook_events",
+      "revenuecat_webhook_event_conflicts",
+      "refunds",
+      "billing_documents",
+      "payment_method_revocation_requests"
+    ],
+    "deferredTables": [],
+    "excludedTables": [
+      "entitlements",
+      "ledger_entries",
+      "payment_intents",
+      "users",
+      "media"
+    ],
+    "tableCount": 15
+  },
+  "schema": {
+    "tables": {
+      "orders": {
+        "source": "0001_order_commerce.sql",
+        "indexes": [
+          "ix_orders_customer_created_order",
+          "ix_orders_status_created_order"
+        ],
+        "triggerCount": 5,
+        "primaryKey": "order_id"
+      },
+      "order_lines": {
+        "source": "0001_order_commerce.sql",
+        "indexes": [
+          "ix_order_lines_order_id",
+          "ix_order_lines_item_ref_version"
+        ],
+        "triggerCount": 3,
+        "primaryKey": "order_line_id"
+      },
+      "order_create_idempotency": {
+        "source": "0001_order_commerce.sql",
+        "indexes": [
+          "ix_order_create_idempotency_customer_created",
+          "ix_order_create_idempotency_expiration"
+        ],
+        "triggerCount": 2,
+        "primaryKey": "id"
+      },
+      "payments": {
+        "source": "0002_payment_provider_events.sql",
+        "indexes": [
+          "ix_payments_customer_created_payment",
+          "ix_payments_order_created_payment",
+          "ix_payments_status_updated_payment",
+          "ux_payments_single_live_or_successful_per_order"
+        ],
+        "triggerCount": 6,
+        "primaryKey": "payment_id"
+      },
+      "payment_provider_events": {
+        "source": "0002_payment_provider_events.sql",
+        "indexes": [
+          "ix_payment_provider_events_state_received",
+          "ix_payment_provider_events_payment_received"
+        ],
+        "triggerCount": 3,
+        "primaryKey": "event_row_id"
+      },
+      "payment_provider_event_conflicts": {
+        "source": "0002_payment_provider_events.sql",
+        "indexes": [
+          "ix_payment_provider_event_conflicts_state_last_seen",
+          "ix_payment_provider_event_conflicts_identity"
+        ],
+        "triggerCount": 5,
+        "primaryKey": "conflict_id"
+      },
+      "saved_payment_methods": {
+        "primaryKey": "saved_payment_method_id",
+        "indexes": [
+          "ix_saved_payment_methods_customer_created"
+        ],
+        "triggerCount": 4,
+        "source": "0003_saved_payment_methods_mandates.sql",
+        "sensitiveFields": [
+          "payment_method_id"
+        ],
+        "privacy": "Only the provider opaque payment-method reference is persisted; no PAN/CVC, API key, browser client secret or raw webhook body."
+      },
+      "payment_mandates": {
+        "primaryKey": "mandate_record_id",
+        "indexes": [
+          "ux_payment_mandates_provider_mandate_id",
+          "ix_payment_mandates_customer_status_created",
+          "ix_payment_mandates_method_status"
+        ],
+        "triggerCount": 8,
+        "source": "0003_saved_payment_methods_mandates.sql",
+        "consentEvidenceFields": [
+          "consent_accepted_at",
+          "consent_acceptance_type",
+          "consent_scope",
+          "consent_terms_version"
+        ],
+        "initialStatus": "PENDING_PROVIDER_CONFIRMATION",
+        "terminalStates": [
+          "REVOKED",
+          "FAILED",
+          "EXPIRED"
+        ]
+      },
+      "subscription_renewal_cycles": {
+        "source": "0004_subscription_renewal_cycles.sql",
+        "primaryKey": "cycle_id",
+        "indexes": [
+          "ux_subscription_renewal_cycles_subscription_cycle",
+          "ux_subscription_renewal_cycles_payment",
+          "ix_subscription_renewal_cycles_state_updated",
+          "ix_subscription_renewal_cycles_subscriber_cycle"
+        ],
+        "triggerCount": 10,
+        "lifecycleStates": [
+          "AWAITING_PRICING",
+          "AWAITING_MANDATE",
+          "PREPARED",
+          "PAYMENT_READY",
+          "SUBMITTING",
+          "SUBMITTED",
+          "SUCCEEDED",
+          "FAILED",
+          "RECONCILIATION_REQUIRED"
+        ],
+        "immutableSnapshots": [
+          "cycle identity",
+          "offer_snapshot_json",
+          "resolved amount_minor",
+          "pricing_snapshot_json",
+          "payment_method_id",
+          "mandate_record_id"
+        ],
+        "requiresActiveMandateFor": [
+          "PAYMENT_READY",
+          "SUBMITTING"
+        ],
+        "subscriptionEntitlementAuthority": "D1-01"
+      },
+      "subscription_renewal_scheduler_state": {
+        "source": "0004_subscription_renewal_cycles.sql",
+        "primaryKey": "state_id",
+        "indexes": [],
+        "triggerCount": 3,
+        "singletonId": "subscription-renewals",
+        "seededControlRow": {
+          "state_id": "subscription-renewals",
+          "cursor_period_end": null,
+          "cursor_subscription_id": null,
+          "version": 1,
+          "updated_at": "1970-01-01T00:00:00.000Z"
+        },
+        "seedRowKind": "SCHEMA_CONTROL_METADATA_NOT_BUSINESS_DATA"
+      },
+      "revenuecat_webhook_events": {
+        "source": "0005_revenuecat_webhook_inbox.sql",
+        "primaryKey": "event_row_id",
+        "uniqueKey": [
+          "app_id",
+          "event_id"
+        ],
+        "indexes": [
+          "ix_revenuecat_webhook_events_state_received",
+          "ix_revenuecat_webhook_events_user_received"
+        ],
+        "triggerCount": 3,
+        "lifecycleStates": [
+          "RECEIVED",
+          "APPLIED",
+          "RECONCILIATION_REQUIRED",
+          "IGNORED"
+        ],
+        "immutableFields": [
+          "event identity",
+          "event_timestamp_ms",
+          "api_version",
+          "app_user_id",
+          "product_id",
+          "store",
+          "environment",
+          "transaction_id",
+          "original_transaction_id",
+          "event_data_json",
+          "payload_sha256",
+          "received_at"
+        ],
+        "terminalRule": "Once state leaves RECEIVED the receipt is immutable.",
+        "payloadRule": "Store bounded object event_data_json; do not store raw_body or subscriber_attributes columns."
+      },
+      "revenuecat_webhook_event_conflicts": {
+        "source": "0005_revenuecat_webhook_inbox.sql",
+        "primaryKey": "conflict_id",
+        "uniqueKey": [
+          "app_id",
+          "event_id",
+          "incoming_payload_sha256"
+        ],
+        "indexes": [
+          "ix_revenuecat_webhook_conflicts_event"
+        ],
+        "triggerCount": 4,
+        "immutableFields": [
+          "conflict identity",
+          "existing_payload_sha256",
+          "incoming_payload_sha256",
+          "first_seen_at"
+        ],
+        "occurrenceRule": "Every update increments occurrence_count by exactly one and never moves last_seen_at backwards.",
+        "referenceRule": "A conflict references the matching app_id/event_id and immutable first receipt payload_sha256."
+      },
+      "refunds": {
+        "source": "0006_refunds_billing_documents.sql",
+        "primaryKey": "refund_id",
+        "indexes": [
+          "ix_refunds_customer_created",
+          "ix_refunds_payment_created",
+          "ix_refunds_status_updated"
+        ],
+        "triggerCount": 6,
+        "provider": "hyperswitch",
+        "idempotencyKey": [
+          "customer_id",
+          "idempotency_key"
+        ],
+        "lifecycleStates": [
+          "REQUESTED",
+          "PENDING",
+          "SUCCEEDED",
+          "FAILED",
+          "REVIEW",
+          "RECONCILIATION_REQUIRED"
+        ],
+        "remainingRefundRule": "Sum every existing refund for the same payment except FAILED; reject a new amount above captured amount minus that sum.",
+        "immutableFields": [
+          "refund identity",
+          "provider",
+          "merchant and customer ownership",
+          "order and payment identity",
+          "amount and captured amount",
+          "currency",
+          "reason",
+          "idempotency key",
+          "request hash",
+          "created_at"
+        ],
+        "retention": "Refund financial facts are retained."
+      },
+      "billing_documents": {
+        "source": "0006_refunds_billing_documents.sql",
+        "primaryKey": "document_id",
+        "indexes": [
+          "ix_billing_documents_customer_issued"
+        ],
+        "triggerCount": 3,
+        "documentTypes": [
+          "INVOICE",
+          "RECEIPT"
+        ],
+        "uniqueKeys": [
+          [
+            "document_type",
+            "order_id"
+          ],
+          [
+            "document_number"
+          ]
+        ],
+        "snapshot": "Bounded valid JSON text, immutable after issue.",
+        "sourceGuard": "Every document matches authoritative Order customer/currency/total; RECEIPT additionally matches a succeeded Payment for the same Order/customer/currency/amount.",
+        "retention": "Issued billing documents are immutable and retained."
+      },
+      "payment_method_revocation_requests": {
+        "source": "0007_payment_method_revocation_requests.sql",
+        "primaryKey": "revocation_request_id",
+        "uniqueKeys": [
+          [
+            "saved_payment_method_id"
+          ],
+          [
+            "customer_id",
+            "idempotency_key"
+          ]
+        ],
+        "indexes": [
+          "ix_payment_method_revocation_status",
+          "ux_payment_method_revocation_customer_idempotency"
+        ],
+        "triggerCount": 7,
+        "provider": "hyperswitch",
+        "lifecycleStates": [
+          "REQUESTED",
+          "PENDING_PROVIDER",
+          "RECONCILIATION_REQUIRED",
+          "COMPLETED"
+        ],
+        "immutableFields": [
+          "revocation request identity",
+          "saved payment method identity",
+          "opaque provider payment method reference",
+          "provider",
+          "merchant",
+          "customer",
+          "customer idempotency key",
+          "created_at"
+        ],
+        "providerDeleteTimestamp": "Once provider_method_deleted_at is set it cannot be changed; it is not proof that mandate webhooks have all been applied.",
+        "completionRule": "COMPLETED requires provider_method_deleted_at and every mandate attached to the saved method to be REVOKED, FAILED or EXPIRED.",
+        "ownerRule": "Insert requires exact provider/merchant/customer/payment_method_id match with one existing saved_payment_methods row.",
+        "relationship": "PostgreSQL keeps D1-04 without foreign keys and preserves the saved-method reference using an owner-binding trigger."
+      }
+    },
+    "explicitIndexNames": [
+      "ix_orders_customer_created_order",
+      "ix_orders_status_created_order",
+      "ix_order_lines_order_id",
+      "ix_order_lines_item_ref_version",
+      "ix_order_create_idempotency_customer_created",
+      "ix_order_create_idempotency_expiration",
+      "ix_payments_customer_created_payment",
+      "ix_payments_order_created_payment",
+      "ix_payments_status_updated_payment",
+      "ux_payments_single_live_or_successful_per_order",
+      "ix_payment_provider_events_state_received",
+      "ix_payment_provider_events_payment_received",
+      "ix_payment_provider_event_conflicts_state_last_seen",
+      "ix_payment_provider_event_conflicts_identity",
+      "ix_saved_payment_methods_customer_created",
+      "ux_payment_mandates_provider_mandate_id",
+      "ix_payment_mandates_customer_status_created",
+      "ix_payment_mandates_method_status",
+      "ux_subscription_renewal_cycles_subscription_cycle",
+      "ux_subscription_renewal_cycles_payment",
+      "ix_subscription_renewal_cycles_state_updated",
+      "ix_subscription_renewal_cycles_subscriber_cycle",
+      "ix_revenuecat_webhook_events_state_received",
+      "ix_revenuecat_webhook_events_user_received",
+      "ix_revenuecat_webhook_conflicts_event",
+      "ix_refunds_customer_created",
+      "ix_refunds_payment_created",
+      "ix_refunds_status_updated",
+      "ix_billing_documents_customer_issued",
+      "ix_payment_method_revocation_status",
+      "ux_payment_method_revocation_customer_idempotency"
+    ],
+    "triggerNames": [
+      "orders_commercial_snapshot_immutable",
+      "orders_version_must_advance",
+      "orders_status_transition_guard",
+      "orders_retained",
+      "order_lines_require_order",
+      "order_lines_immutable_update",
+      "order_lines_retained",
+      "orders_require_matching_completed_idempotency",
+      "order_create_idempotency_identity_immutable",
+      "order_create_idempotency_terminal_immutable",
+      "payments_require_payable_order",
+      "payments_snapshot_immutable",
+      "payments_version_must_advance",
+      "payments_terminal_status_guard",
+      "payments_provider_timestamp_monotonic",
+      "payments_retained",
+      "payment_provider_events_identity_immutable",
+      "payment_provider_events_terminal_immutable",
+      "payment_provider_events_retained",
+      "payment_provider_event_conflicts_reference_first_receipt",
+      "payment_provider_event_conflicts_identity_immutable",
+      "payment_provider_event_conflicts_version_guard",
+      "payment_provider_event_conflicts_resolved_immutable",
+      "payment_provider_event_conflicts_retained",
+      "saved_payment_methods_require_succeeded_payment",
+      "saved_payment_methods_customer_binding_guard",
+      "saved_payment_methods_identity_immutable",
+      "saved_payment_methods_retained",
+      "payment_mandates_require_saved_method",
+      "payment_mandates_start_pending",
+      "payment_mandates_identity_immutable",
+      "payment_mandates_version_guard",
+      "payment_mandates_transition_guard",
+      "payment_mandates_provider_id_immutable",
+      "payment_mandates_provider_timestamp_monotonic",
+      "payment_mandates_retained",
+      "subscription_renewal_cycles_initial_state_guard",
+      "subscription_renewal_cycles_identity_immutable",
+      "subscription_renewal_cycles_resolved_snapshot_immutable",
+      "subscription_renewal_cycles_version_guard",
+      "subscription_renewal_cycles_state_transition_guard",
+      "subscription_renewal_cycles_sync_state_transition_guard",
+      "subscription_renewal_cycles_order_binding_guard",
+      "subscription_renewal_cycles_payment_binding_guard",
+      "subscription_renewal_cycles_requires_active_mandate",
+      "subscription_renewal_cycles_retained",
+      "subscription_renewal_scheduler_state_identity_immutable",
+      "subscription_renewal_scheduler_state_version_guard",
+      "subscription_renewal_scheduler_state_retained",
+      "revenuecat_webhook_events_identity_immutable",
+      "revenuecat_webhook_events_terminal_immutable",
+      "revenuecat_webhook_events_retained",
+      "revenuecat_webhook_conflicts_reference_first_receipt",
+      "revenuecat_webhook_conflicts_identity_immutable",
+      "revenuecat_webhook_conflicts_occurrence_guard",
+      "revenuecat_webhook_conflicts_retained",
+      "refunds_require_captured_payment",
+      "refunds_identity_immutable",
+      "refunds_version_guard",
+      "refunds_state_transition_guard",
+      "refunds_provider_timestamp_monotonic",
+      "refunds_retained",
+      "billing_documents_source_guard",
+      "billing_documents_identity_immutable",
+      "billing_documents_retained",
+      "payment_method_revocation_request_requires_saved_method",
+      "payment_method_revocation_request_identity_immutable",
+      "payment_method_revocation_request_version_guard",
+      "payment_method_revocation_request_transition_guard",
+      "payment_method_revocation_request_provider_deleted_immutable",
+      "payment_method_revocation_request_retained",
+      "payment_method_revocation_request_completion_guard"
+    ],
+    "totals": {
+      "tables": 15,
+      "explicitIndexes": 31,
+      "triggers": 72,
+      "triggerFunctions": 6,
+      "foreignKeys": 0
+    },
+    "cumulativeSlices": [
+      {
+        "migrationId": "0002_w07_d1_04_saved_methods_mandates",
+        "source": "workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql",
+        "contract": "contracts/database/neon-d1-04-w07-saved-methods-mandates-schema.v1.json",
+        "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+        "tables": 2,
+        "explicitIndexes": 4,
+        "triggers": 12,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      },
+      {
+        "migrationId": "0003_w07_d1_04_renewal_cycles",
+        "source": "workers/W07-subscription-commerce/migrations-d1-04/0004_subscription_renewal_cycles.sql",
+        "contract": "contracts/database/neon-d1-04-w07-renewal-cycles-schema.v1.json",
+        "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+        "tables": 2,
+        "explicitIndexes": 4,
+        "triggers": 13,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      },
+      {
+        "migrationId": "0004_w07_d1_04_revenuecat_webhook_inbox",
+        "source": "workers/W07-subscription-commerce/migrations-d1-04/0005_revenuecat_webhook_inbox.sql",
+        "contract": "contracts/database/neon-d1-04-w07-revenuecat-webhook-schema.v1.json",
+        "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+        "tables": 2,
+        "explicitIndexes": 3,
+        "triggers": 7,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      },
+      {
+        "migrationId": "0005_w07_d1_04_refunds_billing_documents",
+        "source": "workers/W07-subscription-commerce/migrations-d1-04/0006_refunds_billing_documents.sql",
+        "contract": "contracts/database/neon-d1-04-w07-refunds-billing-documents-schema.v1.json",
+        "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+        "tables": 2,
+        "explicitIndexes": 4,
+        "triggers": 9,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      },
+      {
+        "migrationId": "0006_w07_d1_04_payment_method_revocation",
+        "source": "workers/W07-subscription-commerce/migrations-d1-04/0007_payment_method_revocation_requests.sql",
+        "contract": "contracts/database/neon-d1-04-w07-payment-method-revocation-schema.v1.json",
+        "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+        "tables": 1,
+        "explicitIndexes": 2,
+        "triggers": 7,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      }
+    ],
+    "sliceTotals": {
+      "orderPayment": {
+        "tables": 6,
+        "explicitIndexes": 14,
+        "triggers": 24,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      },
+      "savedMethodsMandates": {
+        "tables": 2,
+        "explicitIndexes": 4,
+        "triggers": 12,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      },
+      "renewalCycles": {
+        "tables": 2,
+        "explicitIndexes": 4,
+        "triggers": 13,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      },
+      "revenuecatWebhookInbox": {
+        "tables": 2,
+        "explicitIndexes": 3,
+        "triggers": 7,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      },
+      "refundsBillingDocuments": {
+        "tables": 2,
+        "explicitIndexes": 4,
+        "triggers": 9,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      },
+      "paymentMethodRevocationRequests": {
+        "tables": 1,
+        "explicitIndexes": 2,
+        "triggers": 7,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      }
+    }
+  },
+  "postgresMappings": {
+    "integer": "Use BIGINT for D1/SQLite INTEGER fields to preserve the signed 64-bit source range; retain safe-integer checks for money and version counters.",
+    "time": "Map ISO-8601 TEXT instant fields to TIMESTAMPTZ and compare as instants; no local timezone assumptions.",
+    "json": "Keep JSON text snapshots as TEXT with PostgreSQL JSONB type checks where the source requires JSON validity/object shape. Keep response_json as TEXT with validity check.",
+    "partialUnique": "Preserve ux_payments_single_live_or_successful_per_order as a PostgreSQL partial unique index.",
+    "relationships": "Preserve source trigger-enforced logical relations. Do not add foreign keys; the source regression suite explicitly requires zero FKs for D1-04 finance tables.",
+    "triggerSemantics": "Preserve source immutable snapshots, CAS/version guards, allowed order transitions, payable-order binding, idempotency pairing, webhook receipt immutability, conflict first-receipt binding and retention.",
+    "renewalCycles": "Preserve immutable billing-cycle identity and resolved pricing snapshots, the W07-owned cycle state machine, CAS leases, exact Order/Payment binding, active MIT mandate check, terminal provider-outcome synchronization and one scheduler control-metadata singleton. W10 orchestrates but never reads or writes D1-04; subscription entitlements remain D1-01 authority.",
+    "revenuecatWebhook": "Keep RevenueCat app_id/event_id first receipt unique and immutable, store bounded event_data_json as an object without raw webhook bytes or subscriber_attributes, record distinct conflicting payload hashes separately against the first receipt, and advance each conflict occurrence by one with monotonic time. Keep this provider inbox separate from Hyperswitch payment_provider_events.",
+    "refunds": "HyperSwitch-only refund facts; keep money in BIGINT minor units, serialize refundable-balance reservations by locking the matching Payment row, enforce customer-scoped idempotency, CAS version/state transitions and monotonic provider timestamps.",
+    "billingDocuments": "Immutable invoice/receipt snapshots bound to matching Order commercial facts; RECEIPT additionally requires its matching succeeded Payment. Keep bounded JSON text and no foreign keys.",
+    "paymentMethodRevocationRequests": "Persist the one-way local revocation request with exact saved-method owner binding, customer-scoped idempotency, immutable identity, one-step CAS, monotonic timestamps and a completion gate requiring provider deletion plus all associated mandates terminal. Keep zero foreign keys.",
+    "mandateWebhookReplay": "Replace payment_provider_events_terminal_immutable so only a mandate_active/mandate_revoked receipt in RECONCILIATION_REQUIRED can reset to RECEIVED with processed_at/outcome_code cleared; original identity and payload SHA-256 remain immutable; APPLIED and REJECTED remain terminal.",
+    "renewalRevocationGate": "Keep existing W07 renewal-runtime readActiveMandate and isExactMandateActive NOT EXISTS lookups against payment_method_revocation_requests; a matching non-COMPLETED request blocks any new MIT submission."
+  },
+  "sourceInventory": [
+    {
+      "path": "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql",
+      "role": "W07 source schema for orders, order lines and order-create idempotency.",
+      "execution": "Fingerprint and translate only; never run D1/SQLite SQL on Neon."
+    },
+    {
+      "path": "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql",
+      "role": "W07 source schema for provider payment facts, signed-provider event inbox and payload-hash conflict facts.",
+      "execution": "Fingerprint and translate only; never run D1/SQLite SQL on Neon."
+    },
+    {
+      "path": "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+      "role": "Canonical Order/OrderLine/idempotency field and authority contract.",
+      "execution": "Contract source; not SQL."
+    },
+    {
+      "path": "contracts/persistence/PAYMENT-D1-04-persistence.v1.json",
+      "role": "Canonical Payment/provider event and conflict fact contract.",
+      "execution": "Contract source; not SQL."
+    },
+    {
+      "path": "contracts/state-machines/order.json",
+      "role": "Canonical Order lifecycle state machine candidate.",
+      "execution": "Contract source; not SQL."
+    },
+    {
+      "path": "contracts/state-machines/payment.json",
+      "role": "Canonical Payment lifecycle state machine candidate.",
+      "execution": "Contract source; not SQL."
+    },
+    {
+      "path": "contracts/database/neon-schema-migration-ledger.v1.json",
+      "role": "D1-04 is registered to W07 in the shared per-database append-only schema ledger; D1-04 runner remains not implemented.",
+      "execution": "Ownership source; this PR does not install the shared ledger or admit remote apply."
+    },
+    {
+      "path": "workers/W07-subscription-commerce/migrations-d1-04/0004_subscription_renewal_cycles.sql",
+      "role": "W07-owned D1-04 recurring billing-cycle records and the singleton scheduler cursor control row.",
+      "execution": "Fingerprint and translate to PostgreSQL 18 only; no D1/SQLite source SQL runs against Neon. The scheduler seed is schema control metadata, not business-data import."
+    },
+    {
+      "path": "workers/W07-subscription-commerce/migrations-d1-04/0005_revenuecat_webhook_inbox.sql",
+      "role": "W07-owned RevenueCat event first-receipt inbox and distinct-payload conflict records; separate from Hyperswitch payment events.",
+      "execution": "Fingerprint and translate to PostgreSQL 18 only. No raw webhook bytes or subscriber_attributes are persisted; no remote DDL or business-data import."
+    },
+    {
+      "path": "workers/W07-subscription-commerce/migrations-d1-04/0006_refunds_billing_documents.sql",
+      "role": "W07-owned refund facts and immutable customer invoice/receipt snapshots.",
+      "execution": "Fingerprint and translate to PostgreSQL 18 only; HyperSwitch provider events remain the only provider-confirmation source. No remote DDL or business-data import."
+    },
+    {
+      "path": "workers/W07-subscription-commerce/migrations-d1-04/0007_payment_method_revocation_requests.sql",
+      "role": "W07-owned saved-method revocation request lifecycle and exact mandate webhook reconciliation replay policy.",
+      "execution": "Fingerprint and translate to PostgreSQL 18 only. Preserve existing runtime renewal lookup guard; replace only the provider event terminal trigger branch; preserve saved-method owner binding without adding a foreign key."
+    }
+  ],
+  "verification": {
+    "sourceRegression": "workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py",
+    "postgresImage": "postgres:18.6",
+    "tables": 15,
+    "explicitIndexes": 31,
+    "triggers": 72,
+    "triggerFunctions": 6,
+    "foreignKeys": 0,
+    "fixtureRowsAfterRollback": 0,
+    "mustNotExist": [
+      "entitlements",
+      "ledger_entries",
+      "payment_intents",
+      "users",
+      "media"
+    ],
+    "localRehearsalEvidence": {
+      "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+      "workflowRunId": 42498095211,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42498095211",
+      "verifiedHeadSha": "4d855b2547a33507141a442eb9e191e8158b86f6",
+      "postgresVersion": "18.6",
+      "database": "luckread_finance_schema",
+      "sourceRegressionTests": 24,
+      "newSliceTables": 1,
+      "newSliceExplicitIndexes": 2,
+      "newSliceTriggers": 7,
+      "newSliceTriggerFunctions": 1,
+      "cumulativeTables": 15,
+      "cumulativeExplicitIndexes": 31,
+      "cumulativeTriggers": 72,
+      "cumulativeTriggerFunctions": 6,
+      "foreignKeys": 0,
+      "revocationRowsAfterRollback": 0,
+      "businessFixtureRowsAfterRollback": 0,
+      "schedulerControlRowsAfterRollback": 1,
+      "evidenceArtifactId": 13623839431,
+      "evidenceArtifactSha256": "sha256:7638bdea865aa07354b0b9bce0fa288a29259bd0ab500280c58e8fefe19edd86",
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false
+    },
+    "predecessorLocalRehearsalEvidence": {
+      "workflowRunId": 42489584748,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42489584748",
+      "verifiedHeadSha": "6d416296e83d6b0389505f7b224976aae7634345",
+      "postgresVersion": "18.6",
+      "database": "luckread_finance_schema",
+      "tables": 6,
+      "explicitIndexes": 14,
+      "triggers": 24,
+      "triggerFunctions": 1,
+      "foreignKeys": 0,
+      "rowsAfterRollback": 0,
+      "offlineD104SourceRegressionTests": 24,
+      "laterFinanceTablesIncluded": false,
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false,
+      "evidenceArtifactId": 13621195000
+    },
+    "previousSliceLocalRehearsalEvidence": {
+      "status": "NOT_RUN"
+    },
+    "nextGate": "All seven W07 D1-04 source migrations have independent PostgreSQL 18.6 local translation/rehearsal evidence. The shared per-database append-only ledger runner for D1-04 and remote Neon schema apply remain separate, unauthorized gates; Cloudflare D1 remains production authority."
+  },
+  "safety": {
+    "remoteConnectionAttempted": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "workerRuntimeOrBindingsChanged": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "nextGate": "All seven W07 D1-04 source migrations have independent PostgreSQL 18.6 local translation/rehearsal evidence. The shared per-database append-only ledger runner for D1-04 and remote Neon schema apply remain separate, unauthorized gates; Cloudflare D1 remains production authority.",
+  "next": "All seven W07 D1-04 source migrations have independent PostgreSQL 18.6 local translation/rehearsal evidence. The shared per-database append-only ledger runner for D1-04 and remote Neon schema apply remain separate, unauthorized gates; Cloudflare D1 remains production authority."
+}

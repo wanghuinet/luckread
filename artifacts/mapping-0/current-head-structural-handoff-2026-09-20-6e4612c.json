@@ -1,0 +1,57 @@
+{
+  "evidenceType": "MAPPING_0_STRUCTURAL_HANDOFF_CURRENT_HEAD",
+  "repository": "wanghuinet/luckread",
+  "testedHead": "6e4612cb7e3854f5667e474a95b3f3e664a75aea",
+  "source": "GitHub Actions + project stage-separation controls",
+  "mapping0StructuralGate": {
+    "runId": 35458363120,
+    "conclusion": "success"
+  },
+  "featureInventoryGate": {
+    "runId": 35458363107,
+    "conclusion": "success"
+  },
+  "contractCoreGate": {
+    "runId": 35458363130,
+    "conclusion": "failure"
+  },
+  "coreContractSubgates": {
+    "Semantic Cross-Contract Gate": "success",
+    "Payload Contract Reconciliation Gate": "success",
+    "Mapping 0 Structural/Contract Gate": "success",
+    "Blueprint Feature Inventory Gate": "success",
+    "Contract Admission Gate (state-machines)": "success",
+    "Contract Admission Gate (enums)": "success",
+    "Contract Admission Gate (openapi)": "success",
+    "Contract Admission Gate (authz)": "success",
+    "Contract Admission Gate (common)": "success",
+    "Capability Contract Graph Gate": "success"
+  },
+  "downstreamGates": {
+    "Five-Way Alignment Admission Gate": "failure",
+    "Strict Downstream R4/Evidence/R5 Gate": "failure"
+  },
+  "classification": {
+    "mapping0StructuralHandoff": "ACCEPTED",
+    "mapping0StructuralGreen": true,
+    "fullTechnicalRuntimeEvidenceClosure": "NOT_ACCEPTED",
+    "businessImplementationGreen": false,
+    "implementationAdmission": false
+  },
+  "fiveWayObservation": {
+    "blockerCount": 450,
+    "interpretation": "Downstream technical/evidence closure remains incomplete; this does not invalidate the structurally accepted Mapping 0 handoff under the existing stage-separation control."
+  },
+  "authorityDecisionState": {
+    "decisionsRecorded": "docs/change-control/MAPPING-0-AUTHORITY-DECISIONS-2026-09-20.md",
+    "openAuthorityControls": 0,
+    "reconciliationPendingControls": 8
+  },
+  "invariants": [
+    "No full Feature implementation status was promoted from structural closure.",
+    "No remote D1 migration execution was claimed.",
+    "No Evidence Registry PASS was fabricated for unimplemented features.",
+    "Five-Way/R4/R5 failures remain fail-closed."
+  ]
+}
+

@@ -1,0 +1,548 @@
+name: Neon D1-01 W02 Better Auth PostgreSQL Schema
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/neon-d1-01-w02-better-auth-schema.yml'
+      - 'contracts/database/neon-d1-01-w02-identity-schema.v1.json'
+      - 'workers/W02-identity/scripts/neon/verify-w02-identity-postgres-schema.sql'
+      - 'contracts/entity/AUTHZ-role-assignment-authority.v1.json'
+      - 'contracts/entity/AUTH-003-identity-field-contract.v1.json'
+      - 'contracts/entity/AUTH-003-credential-field-contract.v1.json'
+      - 'contracts/api/AUTH-003-credential-management-contract.v1.json'
+      - 'contracts/database/neon-d1-01-migration-manifest.v1.json'
+      - 'workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema.sql'
+      - 'contracts/migration/AUTH-013-publication-journal.v1.json'
+      - 'contracts/events/identity-account-state-changed.v1.json'
+      - 'contracts/migration/AUTH-010-session-revocation-journal.v1.json'
+      - 'contracts/events/AUTH-010-session-revoked-binding.v1.json'
+      - 'contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json'
+      - 'contracts/state-machines/AUTH-007-mfa-lifecycle.v1.json'
+      - 'contracts/migration/AUTH-007-mfa-publication-journal.v1.json'
+      - 'contracts/migration/AUTH-007-mfa-operation-receipt.v1.json'
+      - 'contracts/events/AUTH-007-mfa-audit-binding.v1.json'
+      - 'workers/W02-identity/migrations/0006_better_auth_two_factor.sql'
+      - 'workers/W02-identity/migrations/0008_auth_007_mfa_publication_journal.sql'
+      - 'workers/W02-identity/migrations/0009_auth_007_mfa_operation_receipts.sql'
+      - 'workers/W02-identity/src/auth/mfa-audit-receipts.ts'
+      - 'workers/W02-identity/migrations/0010_auth_username_change_state.sql'
+      - 'docs/change-control/CC-W02-USERNAME-CHANGE-AUTHORITY-2026-11-02.md'
+      - 'contracts/security/username-reservation-policy.v1.json'
+      - 'scripts/w02-username-change-migration-static-audit.mjs'
+      - 'workers/W02-identity/src/auth/username-change.ts'
+      - 'workers/W02-identity/src/auth/username-change-store.ts'
+      - 'contracts/persistence/AUTH-015-account-lifecycle-window-persistence-contract.v1.json'
+      - 'docs/change-control/CC-AUTH-015-W02-LIFECYCLE-WINDOW-PERSISTENCE-2026-11-06.md'
+      - 'contracts/authz/layers.json'
+      - 'workers/W02-identity/package.json'
+      - 'workers/W02-identity/src/auth/better-auth.ts'
+      - 'workers/W02-identity/src/index.ts'
+      - 'workers/W02-identity/src/auth/mfa-factor-state-store.ts'
+      - 'workers/W02-identity/src/auth/mfa-status.ts'
+      - 'workers/W02-identity/src/auth/mfa-factor-state-store.test.ts'
+      - 'workers/W02-identity/src/auth/mfa-enrollment-start.ts'
+      - 'workers/W02-identity/src/auth/mfa-enrollment-start.test.ts'
+      - 'workers/W02-identity/src/auth/mfa-enrollment-start-store.ts'
+      - 'workers/W02-identity/src/auth/mfa-enrollment-start-store.test.ts'
+      - 'workers/W02-identity/src/auth/mfa-enrollment-confirm.ts'
+      - 'workers/W02-identity/src/auth/mfa-enrollment-confirm-store.ts'
+      - 'workers/W02-identity/src/auth/mfa-enrollment-confirm-store.test.ts'
+      - 'workers/W02-identity/src/auth/mfa-audit-operation-receipt-store.ts'
+      - 'workers/W02-identity/src/auth/mfa-audit-receipts.ts'
+      - 'workers/W02-identity/src/auth/neon-postgres-schema.config.ts'
+      - 'workers/W02-identity/src/auth/neon-postgres-runtime-test.config.ts'
+      - 'workers/W02-identity/src/neon/role-assignment-postgres.ts'
+      - 'workers/W02-identity/src/neon/email-verification-activation-postgres.ts'
+      - 'workers/W02-identity/src/neon/auth015-account-lifecycle-postgres.ts'
+      - 'workers/W02-identity/src/neon/account-state-transition-postgres.ts'
+      - 'workers/W02-identity/src/neon/session-revocation-postgres.ts'
+      - 'workers/W02-identity/src/neon/session-revocation-postgres-store.ts'
+      - 'workers/W02-identity/src/auth/session-revoke-store.ts'
+      - 'workers/W02-identity/src/auth/session-revoke.ts'
+      - 'workers/W02-identity/src/auth/session-revoke.test.ts'
+      - 'workers/W02-identity/src/auth/session-logout.ts'
+      - 'workers/W02-identity/src/auth/session-logout-store.ts'
+      - 'workers/W02-identity/src/neon/session-logout-postgres.ts'
+      - 'workers/W02-identity/src/neon/session-logout-postgres-store.ts'
+      - 'workers/W02-identity/scripts/neon/w02-auth010-session-revocation-postgres-runtime-rehearsal.ts'
+      - 'workers/W02-identity/scripts/neon/w02-auth010-session-revocation-publisher-postgres-runtime-rehearsal.ts'
+      - 'workers/W02-identity/src/neon/session-revocation-publisher-postgres.ts'
+      - 'workers/W02-identity/src/neon/mfa-audit-operation-receipts-postgres.ts'
+      - 'workers/W02-identity/src/neon/mfa-audit-operation-receipt-reconciler-postgres.ts'
+      - 'workers/W02-identity/src/neon/mfa-audit-publication-journal-postgres.ts'
+      - 'workers/W02-identity/src/neon/mfa-audit-publication-journal-publisher-postgres.ts'
+      - 'workers/W02-identity/src/neon/mfa-factor-state-postgres.ts'
+      - 'workers/W02-identity/src/neon/mfa-enrollment-start-postgres.ts'
+      - 'workers/W02-identity/src/neon/mfa-enrollment-confirm-postgres.ts'
+      - 'workers/W02-identity/src/neon/username-change-postgres.ts'
+      - 'workers/W02-identity/scripts/neon/w02-auth007-mfa-factor-state-postgres-runtime-rehearsal.ts'
+      - 'workers/W02-identity/scripts/neon/w02-auth007-mfa-publication-publisher-postgres-runtime-rehearsal.ts'
+      - 'workers/W02-identity/scripts/neon/w02-role-assignment-postgres-runtime-rehearsal.ts'
+      - 'workers/W02-identity/scripts/neon/w02-better-auth-postgres-runtime-rehearsal.ts'
+      - 'workers/W02-identity/src/neon/**'
+      - 'workers/W02-identity/src/neon-postgres-migrations/**'
+      - 'workers/W02-identity/scripts/neon/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-and-verify:
+    name: Generate W02 identity schema and verify on disposable PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: schema_generator
+          POSTGRES_PASSWORD: schema_generator_local_only
+          POSTGRES_DB: luckread_schema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schema_generator -d luckread_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pinned W02 toolchain
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify L8 PostgreSQL migration generator is deterministic and isolated from D1-01 baseline
+        working-directory: workers/W02-identity
+        run: |
+          set -euo pipefail
+          migration=src/neon-postgres-migrations/0011_l8_genesis_bootstrap_audit.sql
+          cp "$migration" /tmp/w02-l8-genesis-bootstrap-postgres.sql
+          npm run neon:l8-bootstrap:generate
+          cmp --silent /tmp/w02-l8-genesis-bootstrap-postgres.sql "$migration"
+          git diff --exit-code -- "$migration"
+          grep -F "outside the reviewed fourteen-entry D1-01 shared ledger" "$migration"
+
+      - name: Verify Better Auth and CLI versions are pinned together
+        working-directory: workers/W02-identity
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises'
+          const pkg = JSON.parse(await readFile('./package.json', 'utf8'))
+          const auth = JSON.parse(await readFile('./node_modules/better-auth/package.json', 'utf8'))
+          const cli = JSON.parse(await readFile('./node_modules/auth/package.json', 'utf8'))
+          if (pkg.dependencies['better-auth'] !== '1.7.8' || auth.version !== '1.7.8') {
+            throw new Error('W02 Better Auth runtime must remain pinned to 1.7.8')
+          }
+          if (pkg.devDependencies.auth !== '1.7.8' || cli.version !== '1.7.8') {
+            throw new Error('W02 Better Auth schema CLI must match runtime version 1.7.8')
+          }
+          if (pkg.devDependencies.pg !== '8.20.0') {
+            throw new Error('W02 schema-generation PostgreSQL driver pin drifted')
+          }
+          console.log('Better Auth runtime, schema CLI, and PostgreSQL driver pins: PASS')
+          NODE
+
+      - name: Generate PostgreSQL DDL twice and prove deterministic output
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_PGHOST: 127.0.0.1
+          W02_SCHEMA_PGPORT: '5432'
+          W02_SCHEMA_PGUSER: schema_generator
+          W02_SCHEMA_PGPASSWORD: schema_generator_local_only
+          W02_SCHEMA_PGDATABASE: luckread_schema
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/neon
+          artifact=artifacts/neon/w02-better-auth-postgres-schema.sql
+          first_copy=/tmp/w02-better-auth-postgres-schema.first.sql
+          npm run neon:schema:generate
+          test -s "$artifact"
+          first_sha256="$(sha256sum "$artifact" | cut -d ' ' -f 1)"
+          cp "$artifact" "$first_copy"
+          npm run neon:schema:generate
+          test -s "$artifact"
+          cmp --silent "$first_copy" "$artifact"
+          second_sha256="$(sha256sum "$artifact" | cut -d ' ' -f 1)"
+          test "$first_sha256" = "$second_sha256"
+          git diff --exit-code -- "$artifact"
+          cat > artifacts/neon/w02-better-auth-postgres-schema-generation-provenance.txt <<EOF
+          generatorCommand=npm run neon:schema:generate
+          betterAuth=1.7.8
+          betterAuthCli=1.7.8
+          pg=8.20.0
+          firstGenerationSha256=$first_sha256
+          secondGenerationSha256=$second_sha256
+          deterministic=true
+          databaseTarget=disposable-postgresql-18-only
+          remoteNeonConnectionAttempted=false
+          EOF
+          {
+            echo "## W02 Better Auth PostgreSQL schema generation"
+            echo "- Generator: `npm run neon:schema:generate`"
+            echo "- Better Auth runtime / CLI: `1.7.8 / 1.7.8`"
+            echo "- pg: `8.20.0`"
+            echo "- Artifact SHA-256: `$second_sha256`"
+            echo "- Two consecutive generations: **byte-identical**"
+            echo "- Target: disposable PostgreSQL 18 only; no remote Neon connection"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate W02 custom PostgreSQL migrations from canonical contracts
+        working-directory: workers/W02-identity
+        run: |
+          set -euo pipefail
+          npm run neon:role-assignment:generate
+          npm run neon:auth003:generate
+          npm run neon:auth013-journal:generate
+          npm run neon:auth015:generate
+          npm run neon:auth010:generate
+          npm run neon:auth007-mfa:generate
+          npm run neon:username-change:generate
+          npm run neon:auth007-mfa-journal:generate
+          npm run neon:auth007-mfa-receipts:generate
+          (cd ../.. && node scripts/auth-010-session-revocation-journal-static-audit.mjs)
+          (cd ../.. && node scripts/w02-username-change-migration-static-audit.mjs)
+          git diff --exit-code -- \
+            src/neon-postgres-migrations/0001_role_assignments.sql \
+            src/neon-postgres-migrations/0002_role_authorization_versions.sql \
+            src/neon-postgres-migrations/0003_auth_003_credentials.sql \
+            src/neon-postgres-migrations/0004_auth_013_publication_journal.sql \
+            src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql \
+            src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql \
+            src/neon-postgres-migrations/0007_auth_007_mfa_lifecycle.sql \
+            src/neon-postgres-migrations/0008_auth_username_change_state.sql \
+            src/neon-postgres-migrations/0009_auth_007_mfa_publication_journal.sql \
+            src/neon-postgres-migrations/0010_auth_007_mfa_operation_receipts.sql
+
+      - name: Confirm all generated DDL is PostgreSQL-native
+        working-directory: workers/W02-identity
+        run: |
+          set -euo pipefail
+          files=(
+            artifacts/neon/w02-better-auth-postgres-schema.sql
+            src/neon-postgres-migrations/0001_role_assignments.sql
+            src/neon-postgres-migrations/0002_role_authorization_versions.sql
+            src/neon-postgres-migrations/0003_auth_003_credentials.sql
+            src/neon-postgres-migrations/0004_auth_013_publication_journal.sql
+            src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql
+            src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql
+            src/neon-postgres-migrations/0007_auth_007_mfa_lifecycle.sql
+            src/neon-postgres-migrations/0008_auth_username_change_state.sql
+            src/neon-postgres-migrations/0009_auth_007_mfa_publication_journal.sql
+            src/neon-postgres-migrations/0010_auth_007_mfa_operation_receipts.sql
+          )
+          for file in "${files[@]}"; do
+            test -s "$file"
+            if grep -Eiq '(^|[^[:alnum:]_])(PRAGMA|AUTOINCREMENT|strftime|julianday|GLOB|RAISE[[:space:]]*\([[:space:]]*ABORT)([^[:alnum:]_]|$)' "$file"; then
+              echo "Generated PostgreSQL schema contains SQLite-only SQL: $file"
+              exit 1
+            fi
+          done
+
+      - name: Apply generated Better Auth DDL to disposable PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file artifacts/neon/w02-better-auth-postgres-schema.sql
+
+      - name: Run the official Better Auth schema check against disposable PostgreSQL
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_PGHOST: 127.0.0.1
+          W02_SCHEMA_PGPORT: '5432'
+          W02_SCHEMA_PGUSER: schema_generator
+          W02_SCHEMA_PGPASSWORD: schema_generator_local_only
+          W02_SCHEMA_PGDATABASE: luckread_schema
+        run: npm run neon:schema:check
+
+      - name: Apply generated RoleAssignment PostgreSQL migrations
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          set -euo pipefail
+          for file in \
+            src/neon-postgres-migrations/0001_role_assignments.sql \
+            src/neon-postgres-migrations/0002_role_authorization_versions.sql; do
+            psql --host 127.0.0.1 --port 5432 --username schema_generator \
+              --dbname luckread_schema --set ON_ERROR_STOP=1 --file "$file"
+          done
+
+      - name: Apply generated AUTH-003 identity and credential PostgreSQL migration
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file src/neon-postgres-migrations/0003_auth_003_credentials.sql
+
+      - name: Apply generated AUTH-013 durable publication journal PostgreSQL migration
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file src/neon-postgres-migrations/0004_auth_013_publication_journal.sql
+
+      - name: Apply generated AUTH-015 lifecycle window PostgreSQL migration
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql
+
+      - name: Apply generated AUTH-010 session revocation journal PostgreSQL migration
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql
+
+      - name: Apply generated AUTH-007 MFA lifecycle PostgreSQL migration
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file src/neon-postgres-migrations/0007_auth_007_mfa_lifecycle.sql
+
+      - name: Apply generated W02 username change state PostgreSQL migration
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file src/neon-postgres-migrations/0008_auth_username_change_state.sql
+
+      - name: Apply generated AUTH-007 MFA publication journal PostgreSQL migration
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file src/neon-postgres-migrations/0009_auth_007_mfa_publication_journal.sql
+
+      - name: Apply generated AUTH-007 MFA operation receipts PostgreSQL migration
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file src/neon-postgres-migrations/0010_auth_007_mfa_operation_receipts.sql
+
+      - name: Rehearse Better Auth PostgreSQL registration, credentials, and session lifecycle
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:runtime:rehearsal
+
+      - name: Verify Better Auth core tables and empty business rows
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: node scripts/neon/verify-better-auth-core-schema.mjs > artifacts/neon/w02-better-auth-postgres-schema-postflight.json
+
+      - name: Verify RoleAssignment constraints, temporal overlap, concurrency, and versioning
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:role-assignment:verify > artifacts/neon/w02-role-assignment-postgres-schema-postflight.json
+
+      - name: Rehearse W02 RoleAssignment PostgreSQL runtime transactions, grants, and MFA layer resolution
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:role-assignment:runtime
+
+      - name: Verify AUTH-003 identity/credential constraints, FK, and uniqueness semantics
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth003:verify > artifacts/neon/w02-auth003-postgres-schema-postflight.json
+
+      - name: Verify AUTH-013 journal contract, retry state, and uniqueness semantics
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth013-journal:verify > artifacts/neon/w02-auth013-publication-journal-postgres-schema-postflight.json
+
+      - name: Verify AUTH-015 nullable lifecycle timestamps and empty user table
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth015:verify > artifacts/neon/w02-auth015-lifecycle-windows-postgres-schema-postflight.json
+
+      - name: Rehearse AUTH-015 trusted deletion and reactivation windows on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth015:runtime
+
+      - name: Rehearse W02 moderator/admin account-state transitions on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:account-state:runtime
+
+      - name: Rehearse AUTH-013 PostgreSQL dual-queue publisher and retry on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth013-publisher:runtime
+
+      - name: Verify AUTH-010 secret-free session revocation journal and retry constraints
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth010:verify > artifacts/neon/w02-auth010-session-revocation-postgres-schema-postflight.json
+
+      - name: Rehearse AUTH-010 PostgreSQL session revocation and atomic audit outbox
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth010:runtime
+
+      - name: Rehearse AUTH-010 PostgreSQL outbox publication through the existing queue contract
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth010:publisher:runtime
+
+      - name: Rehearse AUTH-007 PostgreSQL MFA journal publication through the existing AUTH013_QUEUE contract
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth007-mfa:publisher:runtime
+
+      - name: Rehearse AUTH-007 factor state, TOTP replay guard, and status projection on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth007-mfa:factor-state:runtime
+
+      - name: Verify AUTH-007 MFA columns, replay guard, and session lifecycle triggers
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth007-mfa:verify > artifacts/neon/w02-auth007-mfa-lifecycle-postgres-schema-postflight.json
+
+      - name: Verify W02 username lease, identity projection, and expired-handle reuse
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:username-change:verify > artifacts/neon/w02-username-change-state-postgres-schema-postflight.json
+
+      - name: Rehearse W02 username-change atomic writes, previous-handle leases, idempotency, and concurrency on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:username-change:runtime
+
+      - name: Verify AUTH-007 MFA publication journal types, event registry, and retry semantics
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth007-mfa-journal:verify > artifacts/neon/w02-auth007-mfa-publication-journal-postgres-schema-postflight.json
+
+      - name: Rehearse AUTH-007 idempotent MFA publication journal writes on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth007-mfa-journal:runtime
+
+      - name: Verify AUTH-007 MFA operation receipt types, lifecycle states, and safe plans
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth007-mfa-receipts:verify > artifacts/neon/w02-auth007-mfa-operation-receipts-postgres-schema-postflight.json
+
+      - name: Rehearse AUTH-007 MFA operation receipt create, append, and finalization on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth007-mfa-receipts:runtime
+
+      - name: Rehearse AUTH-007 MFA receipt reconciliation on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth007-mfa-receipts:reconcile:runtime
+
+      - name: Verify combined W02 catalog ownership and zero-residual-row postflight
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: |
+          psql "$W02_SCHEMA_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file scripts/neon/verify-w02-identity-postgres-schema.sql \
+            | tee artifacts/neon/w02-identity-postflight.txt
+
+      - name: Rehearse separately reviewed L8 one-time bootstrap on a disposable PostgreSQL 18 database clone
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:l8-bootstrap:runtime
+
+      - name: Upload generated schema and postflight evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w02-better-auth-postgres-schema-${{ github.run_id }}
+          path: |
+            workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema.sql
+            workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema-generation-provenance.txt
+            workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-better-auth-postgres-runtime-rehearsal.json
+            workers/W02-identity/artifacts/neon/w02-role-assignment-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-role-assignment-postgres-runtime-rehearsal.json
+            workers/W02-identity/src/neon-postgres-migrations/0001_role_assignments.sql
+            workers/W02-identity/src/neon-postgres-migrations/0002_role_authorization_versions.sql
+            workers/W02-identity/src/neon-postgres-migrations/0003_auth_003_credentials.sql
+            workers/W02-identity/src/neon-postgres-migrations/0004_auth_013_publication_journal.sql
+            workers/W02-identity/src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql
+            workers/W02-identity/src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql
+            workers/W02-identity/src/neon-postgres-migrations/0007_auth_007_mfa_lifecycle.sql
+            workers/W02-identity/src/neon-postgres-migrations/0008_auth_username_change_state.sql
+            workers/W02-identity/src/neon-postgres-migrations/0009_auth_007_mfa_publication_journal.sql
+            workers/W02-identity/src/neon-postgres-migrations/0010_auth_007_mfa_operation_receipts.sql
+            workers/W02-identity/src/neon-postgres-migrations/0011_l8_genesis_bootstrap_audit.sql
+            workers/W02-identity/artifacts/neon/w02-l8-genesis-bootstrap-postgres-runtime-rehearsal.json
+            workers/W02-identity/artifacts/neon/w02-auth007-mfa-operation-receipts-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-auth007-mfa-operation-receipts-postgres-runtime-rehearsal.json
+            workers/W02-identity/artifacts/neon/w02-auth007-mfa-receipt-reconciliation-postgres-runtime-rehearsal.json
+            workers/W02-identity/artifacts/neon/w02-auth007-mfa-publication-publisher-postgres-runtime-rehearsal.json
+            workers/W02-identity/artifacts/neon/w02-auth007-mfa-factor-state-postgres-runtime-rehearsal.json
+            workers/W02-identity/artifacts/neon/w02-auth007-mfa-publication-journal-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-auth007-mfa-publication-journal-postgres-runtime-rehearsal.json
+            workers/W02-identity/artifacts/neon/w02-username-change-state-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-username-change-postgres-runtime-rehearsal.json
+            workers/W02-identity/artifacts/neon/w02-auth007-mfa-lifecycle-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-auth010-session-revocation-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-auth003-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-auth013-publication-journal-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-auth015-lifecycle-windows-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-auth015-account-lifecycle-postgres-runtime-rehearsal.json
+            workers/W02-identity/artifacts/neon/w02-account-state-transition-postgres-runtime-rehearsal.json
+          if-no-files-found: error
+          retention-days: 30

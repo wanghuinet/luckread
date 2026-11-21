@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/authz/role-assignment-layer-resolution.v1.json",
+  "version": "1.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "purpose": "Deterministic resolver contract for the authLogin/authRefresh response layer using authoritative RoleAssignment data.",
+  "authorityRefs": [
+    "contracts/entity/AUTHZ-role-assignment-authority.v1.json",
+    "contracts/authz/layers.json",
+    "contracts/authz/authorization-decision.json",
+    "contracts/authz/authz-cache-invariant.json",
+    "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
+    "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
+  ],
+  "input": {
+    "subjectId": "Authoritative USER subject id.",
+    "accountState": "Authoritative account state evaluated before successful token issuance/rotation.",
+    "now": "Authoritative evaluation instant.",
+    "roleAssignments": "All RoleAssignment records for subjectId that can be read from the D1-01 authorization authority."
+  },
+  "algorithm": [
+    {
+      "step": 1,
+      "name": "account-state-gate",
+      "rule": "If accountState is not ACTIVE, return DENY under the existing authentication/error contract; do not resolve a successful layer."
+    },
+    {
+      "step": 2,
+      "name": "subject-filter",
+      "rule": "Retain only assignments whose subjectId exactly equals the authenticated subjectId."
+    },
+    {
+      "step": 3,
+      "name": "status-filter",
+      "rule": "Retain only assignments with status ACTIVE."
+    },
+    {
+      "step": 4,
+      "name": "time-filter",
+      "rule": "Retain only assignments where validFrom <= now and (validUntil is null or now < validUntil)."
+    },
+    {
+      "step": 5,
+      "name": "scope-filter-for-global-layer",
+      "rule": "Retain only assignments with scopeType=global for the public response layer. organization and ip assignments are excluded from global layer resolution."
+    },
+    {
+      "step": 6,
+      "name": "role-validation",
+      "rule": "Every retained roleId MUST exist exactly once in contracts/authz/layers.json. Unknown or forbidden role identifiers cause fail-closed resolution."
+    },
+    {
+      "step": 7,
+      "name": "layer-mapping",
+      "rule": "Map each retained roleId directly to its declared L0-L8 layer in contracts/authz/layers.json. No alternate projection may override this mapping."
+    },
+    {
+      "step": 8,
+      "name": "multiple-assignment-resolution",
+      "rule": "When more than one eligible global assignment exists, select the highest numeric layer value. Multiple assignments resolving to the same layer are equivalent; no secondary precedence is required."
+    },
+    {
+      "step": 9,
+      "name": "no-assignment-failure",
+      "rule": "If no eligible global assignment remains, do not infer a layer from User.role, Verification, Entitlement, Subscription, Organization Membership, Ownership, device, IP, cache, or any other uncontracted signal. Return DENY under the existing authentication/error contract."
+    },
+    {
+      "step": 10,
+      "name": "derived-output",
+      "rule": "Return the selected layer only as a derived response value. Do not persist it as User.layer or another layer entity."
+    }
+  ],
+  "outputs": {
+    "success": {
+      "layerPattern": "^L[0-8]$",
+      "source": "RoleAssignment -> contracts/authz/layers.json"
+    },
+    "failure": {
+      "decision": "DENY",
+      "errorAuthority": "Existing authentication/error contract",
+      "newErrorEnum": false
+    }
+  },
+  "securityInvariants": [
+    "RoleAssignment is authorization input, not the final authorization decision.",
+    "Layer is derived capability level and cannot bypass scope, ownership, entitlement, workflow, business-state or policy checks.",
+    "Cache is never the source of truth.",
+    "RoleAssignment revocation or effective-set change participates in role_version invalidation.",
+    "Client-provided request data cannot establish or elevate a RoleAssignment."
+  ],
+  "implementationBoundary": {
+    "allowed": "Implement only the deterministic algorithm above at an existing W01/Payload extension point after the E6 implementation-admission gate is GREEN.",
+    "forbidden": [
+      "new Worker",
+      "new D1 domain",
+      "second session authority",
+      "User.layer",
+      "duplicate layer entity",
+      "new public authorization field",
+      "hand-authored persistence schema inferred from resolver needs"
+    ]
+  },
+  "verificationRequirements": [
+    "global user role resolves to expected layer",
+    "organization/IP scoped role does not alter global login/refresh layer",
+    "multiple global roles select highest numeric layer",
+    "equal-layer assignments are equivalent",
+    "revoked assignment is excluded",
+    "future assignment is excluded",
+    "expired assignment is excluded",
+    "unknown role fails closed",
+    "non-ACTIVE account state fails before successful token response",
+    "no eligible global assignment fails closed",
+    "cache state cannot alter the result"
+  ]
+}

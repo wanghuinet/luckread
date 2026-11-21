@@ -1,0 +1,41 @@
+name: Neon D1-02 Schema Source Inventory
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-02-schema-source-inventory.yml'
+      - 'contracts/database/neon-d1-02-schema-sources.v1.json'
+      - 'scripts/neon/verify-d1-02-schema-sources.mjs'
+      - 'scripts/neon/verify-d1-02-schema-sources.test.mjs'
+      - 'workers/W03-content/migrations/**'
+      - 'workers/W03-content/wrangler.jsonc'
+      - 'workers/W05-social/migrations/**'
+      - 'workers/W05-social/wrangler.jsonc'
+      - 'contracts/persistence/CONTENT-ARTICLE-d1-02-persistence.v1.json'
+      - 'contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    name: Verify D1-02 source inventory and SQLite portability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Test binding guards and portability scanner
+        run: node --test scripts/neon/verify-d1-02-schema-sources.test.mjs
+      - name: Build source inventory and portability report (no database credentials)
+        run: node scripts/neon/verify-d1-02-schema-sources.mjs --report artifacts/neon/d1-02-schema-source-inventory.json
+      - name: Upload D1-02 source inventory evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-02-source-inventory-${{ github.sha }}
+          path: artifacts/neon/d1-02-schema-source-inventory.json
+          if-no-files-found: error
+          retention-days: 90

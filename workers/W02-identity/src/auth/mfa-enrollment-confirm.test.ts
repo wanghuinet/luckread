@@ -1,0 +1,317 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const mocks = vi.hoisted(() => ({
+  handler: vi.fn(),
+  createAuth: vi.fn(),
+  resolvePrincipal: vi.fn(),
+  readStatus: vi.fn(),
+  createReceipt: vi.fn(),
+  finalizeReceipt: vi.fn(),
+  reconcileReceipts: vi.fn(),
+}))
+
+vi.mock('./better-auth.js', () => ({
+  createLuckReadAuth: mocks.createAuth,
+  requireLegacyW02D1Database: (env: { D1_01?: D1Database }) => {
+    if (!env.D1_01) throw new Error('W02_D1_TEST_BINDING_REQUIRED')
+    return env.D1_01
+  },
+}))
+vi.mock('./principal.js', () => ({ resolveBetterAuthPrincipal: mocks.resolvePrincipal }))
+vi.mock('./mfa-status.js', () => ({
+  readAuthoritativeMfaStatus: mocks.readStatus,
+  createD1MfaStatusStore: (db: D1Database) => ({
+    read: (userId: string, now: Date) => mocks.readStatus(db, userId, now),
+  }),
+}))
+vi.mock('./mfa-audit-receipts.js', () => ({
+  createMfaAuditOperationReceipt: mocks.createReceipt,
+  finalizeMfaAuditOperationReceipt: mocks.finalizeReceipt,
+  reconcileMfaAuditOperationReceipts: mocks.reconcileReceipts,
+}))
+
+import type { BetterAuthEnv } from './better-auth.js'
+import { handleMfaEnrollmentConfirmRequest } from './mfa-enrollment-confirm.js'
+
+const makeDb = (row: unknown = {}) => {
+  const stateRow = {
+    userEnabled: 0,
+    confirmationKeyHash: null,
+    confirmationRequestHash: null,
+    factorVerified: 0,
+    ...(typeof row === 'object' && row !== null ? row as Record<string, unknown> : {}),
+  }
+  const statement = {
+    bind: vi.fn().mockReturnThis(),
+    first: vi.fn().mockResolvedValue(stateRow),
+    run: vi.fn().mockResolvedValue({ success: true, meta: { changes: 1 } }),
+  }
+  const db = {
+    prepare: vi.fn(() => statement),
+    batch: vi.fn(async (statements: Array<{ run: () => Promise<{ success: boolean; meta: { changes: number } }> }>) =>
+      Promise.all(statements.map((item) => item.run()))),
+  }
+  return { db: db as unknown as D1Database, prepare: db.prepare, statement, batch: db.batch }
+}
+
+const makeRequest = (
+  body: unknown = { code: '123456' },
+  w01 = true,
+  key = 'mfa-confirm-key-0001',
+) => new Request(
+  'https://luckread-w02.internal/internal/auth/mfa/enrollment/confirm',
+  {
+    method: 'POST',
+    headers: {
+      cookie: 'better-auth.session_token=opaque-session',
+      'content-type': 'application/json',
+      ...(key ? { 'Idempotency-Key': key } : {}),
+      ...(w01 ? {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+      } : {}),
+    },
+    body: JSON.stringify(body),
+  },
+)
+
+const principal = {
+  userId: 'user-12345678',
+  email: 'user@example.com',
+  sessionId: 'session-1',
+  accountState: 'ACTIVE',
+  accountStateVersion: 1,
+  layer: 'L2',
+  roleAssignments: [],
+}
+
+describe('W02 MFA enrollment confirmation authority', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.resolvePrincipal.mockResolvedValue(principal)
+    mocks.handler.mockResolvedValue(Response.json(
+      { token: 'must-not-leak', user: { id: principal.userId } },
+      { headers: {
+        'set-auth-token': 'must-not-leak-either',
+        'set-cookie': 'luckread.session_token=rotated-session; Domain=.luckread.com; Path=/; HttpOnly; Secure; SameSite=Lax',
+      } },
+    ))
+    mocks.createAuth.mockReturnValue({ handler: mocks.handler })
+    mocks.readStatus.mockResolvedValue({
+      enabled: true,
+      verified: true,
+      enrolledAt: '2026-10-24T12:00:00.000Z',
+    })
+    mocks.createReceipt.mockResolvedValue('mfaop_0123456789abcdef0123456789abcdef')
+    mocks.finalizeReceipt.mockResolvedValue(true)
+    mocks.reconcileReceipts.mockResolvedValue({ selected: 1, emitted: 1, failed: 0, unknown: 0 })
+  })
+
+  it('verifies the pending factor through Better Auth then returns D1 read-back without session tokens', async () => {
+    const { db, prepare, statement } = makeDb()
+    const response = await handleMfaEnrollmentConfirmRequest({ D1_01: db } as BetterAuthEnv, makeRequest())
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    const payload = await response.json()
+    expect(payload).toEqual({
+      data: { enabled: true, verified: true, enrolledAt: '2026-10-24T12:00:00.000Z' },
+    })
+    expect(JSON.stringify(payload)).not.toContain('must-not-leak')
+    const getSetCookie = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie
+    const cookies = typeof getSetCookie === 'function'
+      ? getSetCookie.call(response.headers)
+      : [response.headers.get('set-cookie') ?? '']
+    expect(cookies.some((cookie) => cookie.includes('rotated-session'))).toBe(true)
+    expect(cookies.some((cookie) => cookie.includes('must-not-leak'))).toBe(false)
+    expect(prepare).toHaveBeenCalledWith(expect.stringContaining('LEFT JOIN "twoFactor"'))
+    expect(statement.bind).toHaveBeenCalledWith(principal.userId)
+    expect(mocks.handler).toHaveBeenCalledTimes(1)
+    const authRequest = mocks.handler.mock.calls[0]?.[0] as Request
+    expect(new URL(authRequest.url).pathname).toBe('/api/auth/two-factor/verify-totp')
+    expect(authRequest.headers.get('cookie')).toBe('better-auth.session_token=opaque-session')
+    expect(authRequest.headers.get('X-LuckRead-MFA-Operation')).toBe('enrollment-confirm')
+    expect(authRequest.headers.get('X-LuckRead-MFA-Receipt-Id')).toBe('mfaop_0123456789abcdef0123456789abcdef')
+    expect(authRequest.headers.get('X-LuckRead-MFA-Receipt-Mode')).toBe('defer-finalization')
+    await expect(authRequest.json()).resolves.toEqual({ code: '123456', trustDevice: false })
+    expect(mocks.createReceipt).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      userId: principal.userId,
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: false,
+    }))
+    expect(mocks.finalizeReceipt).toHaveBeenCalledWith(
+      db,
+      'mfaop_0123456789abcdef0123456789abcdef',
+      expect.arrayContaining([expect.objectContaining({
+        eventType: 'auth.mfa.enrollment_verified',
+        result: 'succeeded',
+        reasonCode: 'TOTP_ENROLLMENT_VERIFIED',
+        factorState: 'ENABLED',
+      })]),
+    )
+    expect(mocks.reconcileReceipts).toHaveBeenCalledWith(db)
+    expect(mocks.readStatus).toHaveBeenCalledWith(db, principal.userId, expect.any(Date))
+  })
+
+
+  it('recovers an MFA confirmation marker whose database commit response was lost', async () => {
+    const hash = async (value: string) => {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+      return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+    }
+    const key = 'mfa-confirm-key-lost-commit-0001'
+    const keyHash = await hash(key)
+    const requestHash = await hash(key + String.fromCharCode(0) + '123456')
+    const { db } = makeDb()
+    const store = {
+      read: vi.fn()
+        .mockResolvedValueOnce({
+          userEnabled: false,
+          confirmationKeyHash: null,
+          confirmationRequestHash: null,
+          factorVerified: false,
+        })
+        .mockResolvedValueOnce({
+          userEnabled: true,
+          confirmationKeyHash: keyHash,
+          confirmationRequestHash: requestHash,
+          factorVerified: true,
+        }),
+      persistConfirmation: vi.fn().mockRejectedValueOnce(new Error('commit response lost')),
+    }
+
+    const response = await handleMfaEnrollmentConfirmRequest(
+      { D1_01: db } as BetterAuthEnv,
+      makeRequest({ code: '123456' }, true, key),
+      { store },
+    )
+
+    expect(response.status).toBe(200)
+    expect(store.persistConfirmation).toHaveBeenCalledWith({
+      userId: principal.userId,
+      keyHash,
+      requestHash,
+    })
+    expect(store.read).toHaveBeenCalledTimes(2)
+    expect(mocks.handler).toHaveBeenCalledTimes(1)
+    expect(response.headers.get('set-cookie')).toContain('rotated-session')
+  })
+
+  it('does not invent a failed MFA outcome when the handler throws and D1 read-back is indeterminate', async () => {
+    const { db } = makeDb()
+    mocks.handler.mockRejectedValueOnce(new Error('ambiguous internal failure'))
+    mocks.readStatus.mockResolvedValueOnce(null)
+    const response = await handleMfaEnrollmentConfirmRequest({ D1_01: db } as BetterAuthEnv, makeRequest())
+    expect(response.status).toBe(503)
+    expect(mocks.finalizeReceipt).not.toHaveBeenCalled()
+  })
+
+  it('records a verified enrollment if the handler throws but authoritative D1 state proves success', async () => {
+    const { db } = makeDb()
+    mocks.handler.mockRejectedValueOnce(new Error('response lost after mutation'))
+    const response = await handleMfaEnrollmentConfirmRequest({ D1_01: db } as BetterAuthEnv, makeRequest())
+    expect(response.status).toBe(503)
+    expect(mocks.finalizeReceipt).toHaveBeenCalledWith(
+      db,
+      'mfaop_0123456789abcdef0123456789abcdef',
+      expect.arrayContaining([expect.objectContaining({
+        eventType: 'auth.mfa.enrollment_verified',
+        result: 'succeeded',
+        reasonCode: 'TOTP_ENROLLMENT_VERIFIED',
+      })]),
+    )
+  })
+
+  it('requires an idempotency key before resolving the principal or verifying TOTP', async () => {
+    const { db } = makeDb()
+    const response = await handleMfaEnrollmentConfirmRequest(
+      { D1_01: db } as BetterAuthEnv,
+      makeRequest({ code: '123456' }, true, ''),
+    )
+    expect(response.status).toBe(400)
+    expect(mocks.resolvePrincipal).not.toHaveBeenCalled()
+    expect(mocks.handler).not.toHaveBeenCalled()
+  })
+
+  it('replays only the same successful request and rejects key reuse with a different code', async () => {
+    const hash = async (value: string) => {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+      return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+    }
+    const key = 'mfa-confirm-key-0001'
+    const row = {
+      userEnabled: 1,
+      factorVerified: 1,
+      confirmationKeyHash: await hash(key),
+      confirmationRequestHash: await hash(key + String.fromCharCode(0) + '123456'),
+    }
+    const { db } = makeDb(row)
+    const replay = await handleMfaEnrollmentConfirmRequest(
+      { D1_01: db } as BetterAuthEnv,
+      makeRequest({ code: '123456' }, true, key),
+    )
+    expect(replay.status).toBe(200)
+    expect(mocks.handler).not.toHaveBeenCalled()
+
+    const differentPayload = await handleMfaEnrollmentConfirmRequest(
+      { D1_01: db } as BetterAuthEnv,
+      makeRequest({ code: '654321' }, true, key),
+    )
+    expect(differentPayload.status).toBe(409)
+    expect(mocks.handler).not.toHaveBeenCalled()
+  })
+
+  it('rejects calls that did not arrive through the W01 service contract', async () => {
+    const { db } = makeDb()
+    const response = await handleMfaEnrollmentConfirmRequest({ D1_01: db } as BetterAuthEnv, makeRequest({ code: '123456' }, false))
+    expect(response.status).toBe(403)
+    expect(mocks.resolvePrincipal).not.toHaveBeenCalled()
+    expect(mocks.handler).not.toHaveBeenCalled()
+  })
+
+  it('requires an authenticated ACTIVE identity and a six-digit TOTP code', async () => {
+    const { db } = makeDb()
+    mocks.resolvePrincipal.mockResolvedValueOnce(null)
+    const unauthenticated = await handleMfaEnrollmentConfirmRequest({ D1_01: db } as BetterAuthEnv, makeRequest())
+    expect(unauthenticated.status).toBe(401)
+    expect(mocks.handler).not.toHaveBeenCalled()
+
+    mocks.resolvePrincipal.mockResolvedValueOnce({ ...principal, accountState: 'SUSPENDED' })
+    const inactive = await handleMfaEnrollmentConfirmRequest({ D1_01: db } as BetterAuthEnv, makeRequest())
+    expect(inactive.status).toBe(401)
+    expect(mocks.handler).not.toHaveBeenCalled()
+
+    mocks.resolvePrincipal.mockResolvedValueOnce(principal)
+    const invalid = await handleMfaEnrollmentConfirmRequest({ D1_01: db } as BetterAuthEnv, makeRequest({ code: '12345' }))
+    expect(invalid.status).toBe(400)
+    expect(mocks.handler).not.toHaveBeenCalled()
+  })
+
+  it('does not allow confirmation to replace a factor that is already enabled or verified', async () => {
+    const { db } = makeDb({ userEnabled: 1, factorVerified: 1 })
+    const response = await handleMfaEnrollmentConfirmRequest({ D1_01: db } as BetterAuthEnv, makeRequest())
+    expect(response.status).toBe(409)
+    expect(mocks.handler).not.toHaveBeenCalled()
+  })
+
+  it('returns only a generic failure for invalid TOTP and rejects a false-positive read-back', async () => {
+    const { db } = makeDb()
+    mocks.handler.mockResolvedValueOnce(Response.json({ message: 'private Better Auth internals' }, { status: 401 }))
+    const invalidCode = await handleMfaEnrollmentConfirmRequest({ D1_01: db } as BetterAuthEnv, makeRequest())
+    expect(invalidCode.status).toBe(401)
+    expect(await invalidCode.text()).not.toContain('private Better Auth internals')
+    expect(mocks.finalizeReceipt).toHaveBeenCalledWith(
+      db,
+      'mfaop_0123456789abcdef0123456789abcdef',
+      expect.arrayContaining([expect.objectContaining({
+        eventType: 'auth.mfa.enrollment_failed',
+        result: 'failed',
+        reasonCode: 'ENROLLMENT_CONFIRMATION_REJECTED',
+      })]),
+    )
+
+    mocks.handler.mockResolvedValueOnce(Response.json({ ok: true }))
+    mocks.readStatus.mockResolvedValueOnce({ enabled: false, verified: false, enrolledAt: null })
+    const failedReadback = await handleMfaEnrollmentConfirmRequest({ D1_01: db } as BetterAuthEnv, makeRequest())
+    expect(failedReadback.status).toBe(503)
+  })
+})

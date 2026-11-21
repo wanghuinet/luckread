@@ -1,0 +1,580 @@
+/// <reference types="@cloudflare/workers-types" />
+
+import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, hasActiveCreatorMembership, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, transitionMembershipPlanLifecycle, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
+import { handleCommerceOrderRequest } from './order-http-runtime.js'
+import { resolveCommerceOrderItems } from './order-item-resolution.js'
+import { applyDemoTaxPricing, isDemoPricingEnabled } from './demo-tax-pricing.js'
+import { applyTaxJarSandboxPricing } from './taxjar-sandbox-pricing.js'
+import { handleCommercePaymentIntentRequest } from './payment-intent-http-runtime.js'
+import { handleCommerceRefundRequest } from './refund-http-runtime.js'
+import { handleCommerceBillingReadRequest } from './billing-read-http-runtime.js'
+import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
+import { handleRevenueCatWebhookRequest } from './revenuecat-webhook-http-runtime.js'
+import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-subscriber-reconciliation-runtime.js'
+import { previewSubscriptionPlanChange } from './subscription-plan-change-preview.js'
+import { createSubscriptionPlanUpgradeCheckout } from './subscription-plan-change-checkout.js'
+import { getScheduledPlanChangeStore, scheduleSubscriptionPlanDowngrade, scheduleSubscriptionBillingIntervalChange } from './subscription-plan-change-schedule.js'
+import { startSubscriptionTrialPostgres } from './subscription-trial-postgres.js'
+import { listOwnedSavedPaymentMethods, revokeOwnedSavedPaymentMethod, PaymentMethodRuntimeError } from './payment-method-runtime.js'
+import { getW07PaymentMethodReadStore } from './neon/payment-method-read-runtime.js'
+import {
+  getW07MembershipPostgresPool,
+} from './neon/membership-database-runtime.js'
+import { resolveDemoCommercePricing, resolveDemoRenewalPricing } from './demo-commerce-pricing-resolver.js'
+import { runRenewalScheduledBatch } from './renewal-scheduler.js'
+
+interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
+interface Env {
+  W07_DATABASE_DRIVER?: string
+  HYPERDRIVE_FINANCE_DB?: { connectionString?: string }
+  W07_MEMBERSHIP_DATABASE_DRIVER?: string
+  HYPERDRIVE_MEMBERSHIP_DB?: { connectionString?: string }
+  W06_GOVERNANCE?: Fetcher
+  MEMBERSHIP_RENEWAL_ENABLED?: string
+  HYPERSWITCH_ENVIRONMENT?: string
+  COMMERCE_PRICING_MODE?: string
+  HYPERSWITCH_API_KEY?: string
+  HYPERSWITCH_MERCHANT_ID?: string
+  HYPERSWITCH_WEBHOOK_SECRET?: string
+  REVENUECAT_WEBHOOK_AUTHORIZATION?: string
+  REVENUECAT_WEBHOOK_SIGNING_SECRET?: string
+  REVENUECAT_ALLOWED_APP_IDS?: string
+  REVENUECAT_SECRET_API_KEY?: string
+  COMMERCE_DEMO_TAX_PROVIDER?: string
+  TAXJAR_SANDBOX_API_KEY?: string
+  TAXJAR_DEMO_FROM_STREET?: string
+  TAXJAR_DEMO_FROM_CITY?: string
+  TAXJAR_DEMO_FROM_STATE?: string
+  TAXJAR_DEMO_FROM_ZIP?: string
+  TAXJAR_DEMO_TO_STREET?: string
+  TAXJAR_DEMO_TO_CITY?: string
+  TAXJAR_DEMO_TO_STATE?: string
+  TAXJAR_DEMO_TO_ZIP?: string
+  SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
+  SUBSCRIPTION_READ_LIMITER?: RateLimitBinding
+  SUBSCRIPTION_WRITE_LIMITER?: RateLimitBinding
+}
+
+const requirePaymentMethodReadStore = (env: Env) => {
+  const store = getW07PaymentMethodReadStore(env)
+  if (!store) throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return store
+}
+
+const getRateKey = (request: Request): string => {
+  const principal = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
+  if (principal.length > 0 && principal.length <= 256) return 'principal:' + principal
+  const clientIp = request.headers.get('X-LuckRead-Client-IP')?.trim() ?? ''
+  if (clientIp.length > 0 && clientIp.length <= 128) return 'client:' + clientIp
+  return 'transport:W01'
+}
+
+const applyRateLimit = async (limiter: RateLimitBinding, key: string): Promise<void> => {
+  try {
+    const result = await limiter.limit({ key })
+    if (!result.success) throw new SubscriptionRuntimeError('RATE_LIMITED', 429)
+  } catch (error) {
+    if (error instanceof SubscriptionRuntimeError) throw error
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+}
+
+const enforceRateLimit = async (request: Request, env: Env, operationOverride?: 'read' | 'write'): Promise<void> => {
+  const operation = operationOverride ?? (request.method === 'GET' ? 'read' : 'write')
+  const originLimiter = env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
+  if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  await applyRateLimit(originLimiter, 'origin:' + operation)
+
+  const actorLimiter = operation === 'read' ? env.SUBSCRIPTION_READ_LIMITER : env.SUBSCRIPTION_WRITE_LIMITER
+  if (!actorLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  await applyRateLimit(actorLimiter, operation + ':' + getRateKey(request))
+}
+
+const json = (body: unknown, status = 200, etag?: string) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(etag ? { ETag: etag } : {}) } })
+
+const requireTransport = (request: Request, expectedCaller = 'W01'): void => {
+  if (request.headers.get('X-LuckRead-Caller') !== expectedCaller || request.headers.get('X-LuckRead-Transport-Version') !== '1.0' || !request.headers.get('X-LuckRead-Correlation-Id')?.trim()) throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+}
+
+const requirePrincipal = (request: Request): string => { requireTransport(request); return validatePrincipal(request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? '') }
+
+const requireLayer = (request: Request): void => {
+  const layer = request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? ''
+  if (!/^L[0-8]$/.test(layer) || Number(layer.slice(1)) < 2) throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+}
+
+const parseSegments = (pathname: string): string[] => pathname.split('/').filter(Boolean).map((segment) => { try { return decodeURIComponent(segment) } catch { throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400) } })
+
+const requireCreatorLayer = (request: Request): void => {
+  const layer = request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? ''
+  if (!/^L[0-8]$/.test(layer) || Number(layer.slice(1)) < 3) {
+    throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+  }
+}
+
+const requireVerifiedCreatorId = (request: Request): string => {
+  const creatorId = request.headers.get('X-LuckRead-Verified-Creator-Id')?.trim() ?? ''
+  if (!creatorId || creatorId.length > 256) throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+  return validatePrincipal(creatorId)
+}
+
+const readJsonBody = async (request: Request): Promise<unknown> => {
+  const declaredLength = Number(request.headers.get('content-length') ?? '0')
+  if (Number.isFinite(declaredLength) && declaredLength > 16_384) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+  if (!request.body) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let length = 0
+  try {
+    while (true) {
+      const part = await reader.read()
+      if (part.done) break
+      length += part.value.byteLength
+      if (length > 16_384) {
+        await reader.cancel()
+        throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+      }
+      chunks.push(part.value)
+    }
+  } catch (error) {
+    if (error instanceof SubscriptionRuntimeError) throw error
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const bytes = new Uint8Array(length)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown
+  } catch {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+}
+
+type Operation =
+  | { operation: 'listPlans'; subscriptionId: null }
+  | { operation: 'listOwnedPlans'; subscriptionId: null }
+  | { operation: 'createPlan'; subscriptionId: null }
+  | { operation: 'list'; subscriptionId: null }
+  | { operation: 'get'; subscriptionId: string }
+  | { operation: 'planChangePreview'; subscriptionId: string }
+  | { operation: 'planUpgradeCheckout'; subscriptionId: string }
+  | { operation: 'planDowngradeSchedule'; subscriptionId: string }
+  | { operation: 'planBillingIntervalSchedule'; subscriptionId: string }
+  | { operation: 'trialStart'; subscriptionId: null }
+
+const toOperation = (method: string, segments: string[]): Operation | null => {
+  if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
+  if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'GET') return { operation: 'listOwnedPlans', subscriptionId: null }
+  if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'POST') return { operation: 'createPlan', subscriptionId: null }
+  if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
+  if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[2] === 'trial' && method === 'POST') return { operation: 'trialStart', subscriptionId: null }
+  if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
+  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan-preview' && method === 'GET') return { operation: 'planChangePreview', subscriptionId: segments[2] }
+  if (segments.length === 5 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && segments[4] === 'checkout' && method === 'POST') return { operation: 'planUpgradeCheckout', subscriptionId: segments[2] }
+  if (segments.length === 5 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && segments[4] === 'schedule' && method === 'POST') return { operation: 'planDowngradeSchedule', subscriptionId: segments[2] }
+  if (segments.length === 5 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && segments[4] === 'interval-schedule' && method === 'POST') return { operation: 'planBillingIntervalSchedule', subscriptionId: segments[2] }
+  return null
+}
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    try {
+      const runtimeEnv = env
+      // W10 is the only admitted scheduler. This private service-binding
+      // endpoint delegates all commerce and membership writes back to W07.
+      if (new URL(request.url).pathname === '/internal/renewals/w10/scheduled-batch') {
+        if (request.method !== 'POST') {
+          return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        }
+        requireTransport(request, 'W10')
+        if (request.headers.has('Authorization') || request.headers.has('Cookie')) {
+          throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+        }
+        if (runtimeEnv.MEMBERSHIP_RENEWAL_ENABLED !== 'true' ||
+            !isDemoPricingEnabled(runtimeEnv.COMMERCE_PRICING_MODE, runtimeEnv.HYPERSWITCH_ENVIRONMENT) ||
+            !['synthetic', 'taxjar-sandbox'].includes(runtimeEnv.COMMERCE_DEMO_TAX_PROVIDER ?? '')) {
+          throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+        }
+        const originLimiter = runtimeEnv.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
+        if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+        await applyRateLimit(originLimiter, 'origin:renewal')
+        const input = await readJsonBody(request)
+        if (typeof input !== 'object' || input === null || Array.isArray(input) ||
+            Object.keys(input as Record<string, unknown>).length !== 0) {
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await runRenewalScheduledBatch(runtimeEnv, {
+          maxCyclesPerBatch: 1,
+          resolvePricing: (pricingInput) => resolveDemoRenewalPricing(runtimeEnv, pricingInput),
+        })
+        return json({ data: result, requestId: crypto.randomUUID() })
+      }
+
+      // Provider webhooks have no user session. Apply the existing global write
+      // limiter and validate the private W01 transport before normal principal
+      // and layer checks; do not introduce a new rate-limit namespace.
+      if (new URL(request.url).pathname === '/internal/webhooks/hyperswitch') {
+        const originLimiter = runtimeEnv.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
+        if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+        await applyRateLimit(originLimiter, 'origin:webhook')
+        const webhookResponse = await handleHyperswitchWebhookRequest(request, runtimeEnv)
+        if (webhookResponse) return webhookResponse
+      }
+
+      if (new URL(request.url).pathname === '/internal/webhooks/revenuecat') {
+        const originLimiter = runtimeEnv.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
+        if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+        await applyRateLimit(originLimiter, 'origin:webhook')
+        const webhookResponse = await handleRevenueCatWebhookRequest(request, runtimeEnv)
+        if (webhookResponse) return webhookResponse
+      }
+
+      if (new URL(request.url).pathname === '/internal/subscriptions/reconcile-revenuecat') {
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        await enforceRateLimit(request, runtimeEnv, 'read')
+        requireTransport(request, 'W01')
+        if (request.headers.has('Authorization') || request.headers.has('Cookie')) {
+          throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+        }
+        requirePrincipal(request)
+        requireLayer(request)
+        const reconciliationResponse = await handleRevenueCatSubscriberReconciliationRequest(request, runtimeEnv)
+        if (reconciliationResponse) return reconciliationResponse
+      }
+
+      // W03 may ask for a bounded membership decision; this endpoint never
+      // returns subscription, plan, payment, order, or financial records.
+      if (new URL(request.url).pathname === '/internal/entitlements/check-creator-membership') {
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        await enforceRateLimit(request, runtimeEnv, 'read')
+        requireTransport(request, 'W03')
+        if (request.headers.has('Authorization') || request.headers.has('Cookie')) {
+          throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+        }
+        const subscriberId = validatePrincipal(request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? '')
+        requireLayer(request)
+        const input = await readJsonBody(request)
+        if (!input || typeof input !== 'object' || Array.isArray(input) ||
+            Object.keys(input as Record<string, unknown>).length !== 1 ||
+            !Object.hasOwn(input, 'creatorId') ||
+            typeof (input as { creatorId?: unknown }).creatorId !== 'string') {
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const creatorId = validatePrincipal((input as { creatorId: string }).creatorId)
+        const membershipStore = getW07MembershipPostgresPool(runtimeEnv)
+        const allowed = await hasActiveCreatorMembership(membershipStore, subscriberId, creatorId)
+        return json({
+          data: { allowed, reason: allowed ? 'ACTIVE_CREATOR_MEMBERSHIP' : 'MEMBERSHIP_REQUIRED' },
+          requestId: crypto.randomUUID(),
+        })
+      }
+
+      await enforceRateLimit(request, runtimeEnv)
+      requireTransport(request)
+      const principal = requirePrincipal(request)
+      requireLayer(request)
+      const paymentMethodPath = new URL(request.url).pathname
+      if (request.method === 'GET' && paymentMethodPath === '/payment-methods') {
+        const docs = await listOwnedSavedPaymentMethods(
+          runtimeEnv, principal, requirePaymentMethodReadStore(runtimeEnv),
+        )
+        return json({ data: { docs }, requestId: crypto.randomUUID() })
+      }
+      const paymentMethodMatch = /^\/payment-methods\/(spm_[A-Za-z0-9]{26})$/.exec(paymentMethodPath)
+      if (request.method === 'DELETE' && paymentMethodMatch) {
+        if (request.body !== null) {
+          await request.body.cancel().catch((): void => undefined)
+          throw new PaymentMethodRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await revokeOwnedSavedPaymentMethod(
+          runtimeEnv, principal, paymentMethodMatch[1], request.headers.get('Idempotency-Key'),
+          requirePaymentMethodReadStore(runtimeEnv),
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, result.status === 'REMOVED' ? 200 : 202)
+      }
+
+      const paymentIntentResponse = await handleCommercePaymentIntentRequest(request, principal, runtimeEnv)
+      if (paymentIntentResponse) return paymentIntentResponse
+      const billingReadResponse = await handleCommerceBillingReadRequest(request, principal, runtimeEnv)
+      if (billingReadResponse) return billingReadResponse
+      const refundResponse = await handleCommerceRefundRequest(request, principal, runtimeEnv)
+      if (refundResponse) return refundResponse
+      const orderDependencies = isDemoPricingEnabled(runtimeEnv.COMMERCE_PRICING_MODE, runtimeEnv.HYPERSWITCH_ENVIRONMENT)
+        ? { resolvePricing: (input: unknown) => resolveDemoCommercePricing(runtimeEnv, input) }
+        : undefined
+      const commerceOrderResponse = await handleCommerceOrderRequest(request, principal, runtimeEnv, orderDependencies)
+      if (commerceOrderResponse) return commerceOrderResponse
+      const pathname = new URL(request.url).pathname
+      const operation = toOperation(request.method, parseSegments(pathname))
+      if (operation?.operation === 'trialStart') {
+        requireLayer(request)
+        const input = await readJsonBody(request)
+        const idempotencyKey = request.headers.get('Idempotency-Key')
+        const result = await startSubscriptionTrialPostgres(
+          runtimeEnv, getW07MembershipPostgresPool(runtimeEnv), principal, input, idempotencyKey,
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 201, result.etag)
+      }
+      if (operation?.operation === 'planChangePreview') {
+        const targetPlanId = new URL(request.url).searchParams.get('targetPlanId')
+        if (!targetPlanId) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        const result = await previewSubscriptionPlanChange(
+          getScheduledPlanChangeStore(runtimeEnv), principal, operation.subscriptionId, targetPlanId,
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      }
+      if (operation?.operation === 'planDowngradeSchedule') {
+        requireLayer(request)
+        const scheduled = await scheduleSubscriptionPlanDowngrade(
+          runtimeEnv,
+          principal,
+          operation.subscriptionId,
+          await readJsonBody(request),
+          request.headers.get('Idempotency-Key'),
+          request.headers.get('If-Match'),
+        )
+        return json({ data: scheduled, requestId: crypto.randomUUID() }, scheduled.replayed ? 200 : 201)
+      }
+      if (operation?.operation === 'planBillingIntervalSchedule') {
+        requireLayer(request)
+        const scheduled = await scheduleSubscriptionBillingIntervalChange(
+          runtimeEnv,
+          principal,
+          operation.subscriptionId,
+          await readJsonBody(request),
+          request.headers.get('Idempotency-Key'),
+          request.headers.get('If-Match'),
+        )
+        return json({ data: scheduled, requestId: crypto.randomUUID() }, scheduled.replayed ? 200 : 201)
+      }
+      if (operation?.operation === 'planUpgradeCheckout') {
+        requireLayer(request)
+        const checkout = await createSubscriptionPlanUpgradeCheckout(
+          runtimeEnv,
+          principal,
+          operation.subscriptionId,
+          await readJsonBody(request),
+          request.headers.get('Idempotency-Key'),
+          request.headers.get('If-Match'),
+          {
+            resolvePricing: async ({ preview, attempt }) => {
+              const resolved = await resolveCommerceOrderItems(getW07MembershipPostgresPool(runtimeEnv), {
+                items: [{ itemRef: preview.targetPlan.planId, quantity: 1 }],
+              })
+              const item = resolved.items[0]
+              if (!item || resolved.items.length !== 1 ||
+                  item.itemRef !== attempt.targetPlanId ||
+                  item.itemVersion !== String(attempt.targetPlanVersion) ||
+                  item.unitAmountMinor !== preview.targetPlan.priceMinor ||
+                  item.currency !== preview.currency ||
+                  !Number.isSafeInteger(preview.prorationBaseMinor) ||
+                  preview.prorationBaseMinor <= 0 ||
+                  preview.prorationBaseMinor > preview.targetPlan.priceMinor) {
+                throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+              }
+              let rawSnapshot: unknown
+              try {
+                rawSnapshot = JSON.parse(item.itemSnapshotJson) as unknown
+              } catch {
+                throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+              }
+              if (!rawSnapshot || typeof rawSnapshot !== 'object' || Array.isArray(rawSnapshot)) {
+                throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+              }
+              const itemSnapshotJson = JSON.stringify({
+                ...(rawSnapshot as Record<string, unknown>),
+                chargedAmountMinor: preview.prorationBaseMinor,
+                subscriptionChange: {
+                  kind: 'PLAN_UPGRADE',
+                  attemptId: attempt.attemptId,
+                  subscriberId: attempt.subscriberId,
+                  subscriptionId: attempt.subscriptionId,
+                  expectedSubscriptionVersion: attempt.expectedSubscriptionVersion,
+                  expectedPlanId: attempt.expectedPlanId,
+                  expectedPlanVersion: attempt.expectedPlanVersion,
+                  targetPlanId: attempt.targetPlanId,
+                  targetPlanVersion: attempt.targetPlanVersion,
+                  currentPeriodStart: attempt.currentPeriodStart,
+                  currentPeriodEnd: attempt.currentPeriodEnd,
+                  expiresAt: attempt.expiresAt,
+                },
+              })
+              if (new TextEncoder().encode(itemSnapshotJson).byteLength > 65_536) {
+                throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+              }
+              const adjusted = {
+                currency: resolved.currency,
+                items: [{
+                  ...item,
+                  unitAmountMinor: preview.prorationBaseMinor,
+                  itemSnapshotJson,
+                }],
+              }
+              if (isDemoPricingEnabled(runtimeEnv.COMMERCE_PRICING_MODE, runtimeEnv.HYPERSWITCH_ENVIRONMENT)) {
+                if (runtimeEnv.COMMERCE_DEMO_TAX_PROVIDER === 'synthetic') {
+                  return applyDemoTaxPricing(adjusted)
+                }
+                if (runtimeEnv.COMMERCE_DEMO_TAX_PROVIDER === 'taxjar-sandbox') {
+                  try {
+                    return await applyTaxJarSandboxPricing(adjusted, {
+                      apiKey: runtimeEnv.TAXJAR_SANDBOX_API_KEY,
+                      fromAddress: {
+                        street: runtimeEnv.TAXJAR_DEMO_FROM_STREET ?? '',
+                        city: runtimeEnv.TAXJAR_DEMO_FROM_CITY ?? '',
+                        state: runtimeEnv.TAXJAR_DEMO_FROM_STATE ?? '',
+                        zip: runtimeEnv.TAXJAR_DEMO_FROM_ZIP ?? '',
+                      },
+                      toAddress: {
+                        street: runtimeEnv.TAXJAR_DEMO_TO_STREET ?? '',
+                        city: runtimeEnv.TAXJAR_DEMO_TO_CITY ?? '',
+                        state: runtimeEnv.TAXJAR_DEMO_TO_STATE ?? '',
+                        zip: runtimeEnv.TAXJAR_DEMO_TO_ZIP ?? '',
+                      },
+                    })
+                  } catch {
+                    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+                  }
+                }
+              }
+              // Live pricing remains fail-closed until an admitted tax decision is wired.
+              throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+            },
+          },
+        )
+        return json({ data: checkout, requestId: crypto.randomUUID() }, checkout.replayed ? 200 : 201)
+      }
+      const publishPathMatch = /^\/membership\/plans\/([^/]+)\/publish$/.exec(pathname)
+      if (request.method === 'POST' && publishPathMatch) {
+        const segments = parseSegments(pathname)
+        if (segments.length !== 4 || segments[0] !== 'membership' || segments[1] !== 'plans' || segments[3] !== 'publish') {
+          return new Response(null, { status: 404 })
+        }
+        if (request.body !== null) {
+          await request.body.cancel().catch(() => undefined)
+          return json({ error: { code: 'VALIDATION_FAILED', message: 'Plan publish does not accept a request body', details: {} }, requestId: crypto.randomUUID() }, 400)
+        }
+        requireCreatorLayer(request)
+        const creatorId = requireVerifiedCreatorId(request)
+        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv)
+        const result = await publishMembershipPlan(membershipWriteStore, creatorId, segments[2]!, request.headers.get('If-Match'))
+        return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      }
+      const planRevisionMatch = /^\/membership\/plans\/([^/]+)$/.exec(pathname)
+      if (request.method === 'PUT' && planRevisionMatch) {
+        const segments = parseSegments(pathname)
+        if (segments.length !== 3 || segments[0] !== 'membership' || segments[1] !== 'plans') {
+          return new Response(null, { status: 404 })
+        }
+        requireCreatorLayer(request)
+        const creatorId = requireVerifiedCreatorId(request)
+        const input = await readJsonBody(request)
+        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv)
+        const result = await reviseMembershipPlan(
+          membershipWriteStore, creatorId, segments[2]!, request.headers.get('If-Match'), input,
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      }
+      const planLifecycleMatch = /^\/membership\/plans\/([^/]+)\/lifecycle$/.exec(pathname)
+      if (request.method === 'POST' && planLifecycleMatch) {
+        const segments = parseSegments(pathname)
+        if (segments.length !== 4 || segments[0] !== 'membership' || segments[1] !== 'plans' || segments[3] !== 'lifecycle') {
+          return new Response(null, { status: 404 })
+        }
+        requireCreatorLayer(request)
+        const creatorId = requireVerifiedCreatorId(request)
+        const value = await readJsonBody(request)
+        if (!value || typeof value !== 'object' || Array.isArray(value) ||
+            Object.keys(value as Record<string, unknown>).length !== 1 ||
+            !Object.hasOwn(value, 'action') ||
+            !['pause', 'resume', 'retire'].includes(String((value as Record<string, unknown>).action))) {
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv)
+        const result = await transitionMembershipPlanLifecycle(
+          membershipWriteStore, creatorId, segments[2]!, request.headers.get('If-Match'),
+          (value as { action: 'pause' | 'resume' | 'retire' }).action,
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      }
+      if (request.method === 'POST' && operation?.operation !== 'createPlan') {
+        return json({
+          error: {
+            code: 'SERVICE_UNAVAILABLE',
+            message: 'Subscription writes are disabled until verified payment-provider synchronization is available.',
+            details: {},
+          },
+          requestId: crypto.randomUUID(),
+        }, 503)
+      }
+      if (!operation) return new Response(null, { status: 404 })
+      if (operation.operation === 'createPlan') {
+        requireCreatorLayer(request)
+        const creatorId = requireVerifiedCreatorId(request)
+        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv)
+        const result = await createMembershipPlanDraft(
+          membershipWriteStore,
+          principal,
+          creatorId,
+          await readJsonBody(request),
+          request.headers.get('Idempotency-Key'),
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 201, result.etag)
+      }
+      if (operation.operation === 'listOwnedPlans') {
+        requireCreatorLayer(request)
+        const creatorId = requireVerifiedCreatorId(request)
+        const url = new URL(request.url)
+        const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
+        const planCatalogStore = getW07MembershipPostgresPool(runtimeEnv)
+        const result = await listCreatorMembershipPlans(planCatalogStore, creatorId, requestedLimit, url.searchParams.get('cursor'))
+        return json({ data: result, requestId: crypto.randomUUID() })
+      }
+      if (operation.operation === 'listPlans') {
+        const url = new URL(request.url)
+        const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
+        const creatorId = url.searchParams.get('creatorId')
+        const planCatalogStore = getW07MembershipPostgresPool(runtimeEnv)
+        const result = await listActiveMembershipPlans(
+          planCatalogStore,
+          requestedLimit,
+          url.searchParams.get('cursor'),
+          creatorId,
+        )
+        return json({ data: result, requestId: crypto.randomUUID() })
+      }
+      if (operation.operation === 'list') {
+        const url = new URL(request.url)
+        const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
+        const requestedPage = parseBoundedPositiveInt(url.searchParams.get('page'), 1, 10000)
+        const membershipReadStore = getW07MembershipPostgresPool(runtimeEnv)
+        const result = await listSubscriptions(membershipReadStore, principal, requestedLimit, requestedPage)
+        return json({ data: result, requestId: crypto.randomUUID() })
+      }
+      const membershipReadStore = getW07MembershipPostgresPool(runtimeEnv)
+      const result = await getSubscription(membershipReadStore, principal, operation.subscriptionId)
+      return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+    } catch (error) {
+      if (error instanceof PaymentMethodRuntimeError) {
+        return new Response(JSON.stringify({
+          error: { code: error.code, message: error.code === 'PRECONDITION_REQUIRED' ? 'precondition required' :
+            error.code === 'RESOURCE_NOT_FOUND' ? 'resource not found' :
+            error.code === 'CONFLICT' || error.code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' ? 'payment method conflict' :
+            error.code === 'VALIDATION_FAILED' ? 'validation failed' :
+            error.code === 'SERVICE_UNAVAILABLE' ? 'service unavailable' : error.code, details: {} },
+          requestId: crypto.randomUUID(),
+        }), { status: error.status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } })
+      }
+      if (error instanceof SubscriptionRuntimeError) {
+        const message = error.code === 'PERMISSION_DENIED' ? 'permission denied' : error.code === 'PRECONDITION_REQUIRED' ? 'precondition required' : error.code === 'PRECONDITION_FAILED' ? 'precondition failed' : error.code === 'RESOURCE_NOT_FOUND' ? 'resource not found' : error.code === 'INVALID_STATE' ? 'invalid subscription state' : error.code === 'PLAN_NOT_ACTIVE' ? 'membership plan is unavailable' : error.code === 'CONFLICT' ? 'subscription conflict' : error.code === 'VALIDATION_FAILED' ? 'validation failed' : error.code === 'RATE_LIMITED' ? 'too many requests' : error.code === 'SERVICE_UNAVAILABLE' ? 'service unavailable' : error.code
+        return new Response(JSON.stringify({ error: { code: error.code, message, details: error.code === 'RATE_LIMITED' ? { retryAfter: 60 } : {} }, requestId: crypto.randomUUID() }), { status: error.status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(error.code === 'RATE_LIMITED' ? { 'retry-after': '60' } : {}) } })
+      }
+      console.error(error)
+      return json({ error: { code: 'INTERNAL_ERROR', message: 'Internal error', details: {} }, requestId: crypto.randomUUID() }, 500)
+    }
+  },
+}

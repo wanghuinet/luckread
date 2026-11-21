@@ -1,0 +1,64 @@
+{
+  "version": "1.0.0",
+  "evidenceType": "MAPPING_0_AUTH_002_R4_ENTITY_PERSISTENCE_RECONCILIATION",
+  "generatedAt": "2026-09-26",
+  "repository": "wanghuinet/luckread",
+  "currentMain": "782a62eafb9ca444bd93ff6631d5fc48d98e507f",
+  "featureId": "AUTH-002",
+  "registryPath": "contracts/capability/feature-entity-persistence-registry.v1.json",
+  "findings": {
+    "ENT_SESSION": {
+      "result": "IMPLEMENTATION_EVIDENCE_BOUND_BUT_NOT_PROMOTED",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "IMPLEMENTED",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+      "implementationEvidenceRefs": [
+        "workers/W02-content/src/session/session-runtime.ts",
+        "workers/W02-content/src/index.ts",
+        "workers/W01-payload/src/app/auth/login/route.ts",
+        "workers/W01-payload/src/app/auth/refresh/route.ts",
+        "workers/W01-payload/src/app/auth/logout/route.ts"
+      ],
+      "remoteEvidence": [
+        "https://github.com/wanghuinet/luckread/actions/runs/36217784262",
+        "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
+      ]
+    },
+    "ENT_IDENTITY": {
+      "result": "BLOCKED_NO_VERIFIED_IMPLEMENTATION_OR_PERSISTENCE",
+      "catalogStatus": "PROPOSED",
+      "persistenceStatus": "NOT_VERIFIED"
+    },
+    "ENT_CREDENTIAL": {
+      "result": "BLOCKED_NO_VERIFIED_IMPLEMENTATION_OR_PERSISTENCE",
+      "catalogStatus": "PROPOSED",
+      "persistenceStatus": "NOT_VERIFIED"
+    }
+  },
+  "semanticReconciliation": {
+    "auth002PersistenceMode": "MIXED",
+    "nativeSessionAuthority": "Payload users.sessions[]",
+    "extensionPersistence": "auth_session_state",
+    "supersededContract": "contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json",
+    "currentContract": "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
+    "noDuplicateSessionAuthority": true,
+    "noEntityPromotionByInference": true
+  },
+  "gateResult": {
+    "auth002RegistryStatus": "BLOCKED",
+    "r4": "BLOCKED",
+    "fiveWay": "NOT_GREEN",
+    "mapping0": "NOT_GREEN"
+  },
+  "nextAction": {
+    "id": "M0-AUTH-002-R4-CROSS-ENTITY-DEPENDENCY-RECONCILIATION-001",
+    "state": "WAIT_DEPENDENCY_EVIDENCE",
+    "objective": "Determine whether AUTH-002 can be admitted against the existing canonical User plus Session ownership while ENT-IDENTITY and ENT-CREDENTIAL remain governed by AUTH-003, without changing the authoritative mapping contract by inference.",
+    "prohibited": [
+      "Do not remove ENT-IDENTITY or ENT-CREDENTIAL from AUTH-002 registry without explicit authority decision.",
+      "Do not promote ENT-IDENTITY or ENT-CREDENTIAL from contract-only evidence.",
+      "Do not mark AUTH-002 registry VERIFIED.",
+      "Do not rerun 36219132123 unchanged."
+    ]
+  }
+}

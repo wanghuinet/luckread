@@ -1,0 +1,166 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": "src/worker.ts",
+  "name": "luckread-w01-payload",
+  "compatibility_date": "2025-08-15",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
+  "vars": {
+    "PAYLOAD_DATABASE_DRIVER": "neon"
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "0c53a1bb9bc0484bac146e8ae2d3158b",
+      "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:5432/luckread_schema"
+    }
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "services": [
+    {
+      "binding": "W02_AUTH",
+      "service": "luckread-w02"
+    },
+    {
+      "binding": "W03_CONTENT",
+      "service": "luckread-w03"
+    },
+    {
+      "binding": "W04_FEED",
+      "service": "luckread-w04"
+    },
+    {
+      "binding": "W05_SOCIAL",
+      "service": "luckread-w05"
+    },
+    {
+      "binding": "W06_MODERATION",
+      "service": "luckread-w06"
+    },
+    {
+      "binding": "W07_SUBSCRIPTION",
+      "service": "luckread-w07"
+    },
+    {
+      "binding": "W08_CREATOR",
+      "service": "luckread-w08-creator"
+    },
+    {
+      "binding": "W11_ANALYTICS",
+      "service": "luckread-w11"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "PUBLIC_ORIGIN_GLOBAL_LIMITER",
+      "namespace_id": "2026100311",
+      "simple": {
+        "limit": 10000,
+        "period": 60
+      }
+    },
+    {
+      "name": "PUBLIC_READ_LIMITER",
+      "namespace_id": "2026100312",
+      "simple": {
+        "limit": 300,
+        "period": 60
+      }
+    },
+    {
+      "name": "W01_WRITE_ORIGIN_GLOBAL_LIMITER",
+      "namespace_id": "2026100319",
+      "simple": {
+        "limit": 3000,
+        "period": 60
+      }
+    },
+    {
+      "name": "W01_WRITE_LIMITER",
+      "namespace_id": "2026100320",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    },
+    {
+      "name": "AUTH_ORIGIN_GLOBAL_LIMITER",
+      "namespace_id": "2026100310",
+      "simple": {
+        "limit": 3000,
+        "period": 60
+      }
+    },
+    {
+      "name": "AUTH_REGISTER_LIMITER",
+      "namespace_id": "2026100305",
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
+    },
+    {
+      "name": "AUTH_LOGIN_LIMITER",
+      "namespace_id": "2026100306",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    },
+    {
+      "name": "AUTH_REFRESH_LIMITER",
+      "namespace_id": "2026100307",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "luckread.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "api.luckread.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.luckread.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "sso.luckread.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "mp.luckread.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "img.luckread.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "video.luckread.com",
+      "custom_domain": true
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "luckread-w01-assets-placeholder"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  }
+}

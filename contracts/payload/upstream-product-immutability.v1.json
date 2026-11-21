@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "status": "ACTIVE",
+  "source": "LuckRead architecture invariant: Payload and Better Auth are immutable upstream products",
+  "products": [
+    {
+      "name": "Payload",
+      "package": "payload",
+      "sourceAuthority": "upstream-npm"
+    },
+    {
+      "name": "Better Auth",
+      "package": "better-auth",
+      "sourceAuthority": "upstream-npm"
+    }
+  ],
+  "rules": {
+    "upstreamSourceImmutable": true,
+    "allowedLuckReadChanges": [
+      "configuration",
+      "integration",
+      "adapter",
+      "supported-extension",
+      "LuckRead-owned-domain-code"
+    ],
+    "forbiddenMechanisms": [
+      "source-modification",
+      "fork",
+      "vendoring",
+      "patch-package",
+      "monkey-patch",
+      "local-file-dependency"
+    ]
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "version": "1.0.0",
+  "evidenceType": "MAPPING_0_AUTH_002_E6_RUNTIME_EVIDENCE_RECONCILIATION",
+  "generatedAt": "2026-09-26",
+  "repository": "wanghuinet/luckread",
+  "currentMainAtReview": "5be6f348e780dcd70937f1cf90918984c550745b",
+  "featureId": "AUTH-002",
+  "gate": "E6-RUNTIME-003",
+  "runtimeEvidence": {
+    "workflowRunId": 36219132123,
+    "workflowJobId": 108340930519,
+    "testedCommitSha": "5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55",
+    "result": "PASS",
+    "validator": "AUTH-002_RUNTIME_EVIDENCE_VALIDATION_PASS",
+    "gate1Accepted": true,
+    "negativeCasesPassed": true,
+    "concurrencyCasesPassed": true,
+    "databaseName": "luckread",
+    "environmentClass": "CONTROLLED_REMOTE_D1",
+    "deploymentRunId": 36218476233,
+    "deploymentHeadSha": "5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55",
+    "provenanceArtifactName": "w01-w02-binding-deployment-5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55",
+    "evidenceArtifactRun": "36219132123"
+  },
+  "relatedVerifiedEvidence": {
+    "entUserProfileMigration": {
+      "workflowRunId": 36195829989,
+      "status": "PASS_VERIFIED",
+      "migrationId": "20260925_111503_MIG_ENT_USER_PROFILE_V1",
+      "artifactId": "10889878248"
+    },
+    "w02Deployment": {
+      "workflowRunId": 35816952574,
+      "status": "PASS_VERIFIED"
+    },
+    "w01W02ServiceBinding": {
+      "workflowRunId": 35819898556,
+      "status": "PASS_VERIFIED",
+      "binding": "W02_AUTH",
+      "target": "luckread-w02"
+    }
+  },
+  "inheritanceAssessment": {
+    "eligible": true,
+    "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+    "basis": "Post-tested-commit changes through 5be6f348 are restricted to evidence/CI governance files already admitted by the Mapping 0 inheritance rule.",
+    "changedFilesAfterAnchor": [
+      ".github/workflows/auth-002-remote-runtime-evidence.yml",
+      "contracts/evidence/mapping-0-evidence-registry.v1.json",
+      "scripts/mapping-0-evidence-registry-final-check.mjs"
+    ],
+    "runtimeRerunRequired": false
+  },
+  "promotionBoundary": {
+    "auth002": "NOT_GREEN",
+    "canonicalMapping": "NOT_GREEN",
+    "r4": "NOT_GREEN",
+    "featureEntityPersistenceRegistry": "BLOCKED",
+    "reason": [
+      "AUTH-002 Feature→Entity→Persistence registry remains BLOCKED.",
+      "AUTH-002 mapping batch remains CONTRACTED_NOT_VERIFIED / NOT_GREEN.",
+      "ENT-IDENTITY and ENT-CREDENTIAL remain PROPOSED / CONTRACT_ONLY with no concrete implementation/persistence evidence.",
+      "ENT-SESSION remains PROPOSED / CONTRACTED_NOT_VERIFIED even though executable runtime/schema evidence now exists; entity promotion requires the complete contracted evidence chain and final Mapping 0 admission."
+    ]
+  },
+  "nextCursor": {
+    "id": "M0-AUTH-002-R4-ENTITY-PERSISTENCE-RECONCILIATION-001",
+    "state": "TODO_FIX",
+    "objective": "Reconcile the existing AUTH-002 Feature→Entity→Persistence registry using only explicit authority and already-admitted evidence; do not infer identity/credential ownership and do not promote Mapping 0.",
+    "prohibitedActions": [
+      "Do not rerun AUTH-002 runtime evidence 36219132123 unchanged.",
+      "Do not rerun W02 deployment or W01 W02_AUTH binding unchanged.",
+      "Do not mark AUTH-002 or Mapping 0 GREEN by evidence-registry edits alone.",
+      "Do not invent ENT-IDENTITY or ENT-CREDENTIAL implementation/persistence evidence."
+    ]
+  }
+}

@@ -1,0 +1,290 @@
+name: Contract Admission CI
+
+on:
+  push:
+    branches: [main, 'contract/**']
+    paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','workers/W07-subscription-commerce/**','workers/W01-payload/src/subscription/**','workers/W01-payload/src/app/api/v1/memberships/**','workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts','workers/W01-payload/wrangler.jsonc','.github/workflows/contract-admission-v2.yml','.github/workflows/w07-d1-04-binding-preflight.yml','.github/workflows/w07-d1-04-order-migration.yml']
+  pull_request:
+    paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','workers/W07-subscription-commerce/**','workers/W01-payload/src/subscription/**','workers/W01-payload/src/app/api/v1/memberships/**','workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts','workers/W01-payload/wrangler.jsonc','.github/workflows/contract-admission-v2.yml','.github/workflows/w07-d1-04-binding-preflight.yml','.github/workflows/w07-d1-04-order-migration.yml']
+  workflow_dispatch:
+    inputs:
+      checkout_ref:
+        description: 'Exact commit SHA to validate'
+        required: false
+        type: string
+      admission_mode:
+        description: 'DEVELOPMENT = contract/structural admission; FULL = include Five-Way + R4/Evidence/R5 downstream audit'
+        required: true
+        type: choice
+        options:
+          - DEVELOPMENT
+          - FULL
+        default: DEVELOPMENT
+
+permissions:
+  contents: read
+
+env:
+  CHECKOUT_REF: ${{ github.event.inputs.checkout_ref || github.sha }}
+  ADMISSION_MODE: ${{ github.event.inputs.admission_mode || (startsWith(github.head_ref, 'contract/full-admission/') && 'FULL') || (startsWith(github.ref_name, 'contract/full-admission/') && 'FULL') || 'DEVELOPMENT' }}
+
+jobs:
+  upstream-immutability:
+    name: Upstream Product Immutability Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24}
+      - name: Verify Payload and Better Auth upstream immutability
+        run: node scripts/upstream-product-immutability-check.mjs
+
+  contract:
+    name: Contract Admission Gate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        domain: [common, enums, state-machines, authz, events, openapi]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - run: node scripts/contract-ci.mjs ${{ matrix.domain }}
+
+  contract-semantic:
+    name: Semantic Cross-Contract Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - run: node scripts/contract-semantic-ci.mjs
+
+  feature-inventory:
+    name: Blueprint Feature Inventory Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - run: node scripts/build-feature-inventory.mjs
+      - run: test -f contracts/alignment/feature-inventory.v1.json
+      - run: git diff --exit-code -- contracts/alignment/feature-inventory.v1.json
+      - run: test -z "$(git status --porcelain --untracked-files=all)"
+
+  payload-reconciliation:
+    name: Payload Contract Reconciliation Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - run: node scripts/payload-native-inventory.mjs
+      - run: git diff --exit-code -- contracts/payload/payload-native-inventory.v1.json
+      - run: node scripts/payload-contract-reconciliation-check.mjs
+
+  governance-feature-id-alignment:
+    name: Governance Feature ID / Appeal Operation Alignment Gate
+    runs-on: ubuntu-latest
+    needs: [contract, feature-inventory]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - run: node scripts/build-feature-inventory.mjs
+      - run: node scripts/build-api-alignment-inventory.mjs
+      - run: node scripts/verify-governance-feature-id-alignment.mjs
+      - run: node --test scripts/verify-governance-feature-id-alignment.test.mjs
+      - run: git diff --exit-code -- contracts/alignment/feature-inventory.v1.json contracts/alignment/api-inventory.v1.json
+
+  capability-graph:
+    name: Capability Contract Graph Gate
+    runs-on: ubuntu-latest
+    needs: [contract, contract-semantic, feature-inventory, payload-reconciliation]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - run: node scripts/build-capability-contract-graph.mjs
+      - run: node scripts/capability-contract-graph-check.mjs
+      - name: Audit historical L1-L4 reconciliation (non-blocking)
+        continue-on-error: true
+        run: node scripts/l1-l4-reconciliation-baseline-check.mjs
+      - run: node scripts/entity-catalog-check.mjs
+      - run: node scripts/entity-implementation-evidence-check.mjs
+      - run: node scripts/entity-field-contract-check.mjs
+      - run: node scripts/entity-field-schema-contract-check.mjs
+
+  capability-graph-strict-downstream:
+    name: Strict Downstream R4/Evidence/R5 Gate
+    if: ${{ inputs.admission_mode == 'FULL' || startsWith(github.head_ref, 'contract/full-admission/') || startsWith(github.ref_name, 'contract/full-admission/') }}
+    runs-on: ubuntu-latest
+    needs: [capability-graph]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - name: Generate R4 evidence gap report
+        id: r4_report
+        continue-on-error: true
+        run: node scripts/mapping-0-r4-evidence-gap-report.mjs
+      - name: Validate feature entity and persistence registry
+        id: r4_feature_entity
+        if: ${{ always() }}
+        continue-on-error: true
+        run: node scripts/feature-entity-persistence-registry-check.mjs
+      - name: Validate canonical Mapping 0 Evidence Registry
+        id: evidence_registry
+        if: ${{ always() }}
+        continue-on-error: true
+        run: node scripts/mapping-0-evidence-registry-final-check.mjs
+      - name: Upload R4 evidence gap report
+        if: ${{ always() && steps.r4_report.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mapping-0-r4-evidence-gap-${{ github.run_id }}
+          path: artifacts/mapping-0/r4-evidence-gap-report.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Run R5 foundation contract check
+        id: r5_foundation
+        if: ${{ always() }}
+        continue-on-error: true
+        run: node scripts/r5-foundation-contract-check.mjs
+      - name: Enforce all R4, Evidence Registry and R5 results
+        if: ${{ always() }}
+        env:
+          R4_REPORT_OUTCOME: ${{ steps.r4_report.outcome }}
+          R4_FEATURE_ENTITY_OUTCOME: ${{ steps.r4_feature_entity.outcome }}
+          EVIDENCE_REGISTRY_OUTCOME: ${{ steps.evidence_registry.outcome }}
+          R5_FOUNDATION_OUTCOME: ${{ steps.r5_foundation.outcome }}
+        run: |
+          failed=0
+          for result in "$R4_REPORT_OUTCOME" "$R4_FEATURE_ENTITY_OUTCOME" "$EVIDENCE_REGISTRY_OUTCOME" "$R5_FOUNDATION_OUTCOME"; do
+            if [ "$result" != "success" ]; then
+              echo "STRICT_DOWNSTREAM_NOT_GREEN: component outcome=$result"
+              failed=1
+            fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi
+          echo "STRICT_DOWNSTREAM_GREEN"
+
+  alignment:
+    name: Five-Way Alignment Admission Gate
+    if: ${{ inputs.admission_mode == 'FULL' || startsWith(github.head_ref, 'contract/full-admission/') || startsWith(github.ref_name, 'contract/full-admission/') }}
+    runs-on: ubuntu-latest
+    needs: [contract, contract-semantic, feature-inventory, payload-reconciliation]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - run: node scripts/materialize-canonical-mapping.mjs
+      - run: node scripts/alignment-ci.mjs
+      - run: git diff --exit-code -- contracts/alignment/cross-system-mapping.v1.json contracts/alignment/feature-inventory.v1.json contracts/alignment/api-inventory.v1.json contracts/alignment/payload-inventory.v1.json contracts/alignment/code-evidence-inventory.v1.json contracts/alignment/five-way-reconciliation.v1.json contracts/alignment/change-impact.v1.json
+
+  mapping-zero-final:
+    name: Mapping 0 Structural/Contract Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - name: Generate Mapping 0 closure status snapshot
+        if: ${{ always() }}
+        run: node scripts/mapping-0-status-report.mjs
+      - name: Publish Mapping 0 closure status snapshot
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mapping-0-status-${{ github.run_id }}
+          path: artifacts/mapping-0/mapping-0-status-report.json
+          if-no-files-found: error
+          retention-days: 14
+      - run: npm run mapping:0:verify
+
+  repository-hygiene:
+    name: Repository Hygiene Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24}
+      - run: node scripts/repository-hygiene-check.mjs
+
+  contract-full:
+    name: Contract Admission Gate (full)
+    runs-on: ubuntu-latest
+    needs:
+      - contract
+      - contract-semantic
+      - feature-inventory
+      - payload-reconciliation
+      - governance-feature-id-alignment
+      - capability-graph
+      - capability-graph-strict-downstream
+      - alignment
+      - mapping-zero-final
+      - repository-hygiene
+      - upstream-immutability
+    if: ${{ always() && needs.contract.result == 'success' && needs['contract-semantic'].result == 'success' && needs.feature-inventory.result == 'success' && needs.payload-reconciliation.result == 'success' && needs['capability-graph'].result == 'success' && needs['governance-feature-id-alignment'].result == 'success' && needs['mapping-zero-final'].result == 'success' && needs['repository-hygiene'].result == 'success' && needs['upstream-immutability'].result == 'success' && (!(inputs.admission_mode == 'FULL' || startsWith(github.head_ref, 'contract/full-admission/') || startsWith(github.ref_name, 'contract/full-admission/')) || (needs['capability-graph-strict-downstream'].result == 'success' && needs.alignment.result == 'success')) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - run: node scripts/contract-ci.mjs
+      - name: Report admission mode
+        run: echo "Contract admission mode = ${{ env.ADMISSION_MODE }}"
+
+  openapi-lint:
+    name: OpenAPI Lint
+    runs-on: ubuntu-latest
+    # Run syntax lint independently so an unrelated full-alignment blocker
+    # does not suppress the OpenAPI result; Contract Admission Gate (full)
+    # still enforces FULL-mode downstream gates before admission can pass.
+    needs: contract
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - run: npx --yes @redocly/cli@1.34.2 lint contracts/openapi/v1/openapi.yaml

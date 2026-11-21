@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-02-schema-sources.v1.json",
+  "title": "LuckRead D1-02 Neon PostgreSQL Schema Source Inventory Contract",
+  "version": "1.0.0",
+  "status": "SOURCE_INVENTORY_BASELINE",
+  "target": {
+    "domainId": "D1-02",
+    "databaseName": "luckreadpro",
+    "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+    "postgresMajor": 18,
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "owners": [
+    {
+      "worker": "W03",
+      "role": "Authoritative content/article/post/video schema and content lifecycle",
+      "wrangler": "workers/W03-content/wrangler.jsonc",
+      "migrationDirectory": "workers/W03-content/migrations",
+      "physicalBindings": [
+        {
+          "binding": "D1_02",
+          "logicalDomain": "D1-02",
+          "databaseName": "luckreadpro",
+          "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+          "included": true
+        }
+      ],
+      "referenceContracts": [
+        "contracts/persistence/CONTENT-ARTICLE-d1-02-persistence.v1.json"
+      ],
+      "sqlMigrations": [
+        "0001_content_core.sql",
+        "0002_content_2_0_types_media.sql",
+        "0003_creator_list_pagination_index.sql",
+        "0004_content_revision_history.sql",
+        "0005_content_stable_slug.sql",
+        "0006_content_relationships.sql",
+        "0007_content_series.sql",
+        "0008_series_membership_ordering.sql",
+        "0009_content_collections.sql",
+        "0010_collection_membership_ordering.sql",
+        "0011_content_scheduled_publish.sql",
+        "0012_content_snowflake_id_allocator.sql",
+        "0013_content_access_mode.sql",
+        "0014_content_post_threads.sql",
+        "0015_content_media_warning.sql"
+      ]
+    },
+    {
+      "worker": "W05",
+      "role": "Authoritative social graph, interactions, discussions, notifications and push-delivery schema",
+      "wrangler": "workers/W05-social/wrangler.jsonc",
+      "migrationDirectory": "workers/W05-social/migrations",
+      "physicalBindings": [
+        {
+          "binding": "DB",
+          "logicalDomain": "D1-02",
+          "databaseName": "luckreadpro",
+          "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+          "included": true
+        },
+        {
+          "binding": "D1_03",
+          "logicalDomain": "D1-03",
+          "databaseName": "secondary",
+          "databaseUuid": "bda1d247-a371-4244-91ae-aef96034db7f",
+          "included": false,
+          "reason": "Separate governance/platform domain; explicitly excluded from the D1-02 source and migration inventory."
+        }
+      ],
+      "referenceContracts": [
+        "contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json"
+      ],
+      "sqlMigrations": [
+        "20260930_001_social_001_follow_v1.sql",
+        "20261002_002_social_003_like_v1.sql",
+        "20261002_003_social_004_comments_v1.sql",
+        "20261002_004_social_005_favorite_v1.sql",
+        "20261002_005_social_005_comment_likes_v1.sql",
+        "20261002_005_social_006_share_v1.sql",
+        "20261002_006_social_009_block_mute_v1.sql",
+        "20261003_001_social_010_comment_delete_tombstone_v1.sql",
+        "20261008_011_social_closure_v1.sql",
+        "20261016_013_social_repost_pin_v1.sql",
+        "20261017_014_social_polls_v1.sql",
+        "20261019_015_social_reply_audience_v1.sql",
+        "20261022_016_social_discovery_scan_idx.sql",
+        "20261104_017_notification_push_delivery_v1.sql",
+        "20261105_018_social_poll_duration_minutes.sql"
+      ]
+    }
+  ],
+  "knownHistoricalContractPathDiscrepancies": [
+    {
+      "contract": "contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json",
+      "field": "migration.artifactPath",
+      "legacyPath": "workers/W05-transaction/migrations/20260930_001_social_001_follow_v1.sql",
+      "currentSourcePath": "workers/W05-social/migrations/20260930_001_social_001_follow_v1.sql",
+      "status": "LEGACY_REFERENCE_REQUIRES_SEPARATE_CONTRACT_RECONCILIATION",
+      "disposition": "The current W05-social file is inventoried as the repository source. The legacy path is not read or executed."
+    }
+  ],
+  "portabilityReviewRequirements": [
+    {
+      "feature": "SQLite JSON1 functions",
+      "requiredReview": "Map JSON construction/extraction to PostgreSQL JSON/JSONB functions while preserving the existing serialized payload contract."
+    },
+    {
+      "feature": "randomblob-based identifiers",
+      "requiredReview": "Replace SQLite randomblob identifier generation with a PostgreSQL-supported generator and preserve identifier uniqueness/format guarantees."
+    },
+    {
+      "feature": "SQLite triggers",
+      "requiredReview": "Port each trigger to an explicit PostgreSQL trigger function and verify same-transaction outbox/notification semantics."
+    },
+    {
+      "feature": "INSERT OR IGNORE",
+      "requiredReview": "Translate conflict suppression to ON CONFLICT DO NOTHING only after verifying the exact unique/conflict target and idempotency semantics."
+    },
+    {
+      "feature": "SQLite table rebuild migrations",
+      "requiredReview": "Replace create-copy-drop-rename patterns with reviewed PostgreSQL ALTER TABLE operations; never replay SQLite rebuild SQL blindly."
+    },
+    {
+      "feature": "D1 runtime transaction behavior",
+      "requiredReview": "Separately audit D1Database.batch, change-count guards, query result shapes and transaction ownership before any Worker runtime adapter migration."
+    }
+  ],
+  "executionOrder": [
+    "Freeze W03 and W05 D1-02 source inventories and physical binding ownership",
+    "Review every SQLite-specific migration construct and record PostgreSQL translation decisions",
+    "Create PostgreSQL-native D1-02 migration artifacts under the owning Worker boundaries",
+    "Run targeted SQL/static checks and a fresh PostgreSQL 18 local bootstrap with schema/constraint/index/trigger assertions",
+    "Run all applicable W03 and W05 tests against the PostgreSQL-native artifacts",
+    "Only after a separately reviewed PR and green CI, consider the D1-02 schema-only Neon apply under its own exact release gate"
+  ],
+  "safetyInvariants": [
+    "Do not execute any SQLite/D1 migration file against PostgreSQL.",
+    "Do not inspect, mutate or apply DDL to Neon in this source-inventory slice.",
+    "Do not mutate Cloudflare D1 or deploy/change W03/W05 Worker bindings.",
+    "Do not import accounts, content, media, social relationships, notifications or other business rows.",
+    "Do not include W05's D1-03 binding or D1-03-owned records in D1-02 migration artifacts.",
+    "Do not add cross-domain foreign keys or distributed transactions.",
+    "Do not add Workers, D1 databases, Queues or Service Bindings.",
+    "Do not claim PostgreSQL runtime compatibility or production cutover from a source inventory report."
+  ]
+}

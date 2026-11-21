@@ -1,0 +1,606 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+  "title": "LuckRead Subscription D1-01 Logical Persistence Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureIds": [
+    "MON-005",
+    "MON-006",
+    "MON-008"
+  ],
+  "entityId": "ENT-SUBSCRIPTION",
+  "entityFieldContract": "contracts/entity/entity-field-contract.v1.json#ENT-SUBSCRIPTION",
+  "sourceOfTruth": "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+  "authority": {
+    "domainId": "D1-01",
+    "primaryTask": "T16",
+    "primaryWorker": "W07",
+    "workerRuntimeBoundary": "W07 Subscription workflow with explicitly admitted D1-01 access transition; W02 remains D1-01 Identity/Account/Access authority owner.",
+    "databaseUuid": "2f80471e-3756-49f9-8db1-7707a433ad64"
+  },
+  "table": {
+    "name": "membership_subscriptions",
+    "purpose": "Authoritative durable Subscription lifecycle state for Membership/Subscription access. Includes nullable immutable trial window metadata; TRIALING authorization remains period-bounded.",
+    "primaryKey": "subscription_id",
+    "columns": [
+      {
+        "name": "subscription_id",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": true,
+        "fieldId": "ENT-SUBSCRIPTION-F-SUBSCRIPTION-ID"
+      },
+      {
+        "name": "subscriber_id",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-SUBSCRIBER-ID"
+      },
+      {
+        "name": "version",
+        "type": "INTEGER",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-VERSION"
+      },
+      {
+        "name": "plan_id",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-PLAN-ID"
+      },
+      {
+        "name": "plan_version",
+        "type": "INTEGER",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-PLAN-VERSION"
+      },
+      {
+        "name": "creator_id",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-CREATOR-ID"
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-STATUS",
+        "stateMachineRef": "contracts/state-machines/subscription.json"
+      },
+      {
+        "name": "started_at",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-STARTED-AT"
+      },
+      {
+        "name": "current_period_start",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-CURRENT-PERIOD-START"
+      },
+      {
+        "name": "current_period_end",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-CURRENT-PERIOD-END"
+      },
+      {
+        "name": "trial_started_at",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-STARTED-AT"
+      },
+      {
+        "name": "trial_ends_at",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-ENDS-AT"
+      },
+      {
+        "name": "trial_converted_at",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-CONVERTED-AT"
+      },
+      {
+        "name": "cancel_at",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-CANCEL-AT"
+      },
+      {
+        "name": "entitlement_snapshot_ref",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-ENTITLEMENT-SNAPSHOT-REF"
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-CREATED-AT"
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-UPDATED-AT"
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_membership_subscriptions_subscriber_status_period",
+        "columns": [
+          "subscriber_id",
+          "status",
+          "current_period_end"
+        ]
+      },
+      {
+        "name": "ix_membership_subscriptions_plan_version",
+        "columns": [
+          "plan_id",
+          "plan_version"
+        ]
+      },
+      {
+        "name": "ix_membership_subscriptions_creator_status",
+        "columns": [
+          "creator_id",
+          "status"
+        ]
+      },
+      {
+        "name": "ix_membership_subscriptions_updated_at",
+        "columns": [
+          "updated_at"
+        ]
+      },
+      {
+        "name": "ux_membership_subscriptions_trial_per_subscriber_creator",
+        "unique": true,
+        "partial": true,
+        "where": "trial_started_at IS NOT NULL",
+        "columns": [
+          "subscriber_id",
+          "creator_id"
+        ]
+      },
+      {
+        "name": "ix_membership_subscriptions_trial_end",
+        "unique": false,
+        "partial": true,
+        "where": "trial_started_at IS NOT NULL",
+        "columns": [
+          "status",
+          "trial_ends_at",
+          "subscription_id"
+        ]
+      }
+    ]
+  },
+  "constraints": {
+    "subscriptionIdUnique": "subscription_id is the primary key and is never reused.",
+    "subscriberReference": "subscriber_id references authoritative ENT-USER by stable identifier only; no cross-D1 physical foreign key.",
+    "planVersionReference": "plan_id + plan_version identifies the immutable plan definition consumed by the subscription.",
+    "statusAuthority": "status is constrained by contracts/state-machines/subscription.json.",
+    "financialIsolation": "No payment, order, ledger, wallet or settlement facts are persisted as Subscription authority.",
+    "entitlementIsolation": "entitlement_snapshot_ref is a reference only; Entitlement remains its own authority.",
+    "privacy": "subscriber_id is not a public identifier and must be exposed only through authorized scoped APIs.",
+    "versionMonotonic": "version starts at 1 and increments exactly once per successful authoritative mutation."
+  },
+  "concurrency": {
+    "required": true,
+    "apiBoundary": "If-Match / expected-version semantics from Membership API contract.",
+    "physicalVersionField": "ENT-SUBSCRIPTION-F-VERSION",
+    "decision": "The Subscription entity field contract now defines version as the authoritative concurrency source. If-Match/expectedVersion MUST compare-and-set against this field; ETag remains representation metadata only.",
+    "status": "CONTRACTED_NOT_VERIFIED"
+  },
+  "uniqueness": {
+    "activeSubscriptionKey": "NOT_YET_FIXED",
+    "reason": "Membership Data Contract requires prevention of duplicate active subscriptions where business policy requires it, but the authoritative policy does not yet define whether the business key is subscriber-only, subscriber+plan, creator scope, organization scope, or another combination.",
+    "rule": "No speculative unique constraint may be introduced until the applicable Membership policy/plan scope contract resolves the active-subscription uniqueness boundary.",
+    "status": "DECISION_REQUIRED"
+  },
+  "migration": {
+    "status": "PREPARED_NOT_APPLIED",
+    "candidateMigration": "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
+    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence. The paid upgrade attempt reservation is an auxiliary D1-01 workflow table with no financial fields; it remains PREPARED_NOT_APPLIED until exact target migration evidence is recorded. Scheduled downgrade requests add only future-dated lifecycle metadata to D1-01; the physical migration remains source-only until controlled target, migration-history and postflight evidence is admitted. Migration 0007 adds the typed DOWNGRADE/BILLING_INTERVAL_CHANGE discriminator to the scheduled-change metadata; it remains source-only until separately admitted and applied after 0006. Migration 0008 adds immutable trial duration to membership_plan_versions and nullable trial lifecycle timestamps to membership_subscriptions, plus one-trial-per-subscriber/creator and trial-end indexes; it remains source-only until controlled D1-01 migration evidence is admitted.",
+    "additionalMigrations": [
+      "workers/W07-subscription-commerce/migrations/0005_membership_subscription_plan_change_attempts.sql",
+      "workers/W07-subscription-commerce/migrations/0006_membership_subscription_scheduled_plan_changes.sql",
+      "workers/W07-subscription-commerce/migrations/0007_scheduled_plan_change_type.sql",
+      "workers/W07-subscription-commerce/migrations/0008_subscription_trial_lifecycle.sql"
+    ],
+    "additionalColumns": [
+      {
+        "table": "membership_plan_versions",
+        "columns": [
+          {
+            "name": "trial_period_days",
+            "type": "INTEGER",
+            "nullable": false,
+            "default": 0,
+            "check": "typeof(trial_period_days) = 'integer' AND trial_period_days BETWEEN 0 AND 30"
+          }
+        ],
+        "invariant": "The value is stored on each immutable plan version and is never updated in place; a plan edit creates a new plan_version."
+      }
+    ]
+  },
+  "runtime": {
+    "w07Binding": "NOT_VERIFIED",
+    "d1Execution": "NOT_VERIFIED",
+    "subscriptionHandlers": "NOT_ADMITTED",
+    "evidenceRegistry": "NOT_VERIFIED"
+  },
+  "forbidden": [
+    "Add a second Subscription authority in D1-04.",
+    "Store payment-provider secrets or raw payment credentials.",
+    "Add an authoritative entitlement copy.",
+    "Add cross-D1 physical foreign keys.",
+    "Create a speculative active-subscription uniqueness constraint.",
+    "Introduce a standalone version field without a field-contract change.",
+    "Treat cache, projection or analytics data as Subscription authority.",
+    "Execute or claim migration success from this logical contract."
+  ],
+  "verificationRequirements": [
+    "exact D1-01 target UUID evidence",
+    "migration artifact hash",
+    "schema inspection proving all 17 columns and nullability, including trial_started_at, trial_ends_at and trial_converted_at",
+    "index inspection",
+    "no cross-D1 foreign-key evidence",
+    "W07 runtime binding evidence",
+    "optimistic-lock source binding evidence",
+    "active-subscription uniqueness policy decision",
+    "Subscription runtime positive/duplicate/cancel/pause/resume/change-plan evidence",
+    "Evidence Registry record tied to validating commit SHA",
+    "schema inspection proving membership_subscription_plan_change_attempts columns, CHECK constraints and four indexes",
+    "idempotency replay and one-pending-attempt-per-subscription constraint evidence",
+    "signed payment-success upgrade CAS and W06 applied-audit retry evidence",
+    "failed or late payment expiry and reconciliation-required no-entitlement-grant evidence",
+    "schema inspection proving membership_subscription_scheduled_plan_changes columns, CHECK constraints and three indexes",
+    "schedule request owner, If-Match, idempotency replay and one-pending-change-per-subscription evidence",
+    "renewal cycle snapshot uses scheduled immutable target plan version without changing current subscription entitlement",
+    "failed renewal leaves scheduled downgrade unapplied",
+    "signed successful renewal CAS applies target plan and W06 D1-03 audit before marking D1-04 cycle synchronization complete",
+    "schema inspection proving scheduled-plan-change change_type CHECK permits only DOWNGRADE and BILLING_INTERVAL_CHANGE",
+    "interval-change request requires opposite MONTHLY/YEARLY target interval with same creator and currency",
+    "renewal cycle period-end is calculated from the immutable scheduled target plan billing interval and charge amount",
+    "failed monthly/yearly interval-change renewal retains the current plan and original period while preserving the scheduled change for retry",
+    "signed successful renewal advances current_period_end by the scheduled target billing interval, atomically applies target plan version and records W06 D1-03 audit",
+    "schema inspection proving membership_plan_versions.trial_period_days is integer NOT NULL DEFAULT 0 with CHECK 0..30",
+    "schema inspection proving membership_subscriptions trial_started_at, trial_ends_at and trial_converted_at nullable columns and trial indexes",
+    "creator immutable plan version trialPeriodDays bounds 0..30 and idempotent plan revision evidence",
+    "one subscriber lifetime trial per creator uniqueness and active membership conflict evidence",
+    "trial start PENDING -> TRIALING after W06 immutable audit confirmation with no D1-04 order/payment creation",
+    "trial entitlement denied by period boundary when trial_ends_at has passed, including AWAITING_MANDATE",
+    "signed successful first MIT renewal sets trial_converted_at and transitions TRIALING -> ACTIVE by subscription version CAS and W06 audit",
+    "failed first paid renewal transitions TRIALING -> PAST_DUE without extending the trial period or granting entitlement",
+    "missing or revoked MIT mandate leaves renewal AWAITING_MANDATE and requires a verified customer-present payment-method consent flow",
+    "membership_plan_versions.trial_period_days is part of each immutable plan version and legacy plan versions read as zero after migration default",
+    "D1-01 triggers prevent changing trial_started_at/trial_ends_at after creation and prevent rewriting non-null trial_converted_at"
+  ],
+  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted.",
+  "additionalTables": [
+    {
+      "name": "membership_subscription_plan_change_attempts",
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "purpose": "Durable single-pending paid upgrade reservation and idempotency linkage. This is workflow metadata only and never an authority for price, tax, payment, refund or entitlement.",
+      "primaryKey": "attempt_id",
+      "columns": [
+        {
+          "name": "attempt_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "name": "subscriber_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "subscription_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "expected_subscription_version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "expected_plan_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "expected_plan_version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "target_plan_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "target_plan_version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "current_period_start",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "current_period_end",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "idempotency_key_hash",
+          "type": "TEXT",
+          "nullable": false,
+          "classification": "HASHED_IDEMPOTENCY_IDENTITY"
+        },
+        {
+          "name": "order_id",
+          "type": "TEXT",
+          "nullable": true,
+          "classification": "OPAQUE_D1_04_REFERENCE_ONLY"
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "nullable": false,
+          "allowed": [
+            "PENDING_PAYMENT",
+            "APPLIED",
+            "EXPIRED",
+            "RECONCILIATION_REQUIRED"
+          ]
+        },
+        {
+          "name": "expires_at",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "applied_at",
+          "type": "TEXT",
+          "nullable": true
+        },
+        {
+          "name": "applied_subscription_version",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ux_membership_plan_change_attempts_idempotency",
+          "unique": true,
+          "columns": [
+            "subscriber_id",
+            "idempotency_key_hash"
+          ]
+        },
+        {
+          "name": "ux_membership_plan_change_attempts_pending_subscription",
+          "unique": true,
+          "partial": true,
+          "where": "status = 'PENDING_PAYMENT'",
+          "columns": [
+            "subscription_id"
+          ]
+        },
+        {
+          "name": "ix_membership_plan_change_attempts_order_status",
+          "unique": false,
+          "columns": [
+            "order_id",
+            "status"
+          ]
+        },
+        {
+          "name": "ix_membership_plan_change_attempts_expiry",
+          "unique": false,
+          "columns": [
+            "status",
+            "expires_at"
+          ]
+        }
+      ],
+      "invariants": [
+        "attempt_id is deterministically derived from subscriber-scoped Idempotency-Key using a one-way SHA-256 digest; raw idempotency keys are never stored.",
+        "At most one PENDING_PAYMENT upgrade attempt may exist per subscription.",
+        "A replay with the same subscriber and key returns the same opaque order reference; a semantically different replay conflicts.",
+        "Subscription mutation requires verified D1-04 payment success and a compare-and-set against expected subscription version, current plan/version and billing period.",
+        "order_id is only an opaque reference to D1-04 and does not make D1-01 a financial authority.",
+        "No monetary amount, currency, tax, discount, provider ID, payment status, refund or card data is stored in this table.",
+        "A paid upgrade applies only after its D1-03 W06 audit event is durably confirmed; otherwise webhook acknowledgement remains retryable."
+      ]
+    },
+    {
+      "name": "membership_subscription_scheduled_plan_changes",
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "purpose": "Subscriber-owned future-dated plan downgrade or monthly/yearly billing-interval change. The current Subscription plan and entitlement remain unchanged until the existing renewal payment succeeds and its D1-04 outcome is synchronized.",
+      "primaryKey": "change_id",
+      "columns": [
+        {
+          "name": "change_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "name": "subscriber_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "subscription_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "expected_subscription_version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "expected_plan_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "expected_plan_version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "target_plan_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "target_plan_version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "effective_at",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "idempotency_key_hash",
+          "type": "TEXT",
+          "nullable": false,
+          "classification": "HASHED_IDEMPOTENCY_IDENTITY"
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "nullable": false,
+          "allowed": [
+            "SCHEDULED",
+            "APPLIED",
+            "CANCELLED",
+            "RECONCILIATION_REQUIRED"
+          ]
+        },
+        {
+          "name": "applied_at",
+          "type": "TEXT",
+          "nullable": true
+        },
+        {
+          "name": "applied_subscription_version",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "change_type",
+          "type": "TEXT",
+          "nullable": false,
+          "default": "DOWNGRADE",
+          "allowed": [
+            "DOWNGRADE",
+            "BILLING_INTERVAL_CHANGE"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ux_membership_scheduled_plan_changes_idempotency",
+          "unique": true,
+          "columns": [
+            "subscriber_id",
+            "idempotency_key_hash"
+          ]
+        },
+        {
+          "name": "ux_membership_scheduled_plan_changes_pending_subscription",
+          "unique": true,
+          "partial": true,
+          "where": "status = 'SCHEDULED'",
+          "columns": [
+            "subscription_id"
+          ]
+        },
+        {
+          "name": "ix_membership_scheduled_plan_changes_effective",
+          "unique": false,
+          "columns": [
+            "status",
+            "effective_at",
+            "subscription_id"
+          ]
+        }
+      ],
+      "invariants": [
+        "change_id is deterministically derived from subscriber-scoped Idempotency-Key using SHA-256; raw idempotency keys are never stored.",
+        "Only an authenticated subscriber may schedule a plan downgrade or billing-interval change for their own ACTIVE, non-cancelled subscription using If-Match.",
+        "change_type is DOWNGRADE or BILLING_INTERVAL_CHANGE. DOWNGRADE requires the same creator, currency, and billing interval with a lower immutable plan-version price; BILLING_INTERVAL_CHANGE requires the same creator, plan tier and currency with the opposite MONTHLY/YEARLY interval.",
+        "The scheduled change takes effect exactly at the current_period_end boundary; the live membership_subscriptions plan_id, plan_version and entitlement reference are not changed when the request is accepted.",
+        "No Order, PaymentIntent, charge, monetary amount, tax, discount, ledger or provider fact is created or persisted in D1-01 by scheduling a change.",
+        "At most one SCHEDULED plan change may exist per subscription; the same subscriber and key replays the same change.",
+        "The existing W07 renewal pipeline uses the scheduled immutable target plan version for the next cycle amount and billing interval; the selected target interval determines cycle_end while the current paid period remains unchanged.",
+        "A failed or unpaid renewal does not apply the scheduled change; it retains the target for a verified retry and otherwise remains reconciliation-owned.",
+        "D1-01 atomically applies the target plan identity, advances the period using the target interval, and marks the schedule APPLIED by subscription version CAS; W06 D1-03 audit confirmation is required before D1-04 renewal sync is acknowledged as complete."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,346 @@
+import { describe, expect, it } from 'vitest'
+import { ModerationRuntimeError, decideModerationCase, getModerationCase, listModerationQueue } from './moderation-runtime'
+import type { ModerationDecisionWriteStore } from './moderation-decision-write-store-postgres'
+import { createPostgresModerationQueueReadStore } from './moderation-queue-read-store-postgres'
+import type { ModerationQueuePostgresQueryExecutor } from './moderation-queue-read-store-postgres'
+import {
+  ModerationQueueReadStoreError,
+  type ModerationQueueReadInput,
+  type ModerationQueueReadRow,
+  type ModerationQueueReadStore,
+} from './moderation-queue-read-store'
+import {
+  createPostgresModerationCaseDetailReadStore,
+  type ModerationCaseDetailPostgresQueryExecutor,
+  type ModerationCaseDetailReadRow,
+} from './moderation-case-detail-read-store-postgres'
+
+const baseInput = {
+  reviewerId: 'reviewer_1',
+  reviewerLayer: 'L6',
+  caseId: 'case_1',
+  ifMatch: '"v1"',
+  idempotencyKey: 'idem_1',
+  correlationId: 'trace-1',
+  requestId: 'req_1',
+  expectedVersion: 1,
+  decision: 'APPROVED' as const,
+  policyVersion: 'moderation-v1.0',
+  reasonCode: 'POLICY_MATCH',
+  severity: 'medium',
+  scope: 'content',
+  effectiveAt: '2026-10-01T00:00:00.000Z',
+  expiresAt: null,
+}
+
+describe('moderation runtime admission guards', () => {
+  it('rejects reviewer layers below L6 before any PostgreSQL Store access', async () => {
+    const store = {} as ModerationDecisionWriteStore
+    const w03 = {} as Fetcher
+    await expect(
+      decideModerationCase(store, w03, { ...baseInput, reviewerLayer: 'L5' }),
+    ).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+  })
+
+  it('requires both optimistic concurrency and idempotency headers', async () => {
+    const store = {} as ModerationDecisionWriteStore
+    const w03 = {} as Fetcher
+    await expect(
+      decideModerationCase(store, w03, { ...baseInput, ifMatch: null }),
+    ).rejects.toMatchObject({ code: 'PRECONDITION_REQUIRED', status: 428 })
+  })
+
+  it('returns a stored native-Store replay without dispatching W03 again', async () => {
+    const storedResponse = {
+      caseId: baseInput.caseId,
+      decisionId: 'dec_replay_1',
+      outcome: 'APPROVED' as const,
+      version: 2,
+      effectiveAt: baseInput.effectiveAt,
+      requestId: baseInput.requestId,
+    }
+    let commits = 0
+    const store: ModerationDecisionWriteStore = {
+      async commit() {
+        commits++
+        return { response: storedResponse, replayed: true, outbox: null }
+      },
+      async listReadyOutbox() { return [] },
+      async markOutboxDelivered() {},
+      async markOutboxMissingActor() {},
+      async markOutboxRetry() {},
+    }
+    const w03 = { fetch: async () => { throw new Error('replay must not call W03') } } as unknown as Fetcher
+
+    await expect(decideModerationCase(store, w03, baseInput)).resolves.toEqual(storedResponse)
+    expect(commits).toBe(1)
+  })
+
+  it('fails closed on malformed reviewer layer', async () => {
+    const store = {} as ModerationDecisionWriteStore
+    const w03 = {} as Fetcher
+    await expect(
+      decideModerationCase(store, w03, { ...baseInput, reviewerLayer: 'admin' }),
+    ).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+  })
+
+  it('uses a typed moderation runtime error for denied authority', () => {
+    const error = new ModerationRuntimeError('PERMISSION_DENIED', 403)
+    expect(error.status).toBe(403)
+    expect(error.code).toBe('PERMISSION_DENIED')
+  })
+
+  it('maps the provider-neutral moderation queue Store into a bounded reviewer-visible page', async () => {
+    const calls: ModerationQueueReadInput[] = []
+    const row: ModerationQueueReadRow = {
+      case_id: 'case_1',
+      target_type: 'content',
+      target_id: 'content_1',
+      target_version: 1,
+      policy_version: 'moderation-v1',
+      state: 'OPEN',
+      priority: 10,
+      assigned_reviewer_id: null,
+      current_decision_id: null,
+      evidence_bundle_ref: null,
+      version: 1,
+      created_at: '2026-11-10T00:00:00.000000Z',
+      updated_at: '2026-11-10T00:00:00.000000Z',
+      decision_id: null,
+      case_version: null,
+      outcome: null,
+      decision_policy_version: null,
+      decision_effective_at: null,
+      decision_request_id: null,
+      decision_created_at: null,
+    }
+    const store: ModerationQueueReadStore = {
+      async list(input) {
+        calls.push(input)
+        return [row]
+      },
+    }
+
+    const result = await listModerationQueue(store, 'reviewer_1', null, 1)
+
+    expect(result.items).toHaveLength(1)
+    expect(result.items[0]?.caseId).toBe('case_1')
+    expect(result.hasMore).toBe(false)
+    expect(calls).toEqual([{
+      reviewerId: 'reviewer_1',
+      openStates: ['OPEN', 'UNDER_REVIEW', 'ESCALATED', 'APPEALED'],
+      cursor: null,
+      limit: 2,
+    }])
+  })
+
+  it('maps queue Store failures to a sanitized service-unavailable response', async () => {
+    const store: ModerationQueueReadStore = {
+      async list() {
+        throw new ModerationQueueReadStoreError()
+      },
+    }
+
+    await expect(
+      listModerationQueue(store, 'reviewer_1', null, 20),
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+      message: 'SERVICE_UNAVAILABLE',
+    })
+  })
+
+  it('uses the PostgreSQL moderation queue store with identical reviewer and page boundaries', async () => {
+    const calls: Array<{ sql: string; values: unknown[] }> = []
+    const makeRow = (caseId: string, priority: number, decisionId: string | null) => ({
+      case_id: caseId,
+      target_type: 'content',
+      target_id: 'content_' + caseId,
+      target_version: 2,
+      policy_version: 'moderation-v1',
+      state: 'OPEN',
+      priority,
+      assigned_reviewer_id: null,
+      current_decision_id: decisionId,
+      evidence_bundle_ref: 'evidence/' + caseId,
+      version: 2,
+      created_at: '2026-11-10T04:02:00.123456Z',
+      updated_at: '2026-11-10T04:02:00.123456Z',
+      decision_id: decisionId,
+      case_version: decisionId ? 2 : null,
+      outcome: decisionId ? 'APPROVED' : null,
+      decision_policy_version: decisionId ? 'moderation-v1' : null,
+      decision_effective_at: decisionId ? '2026-11-10T04:02:00.123456Z' : null,
+      decision_request_id: decisionId ? 'req_case_1' : null,
+      decision_created_at: decisionId ? '2026-11-10T04:02:00.123456Z' : null,
+    })
+    const db: ModerationQueuePostgresQueryExecutor = {
+      async query<Row extends Record<string, unknown>>(sql: string, values: unknown[] = []) {
+        calls.push({ sql, values })
+        return { rows: [
+          makeRow('case_1', 90, 'decision_1'),
+          makeRow('case_2', 80, null),
+          makeRow('case_3', 70, null),
+        ] as unknown as Row[] }
+      },
+    }
+
+    const result = await listModerationQueue(
+      createPostgresModerationQueueReadStore(db),
+      'reviewer_1',
+      null,
+      2,
+    )
+
+    expect(result.items.map((item) => item.caseId)).toEqual(['case_1', 'case_2'])
+    expect(result.items[0]?.currentDecision).toEqual({
+      decisionId: 'decision_1',
+      outcome: 'APPROVED',
+      policyVersion: 'moderation-v1',
+      effectiveAt: '2026-11-10T04:02:00.123456Z',
+    })
+    expect(result.hasMore).toBe(true)
+    expect(result.nextCursor).toBeTruthy()
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.values).toEqual([['OPEN', 'UNDER_REVIEW', 'ESCALATED', 'APPEALED'], 'reviewer_1', 3])
+    expect(calls[0]?.sql).toContain('c.state = ANY($1::text[])')
+    expect(calls[0]?.sql).toContain("c.target_type = 'content'")
+    expect(calls[0]?.sql).toContain('(c.assigned_reviewer_id IS NULL OR c.assigned_reviewer_id = $2)')
+    expect(calls[0]?.sql).toContain('ORDER BY c.priority DESC, c.created_at ASC, c.case_id ASC')
+    expect(calls[0]?.sql).toContain('LIMIT $3')
+    expect(calls[0]?.sql).toContain('HH24:MI:SS.US')
+  })
+
+  it('preserves microsecond queue cursors in PostgreSQL keyset pagination', async () => {
+    const calls: Array<{ sql: string; values: unknown[] }> = []
+    const db: ModerationQueuePostgresQueryExecutor = {
+      async query<Row extends Record<string, unknown>>(sql: string, values: unknown[] = []) {
+        calls.push({ sql, values })
+        return { rows: [] as Row[] }
+      },
+    }
+    const encoded = btoa(JSON.stringify({
+      version: 1,
+      reviewerId: 'reviewer_1',
+      priority: 40,
+      createdAt: '2026-11-10T04:02:00.123456Z',
+      caseId: 'case_cursor',
+    })).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+
+    await listModerationQueue(createPostgresModerationQueueReadStore(db), 'reviewer_1', encoded, 1)
+
+    expect(calls[0]?.values).toEqual([
+      ['OPEN', 'UNDER_REVIEW', 'ESCALATED', 'APPEALED'],
+      'reviewer_1',
+      40,
+      '2026-11-10T04:02:00.123456Z',
+      'case_cursor',
+      2,
+    ])
+    expect(calls[0]?.sql).toContain('c.created_at > $4::timestamptz')
+    expect(calls[0]?.sql).toContain('c.created_at = $4::timestamptz AND c.case_id > $5')
+  })
+
+  it('maps PostgreSQL queue failures to a sanitized service-unavailable error', async () => {
+    const db: ModerationQueuePostgresQueryExecutor = {
+      async query<Row extends Record<string, unknown>>() {
+        throw new Error('private-postgres-driver-detail')
+      },
+    }
+
+    await expect(
+      listModerationQueue(createPostgresModerationQueueReadStore(db), 'reviewer_1', null, 20),
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+      message: 'SERVICE_UNAVAILABLE',
+    })
+  })
+
+})
+
+
+describe('W06 native PostgreSQL moderation case detail runtime', () => {
+  it('returns the same case and decision projection through the PostgreSQL store', async () => {
+    const calls: Array<{ sql: string; values: unknown[] }> = []
+    const row: ModerationCaseDetailReadRow = {
+      case_id: 'case_1',
+      target_type: 'content',
+      target_id: 'content_1',
+      target_version: 4,
+      policy_version: 'moderation-v1',
+      state: 'ACTION_TAKEN',
+      priority: 80,
+      assigned_reviewer_id: 'reviewer_1',
+      current_decision_id: 'decision_1',
+      evidence_bundle_ref: 'evidence/case_1',
+      version: 3,
+      created_at: '2026-11-19T03:00:00.123456Z',
+      updated_at: '2026-11-19T03:02:00.654321Z',
+      decision_id: 'decision_1',
+      case_version: 3,
+      outcome: 'APPROVED',
+      decision_policy_version: 'moderation-v1',
+      decision_effective_at: '2026-11-19T03:02:00.654321Z',
+      reason_code: 'POLICY_MATCH',
+      severity: 'medium',
+      scope: 'content',
+      expires_at: null,
+      source_kind: 'HUMAN_REVIEW',
+      reviewer_id: 'reviewer_1',
+      reviewer_layer: 'L6',
+      request_id: 'req_case_1',
+      decision_created_at: '2026-11-19T03:02:00.654321Z',
+      decision_target_type: 'content',
+      decision_target_id: 'content_1',
+      decision_target_version: 4,
+    }
+    const db: ModerationCaseDetailPostgresQueryExecutor = {
+      async query<Row extends Record<string, unknown>>(sql: string, values: unknown[] = []) {
+        calls.push({ sql, values })
+        return { rows: [row] as unknown as Row[] }
+      },
+    }
+
+    const result = await getModerationCase(
+      createPostgresModerationCaseDetailReadStore(db),
+      'reviewer_1',
+      'case_1',
+    )
+
+    expect(result).toMatchObject({
+      caseId: 'case_1',
+      target: { targetType: 'content', targetId: 'content_1' },
+      currentDecision: {
+        decisionId: 'decision_1',
+        outcome: 'APPROVED',
+        policyVersion: 'moderation-v1',
+        effectiveAt: '2026-11-19T03:02:00.654321Z',
+      },
+      status: 'ACTION_TAKEN',
+      version: 3,
+    })
+    expect(result.createdAt).toBe('2026-11-19T03:00:00.123456Z')
+    expect(result.updatedAt).toBe('2026-11-19T03:02:00.654321Z')
+    expect(calls[0]?.values).toEqual(['case_1', 'reviewer_1'])
+  })
+
+  it('maps a native PostgreSQL read failure to the moderation service error', async () => {
+    const db: ModerationCaseDetailPostgresQueryExecutor = {
+      async query<Row extends Record<string, unknown>>() {
+        throw new Error('private PostgreSQL connection detail')
+      },
+    }
+
+    await expect(
+      getModerationCase(
+        createPostgresModerationCaseDetailReadStore(db),
+        'reviewer_1',
+        'case_1',
+      ),
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+    })
+  })
+})

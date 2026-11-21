@@ -1,0 +1,699 @@
+name: Content Publish Runtime E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact main commit deployed for article/video publishing
+        required: true
+        type: string
+      launch_run_id:
+        description: Successful production launch run to bind this E2E to
+        required: true
+        type: string
+      content_api_base_url:
+        description: W01 public content API base URL
+        required: true
+        type: string
+      moderation_base_url:
+        description: W01 public moderation API base URL
+        required: true
+        type: string
+      confirm:
+        description: Type RUN_CONTENT_PUBLISH_E2E to permit controlled remote fixture/test mutations
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  DATABASE_NAME_W01: luckread
+  DATABASE_NAME_W03: luckreadpro
+  DATABASE_NAME_W06: secondary
+  W01_SOURCE_SHA: ${{ inputs.source_sha }}
+  CONTENT_API_BASE_URL: ${{ inputs.content_api_base_url }}
+  MODERATION_BASE_URL: ${{ inputs.moderation_base_url }}
+  LAUNCH_RUN_ID: ${{ inputs.launch_run_id }}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout workflow revision for test harness
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Validate explicit E2E source, endpoint, and mutation confirmation
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          LAUNCH_RUN_ID: ${{ inputs.launch_run_id }}
+          CONTENT_API_BASE_URL: ${{ inputs.content_api_base_url }}
+          MODERATION_BASE_URL: ${{ inputs.moderation_base_url }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::source_sha must be an explicit full 40-character lowercase commit SHA."; exit 1; }
+          [[ "$LAUNCH_RUN_ID" =~ ^[1-9][0-9]*$ ]] || { echo "::error::launch_run_id must be an explicit positive GitHub Actions run ID."; exit 1; }
+          [[ "$CONFIRM" == "RUN_CONTENT_PUBLISH_E2E" ]] || { echo "::error::Type RUN_CONTENT_PUBLISH_E2E explicitly to authorize controlled remote E2E fixture/test mutations."; exit 1; }
+          node --input-type=module <<'NODE'
+          for (const name of ['CONTENT_API_BASE_URL', 'MODERATION_BASE_URL']) {
+            const raw = process.env[name] ?? '';
+            let url;
+            try { url = new URL(raw); } catch { throw new Error(name + ' must be a valid explicit HTTPS origin'); }
+            if (
+              url.origin !== 'https://api.luckread.com' ||
+              url.username ||
+              url.password ||
+              (url.pathname !== '/' && url.pathname !== '') ||
+              url.search ||
+              url.hash
+            ) {
+              throw new Error(name + ' must be the exact trusted origin https://api.luckread.com without credentials, path, query, or fragment');
+            }
+          }
+          console.log('Explicit source SHA, launch run ID, trusted endpoints and remote-mutation confirmation: PASS');
+          NODE
+
+      - name: Verify exact successful production launch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = "refs/heads/main"
+          run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$LAUNCH_RUN_ID")"
+          artifacts_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$LAUNCH_RUN_ID/artifacts?per_page=100")"
+          W01_SOURCE_SHA="$W01_SOURCE_SHA" node --input-type=module -e '
+            const run = JSON.parse(process.argv[1]);
+            const artifacts = JSON.parse(process.argv[2]);
+            const expectedArtifact = `w01-w02-binding-deployment-${process.env.W01_SOURCE_SHA}`;
+            if (run.name !== "W01 W02 Auth Binding Deploy") throw new Error("launch workflow mismatch: " + run.name);
+            if (run.conclusion !== "success") throw new Error("launch run is not SUCCESS");
+            if (run.head_branch !== "main") throw new Error("launch run is not on main");
+            if (run.head_sha !== process.env.W01_SOURCE_SHA) throw new Error("launch source commit mismatch");
+            const match = (artifacts.artifacts ?? []).find((a) => a?.name === expectedArtifact && a?.expired_at == null);
+            if (!match) throw new Error("deployment source artifact mismatch: expected " + expectedArtifact);
+            console.log(JSON.stringify({runId:run.id,workflow:run.name,workflowHeadSha:run.head_sha,deployedSourceSha:process.env.W01_SOURCE_SHA,artifact:match.name,conclusion:run.conclusion}));
+          ' "$run_json" "$artifacts_json"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Initialize runtime evidence directory
+        run: |
+          set -euo pipefail
+          evidence_dir="artifacts/mapping-0/content-publish-runtime-e2e"
+          mkdir -p "$evidence_dir"
+          cat > "$evidence_dir/run-start.json" <<EOF
+          {
+            "workflow": "Content Publish Runtime E2E",
+            "runId": "$GITHUB_RUN_ID",
+            "sourceSha": "$W01_SOURCE_SHA",
+            "launchRunId": "$LAUNCH_RUN_ID",
+            "stage": "fixture-setup"
+          }
+          EOF
+
+      - name: Verify W03 D1 schema required by content mutations
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_VERSION: ${{ env.WRANGLER_VERSION }}
+          DATABASE_NAME_W03: ${{ env.DATABASE_NAME_W03 }}
+        run: |
+          set -euo pipefail
+          SQL="SELECT 'contents' AS table_name, name AS column_name FROM pragma_table_info('contents')
+            UNION ALL SELECT 'content_revisions', name FROM pragma_table_info('content_revisions')
+            UNION ALL SELECT 'content_mutation_idempotency', name FROM pragma_table_info('content_mutation_idempotency')
+            UNION ALL SELECT 'content_txn_guard', name FROM pragma_table_info('content_txn_guard')
+            UNION ALL SELECT name, '__TABLE__' FROM sqlite_master
+              WHERE type='table' AND name IN ('contents','content_revisions','content_mutation_idempotency','content_txn_guard');"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W03" --remote --json --config workers/W03-content/wrangler.jsonc --command "$SQL" > /tmp/w03-schema-preflight.json
+          node <<'NODE'
+          const fs = require('node:fs');
+          const parsed = JSON.parse(fs.readFileSync('/tmp/w03-schema-preflight.json', 'utf8'));
+          const rows = Array.isArray(parsed)
+            ? parsed.flatMap((item) => Array.isArray(item?.results) ? item.results : [])
+            : Array.isArray(parsed?.results) ? parsed.results : [];
+          const tables = new Set(rows.filter((row) => row.column_name === '__TABLE__').map((row) => row.table_name));
+          const requiredTables = ['contents', 'content_revisions', 'content_mutation_idempotency', 'content_txn_guard'];
+          const requirements = {
+            contents: ['id', 'content_type', 'owner_user_id', 'creator_id', 'ip_id', 'state', 'version', 'revision', 'slug', 'title', 'body_ref', 'media_refs_json', 'cover_ref', 'etag', 'created_at', 'updated_at', 'scheduled_at', 'access_mode'],
+            content_revisions: ['id', 'content_id', 'revision', 'content_version', 'actor_user_id', 'source_revision', 'operation', 'state', 'slug', 'title', 'body_ref', 'media_refs_json', 'cover_ref', 'etag', 'reason', 'correlation_id', 'created_at', 'access_mode'],
+            content_mutation_idempotency: ['id', 'owner_user_id', 'operation_id', 'idempotency_key', 'request_hash', 'status', 'response_status', 'response_json', 'created_at', 'expires_at'],
+            content_txn_guard: ['id', 'successful'],
+          };
+          const missingTables = requiredTables.filter((table) => !tables.has(table));
+          const missingColumns = Object.entries(requirements).flatMap(([table, columns]) => {
+            const present = new Set(rows.filter((row) => row.table_name === table && row.column_name !== '__TABLE__').map((row) => row.column_name));
+            return columns.filter((column) => !present.has(column)).map((column) => table + '.' + column);
+          });
+          if (missingTables.length || missingColumns.length) {
+            throw new Error('W03 D1 schema is behind the deployed content runtime; missing tables=' + JSON.stringify(missingTables) + ', missing columns=' + JSON.stringify(missingColumns) + '. Apply only the admitted W03 migrations through the approved deployment workflow before rerunning E2E.');
+          }
+          console.log('W03_D1_CONTENT_MUTATION_SCHEMA=PASS');
+          NODE
+
+      - name: Setup native moderator fixture
+        env:
+          AUTH_BASE_URL: ${{ inputs.content_api_base_url }}
+          # Better Auth validates the trusted web origin, not the API endpoint host.
+          AUTH_BROWSER_ORIGIN: https://luckread.com
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/moderation-native-reviewer-fixture.mjs
+
+      - name: Setup creator fixture and login
+        env:
+          AUTH_BASE_URL: ${{ inputs.content_api_base_url }}
+          # Better Auth validates the trusted web origin, not the API endpoint host.
+          AUTH_BROWSER_ORIGIN: https://luckread.com
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_VERSION: ${{ env.WRANGLER_VERSION }}
+          DATABASE_NAME_W01: ${{ env.DATABASE_NAME_W01 }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { randomBytes } from 'node:crypto';
+          import { appendFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const base = String(process.env.AUTH_BASE_URL).replace(/\/$/, '');
+          const runId = String(process.env.GITHUB_RUN_ID);
+          const suffix = 'CRL3-' + runId + '-' + randomBytes(5).toString('hex');
+          const email = 'content-e2e-' + suffix + '@example.com';
+          const username = 'contente2e' + runId + randomBytes(5).toString('hex');
+          const password = 'Evd-CNT-' + randomBytes(24).toString('base64url') + '-Z9!';
+          const roleId = 'CONTENT-E2E-ROLE-' + runId + '-' + randomBytes(5).toString('hex');
+          const registerKey = 'CONTENT-E2E-' + runId + '-register';
+
+          async function post(path, body, headers = {}) {
+            const response = await fetch(base + path, {
+              method: 'POST',
+              headers: { accept: 'application/json', 'content-type': 'application/json', origin: new URL(process.env.AUTH_BROWSER_ORIGIN || 'https://luckread.com').origin, ...headers },
+              body: JSON.stringify(body),
+            });
+            const raw = await response.text();
+            let data = null;
+            try { data = raw ? JSON.parse(raw) : null; } catch {}
+            return { status: response.status, data, headers: response.headers };
+          }
+
+          const register = await post('/auth/register', {
+            identityType: 'email',
+            identity: email,
+            credential: password,
+            username,
+            consent: { purpose: 'ACCOUNT_REGISTRATION', policyVersion: 'PROD-2026-09-28.1' },
+          }, { 'Idempotency-Key': registerKey });
+
+          if (register.status !== 201 || typeof register.data?.userId !== 'string') {
+            throw new Error('creator registration failed: HTTP ' + register.status + ' body=' + JSON.stringify(register.data));
+          }
+
+          const userId = String(register.data.userId);
+          const now = new Date().toISOString();
+          const sql = (value) => "'" + String(value).replaceAll("'", "''") + "'";
+          const d1 = (command) => execFileSync('npx', [
+            '--yes', 'wrangler@' + process.env.WRANGLER_VERSION, 'd1', 'execute',
+            process.env.DATABASE_NAME_W01, '--remote', '--json', '--yes',
+            '--config', 'workers/W01-payload/wrangler.jsonc', '--command', command,
+          ], { encoding: 'utf8', env: process.env, maxBuffer: 8 * 1024 * 1024 });
+
+           d1('UPDATE "user" SET email_verified=1, account_state=\'ACTIVE\', account_state_version=account_state_version+1 WHERE id=' + sql(userId));
+          d1('INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (' + sql(roleId) + ',' + sql(userId) + ',\'creator\',\'global\',NULL,\'ACTIVE\',' + sql(now) + ',NULL,' + sql(now) + ',' + sql(now) + ')');
+
+          appendFileSync(process.env.GITHUB_ENV, 'CREATOR_AUTH_USER_ID=' + userId + '\n');
+          appendFileSync(process.env.GITHUB_ENV, 'CREATOR_AUTH_EMAIL=' + email + '\n');
+          appendFileSync(process.env.GITHUB_ENV, 'CREATOR_ROLE_ID=' + roleId + '\n');
+          appendFileSync(process.env.GITHUB_ENV, 'CREATOR_REGISTRATION_KEY=' + registerKey + '\n');
+
+          const login = await post('/v1/auth/login', {
+            identity: email,
+            credential: password,
+          });
+          const user = login.data?.data?.user;
+          const token = login.headers.get('x-luckread-session-token');
+          if (
+            login.status !== 200 ||
+            !token ||
+            String(user?.id) !== userId ||
+            user?.emailVerified !== true
+          ) {
+            throw new Error(
+              'creator login failed against APP-AUTH-01: HTTP ' + login.status +
+              ' body=' + JSON.stringify(login.data) +
+              ' nativeSessionHeader=' + Boolean(token),
+            );
+          }
+          console.log('::add-mask::' + token);
+          appendFileSync(process.env.GITHUB_ENV, 'CREATOR_TOKEN=' + token + '\n');
+          console.log(JSON.stringify({ creatorUserId: userId, emailVerified: user.emailVerified, nativeSessionHeaderPresent: true }));
+          NODE
+
+      - name: Probe authenticated W01-to-W03 content route
+        run: |
+          set -euo pipefail
+          set +e
+          status="$(curl --silent --show-error --output /tmp/w03-content-probe.json --write-out '%{http_code}' -H "Authorization: Bearer $CREATOR_TOKEN" "$CONTENT_API_BASE_URL/v1/contents")"
+          curl_exit=$?
+          set -e
+          if [ "$curl_exit" -ne 0 ] || [ "$status" != "200" ]; then
+            echo "::error::Authenticated W01-to-W03 content route probe failed: HTTP $status (curl exit $curl_exit)"
+            node -e 'const fs=require("node:fs"); const raw=fs.readFileSync("/tmp/w03-content-probe.json","utf8"); let v; try { v=JSON.parse(raw) } catch {} const error=v?.error; console.error(JSON.stringify({errorCode:error?.code??null,errorMessage:error?.message??null,requestId:v?.requestId??null,nonJsonBody:error?undefined:raw.slice(0,240)}))'
+            exit 1
+          fi
+          echo "W01_TO_W03_AUTHENTICATED_CONTENT_READ=PASS"
+
+      - name: Upload authoritative social post body asset
+        run: |
+          set -euo pipefail
+          POST_BODY_TEXT='这是一条受控社交动态发布验收，用于验证正文保存、风险预检、直接发布和公开读取；这条测试动态不需要人工审核。'
+          printf '%s' "$POST_BODY_TEXT" > /tmp/social-post-body.txt
+          echo "POST_BODY_TEXT=$POST_BODY_TEXT" >> "$GITHUB_ENV"
+
+          curl --silent --show-error --fail-with-body \
+            -X POST \
+            -H "Authorization: Bearer $CREATOR_TOKEN" \
+            -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-BODY-UPLOAD" \
+            -F "_payload={\"alt\":\"content-e2e-social-post-$GITHUB_RUN_ID.txt\"}" \
+            -F "file=@/tmp/social-post-body.txt;type=text/plain" \
+            "$CONTENT_API_BASE_URL/v1/media" > /tmp/social-post-body-upload.json
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const envelope = JSON.parse(fs.readFileSync('/tmp/social-post-body-upload.json', 'utf8'));
+          const doc = envelope?.doc ?? envelope;
+          if (doc?.id) fs.appendFileSync(process.env.GITHUB_ENV, 'POST_BODY_MEDIA_ID=' + String(doc.id) + '\n');
+          if (!doc?.id || typeof doc.url !== 'string' || !doc.url.trim()) {
+            throw new Error('social post body upload did not return a delivery-ready media id/url: ' + JSON.stringify(envelope));
+          }
+          fs.appendFileSync(process.env.GITHUB_ENV, 'POST_BODY_REF=' + doc.url.trim() + '\n');
+          console.log(JSON.stringify({ bodyAssetUploaded: true, mediaIdPresent: true, publicUrlPresent: true }));
+          NODE
+
+      - name: Upload authoritative social post attachment asset
+        run: |
+          set -euo pipefail
+          printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/social-post-attachment.png
+          curl --silent --show-error --fail-with-body -X POST -H "Authorization: Bearer $CREATOR_TOKEN" -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-ATTACHMENT-UPLOAD" -F '_payload={"alt":"social post attachment E2E"}' -F "file=@/tmp/social-post-attachment.png;type=image/png" "$CONTENT_API_BASE_URL/v1/media" > /tmp/social-post-attachment-upload.json
+          node <<'NODE'
+          const fs = require('node:fs');
+          const envelope = JSON.parse(fs.readFileSync('/tmp/social-post-attachment-upload.json', 'utf8'));
+          const doc = envelope?.doc ?? envelope;
+          if (!doc?.id || typeof doc.url !== 'string' || !doc.url.trim()) {
+            throw new Error('social post attachment upload did not return a delivery-ready media id/url: ' + JSON.stringify(envelope));
+          }
+          fs.appendFileSync(process.env.GITHUB_ENV, 'POST_ATTACHMENT_MEDIA_ID=' + String(doc.id) + '\n');
+          fs.appendFileSync(process.env.GITHUB_ENV, 'POST_ATTACHMENT_REF=' + doc.url.trim() + '\n');
+          console.log(JSON.stringify({ attachmentAssetUploaded: true, mediaIdPresent: true, publicUrlPresent: true }));
+          NODE
+
+      - name: Create article through public API
+        run: |
+          set -euo pipefail
+          set +e
+          article_status="$(curl --silent --show-error --output /tmp/article-create.json --write-out '%{http_code}'             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-CREATE"             --data '{"contentType":"article","title":"Content E2E Article","bodyRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/article","mediaRefs":[],"coverRef":null}'             "$CONTENT_API_BASE_URL/v1/contents")"
+          article_curl_exit=$?
+          set -e
+          if [ "$article_curl_exit" -ne 0 ] || [ "$article_status" != "201" ]; then
+            echo "::error::Article creation failed: HTTP $article_status (curl exit $article_curl_exit)"
+            node -e 'const fs=require("node:fs"); const raw=fs.readFileSync("/tmp/article-create.json","utf8"); let v; try { v=JSON.parse(raw) } catch {} const error=v?.error; console.error(JSON.stringify({errorCode:error?.code??null,errorMessage:error?.message??null,requestId:v?.requestId??null,nonJsonBody:error?undefined:raw.slice(0,240)}))'
+            exit 1
+          fi
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const value = JSON.parse(fs.readFileSync('/tmp/article-create.json', 'utf8'));
+          if (value.state !== 'DRAFT' || typeof value.id !== 'string' || !/^[0-9]{18,20}$/.test(value.id) || BigInt(value.id).toString(10) !== value.id || value.etag !== 'W/"1"' || Number(value.version) !== 1) throw new Error('article Snowflake create assertion failed: ' + JSON.stringify(value));
+          fs.appendFileSync(process.env.GITHUB_ENV, 'ARTICLE_ID=' + value.id + '\nARTICLE_ETAG=' + value.etag + '\n');
+          NODE
+
+      - name: Create video through public API
+        run: |
+          set -euo pipefail
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-CREATE"             --data '{"contentType":"video","title":"Content E2E Video","bodyRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/video","mediaRefs":["r2://content-e2e/'"$GITHUB_RUN_ID"'/video.mp4"],"coverRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/video-cover.jpg"}'             "$CONTENT_API_BASE_URL/v1/contents" > /tmp/video-create.json
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const value = JSON.parse(fs.readFileSync('/tmp/video-create.json', 'utf8'));
+          if (value.state !== 'DRAFT' || typeof value.id !== 'string' || !/^[0-9]{18,20}$/.test(value.id) || BigInt(value.id).toString(10) !== value.id || value.etag !== 'W/"1"' || Number(value.version) !== 1) throw new Error('video Snowflake create assertion failed: ' + JSON.stringify(value));
+          fs.appendFileSync(process.env.GITHUB_ENV, 'VIDEO_ID=' + value.id + '\nVIDEO_ETAG=' + value.etag + '\n');
+          NODE
+
+      - name: Create social post through public API
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const body = process.env.POST_BODY_TEXT ?? '';
+          const value = {
+            contentType: 'post',
+            title: body.trim().slice(0, 500),
+            bodyRef: process.env.POST_BODY_REF,
+            mediaRefs: [process.env.POST_ATTACHMENT_REF],
+            coverRef: process.env.POST_ATTACHMENT_REF,
+          };
+          if (!body.trim() || !value.bodyRef || !value.mediaRefs[0] || !value.coverRef) throw new Error('social post body/attachment media fixtures are missing');
+          fs.writeFileSync('/tmp/social-post-create-request.json', JSON.stringify(value));
+          NODE
+
+          curl --silent --show-error --fail-with-body \
+            -X POST \
+            -H "Authorization: Bearer $CREATOR_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-CREATE" \
+            --data @/tmp/social-post-create-request.json \
+            "$CONTENT_API_BASE_URL/v1/contents" > /tmp/social-post-create.json
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const value = JSON.parse(fs.readFileSync('/tmp/social-post-create.json', 'utf8'));
+          if (value.contentType !== 'post' || value.state !== 'DRAFT' || typeof value.id !== 'string' ||
+              !/^[0-9]{18,20}$/.test(value.id) || BigInt(value.id).toString(10) !== value.id ||
+              value.etag !== 'W/"1"' || Number(value.version) !== 1) {
+            throw new Error('social post Snowflake create assertion failed: ' + JSON.stringify(value));
+          }
+          fs.appendFileSync(process.env.GITHUB_ENV, 'SOCIAL_POST_ID=' + value.id + '\nSOCIAL_POST_ETAG=' + value.etag + '\n');
+          NODE
+
+      - name: Run publish preflight for article, video, and social post
+        run: |
+          set -euo pipefail
+          ARTICLE_PREFLIGHT_BODY='{"contentType":"article","title":"Content E2E Article","body":"我实测这条受控文章发布链，记录创建、审核和公开展示结果。这里包含真实测试过程、版本、时间、数据和结论，作为创作者本人完成实质补充与核验的测试正文。结果将由生产 API 和远程 D1 再次确认。","mediaRefs":[],"coverRef":null,"aiMode":"outline","humanContribution":"substantial"}'
+          VIDEO_PREFLIGHT_BODY='{"contentType":"video","title":"Content E2E Video","body":"这是一条受控视频发布链测试，记录创建、审核、发布和公开访问结果。","mediaRefs":["r2://content-e2e/'"$GITHUB_RUN_ID"'/video.mp4"],"coverRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/video-cover.jpg","aiMode":"outline","humanContribution":"substantial"}'
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const body = process.env.POST_BODY_TEXT ?? '';
+          const value = {
+            contentType: 'post',
+            title: body.trim().slice(0, 500),
+            body,
+            mediaRefs: [process.env.POST_ATTACHMENT_REF],
+            coverRef: process.env.POST_ATTACHMENT_REF,
+            aiMode: 'outline',
+            humanContribution: 'substantial',
+          };
+          fs.writeFileSync('/tmp/social-post-preflight-request.json', JSON.stringify(value));
+          NODE
+
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             --data "$ARTICLE_PREFLIGHT_BODY"             "$CONTENT_API_BASE_URL/api/creator/contents/$ARTICLE_ID/preflight" > /tmp/article-preflight.json
+
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             --data "$VIDEO_PREFLIGHT_BODY"             "$CONTENT_API_BASE_URL/api/creator/contents/$VIDEO_ID/preflight" > /tmp/video-preflight.json
+
+          curl --silent --show-error --fail-with-body \
+            -X POST \
+            -H "Authorization: Bearer $CREATOR_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data @/tmp/social-post-preflight-request.json \
+            "$CONTENT_API_BASE_URL/api/creator/contents/$SOCIAL_POST_ID/preflight" > /tmp/social-post-preflight.json
+
+          node <<'NODE'
+          const fs=require('node:fs');
+          for(const [kind,file] of [['article','/tmp/article-preflight.json'],['video','/tmp/video-preflight.json'],['social post','/tmp/social-post-preflight.json']]){
+            const v=JSON.parse(fs.readFileSync(file,'utf8'));
+            if(!v || !['PASS','YELLOW'].includes(v.verdict)) throw new Error(kind+' preflight blocked: '+JSON.stringify(v));
+            console.log(kind.toUpperCase().replaceAll(' ','_')+'_PREFLIGHT='+v.verdict);
+          }
+          NODE
+
+      - name: Submit article for review
+        run: |
+          set -euo pipefail
+          node -e "const fs=require('fs'); const p={contentType:'article',title:'Content E2E Article',body:'我实测这条受控文章发布链，记录创建、审核和公开展示结果。这里包含真实测试过程、版本、时间、数据和结论，作为创作者本人完成实质补充与核验的测试正文。结果将由生产 API 和远程 D1 再次确认。',mediaRefs:[],coverRef:null,aiMode:'outline',humanContribution:'substantial'}; fs.writeFileSync('/tmp/article-review-request.json', JSON.stringify({to:'PENDING_REVIEW',preflight:p}));"
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-REVIEW"             -H "If-Match: $ARTICLE_ETAG"             --data @/tmp/article-review-request.json             "$CONTENT_API_BASE_URL/v1/contents/$ARTICLE_ID/state" > /tmp/article-review.json
+          node -e "const v=require('/tmp/article-review.json'); if(v.from!=='DRAFT'||v.to!=='PENDING_REVIEW'||Number(v.version)!==2) throw new Error('article review transition failed: '+JSON.stringify(v));"
+
+      - name: Submit video for review
+        run: |
+          set -euo pipefail
+          node -e "const fs=require('fs'); const runId=process.env.GITHUB_RUN_ID; const p={contentType:'video',title:'Content E2E Video',body:'这是一条受控视频发布链测试，记录创建、审核、发布和公开访问结果。',mediaRefs:['r2://content-e2e/'+runId+'/video.mp4'],coverRef:'r2://content-e2e/'+runId+'/video-cover.jpg',aiMode:'outline',humanContribution:'substantial'}; fs.writeFileSync('/tmp/video-review-request.json', JSON.stringify({to:'PENDING_REVIEW',preflight:p}));"
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-REVIEW"             -H "If-Match: $VIDEO_ETAG"             --data @/tmp/video-review-request.json             "$CONTENT_API_BASE_URL/v1/contents/$VIDEO_ID/state" > /tmp/video-review.json
+          node -e "const v=require('/tmp/video-review.json'); if(v.from!=='DRAFT'||v.to!=='PENDING_REVIEW'||Number(v.version)!==2) throw new Error('video review transition failed: '+JSON.stringify(v));"
+
+      - name: Publish social post directly after W03 preflight
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          // The publish transition re-runs the policy engine against the original
+          // preflight input. The preflight response is only a report (verdict/findings)
+          // and intentionally does not contain the submitted body/input.
+          const preflightInput = JSON.parse(fs.readFileSync('/tmp/social-post-preflight-request.json', 'utf8'));
+          fs.writeFileSync('/tmp/social-post-publish-request.json', JSON.stringify({
+            to: 'PUBLISHED',
+            preflight: preflightInput,
+          }));
+          NODE
+
+          set +e
+          HTTP_STATUS="$(curl --silent --show-error \
+            -o /tmp/social-post-publish.json \
+            -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer $CREATOR_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-PUBLISH" \
+            -H "If-Match: $SOCIAL_POST_ETAG" \
+            --data @/tmp/social-post-publish-request.json \
+            "$CONTENT_API_BASE_URL/v1/contents/$SOCIAL_POST_ID/state")"
+          CURL_STATUS=$?
+          set -e
+          if [ "$CURL_STATUS" -ne 0 ] || [[ ! "$HTTP_STATUS" =~ ^2[0-9][0-9]$ ]]; then
+            echo "::error::Social post direct publish request failed: curl_status=$CURL_STATUS http_status=${HTTP_STATUS:-unknown}"
+            if [ -s /tmp/social-post-publish.json ]; then
+              cat /tmp/social-post-publish.json
+            fi
+            exit 1
+          fi
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const value = JSON.parse(fs.readFileSync('/tmp/social-post-publish.json', 'utf8'));
+          if (value.from !== 'DRAFT' || value.to !== 'PUBLISHED' || Number(value.version) !== 2 || value.etag !== 'W/"2"') {
+            throw new Error('social post direct publish transition failed: ' + JSON.stringify(value));
+          }
+          console.log('SOCIAL_POST_DIRECT_PUBLISH=PASS');
+          NODE
+
+      - name: Seed controlled moderation cases
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          NOW="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+          SQL="INSERT INTO moderation_cases (case_id,target_type,target_id,target_version,policy_version,state,priority,assigned_reviewer_id,current_decision_id,evidence_bundle_ref,version,created_at,updated_at) VALUES ('content-e2e-article-$GITHUB_RUN_ID','content','$ARTICLE_ID',2,'moderation-v1.0','UNDER_REVIEW',100,NULL,NULL,'content-e2e/$GITHUB_RUN_ID/article',1,'$NOW','$NOW');"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc --command "$SQL"
+          SQL="INSERT INTO moderation_cases (case_id,target_type,target_id,target_version,policy_version,state,priority,assigned_reviewer_id,current_decision_id,evidence_bundle_ref,version,created_at,updated_at) VALUES ('content-e2e-video-$GITHUB_RUN_ID','content','$VIDEO_ID',2,'moderation-v1.0','UNDER_REVIEW',100,NULL,NULL,'content-e2e/$GITHUB_RUN_ID/video',1,'$NOW','$NOW');"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc --command "$SQL"
+          echo "CASE_ARTICLE_ID=content-e2e-article-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+          echo "CASE_VIDEO_ID=content-e2e-video-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+
+      - name: Approve article through moderation boundary
+        run: |
+          set -euo pipefail
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-APPROVE"             -H "If-Match: v1"             --data '{"expectedVersion":1,"decision":"APPROVED","policyVersion":"moderation-v1.0","reasonCode":"CONTENT_PUBLISH_E2E","severity":"medium","scope":"content","effectiveAt":"'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","expiresAt":null}'             "$MODERATION_BASE_URL/v1/admin/moderation/cases/$CASE_ARTICLE_ID/decision" > /tmp/article-approve.json
+          node -e "const v=require('/tmp/article-approve.json'); if(v.outcome!=='APPROVED'||Number(v.version)!==2) throw new Error('article moderation approval failed: '+JSON.stringify(v));"
+
+      - name: Approve video through moderation boundary
+        run: |
+          set -euo pipefail
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-APPROVE"             -H "If-Match: v1"             --data '{"expectedVersion":1,"decision":"APPROVED","policyVersion":"moderation-v1.0","reasonCode":"CONTENT_PUBLISH_E2E","severity":"medium","scope":"content","effectiveAt":"'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","expiresAt":null}'             "$MODERATION_BASE_URL/v1/admin/moderation/cases/$CASE_VIDEO_ID/decision" > /tmp/video-approve.json
+          node -e "const v=require('/tmp/video-approve.json'); if(v.outcome!=='APPROVED'||Number(v.version)!==2) throw new Error('video moderation approval failed: '+JSON.stringify(v));"
+
+      - name: Wait for W06 approval propagation
+        run: |
+          set -euo pipefail
+
+          wait_for_approved() {
+            local kind="$1"
+            local content_id="$2"
+            local output_file="$3"
+            local etag_var="$4"
+
+            for attempt in $(seq 1 20); do
+              curl --silent --show-error --fail-with-body                 -H "Authorization: Bearer $CREATOR_TOKEN"                 "$CONTENT_API_BASE_URL/v1/contents/$content_id" > "$output_file"
+
+              state="$(node -e "const v=require(process.argv[1]); process.stdout.write(String(v.state||''))" "$output_file")"
+              etag="$(node -e "const v=require(process.argv[1]); process.stdout.write(String(v.etag||''))" "$output_file")"
+
+              if [ "$state" = "APPROVED" ] && [ -n "$etag" ]; then
+                echo "$kind approved with etag=$etag"
+                echo "$etag_var=$etag" >> "$GITHUB_ENV"
+                return 0
+              fi
+
+              if [ "$state" = "PUBLISHED" ]; then
+                echo "$kind unexpectedly already PUBLISHED" >&2
+                return 1
+              fi
+
+              sleep 2
+            done
+
+            echo "$kind approval did not propagate within 40 seconds" >&2
+            cat "$output_file" >&2
+            return 1
+          }
+
+          wait_for_approved article "$ARTICLE_ID" /tmp/article-approved.json ARTICLE_PUBLISH_ETAG
+          wait_for_approved video "$VIDEO_ID" /tmp/video-approved.json VIDEO_PUBLISH_ETAG
+
+      - name: Publish article and video
+        run: |
+          set -euo pipefail
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-PUBLISH"             -H "If-Match: $ARTICLE_PUBLISH_ETAG"             --data '{"to":"PUBLISHED"}'             "$CONTENT_API_BASE_URL/v1/contents/$ARTICLE_ID/state" > /tmp/article-publish.json
+
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-PUBLISH"             -H "If-Match: $VIDEO_PUBLISH_ETAG"             --data '{"to":"PUBLISHED"}'             "$CONTENT_API_BASE_URL/v1/contents/$VIDEO_ID/state" > /tmp/video-publish.json
+
+          node <<'NODE'
+          const fs=require('node:fs');
+          for(const [kind,file] of [['article','/tmp/article-publish.json'],['video','/tmp/video-publish.json']]){
+            const v=JSON.parse(fs.readFileSync(file,'utf8'));
+            if(v.from!=='APPROVED'||v.to!=='PUBLISHED'||Number(v.version)!==4) throw new Error(kind+' publish transition failed: '+JSON.stringify(v));
+          }
+          NODE
+
+      - name: Verify public visibility and remote D1 evidence
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/content-publish-runtime-e2e
+          curl --silent --show-error --fail-with-body "$CONTENT_API_BASE_URL/v1/contents/$ARTICLE_ID" > artifacts/mapping-0/content-publish-runtime-e2e/article-public.json
+          curl --silent --show-error --fail-with-body "$CONTENT_API_BASE_URL/v1/contents/$VIDEO_ID" > artifacts/mapping-0/content-publish-runtime-e2e/video-public.json
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $CREATOR_TOKEN" "$CONTENT_API_BASE_URL/v1/contents/$SOCIAL_POST_ID" > artifacts/mapping-0/content-publish-runtime-e2e/social-post-public.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W03" --remote --json --config workers/W03-content/wrangler.jsonc             --command "SELECT id,content_type,owner_user_id,state,version,revision,title,body_ref,media_refs_json,cover_ref,etag FROM contents WHERE id IN ('$ARTICLE_ID','$VIDEO_ID','$SOCIAL_POST_ID') ORDER BY id;"             > artifacts/mapping-0/content-publish-runtime-e2e/content-state.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc             --command "SELECT case_id,state,version,current_decision_id FROM moderation_cases WHERE case_id IN ('$CASE_ARTICLE_ID','$CASE_VIDEO_ID') ORDER BY case_id;"             > artifacts/mapping-0/content-publish-runtime-e2e/moderation-cases.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc             --command "SELECT case_id,state,target_id FROM moderation_cases WHERE target_type='content' AND target_id='$SOCIAL_POST_ID' ORDER BY case_id;"             > artifacts/mapping-0/content-publish-runtime-e2e/social-post-moderation-cases.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc             --command "SELECT decision_id,case_id,case_version,outcome,policy_version,reviewer_id,reviewer_layer FROM moderation_decisions WHERE case_id IN ('$CASE_ARTICLE_ID','$CASE_VIDEO_ID') ORDER BY case_id;"             > artifacts/mapping-0/content-publish-runtime-e2e/moderation-decisions.json
+          node <<'NODE'
+          const fs=require('node:fs');
+          for(const [kind,expectedId] of [['article',process.env.ARTICLE_ID],['video',process.env.VIDEO_ID]]){
+            const pub=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/'+kind+'-public.json','utf8'));
+            if(typeof pub.id!=='string'||pub.id!==expectedId||!/^[0-9]{18,20}$/.test(pub.id)||BigInt(pub.id).toString(10)!==pub.id) {
+              throw new Error(kind+' public W01 readback changed or coerced its Snowflake ID: '+JSON.stringify({expectedId,actualId:pub.id}));
+            }
+            if(pub.state!=='PUBLISHED'||Number(pub.version)!==4) throw new Error(kind+' public visibility failed: '+JSON.stringify(pub));
+          }
+          const socialPostPublic=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/social-post-public.json','utf8'));
+          if(socialPostPublic.contentType!=='post'||socialPostPublic.state!=='PUBLISHED'||Number(socialPostPublic.version)!==2) {
+            throw new Error('social post public visibility failed: '+JSON.stringify(socialPostPublic));
+          }
+          if(typeof socialPostPublic.id!=='string'||socialPostPublic.id!==process.env.SOCIAL_POST_ID||
+             !/^[0-9]{18,20}$/.test(socialPostPublic.id)||BigInt(socialPostPublic.id).toString(10)!==socialPostPublic.id) {
+            throw new Error('social post public W01 readback changed or coerced its Snowflake ID: '+
+              JSON.stringify({expectedId:process.env.SOCIAL_POST_ID,actualId:socialPostPublic.id}));
+          }
+          const expectedAttachmentRef = process.env.POST_ATTACHMENT_REF;
+          if (!expectedAttachmentRef || !Array.isArray(socialPostPublic.mediaRefs) || socialPostPublic.mediaRefs.length !== 1 ||
+              socialPostPublic.mediaRefs[0] !== expectedAttachmentRef || socialPostPublic.coverRef !== expectedAttachmentRef) {
+            throw new Error('W01/W03 public social-post mediaRefs/coverRef relation was not preserved: ' +
+              JSON.stringify({ expectedAttachmentRef, mediaRefs: socialPostPublic.mediaRefs, coverRef: socialPostPublic.coverRef }));
+          }
+          const content=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/content-state.json'))?.[0]?.results??[];
+          if(content.length!==3) throw new Error('W03 remote content evidence missing records: '+JSON.stringify(content));
+          for (const [id,kind,version] of [[process.env.ARTICLE_ID,'article',4],[process.env.VIDEO_ID,'video',4],[process.env.SOCIAL_POST_ID,'post',2]]) {
+            const row=content.find(x=>x.id===id);
+            if(!row||row.content_type!==kind||row.state!=='PUBLISHED'||Number(row.version)!==version) {
+              throw new Error('W03 remote '+kind+' state evidence invalid: '+JSON.stringify(row));
+            }
+          }
+          const storedPost = content.find(x=>x.id===process.env.SOCIAL_POST_ID);
+          let storedPostMediaRefs = null;
+          try { storedPostMediaRefs = JSON.parse(storedPost?.media_refs_json ?? 'null'); } catch {}
+          if (!Array.isArray(storedPostMediaRefs) || storedPostMediaRefs.length !== 1 ||
+              storedPostMediaRefs[0] !== expectedAttachmentRef || storedPost?.cover_ref !== expectedAttachmentRef) {
+            throw new Error('W03 D1 media_refs_json/cover_ref did not persist the uploaded attachment: ' +
+              JSON.stringify({ storedPostMediaRefs, storedCoverRef: storedPost?.cover_ref, expectedAttachmentRef }));
+          }
+          fs.writeFileSync('artifacts/mapping-0/content-publish-runtime-e2e/social-post-media-refs.json', JSON.stringify({
+            status: 'PASS',
+            mediaReferenceCount: storedPostMediaRefs.length,
+            publicMediaRefs: socialPostPublic.mediaRefs,
+            publicCoverRef: socialPostPublic.coverRef,
+            storedMediaRefs: storedPostMediaRefs,
+            storedCoverRef: storedPost.cover_ref,
+          }, null, 2) + String.fromCharCode(10));
+          const decisions=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/moderation-decisions.json'))?.[0]?.results??[];
+          if(decisions.length!==2||decisions.some(x=>x.outcome!=='APPROVED'||x.reviewer_id===null||x.reviewer_layer!=='L6')) throw new Error('W06 decision evidence invalid: '+JSON.stringify(decisions));
+          const postCases=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/social-post-moderation-cases.json'))?.[0]?.results??[];
+          if(postCases.length!==0) throw new Error('social post unexpectedly entered moderation: '+JSON.stringify(postCases));
+          console.log('CONTENT_PUBLISH_RUNTIME_E2E=PASS; SOCIAL_POST_DIRECT_PUBLISH=PASS; SOCIAL_POST_MODERATION_CASES=0');
+          NODE
+
+      - name: Capture provenance
+        run: |
+          mkdir -p artifacts/mapping-0/content-publish-runtime-e2e
+          cat > artifacts/mapping-0/content-publish-runtime-e2e/provenance.txt <<EOF
+          workflow=Content Publish Runtime E2E
+          source_sha=$W01_SOURCE_SHA
+          launch_run_id=$LAUNCH_RUN_ID
+          creator_layer=L3
+          article_create_review_approve_publish=true
+          video_create_review_approve_publish=true
+          social_post_create_preflight_direct_publish=true
+          social_post_no_moderation_handoff=true
+          public_visibility_assertion=true
+          remote_d1_evidence=true
+          new_worker=0
+          new_d1=0
+          new_task=0
+          controlled_synthetic_fixtures=true
+          EOF
+
+      - name: Cleanup controlled content and auth fixtures
+        if: always()
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${POST_BODY_MEDIA_ID:-}" ] && [ -n "${CREATOR_TOKEN:-}" ]; then
+            if curl --silent --show-error --fail-with-body \
+              -X DELETE \
+              -H "Authorization: Bearer $CREATOR_TOKEN" \
+              -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-BODY-CLEANUP" \
+              "$CONTENT_API_BASE_URL/v1/media/$POST_BODY_MEDIA_ID"; then
+              echo "Social post body asset cleanup: PASS"
+            else
+              echo "::warning::Social post body asset cleanup failed for the controlled E2E fixture"
+            fi
+          fi
+          if printenv POST_ATTACHMENT_MEDIA_ID >/dev/null 2>&1 && printenv CREATOR_TOKEN >/dev/null 2>&1; then
+            if curl --silent --show-error --fail-with-body -X DELETE -H "Authorization: Bearer $CREATOR_TOKEN" -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-ATTACHMENT-CLEANUP" "$CONTENT_API_BASE_URL/v1/media/$POST_ATTACHMENT_MEDIA_ID"; then
+              echo "Social post attachment asset cleanup: PASS"
+            else
+              echo "::warning::Social post attachment asset cleanup failed for the controlled E2E fixture"
+            fi
+          fi
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc             --command "DELETE FROM moderation_enforcement_outbox WHERE decision_id IN (SELECT decision_id FROM moderation_decisions WHERE case_id LIKE 'content-e2e-%'); DELETE FROM moderation_decision_idempotency WHERE case_id LIKE 'content-e2e-%'; DELETE FROM moderation_decisions WHERE case_id LIKE 'content-e2e-%'; DELETE FROM moderation_cases WHERE case_id LIKE 'content-e2e-%';"
+          CREATOR_USER="${CREATOR_AUTH_USER_ID:-__none__}"
+          CREATOR_ROLE="${CREATOR_ROLE_ID:-__none__}"
+          CREATOR_REG_KEY="${CREATOR_REGISTRATION_KEY:-__none__}"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-content/wrangler.jsonc             --command "DELETE FROM content_mutation_idempotency WHERE owner_user_id='$CREATOR_USER'; DELETE FROM contents WHERE owner_user_id='$CREATOR_USER';"
+           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W01" --remote --yes --config workers/W01-payload/wrangler.jsonc             --command "DELETE FROM role_assignments WHERE id='$CREATOR_ROLE' OR subject_id='$CREATOR_USER'; DELETE FROM \"session\" WHERE user_id='$CREATOR_USER'; DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT)='$CREATOR_USER' OR CAST(owner_subject_id AS TEXT)='$CREATOR_USER'; DELETE FROM auth_registration_envelopes WHERE idempotency_key='$CREATOR_REG_KEY'; DELETE FROM users WHERE CAST(id AS TEXT)='$CREATOR_USER'; DELETE FROM \"user\" WHERE id='$CREATOR_USER';"
+           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W01" --remote --yes --config workers/W01-payload/wrangler.jsonc             --command "DELETE FROM role_assignments WHERE id LIKE 'MODERATION-E2E-ROLE-%'; DELETE FROM \"session\" WHERE user_id IN (SELECT id FROM \"user\" WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'); DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT) IN (SELECT id FROM \"user\" WHERE email LIKE 'moderation-e2e-MODL6-%@example.com') OR CAST(owner_subject_id AS TEXT) IN (SELECT id FROM \"user\" WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'); DELETE FROM auth_registration_envelopes WHERE idempotency_key LIKE 'MODERATION-E2E-%-register'; DELETE FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'; DELETE FROM \"user\" WHERE email LIKE 'moderation-e2e-MODL6-%@example.com';"
+
+      - name: Upload content publish runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: content-publish-runtime-e2e-${{ inputs.source_sha }}
+          path: artifacts/mapping-0/content-publish-runtime-e2e/
+          if-no-files-found: error
+          retention-days: 14

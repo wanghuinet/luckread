@@ -1,0 +1,78 @@
+name: W10 Async Runtime CI
+
+on:
+  pull_request:
+    paths:
+      - 'workers/W10-async/**'
+      - 'workers/W07-subscription-commerce/src/index.ts'
+      - 'workers/W07-subscription-commerce/src/renewal-scheduler.ts'
+      - 'workers/W07-subscription-commerce/src/renewal-scheduler.test.ts'
+      - 'workers/W07-subscription-commerce/wrangler.jsonc'
+      - 'workers/W07-subscription-commerce/scripts/verify-renewal-activation-gate.test.mjs'
+      - 'contracts/transport/W10-W07-membership-renewal-workflow.v1.json'
+      - '.github/workflows/w10-queue-batch-ci.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W10-async/**'
+      - 'workers/W07-subscription-commerce/src/index.ts'
+      - 'workers/W07-subscription-commerce/src/renewal-scheduler.ts'
+      - 'workers/W07-subscription-commerce/src/renewal-scheduler.test.ts'
+      - 'workers/W07-subscription-commerce/wrangler.jsonc'
+      - 'workers/W07-subscription-commerce/scripts/verify-renewal-activation-gate.test.mjs'
+      - 'contracts/transport/W10-W07-membership-renewal-workflow.v1.json'
+      - '.github/workflows/w10-queue-batch-ci.yml'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+jobs:
+  async-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked repository dependencies
+        run: npm ci --ignore-scripts --no-audit --fund=false
+      - name: Install locked W10 SDK dependency
+        run: npm ci --prefix workers/W10-async --ignore-scripts --no-audit --fund=false
+      - name: Test W10 async execution and Workflow orchestration
+        run: npx vitest run workers/W10-async/src/*.test.ts
+      - name: Verify renewal activation and W10 transport boundary
+        run: node --test workers/W07-subscription-commerce/scripts/verify-renewal-activation-gate.test.mjs
+      - name: Typecheck W10 async and Workflow runtime
+        run: >-
+          npx tsc --noEmit --strict --skipLibCheck
+          --target ES2022 --module ESNext --moduleResolution Bundler
+          --lib ES2022,DOM --types @cloudflare/workers-types
+          workers/W10-async/src/queue-batch.ts
+          workers/W10-async/src/queue-batch.test.ts
+          workers/W10-async/src/retry-policy.ts
+          workers/W10-async/src/retry-policy.test.ts
+          workers/W10-async/src/event-envelope.ts
+          workers/W10-async/src/event-envelope.test.ts
+          workers/W10-async/src/canonical-json-idempotency.ts
+          workers/W10-async/src/execution-job-read-store.ts
+          workers/W10-async/src/execution-job-read-store-postgres.ts
+          workers/W10-async/src/expo-push-service.ts
+          workers/W10-async/src/expo-push-service.test.ts
+          workers/W10-async/src/membership-renewal-workflow-runtime.ts
+          workers/W10-async/src/membership-renewal-workflow.test.ts
+          workers/W10-async/src/membership-renewal-workflow.ts
+          workers/W10-async/src/index.ts
+      - name: Validate and bundle the W10 Workflow configuration without deploying
+        run: >-
+          npx --yes wrangler@4.156.0 deploy
+          --dry-run
+          --config workers/W10-async/wrangler.jsonc
+          --outdir /tmp/w10-renewal-workflow-dry-run

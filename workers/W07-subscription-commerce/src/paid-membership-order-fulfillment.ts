@@ -1,0 +1,874 @@
+import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js';
+import { addBillingPeriod } from './subscription-runtime.js';
+import {
+  getW07PaymentWebhookPostgresPool,
+  type W07PaymentMethodReadRuntimeEnv,
+} from './neon/payment-method-read-runtime.js';
+import {
+  getW07MembershipPostgresPool,
+  type W07MembershipDatabaseRuntimeEnv,
+} from './neon/membership-database-runtime.js';
+import type { W07WebhookPostgresClient, W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
+
+type PaidOrderRow = Readonly<{
+  payment_id: string;
+  order_id: string;
+  customer_id: string;
+  provider: string;
+  merchant_id: string;
+  payment_status: string;
+  amount_minor: number;
+  payment_currency: string;
+  order_status: string;
+  order_currency: string;
+  total_minor: number;
+  confirmed_at: string | null;
+}>;
+
+type PaidOrderLineRow = Readonly<{
+  order_line_id: string;
+  item_type: string;
+  item_ref: string;
+  item_version: string;
+  quantity: number;
+  unit_amount_minor: number;
+  line_total_minor: number;
+  item_snapshot_json: string;
+}>;
+
+type MembershipPlanVersionRow = Readonly<{
+  plan_id: string;
+  owner_type: string;
+  owner_id: string;
+  plan_version: number;
+  name: string;
+  tier: string;
+  billing_interval: string;
+  price_minor: number;
+  currency: string;
+  benefits_json: string;
+}>;
+
+type ExistingSubscriptionRow = Readonly<{
+  subscription_id: string;
+  subscriber_id: string;
+  plan_id: string;
+  plan_version: number;
+  creator_id: string | null;
+  status: string;
+  started_at: string;
+  current_period_start: string;
+  current_period_end: string;
+  entitlement_snapshot_ref: string | null;
+}>;
+
+export type PaidMembershipPurchaseFulfillmentResult = Readonly<{
+  outcome: 'APPLIED' | 'ALREADY_APPLIED' | 'NOT_APPLICABLE' | 'RECONCILIATION_REQUIRED';
+  fulfilledCount: number;
+  reasonCode?: string;
+}>;
+
+export class PaidMembershipPurchaseFulfillmentError extends Error {
+  constructor(readonly code: 'VALIDATION_FAILED' | 'SERVICE_UNAVAILABLE', readonly status: number) {
+    super(code);
+    this.name = 'PaidMembershipPurchaseFulfillmentError';
+  }
+}
+
+type FulfillmentEnv =
+  Pick<W07PaymentMethodReadRuntimeEnv, 'W07_DATABASE_DRIVER' | 'HYPERDRIVE_FINANCE_DB'> &
+  W07MembershipDatabaseRuntimeEnv &
+  Readonly<{ W06_GOVERNANCE?: Fetcher }>;
+type SubscriptionPlanUpgradeSnapshot = Readonly<{
+  kind: 'PLAN_UPGRADE';
+  attemptId: string;
+  subscriberId: string;
+  subscriptionId: string;
+  expectedSubscriptionVersion: number;
+  expectedPlanId: string;
+  expectedPlanVersion: number;
+  targetPlanId: string;
+  targetPlanVersion: number;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  expiresAt: string;
+}>;
+
+type MembershipOfferSnapshot = Readonly<{
+  planId: string;
+  planVersion: number;
+  creatorId: string;
+  name: string;
+  tier: string;
+  billingInterval: 'MONTHLY' | 'YEARLY';
+  priceMinor: number;
+  chargedAmountMinor: number;
+  currency: string;
+  benefits: string[];
+  subscriptionChange: SubscriptionPlanUpgradeSnapshot | null;
+}>;
+
+
+type FulfillmentDependencies = Readonly<{
+  getFinancePostgresPool?: (env: FulfillmentEnv) => W07WebhookPostgresPool | undefined;
+  getMembershipPostgresPool?: (env: FulfillmentEnv) => W07WebhookPostgresPool | undefined;
+}>;
+
+function selectedFulfillmentDatabases(
+  env: FulfillmentEnv,
+  dependencies: FulfillmentDependencies = {},
+): Readonly<{ finance: W07WebhookPostgresPool; membership: W07WebhookPostgresPool }> {
+  const financePool = (dependencies.getFinancePostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
+  const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
+  if (!financePool || !membershipPool) {
+    throw new PaidMembershipPurchaseFulfillmentError('SERVICE_UNAVAILABLE', 503);
+  }
+  return { finance: financePool, membership: membershipPool };
+}
+
+const PAYMENT_ID_PATTERN = /^pay_[A-Za-z0-9]{26}$/;
+const PLAN_ID_PATTERN = /^plan_[a-f0-9]{64}$/;
+const MAX_ID = 256;
+const MEMBERSHIP_ITEM = 'MEMBERSHIP_PLAN';
+
+function boundedId(value: unknown, max = MAX_ID): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= max &&
+    value.trim() === value && !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+function canonicalIso(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= 64 &&
+    Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+}
+
+function safeMinor(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function failClosed(): never {
+  throw new PaidMembershipPurchaseFulfillmentError('SERVICE_UNAVAILABLE', 503);
+}
+
+function parseSnapshot(raw: string, line: PaidOrderLineRow, orderCurrency: string): MembershipOfferSnapshot {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    return failClosed();
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return failClosed();
+  const value = parsed as Record<string, unknown>;
+  const benefits = value.benefits;
+  const priceMinor = value.priceMinor;
+  const chargedAmountMinor = value.chargedAmountMinor === undefined ? priceMinor : value.chargedAmountMinor;
+  let subscriptionChange: SubscriptionPlanUpgradeSnapshot | null = null;
+  if (Object.prototype.hasOwnProperty.call(value, 'subscriptionChange')) {
+    const rawChange = value.subscriptionChange;
+    if (typeof rawChange !== 'object' || rawChange === null || Array.isArray(rawChange)) return failClosed();
+    const change = rawChange as Record<string, unknown>;
+    if (
+      change.kind !== 'PLAN_UPGRADE' ||
+      typeof change.attemptId !== 'string' || !/^suca_[a-f0-9]{64}$/.test(change.attemptId) ||
+      !boundedId(change.subscriberId) ||
+      !boundedId(change.subscriptionId) ||
+      !Number.isSafeInteger(change.expectedSubscriptionVersion) || (change.expectedSubscriptionVersion as number) < 1 ||
+      typeof change.expectedPlanId !== 'string' || !PLAN_ID_PATTERN.test(change.expectedPlanId) ||
+      !Number.isSafeInteger(change.expectedPlanVersion) || (change.expectedPlanVersion as number) < 1 ||
+      change.targetPlanId !== value.planId ||
+      change.targetPlanVersion !== value.planVersion ||
+      !canonicalIso(change.currentPeriodStart) ||
+      !canonicalIso(change.currentPeriodEnd) ||
+      change.currentPeriodEnd <= change.currentPeriodStart ||
+      !canonicalIso(change.expiresAt)
+    ) return failClosed();
+    subscriptionChange = {
+      kind: 'PLAN_UPGRADE',
+      attemptId: change.attemptId,
+      subscriberId: change.subscriberId,
+      subscriptionId: change.subscriptionId,
+      expectedSubscriptionVersion: change.expectedSubscriptionVersion as number,
+      expectedPlanId: change.expectedPlanId,
+      expectedPlanVersion: change.expectedPlanVersion as number,
+      targetPlanId: change.targetPlanId as string,
+      targetPlanVersion: change.targetPlanVersion as number,
+      currentPeriodStart: change.currentPeriodStart,
+      currentPeriodEnd: change.currentPeriodEnd,
+      expiresAt: change.expiresAt,
+    };
+  }
+  if (
+    typeof value.planId !== 'string' || !PLAN_ID_PATTERN.test(value.planId) ||
+    value.planId !== line.item_ref ||
+    !Number.isSafeInteger(value.planVersion) || (value.planVersion as number) < 1 ||
+    String(value.planVersion) !== line.item_version ||
+    !boundedId(value.creatorId) ||
+    typeof value.name !== 'string' || value.name.trim().length < 1 || value.name.length > 120 ||
+    typeof value.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(value.tier) ||
+    (value.billingInterval !== 'MONTHLY' && value.billingInterval !== 'YEARLY') ||
+    !safeMinor(priceMinor) || priceMinor < 1 ||
+    !safeMinor(chargedAmountMinor) || chargedAmountMinor < 1 ||
+    chargedAmountMinor > priceMinor ||
+    chargedAmountMinor !== line.unit_amount_minor ||
+    value.currency !== orderCurrency ||
+    !Array.isArray(benefits) || benefits.length > 20 ||
+    benefits.some((item) => typeof item !== 'string' || item.length < 1 || item.length > 180) ||
+    new Set(benefits).size !== benefits.length ||
+    !Number.isSafeInteger(line.quantity) || line.quantity !== 1 ||
+    !safeMinor(line.line_total_minor) || line.line_total_minor < 1
+  ) return failClosed();
+
+  if (subscriptionChange &&
+      (subscriptionChange.targetPlanId !== value.planId ||
+       subscriptionChange.targetPlanVersion !== value.planVersion)) return failClosed();
+
+  return {
+    planId: value.planId,
+    planVersion: value.planVersion as number,
+    creatorId: value.creatorId,
+    name: value.name,
+    tier: value.tier,
+    billingInterval: value.billingInterval,
+    priceMinor,
+    chargedAmountMinor,
+    currency: value.currency,
+    benefits: benefits as string[],
+    subscriptionChange,
+  };
+}
+
+async function readPaidOrder(
+  db: W07WebhookPostgresPool,
+  paymentId: string,
+  merchantId: string,
+): Promise<PaidOrderRow> {
+  let row: PaidOrderRow | null;
+  try {
+    const result = await db.query<PaidOrderRow & Record<string, unknown>>(
+      'SELECT p.payment_id, p.order_id, p.customer_id, p.provider, p.merchant_id, ' +
+      'p.status AS payment_status, p.amount_minor::double precision AS amount_minor, p.currency AS payment_currency, ' +
+      'o.status AS order_status, o.currency AS order_currency, o.total_minor::double precision AS total_minor, ' +
+      'to_char(o.confirmed_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"\') AS confirmed_at ' +
+      'FROM payments AS p INNER JOIN orders AS o ON o.order_id = p.order_id AND o.customer_id = p.customer_id ' +
+      "WHERE p.provider = 'hyperswitch' AND p.payment_id = $1 AND p.merchant_id = $2 LIMIT 1",
+      [paymentId, merchantId],
+    );
+    row = result.rows[0] ?? null;
+  } catch {
+    return failClosed();
+  }
+  if (!row) return failClosed();
+  if (
+    row.provider !== 'hyperswitch' || row.payment_id !== paymentId || row.merchant_id !== merchantId ||
+    !boundedId(row.order_id, 255) || !boundedId(row.customer_id) ||
+    row.payment_status !== 'succeeded' ||
+    !safeMinor(row.amount_minor) || row.amount_minor < 1 ||
+    !/^[A-Z]{3}$/.test(row.payment_currency) ||
+    row.payment_currency !== row.order_currency || row.amount_minor !== row.total_minor ||
+    !['CONFIRMED', 'COMPLETED'].includes(row.order_status) ||
+    !canonicalIso(row.confirmed_at)
+  ) return failClosed();
+  return row;
+}
+
+async function readOrderLines(db: W07WebhookPostgresPool, orderId: string): Promise<PaidOrderLineRow[]> {
+  try {
+    const result = await db.query<PaidOrderLineRow & Record<string, unknown>>(
+      'SELECT order_line_id, item_type, item_ref, item_version, quantity::double precision AS quantity, ' +
+      'unit_amount_minor::double precision AS unit_amount_minor, line_total_minor::double precision AS line_total_minor, ' +
+      'item_snapshot_json FROM order_lines WHERE order_id = $1 ORDER BY order_line_id ASC',
+      [orderId],
+    );
+    return result.rows;
+  } catch {
+    return failClosed();
+  }
+}
+
+async function readPlanVersion(
+  db: W07WebhookPostgresPool,
+  snapshot: MembershipOfferSnapshot,
+): Promise<MembershipPlanVersionRow> {
+  let row: MembershipPlanVersionRow | null;
+  try {
+    const result = await db.query<MembershipPlanVersionRow & Record<string, unknown>>(
+      'SELECT p.plan_id, p.owner_type, p.owner_id, v.plan_version, v.name, v.tier, ' +
+      'v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id ' +
+      'WHERE p.plan_id = $1 AND v.plan_version = $2 LIMIT 1',
+      [snapshot.planId, snapshot.planVersion],
+    );
+    row = result.rows[0] ?? null;
+  } catch {
+    return failClosed();
+  }
+  if (!row) return failClosed();
+  let benefits: unknown;
+  try {
+    benefits = JSON.parse(row.benefits_json) as unknown;
+  } catch {
+    return failClosed();
+  }
+  if (
+    row.plan_id !== snapshot.planId || row.owner_type !== 'CREATOR' || row.owner_id !== snapshot.creatorId ||
+    row.plan_version !== snapshot.planVersion || row.name !== snapshot.name || row.tier !== snapshot.tier ||
+    row.billing_interval !== snapshot.billingInterval || row.price_minor !== snapshot.priceMinor ||
+    row.currency !== snapshot.currency || !Array.isArray(benefits) ||
+    JSON.stringify(benefits) !== JSON.stringify(snapshot.benefits)
+  ) return failClosed();
+  return row;
+}
+
+async function subscriptionIdForPaidOrderLine(orderId: string, lineId: string, subscriberId: string): Promise<string> {
+  if (!boundedId(orderId, 255) || !boundedId(lineId, 255) || !boundedId(subscriberId)) {
+    throw new PaidMembershipPurchaseFulfillmentError('VALIDATION_FAILED', 400);
+  }
+  const material = new TextEncoder().encode(
+    'paid-membership-order-line-v1\u0000' + subscriberId + '\u0000' + orderId + '\u0000' + lineId,
+  );
+  try {
+    return 'sub_' + await sha256BytesToHex(material);
+  } catch {
+    return failClosed();
+  }
+}
+
+function matchesExistingSubscription(
+  row: ExistingSubscriptionRow,
+  input: {
+    subscriptionId: string;
+    subscriberId: string;
+    orderId: string;
+    lineId: string;
+    snapshot: MembershipOfferSnapshot;
+    periodStart: string;
+    periodEnd: string;
+  },
+): boolean {
+  // Billing periods and lifecycle status are mutable after the initial
+  // purchase (renewal, pause, cancellation, expiration). Replay identity must
+  // match only immutable order/subscription lineage and must never reactivate
+  // or reset the current period.
+  // A subscription may legitimately change plan/version or billing period
+  // after purchase. The stable subscription ID is derived from this exact
+  // customer/order-line lineage, so replay compares only immutable lineage.
+  return row.subscription_id === input.subscriptionId &&
+    row.subscriber_id === input.subscriberId &&
+    row.creator_id === input.snapshot.creatorId &&
+    row.started_at === input.periodStart &&
+    row.entitlement_snapshot_ref === 'commerce-order:' + input.orderId + ':line:' + input.lineId;
+}
+
+async function readExistingSubscription(
+  db: W07WebhookPostgresPool,
+  subscriptionId: string,
+): Promise<ExistingSubscriptionRow | null> {
+  try {
+    const result = await db.query<ExistingSubscriptionRow & Record<string, unknown>>(
+      'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, ' +
+      'to_char(started_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS started_at, ' +
+      'to_char(current_period_start AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS current_period_start, ' +
+      'to_char(current_period_end AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS current_period_end, ' +
+      'entitlement_snapshot_ref FROM membership_subscriptions WHERE subscription_id = $1 LIMIT 1',
+      [subscriptionId],
+    );
+    return result.rows[0] ?? null;
+  } catch { return failClosed(); }
+}
+
+async function createOrReplayPaidSubscription(
+  db: W07WebhookPostgresPool,
+  input: { subscriptionId: string; subscriberId: string; orderId: string; lineId: string; snapshot: MembershipOfferSnapshot; periodStart: string; periodEnd: string },
+): Promise<'APPLIED' | 'ALREADY_APPLIED'> {
+  const existing = await readExistingSubscription(db, input.subscriptionId);
+  if (existing) {
+    if (!matchesExistingSubscription(existing, input)) return failClosed();
+    return 'ALREADY_APPLIED';
+  }
+  const entitlementSnapshotRef = 'commerce-order:' + input.orderId + ':line:' + input.lineId;
+  try {
+    const result = await db.query<{ subscription_id: string } & Record<string, unknown>>(
+      'INSERT INTO membership_subscriptions ' +
+      '(subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at, version) ' +
+      "VALUES ($1, $2, $3, $4, $5, 'ACTIVE', $6::timestamptz, $7::timestamptz, $8::timestamptz, NULL, $9, $10::timestamptz, $11::timestamptz, 1) " +
+      'ON CONFLICT (subscription_id) DO NOTHING RETURNING subscription_id',
+      [input.subscriptionId, input.subscriberId, input.snapshot.planId, input.snapshot.planVersion, input.snapshot.creatorId, input.periodStart, input.periodStart, input.periodEnd, entitlementSnapshotRef, input.periodStart, input.periodStart],
+    );
+    if (!result.rows.length) {
+      const raced = await readExistingSubscription(db, input.subscriptionId);
+      if (raced && matchesExistingSubscription(raced, input)) return 'ALREADY_APPLIED';
+      return failClosed();
+    }
+  } catch {
+    const raced = await readExistingSubscription(db, input.subscriptionId).catch(() => null);
+    if (raced && matchesExistingSubscription(raced, input)) return 'ALREADY_APPLIED';
+    throw new PaidMembershipPurchaseFulfillmentError('SERVICE_UNAVAILABLE', 503);
+  }
+  const inserted = await readExistingSubscription(db, input.subscriptionId);
+  if (!inserted || !matchesExistingSubscription(inserted, input) || inserted.status !== 'ACTIVE') return failClosed();
+  return 'APPLIED';
+}
+
+/**
+ * Fulfill only a durable, successfully reconciled Hyperswitch payment against its
+ * Neon finance Order and immutable membership-plan snapshot. This is intentionally
+ * separate from the user-facing subscription-create API: clients cannot assert
+ * payment success, select the subscription ID, or assign their own entitlement.
+ *
+ * One order may contain at most one membership line in this Beta flow. Other
+ * order item families are ignored; a mixed/multi-membership order is not partially
+ * fulfilled because it requires its own admitted fulfillment contract.
+ */
+type UpgradeAttemptRow = Readonly<{
+  attempt_id: string;
+  subscriber_id: string;
+  subscription_id: string;
+  expected_subscription_version: number;
+  expected_plan_id: string;
+  expected_plan_version: number;
+  target_plan_id: string;
+  target_plan_version: number;
+  current_period_start: string;
+  current_period_end: string;
+  order_id: string | null;
+  status: 'PENDING_PAYMENT' | 'APPLIED' | 'EXPIRED' | 'RECONCILIATION_REQUIRED';
+  expires_at: string;
+  updated_at: string;
+}>;
+
+type UpgradeSubscriptionRow = Readonly<{
+  subscription_id: string;
+  subscriber_id: string;
+  plan_id: string;
+  plan_version: number;
+  creator_id: string | null;
+  status: string;
+  current_period_start: string;
+  current_period_end: string;
+  cancel_at: string | null;
+  entitlement_snapshot_ref: string | null;
+  updated_at: string;
+  version: number;
+}>;
+
+async function readUpgradeAttempt(db: W07WebhookPostgresPool, attemptId: string): Promise<UpgradeAttemptRow | null> {
+  try {
+    const result = await db.query<UpgradeAttemptRow & Record<string, unknown>>(
+      'SELECT attempt_id, subscriber_id, subscription_id, expected_subscription_version, expected_plan_id, expected_plan_version, target_plan_id, target_plan_version, ' +
+      'to_char(current_period_start AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS current_period_start, ' +
+      'to_char(current_period_end AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS current_period_end, ' +
+      'order_id, status, to_char(expires_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS expires_at, ' +
+      'to_char(updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS updated_at ' +
+      'FROM membership_subscription_plan_change_attempts WHERE attempt_id = $1 LIMIT 1',
+      [attemptId],
+    );
+    return result.rows[0] ?? null;
+  } catch { return failClosed(); }
+}
+
+async function readUpgradeSubscription(
+  db: W07WebhookPostgresPool, subscriptionId: string, subscriberId: string,
+): Promise<UpgradeSubscriptionRow | null> {
+  try {
+    const result = await db.query<UpgradeSubscriptionRow & Record<string, unknown>>(
+      'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, ' +
+      'to_char(current_period_start AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS current_period_start, ' +
+      'to_char(current_period_end AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS current_period_end, ' +
+      'CASE WHEN cancel_at IS NULL THEN NULL ELSE to_char(cancel_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') END AS cancel_at, ' +
+      'entitlement_snapshot_ref, to_char(updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.MS"Z\') AS updated_at, version ' +
+      'FROM membership_subscriptions WHERE subscription_id = $1 AND subscriber_id = $2 LIMIT 1',
+      [subscriptionId, subscriberId],
+    );
+    return result.rows[0] ?? null;
+  } catch { return failClosed(); }
+}
+
+async function markUpgradeReconciliation(
+  db: W07WebhookPostgresPool, attempt: UpgradeAttemptRow, now: string,
+): Promise<void> {
+  if (attempt.status !== 'PENDING_PAYMENT') return;
+  const updatedAt = new Date(Math.max(Date.parse(attempt.updated_at) + 1, Date.parse(now))).toISOString();
+  try {
+    await db.query(
+      "UPDATE membership_subscription_plan_change_attempts SET status = 'RECONCILIATION_REQUIRED', updated_at = $1::timestamptz, version = version + 1 " +
+      'WHERE attempt_id = $2 AND subscriber_id = $3 AND subscription_id = $4 AND status = $5',
+      [updatedAt, attempt.attempt_id, attempt.subscriber_id, attempt.subscription_id, 'PENDING_PAYMENT'],
+    );
+  } catch { return failClosed(); }
+}
+
+async function auditAppliedSubscriptionPlanUpgrade(
+  env: FulfillmentEnv,
+  order: PaidOrderRow,
+  line: PaidOrderLineRow,
+  snapshot: MembershipOfferSnapshot,
+): Promise<boolean> {
+  const change = snapshot.subscriptionChange
+  if (!change || !env.W06_GOVERNANCE) return false
+  const eventId = 'evt_subscription_plan_upgraded_' + change.attemptId
+  const requestId = 'req_' + change.attemptId.slice('suca_'.length)
+  const payload = {
+    eventId,
+    attemptId: change.attemptId,
+    subscriberId: change.subscriberId,
+    subscriptionId: change.subscriptionId,
+    orderId: order.order_id,
+    fromPlanId: change.expectedPlanId,
+    fromPlanVersion: change.expectedPlanVersion,
+    toPlanId: change.targetPlanId,
+    toPlanVersion: change.targetPlanVersion,
+    expectedSubscriptionVersion: change.expectedSubscriptionVersion,
+    appliedSubscriptionVersion: change.expectedSubscriptionVersion + 1,
+    occurredAt: order.confirmed_at!,
+  }
+  try {
+    const response = await env.W06_GOVERNANCE.fetch(new Request(
+      'https://luckread-w06.internal/internal/audit-events/subscription-plan-upgraded',
+      {
+        method: 'POST',
+        headers: {
+          'X-LuckRead-Caller': 'W07',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'subscription-upgrade:' + change.attemptId,
+          'X-LuckRead-Request-Id': requestId,
+          'X-LuckRead-Principal-User-Id': change.subscriberId,
+          'content-type': 'application/json; charset=utf-8',
+        },
+        body: JSON.stringify(payload),
+      },
+    ))
+    const result: unknown = await response.json().catch((): null => null)
+    return (response.status === 200 || response.status === 201) &&
+      !!result && typeof result === 'object' && !Array.isArray(result) &&
+      (result as { eventId?: unknown }).eventId === eventId &&
+      (result as { action?: unknown }).action === 'subscription.plan_upgraded' &&
+      (result as { targetType?: unknown }).targetType === 'Subscription' &&
+      (result as { targetId?: unknown }).targetId === change.subscriptionId
+  } catch {
+    return false
+  }
+}
+
+function isAppliedUpgradeSubscription(
+  subscription: UpgradeSubscriptionRow,
+  change: SubscriptionPlanUpgradeSnapshot,
+  orderId: string,
+  lineId: string,
+): boolean {
+  return subscription.plan_id === change.targetPlanId &&
+    subscription.plan_version === change.targetPlanVersion &&
+    subscription.entitlement_snapshot_ref === 'commerce-plan-upgrade:' + orderId + ':line:' + lineId &&
+    subscription.version === change.expectedSubscriptionVersion + 1;
+}
+
+async function markUpgradeApplied(
+  db: W07WebhookPostgresPool,
+  attempt: UpgradeAttemptRow,
+  change: SubscriptionPlanUpgradeSnapshot,
+  orderId: string,
+  lineId: string,
+  appliedAt: string,
+  updatedAt: string,
+): Promise<boolean> {
+  const entitlementRef = 'commerce-plan-upgrade:' + orderId + ':line:' + lineId;
+  try {
+    const result = await db.query<{ attempt_id: string } & Record<string, unknown>>(
+      "UPDATE membership_subscription_plan_change_attempts SET status = 'APPLIED', applied_at = $1::timestamptz, " +
+      'applied_subscription_version = $2, updated_at = $3::timestamptz, version = version + 1 ' +
+      "WHERE attempt_id = $4 AND subscriber_id = $5 AND subscription_id = $6 AND order_id = $7 AND status = 'PENDING_PAYMENT' " +
+      'AND expected_subscription_version = $8 AND expected_plan_id = $9 AND expected_plan_version = $10 ' +
+      'AND target_plan_id = $11 AND target_plan_version = $12 AND current_period_start = $13::timestamptz ' +
+      'AND current_period_end = $14::timestamptz AND expires_at >= $15::timestamptz ' +
+      'AND EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = $16 AND s.subscriber_id = $17 ' +
+      'AND s.plan_id = $18 AND s.plan_version = $19 AND s.version = $20 AND s.entitlement_snapshot_ref = $21) ' +
+      'RETURNING attempt_id',
+      [appliedAt, change.expectedSubscriptionVersion + 1, updatedAt, attempt.attempt_id, change.subscriberId, change.subscriptionId, orderId,
+       change.expectedSubscriptionVersion, change.expectedPlanId, change.expectedPlanVersion, change.targetPlanId, change.targetPlanVersion,
+       change.currentPeriodStart, change.currentPeriodEnd, appliedAt, change.subscriptionId, change.subscriberId, change.targetPlanId,
+       change.targetPlanVersion, change.expectedSubscriptionVersion + 1, entitlementRef],
+    );
+    return result.rows.length === 1;
+  } catch { return failClosed(); }
+}
+
+/**
+ * Applies an already-paid upgrade against the existing subscription. Order and
+ * Payment remain in the Neon finance database; only plan identity, opaque order
+ * reference and CAS version change in the Neon membership database.
+ */
+async function applyPaidSubscriptionPlanUpgradePostgres(
+  pool: W07WebhookPostgresPool,
+  attempt: UpgradeAttemptRow,
+  change: SubscriptionPlanUpgradeSnapshot,
+  order: PaidOrderRow,
+  creatorId: string,
+  entitlementRef: string,
+  updatedAt: string,
+): Promise<boolean> {
+  let client: W07WebhookPostgresClient | undefined;
+  let settled = false;
+  try {
+    client = await pool.connect();
+    await client.query('BEGIN');
+    const subscription = await client.query<{ subscription_id: string } & Record<string, unknown>>(
+      'UPDATE membership_subscriptions SET plan_id = $1, plan_version = $2, entitlement_snapshot_ref = $3, ' +
+      'updated_at = $4::timestamptz, version = version + 1 WHERE subscription_id = $5 AND subscriber_id = $6 AND creator_id = $7 ' +
+      "AND plan_id = $8 AND plan_version = $9 AND status = 'ACTIVE' AND cancel_at IS NULL AND version = $10 " +
+      'AND current_period_start = $11::timestamptz AND current_period_end = $12::timestamptz RETURNING subscription_id',
+      [
+        change.targetPlanId, change.targetPlanVersion, entitlementRef, updatedAt,
+        change.subscriptionId, change.subscriberId, creatorId,
+        change.expectedPlanId, change.expectedPlanVersion, change.expectedSubscriptionVersion,
+        change.currentPeriodStart, change.currentPeriodEnd,
+      ],
+    );
+    if (subscription.rows.length !== 1) {
+      await client.query('ROLLBACK');
+      settled = true;
+      return false;
+    }
+    const attemptResult = await client.query<{ attempt_id: string } & Record<string, unknown>>(
+      "UPDATE membership_subscription_plan_change_attempts SET status = 'APPLIED', applied_at = $1::timestamptz, " +
+      'applied_subscription_version = $2, updated_at = $3::timestamptz, version = version + 1 ' +
+      "WHERE attempt_id = $4 AND subscriber_id = $5 AND subscription_id = $6 AND order_id = $7 AND status = 'PENDING_PAYMENT' " +
+      'AND expected_subscription_version = $8 AND expected_plan_id = $9 AND expected_plan_version = $10 ' +
+      'AND target_plan_id = $11 AND target_plan_version = $12 AND current_period_start = $13::timestamptz ' +
+      'AND current_period_end = $14::timestamptz AND expires_at >= $15::timestamptz ' +
+      'AND EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = $16 AND s.subscriber_id = $17 ' +
+      'AND s.plan_id = $18 AND s.plan_version = $19 AND s.version = $20 AND s.entitlement_snapshot_ref = $21) ' +
+      'RETURNING attempt_id',
+      [
+        order.confirmed_at!, change.expectedSubscriptionVersion + 1, updatedAt,
+        attempt.attempt_id, change.subscriberId, change.subscriptionId, order.order_id,
+        change.expectedSubscriptionVersion, change.expectedPlanId, change.expectedPlanVersion,
+        change.targetPlanId, change.targetPlanVersion, change.currentPeriodStart, change.currentPeriodEnd, order.confirmed_at!,
+        change.subscriptionId, change.subscriberId, change.targetPlanId, change.targetPlanVersion,
+        change.expectedSubscriptionVersion + 1, entitlementRef,
+      ],
+    );
+    if (attemptResult.rows.length !== 1) {
+      await client.query('ROLLBACK');
+      settled = true;
+      return false;
+    }
+    await client.query('COMMIT');
+    settled = true;
+    return true;
+  } catch {
+    if (client && !settled) {
+      try { await client.query('ROLLBACK'); } catch { /* preserve the sanitized failure */ }
+    }
+    return failClosed();
+  } finally {
+    client?.release();
+  }
+}
+
+async function applyPaidSubscriptionPlanUpgrade(
+  env: FulfillmentEnv,
+  membershipDb: W07WebhookPostgresPool,
+  order: PaidOrderRow,
+  line: PaidOrderLineRow,
+  snapshot: MembershipOfferSnapshot,
+): Promise<Readonly<{ outcome: 'APPLIED' | 'ALREADY_APPLIED' | 'RECONCILIATION_REQUIRED'; reasonCode?: string }>> {
+  const change = snapshot.subscriptionChange;
+  if (!change || change.subscriberId !== order.customer_id || change.targetPlanId !== snapshot.planId ||
+      change.targetPlanVersion !== snapshot.planVersion) {
+    return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_SNAPSHOT_INVALID' };
+  }
+
+  const attempt = await readUpgradeAttempt(membershipDb, change.attemptId);
+  if (!attempt) return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_ATTEMPT_NOT_FOUND' };
+  if (attempt.status === 'APPLIED') {
+    if (attempt.order_id !== order.order_id) {
+      return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_ATTEMPT_ORDER_MISMATCH' }
+    }
+    return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+      ? { outcome: 'ALREADY_APPLIED' }
+      : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
+  }
+
+  const mismatch =
+    attempt.attempt_id !== change.attemptId ||
+    attempt.subscriber_id !== change.subscriberId ||
+    attempt.subscription_id !== change.subscriptionId ||
+    attempt.expected_subscription_version !== change.expectedSubscriptionVersion ||
+    attempt.expected_plan_id !== change.expectedPlanId ||
+    attempt.expected_plan_version !== change.expectedPlanVersion ||
+    attempt.target_plan_id !== change.targetPlanId ||
+    attempt.target_plan_version !== change.targetPlanVersion ||
+    attempt.current_period_start !== change.currentPeriodStart ||
+    attempt.current_period_end !== change.currentPeriodEnd ||
+    attempt.expires_at !== change.expiresAt ||
+    attempt.order_id !== order.order_id;
+  if (mismatch || attempt.status !== 'PENDING_PAYMENT') {
+    await markUpgradeReconciliation(membershipDb, attempt, order.confirmed_at!);
+    return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_ATTEMPT_MISMATCH' };
+  }
+  if (order.confirmed_at! > attempt.expires_at || order.confirmed_at! < attempt.updated_at) {
+    await markUpgradeReconciliation(membershipDb, attempt, order.confirmed_at!);
+    return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_PAYMENT_AFTER_EXPIRY' };
+  }
+
+  const subscription = await readUpgradeSubscription(membershipDb, change.subscriptionId, change.subscriberId);
+  if (!subscription) {
+    await markUpgradeReconciliation(membershipDb, attempt, order.confirmed_at!);
+    return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_SUBSCRIPTION_NOT_FOUND' };
+  }
+
+  const entitlementRef = 'commerce-plan-upgrade:' + order.order_id + ':line:' + line.order_line_id;
+  if (isAppliedUpgradeSubscription(subscription, change, order.order_id, line.order_line_id)) {
+    const recovered = await markUpgradeApplied(
+      membershipDb, attempt, change, order.order_id, line.order_line_id, order.confirmed_at!,
+      new Date(Math.max(Date.parse(subscription.updated_at) + 1, Date.parse(attempt.updated_at) + 1, Date.parse(order.confirmed_at!))).toISOString(),
+    );
+    if (recovered) {
+      return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+        ? { outcome: 'APPLIED' }
+        : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
+    }
+    const latest = await readUpgradeAttempt(membershipDb, change.attemptId);
+    if (latest?.status === 'APPLIED' && latest.order_id === order.order_id) {
+      return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+        ? { outcome: 'ALREADY_APPLIED' }
+        : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
+    }
+    return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_APPLIED_MARKER_RECOVERY_FAILED' };
+  }
+
+  const currentStateMatches =
+    subscription.subscription_id === change.subscriptionId &&
+    subscription.subscriber_id === change.subscriberId &&
+    subscription.creator_id === snapshot.creatorId &&
+    subscription.plan_id === change.expectedPlanId &&
+    subscription.plan_version === change.expectedPlanVersion &&
+    subscription.status === 'ACTIVE' &&
+    subscription.cancel_at === null &&
+    subscription.version === change.expectedSubscriptionVersion &&
+    subscription.current_period_start === change.currentPeriodStart &&
+    subscription.current_period_end === change.currentPeriodEnd &&
+    canonicalIso(subscription.updated_at);
+  if (!currentStateMatches) {
+    await markUpgradeReconciliation(membershipDb, attempt, order.confirmed_at!);
+    return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_SUBSCRIPTION_CAS_PRECONDITION_FAILED' };
+  }
+
+  const updatedAt = new Date(Math.max(
+    Date.parse(order.confirmed_at!),
+    Date.parse(subscription.updated_at) + 1,
+    Date.parse(attempt.updated_at) + 1,
+  )).toISOString();
+  try {
+    const applied = await applyPaidSubscriptionPlanUpgradePostgres(
+      membershipDb, attempt, change, order, snapshot.creatorId, entitlementRef, updatedAt,
+    );
+    if (applied) {
+      return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+        ? { outcome: 'APPLIED' }
+        : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
+    }
+  } catch {
+    const latestAttempt = await readUpgradeAttempt(membershipDb, change.attemptId);
+    if (latestAttempt?.status === 'APPLIED' && latestAttempt.order_id === order.order_id) {
+      return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+        ? { outcome: 'ALREADY_APPLIED' }
+        : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
+    }
+    return failClosed() as never;
+  }
+
+  const latestAttempt = await readUpgradeAttempt(membershipDb, change.attemptId);
+  if (latestAttempt?.status === 'APPLIED' && latestAttempt.order_id === order.order_id) {
+    return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+      ? { outcome: 'ALREADY_APPLIED' }
+      : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
+  }
+  const latestSubscription = await readUpgradeSubscription(membershipDb, change.subscriptionId, change.subscriberId);
+  if (latestAttempt && latestSubscription &&
+      isAppliedUpgradeSubscription(latestSubscription, change, order.order_id, line.order_line_id)) {
+    const recovered = await markUpgradeApplied(
+      membershipDb, latestAttempt, change, order.order_id, line.order_line_id, order.confirmed_at!, updatedAt,
+    );
+    if (recovered) {
+      return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+        ? { outcome: 'APPLIED' }
+        : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
+    }
+    const afterRecovery = await readUpgradeAttempt(membershipDb, change.attemptId);
+    if (afterRecovery?.status === 'APPLIED' && afterRecovery.order_id === order.order_id) {
+      return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+        ? { outcome: 'ALREADY_APPLIED' }
+        : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
+    }
+  }
+
+  if (latestAttempt) await markUpgradeReconciliation(membershipDb, latestAttempt, order.confirmed_at!);
+  return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_SUBSCRIPTION_CAS_LOST' };
+}
+
+export async function fulfillPaidMembershipOrder(
+  env: FulfillmentEnv,
+  paymentId: string,
+  merchantId: string,
+  dependencies: FulfillmentDependencies = {},
+): Promise<PaidMembershipPurchaseFulfillmentResult> {
+  if (!PAYMENT_ID_PATTERN.test(paymentId) || !boundedId(merchantId)) {
+    throw new PaidMembershipPurchaseFulfillmentError('VALIDATION_FAILED', 400);
+  }
+
+  const stores = selectedFulfillmentDatabases(env, dependencies);
+  const order = await readPaidOrder(stores.finance, paymentId, merchantId);
+  const lines = await readOrderLines(stores.finance, order.order_id);
+  if (lines.length === 0) return failClosed();
+
+  let total = 0;
+  for (const line of lines) {
+    if (!safeMinor(line.line_total_minor)) return failClosed();
+    total += line.line_total_minor;
+    if (!Number.isSafeInteger(total)) return failClosed();
+  }
+  if (total !== order.total_minor) return failClosed();
+
+  const membershipLines = lines.filter((line) => line.item_type === MEMBERSHIP_ITEM);
+  if (membershipLines.length === 0) {
+    return { outcome: 'NOT_APPLICABLE', fulfilledCount: 0 };
+  }
+  // Beta fulfillment admits a single-line membership order only. Do not grant
+  // one entitlement from a mixed cart: the other line family may require its
+  // own fulfillment/rollback contract and must be reconciled as one payment.
+  if (membershipLines.length !== 1 || lines.length !== 1) return failClosed();
+
+  const line = membershipLines[0]!;
+  if (!boundedId(line.order_line_id, 255) || !PLAN_ID_PATTERN.test(line.item_ref)) return failClosed();
+  const snapshot = parseSnapshot(line.item_snapshot_json, line, order.order_currency);
+  await readPlanVersion(stores.membership, snapshot);
+
+  if (snapshot.subscriptionChange) {
+    const result = await applyPaidSubscriptionPlanUpgrade(env, stores.membership, order, line, snapshot);
+    return {
+      outcome: result.outcome,
+      fulfilledCount: result.outcome === 'RECONCILIATION_REQUIRED' ? 0 : 1,
+      ...(result.reasonCode ? { reasonCode: result.reasonCode } : {}),
+    };
+  }
+
+  const periodStart = order.confirmed_at!;
+  let periodEnd: string;
+  try {
+    periodEnd = addBillingPeriod(periodStart, snapshot.billingInterval);
+  } catch {
+    return failClosed();
+  }
+
+  const subscriptionId = await subscriptionIdForPaidOrderLine(order.order_id, line.order_line_id, order.customer_id);
+  const outcome = await createOrReplayPaidSubscription(stores.membership, {
+    subscriptionId,
+    subscriberId: order.customer_id,
+    orderId: order.order_id,
+    lineId: line.order_line_id,
+    snapshot,
+    periodStart,
+    periodEnd,
+  });
+
+  return { outcome, fulfilledCount: 1 };
+}

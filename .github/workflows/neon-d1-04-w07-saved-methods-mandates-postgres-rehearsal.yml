@@ -1,0 +1,123 @@
+name: Neon D1-04 W07 Saved Methods and Mandates PostgreSQL 18 Local Rehearsal
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-04-w07-saved-methods-mandates-postgres-rehearsal.yml'
+      - '.github/workflows/worker-d1-access-boundary-gate.yml'
+      - 'contracts/database/neon-d1-04-w07-saved-methods-mandates-schema.v1.json'
+      - 'contracts/database/neon-d1-04-w07-order-payment-schema.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'contracts/persistence/SAVED-PAYMENT-METHOD-D1-04-persistence.v1.json'
+      - 'contracts/transport/worker-d1-access-boundary.v1.json'
+      - 'workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql'
+      - 'workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py'
+      - 'workers/W07-subscription-commerce/scripts/neon-d1-04/**'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-04-w07-saved-methods-mandates-postgres-rehearsal.yml'
+      - '.github/workflows/worker-d1-access-boundary-gate.yml'
+      - 'contracts/database/neon-d1-04-w07-saved-methods-mandates-schema.v1.json'
+      - 'contracts/database/neon-d1-04-w07-order-payment-schema.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'contracts/persistence/SAVED-PAYMENT-METHOD-D1-04-persistence.v1.json'
+      - 'contracts/transport/worker-d1-access-boundary.v1.json'
+      - 'workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql'
+      - 'workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py'
+      - 'workers/W07-subscription-commerce/scripts/neon-d1-04/**'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-04-w07-saved-methods-mandates-postgres-rehearsal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  w07-saved-methods-mandates-local-rehearsal:
+    name: Rehearse W07 D1-04 saved methods and mandates on disposable PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: schema_generator
+          POSTGRES_PASSWORD: schema_local_only
+          POSTGRES_DB: luckread_finance_schema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schema_generator -d luckread_finance_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Prepare rehearsal evidence directory
+        run: mkdir -p artifacts/neon
+
+      - name: Run existing offline D1-04 source regression suite
+        run: python3 workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py
+
+      - name: Verify deterministic PAY-003 PostgreSQL artifact and dependency contract
+        run: |
+          set -euo pipefail
+          node --check workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.mjs
+          node --test workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.test.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.mjs
+          git diff --exit-code -- workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0002_w07_d1_04_saved_methods_mandates.sql
+
+      - name: Apply admitted W07 order/payment predecessor to disposable PostgreSQL 18
+        env:
+          W07_D104_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_local_only@127.0.0.1:5432/luckread_finance_schema
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/neon
+          psql "$W07_D104_SCHEMA_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 --no-psqlrc --single-transaction \
+            --file workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql
+          psql "$W07_D104_SCHEMA_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-order-payment-postgres-schema.sql \
+            | tee artifacts/neon/w07-d1-04-order-payment-predecessor-postflight.txt
+
+      - name: Apply PAY-003 saved methods and mandates additive schema
+        env:
+          W07_D104_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_local_only@127.0.0.1:5432/luckread_finance_schema
+        run: |
+          set -euo pipefail
+          psql "$W07_D104_SCHEMA_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 --no-psqlrc --single-transaction \
+            --file workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0002_w07_d1_04_saved_methods_mandates.sql
+
+      - name: Verify cumulative D1-04 catalog, mandate consent, token binding and lifecycle guards
+        env:
+          W07_D104_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_local_only@127.0.0.1:5432/luckread_finance_schema
+        run: |
+          set -euo pipefail
+          psql "$W07_D104_SCHEMA_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-saved-methods-mandates-postgres-schema.sql \
+            | tee artifacts/neon/w07-d1-04-saved-methods-mandates-postflight.txt
+
+      - name: Upload W07 D1-04 PAY-003 PostgreSQL 18 rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-04-w07-saved-methods-mandates-postgres18-${{ github.sha }}
+          path: artifacts/neon/
+          if-no-files-found: error
+          retention-days: 90

@@ -1,0 +1,19 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "contractVersion":"1.0",
+  "sourceOfTruth":"docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "batch":"J",
+  "domain":"J. Recommendation",
+  "status":"NOT_GREEN",
+  "records":[
+    {"featureId":"REC-001","name":"user interest profile","hierarchy":{"l1":"J. Recommendation","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"REC-002","name":"content profile","hierarchy":{"l1":"J. Recommendation","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"REC-003","name":"recall strategies","hierarchy":{"l1":"J. Recommendation","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"REC-004","name":"ranking signals","hierarchy":{"l1":"J. Recommendation","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"REC-005","name":"freshness/diversity","hierarchy":{"l1":"J. Recommendation","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"REC-006","name":"creator/content exposure control","hierarchy":{"l1":"J. Recommendation","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"REC-007","name":"cold start","hierarchy":{"l1":"J. Recommendation","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"REC-008","name":"exploration/exploitation","hierarchy":{"l1":"J. Recommendation","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"REC-009","name":"recommendation experiments","hierarchy":{"l1":"J. Recommendation","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+  ]
+}

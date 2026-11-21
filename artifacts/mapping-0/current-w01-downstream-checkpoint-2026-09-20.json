@@ -1,0 +1,91 @@
+{
+  "repository": "wanghuinet/luckread",
+  "sourceHead": "f31e8bc691298995e2732cb1012c794a1e6897e2",
+  "checkpointDate": "2026-09-20",
+  "checks": {
+    "Payload Implementation Admission": {
+      "runId": 35459936208,
+      "conclusion": "success"
+    },
+    "Payload Foundation CI": {
+      "runId": 35459936366,
+      "conclusion": "success"
+    },
+    "W01 Payload Migration Generation": {
+      "runId": 35459850548,
+      "conclusion": "success",
+      "staticAudit": "success",
+      "promoted": false
+    }
+  },
+  "migrationGeneration": {
+    "acceptedStatus": "GENERATED_PENDING_BASELINE_AUTHORITY",
+    "reason": "Generated artifact is a full Payload schema snapshot rather than a safely proven additive second migration.",
+    "changeControl": "docs/change-control/CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20.md"
+  },
+  "remoteEvidenceTarget": {
+    "databaseName": "luckread",
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "workflow": ".github/workflows/auth-session-schema-evidence.yml",
+    "requiredInputs": [
+      "database_name",
+      "environment_class=CONTROLLED_REMOTE_D1"
+    ],
+    "requiredSecrets": [
+      "CLOUDFLARE_API_TOKEN",
+      "CLOUDFLARE_ACCOUNT_ID"
+    ],
+    "executionMode": "read-only evidence capture; no migration apply command"
+  },
+  "currentState": "BLOCKED_EXTERNAL",
+  "nextAction": "Manual controlled execution of the already-admitted 20250929_111647 baseline, followed by fresh post-migration evidence review. Do not execute via the read-only evidence workflow.",
+  "currentHeadAudit": {
+    "migrationGenerationAdmission": "PASS_VERIFIED",
+    "migrationStaticAudit": "PASS_VERIFIED",
+    "remoteD1BaselineAuthority": "BLOCKED_EXTERNAL_CONFIRMED",
+    "remoteEvidenceWorkflowDispatchAvailableInSession": false,
+    "duplicateMappingReexecution": "SKIPPED_BY_INHERITANCE",
+    "generatedFullSchemaMigrationPromoted": false,
+    "remoteD1MigrationExecuted": false,
+    "remoteEvidencePushPath": "PASS_VERIFIED",
+    "executionAdmission": "PASS_VERIFIED",
+    "executionWorkflowPath": "PASS_VERIFIED",
+    "workflowDefaultSourceHead": "f31e8bc691298995e2732cb1012c794a1e6897e2"
+  },
+  "remoteEvidenceCapture": {
+    "workflowRunId": 35484344942,
+    "jobId": 106007813815,
+    "testedCommitSha": "45af6bb9fd91a61c6fd242d71eda3c831fdc9dd0",
+    "environmentClass": "CONTROLLED_REMOTE_D1",
+    "databaseName": "luckread",
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "migrationHistoryTable": "payload_migrations",
+    "migrationHistoryStatus": "TABLE_ABSENT",
+    "physicalUsersTable": "ABSENT",
+    "physicalUsersSessionsTable": "ABSENT",
+    "physicalAuthSessionStateTable": "ABSENT",
+    "d1NumTables": 0,
+    "d1DatabaseSizeBytes": 12288,
+    "remoteWrites": 0,
+    "validator": "FAILED_EXPECTED_BASELINE_NOT_PRESENT",
+    "validatorReason": "catalog does not prove a physical users table",
+    "artifactId": 10596323024,
+    "artifactDigest": "sha256:a08284d79fd2d3f3ef14dee73a3d0964739dc9d5a722a3256fd7a56c1a0b48a7",
+    "interpretation": "Controlled remote D1 query succeeded and proved the target database is currently uninitialized for the W01 Payload baseline. No migration was applied by the evidence workflow."
+  },
+  "executionAdmission": {
+    "status": "GREEN — EXECUTION ADMITTED",
+    "changeControl": "docs/change-control/CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20.md",
+    "scope": {
+      "databaseName": "luckread",
+      "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+      "environmentClass": "CONTROLLED_REMOTE_D1",
+      "migration": "20250929_111647",
+      "migrationBlobSha": "21e4a9ce27c828da655e479e35eb44ea3daff0f3",
+      "migrationIndexBlobSha": "e596aeb65381fd3bb2e0cfa7879c8f850bb77cbe"
+    },
+    "executionWorkflow": ".github/workflows/w01-baseline-migration-execution.yml",
+    "executed": false,
+    "nextStep": "manual controlled workflow dispatch followed by fresh post-migration evidence review"
+  }
+}

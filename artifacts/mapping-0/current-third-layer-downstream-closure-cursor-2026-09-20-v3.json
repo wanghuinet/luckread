@@ -1,0 +1,99 @@
+{
+  "version": "3.0.0",
+  "evidenceType": "MAPPING_0_THIRD_LAYER_DOWNSTREAM_CLOSURE_CURSOR",
+  "generatedAt": "2026-09-20",
+  "repository": "wanghuinet/luckread",
+  "sourceHead": "e84860a343455421b71b8e6b1239f3730c7121a4",
+  "previousCursor": "artifacts/mapping-0/current-third-layer-downstream-closure-cursor-2026-09-20-v2.json",
+  "completedBatch": {
+    "id": "M0-AUTH-002-REMOTE-E45-001",
+    "result": "ADAPTER_REGRESSION_REPRODUCED_AND_REGISTERED",
+    "workflowRunId": 35509055040,
+    "workflowJobId": 106073661985,
+    "testedCommitSha": "3c1ed995477be05340f3941be9eaf14c10681948",
+    "evidenceArtifactId": 10604653629,
+    "evidenceManifest": "artifacts/evidence/auth-002/adapter-regression/run-35509055040.json",
+    "mappingEvidenceBoundFeature": "AUTH-002",
+    "validationMarker": "AUTH-002_E4_5_REMOTE_ADAPTER_REGRESSION_FAIL"
+  },
+  "currentState": {
+    "canonicalMapping": {
+      "total": 449,
+      "status": "NOT_GREEN",
+      "partial": 17,
+      "unresolved": 431,
+      "missing": 1,
+      "missingFeature": "AUTH-007"
+    },
+    "fiveWay": "PENDING_CURRENT_HEAD_VERIFICATION",
+    "r4": {
+      "total": 449,
+      "ready": 0,
+      "blocked": 449
+    },
+    "evidenceRegistry": "NOT_GREEN"
+  },
+  "auth002": {
+    "remoteTarget": "luckread/2f80471e-3756-49f9-8db1-7707a433ad64",
+    "environment": "CONTROLLED_REMOTE_D1",
+    "remoteTables": [
+      "_cf_KV",
+      "media",
+      "payload_locked_documents",
+      "payload_locked_documents_rels",
+      "payload_migrations",
+      "payload_preferences",
+      "payload_preferences_rels",
+      "users",
+      "users_sessions"
+    ],
+    "payloadMigrations": {
+      "status": "PRESENT",
+      "rows": [
+        {
+          "id": 1,
+          "name": "20250929_111647",
+          "batch": 1
+        }
+      ]
+    },
+    "users": {
+      "status": "PRESENT",
+      "columns": [
+        "id",
+        "updated_at",
+        "created_at",
+        "email",
+        "reset_password_token",
+        "reset_password_expiration",
+        "salt",
+        "hash",
+        "login_attempts",
+        "lock_until"
+      ],
+      "canonicalProfileFieldsPresent": []
+    },
+    "authSessionState": "NATIVE_USERS_SESSIONS_SCHEMA_PRESENT",
+    "remoteWritesDuringEvidenceCapture": 0,
+    "postMigrationEvidence": true,
+    "baselineEvidenceValidation": "PASS",
+    "migrationExecutionAdmission": "GREEN — EXECUTION ADMITTED",
+    "executionState": "BLOCKED_ADAPTER_REGRESSION",
+    "nextRequiredAction": "Apply only an approved W01 configuration-level adapter correction or wait for a verified upstream package fix; then rerun E4.5 on a new exact commit. Do not alter Payload core or create duplicate persistence."
+  },
+  "closureProgress": {
+    "deterministicMappingStatusPromotions": 0,
+    "newEvidenceBindings": 3,
+    "newCanonicalFeatureEdges": 0,
+    "contractChanges": 0,
+    "blueprintChanges": 0,
+    "architectureChanges": 0,
+    "d1WritesByEvidenceWorkflow": 1
+  },
+  "antiLoop": {
+    "inheritedStructuralGate": true,
+    "inheritedClosedAuthorityControls": true,
+    "auth002BaselineEvidenceReusableUntilInputsChange": true,
+    "auth002RemoteBaselineEvidenceReusableUntilInputsChange": true
+  }
+}

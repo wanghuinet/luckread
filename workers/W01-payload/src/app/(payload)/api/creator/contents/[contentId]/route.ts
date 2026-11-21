@@ -1,0 +1,123 @@
+import {
+  invalidatePublicContentComments,
+  invalidatePublicContentDetail,
+  invalidatePublicContentList,
+  invalidatePublicContentVisibility,
+  invalidatePublicContentRelationships,
+  invalidatePublicContentThreads,
+} from '../../../../../../lib/public-response-cache.js'
+import {
+  callW03Content,
+  resolveCookieContentPrincipal,
+  resolveVerifiedContentCreatorId,
+  W03ContentClientError,
+} from '../../../../../../content/w03-content-client.js'
+
+const errorResponse = (status: number, code: string, message: string) =>
+  Response.json(
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
+    { status, headers: { 'cache-control': 'no-store' } },
+  )
+
+export async function GET(
+  request: Request,
+  context: { params: Promise<{ contentId: string }> },
+): Promise<Response> {
+  try {
+    const { contentId } = await context.params
+    const principal = await resolveCookieContentPrincipal(request)
+    if (principal instanceof Response) return principal
+    return await callW03Content({
+      request,
+      pathname: `/internal/content/contents/${encodeURIComponent(contentId)}`,
+      method: 'GET',
+      principal,
+    })
+  } catch (error) {
+    if (error instanceof W03ContentClientError) {
+      return errorResponse(error.status, error.code, 'Content service unavailable')
+    }
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ contentId: string }> },
+): Promise<Response> {
+  try {
+    const { contentId } = await context.params
+    const principal = await resolveCookieContentPrincipal(request)
+    if (principal instanceof Response) return principal
+
+    const response = await callW03Content({
+      request,
+      pathname: `/internal/content/contents/${encodeURIComponent(contentId)}`,
+      method: 'DELETE',
+      principal,
+    })
+    if (response.ok) {
+      await invalidatePublicContentComments(contentId)
+      await invalidatePublicContentVisibility(contentId)
+      await invalidatePublicContentRelationships(contentId)
+      await invalidatePublicContentThreads()
+      await invalidatePublicContentDetail(request, contentId)
+      await invalidatePublicContentList(request)
+    }
+    return response
+  } catch (error) {
+    if (error instanceof W03ContentClientError) {
+      return errorResponse(error.status, error.code, 'Content service unavailable')
+    }
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ contentId: string }> },
+): Promise<Response> {
+  try {
+    const { contentId } = await context.params
+    const principal = await resolveCookieContentPrincipal(request)
+    if (principal instanceof Response) return principal
+
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content request')
+    }
+
+    const changesAccessMode = body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body, 'accessMode')
+    let verifiedCreatorId: string | undefined
+    if (changesAccessMode) {
+      const resolved = await resolveVerifiedContentCreatorId(request, principal)
+      if (resolved instanceof Response) return resolved
+      verifiedCreatorId = resolved
+    }
+
+    const response = await callW03Content({
+      request,
+      pathname: `/internal/content/contents/${encodeURIComponent(contentId)}`,
+      method: 'PATCH',
+      body,
+      principal,
+      verifiedCreatorId,
+    })
+    if (response.ok) {
+      await invalidatePublicContentThreads()
+      if (changesAccessMode) {
+        await invalidatePublicContentVisibility(contentId)
+        await invalidatePublicContentList(request)
+      }
+      await invalidatePublicContentDetail(request, contentId)
+    }
+    return response
+  } catch (error) {
+    if (error instanceof W03ContentClientError) {
+      return errorResponse(error.status, error.code, 'Content service unavailable')
+    }
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
+  }
+}

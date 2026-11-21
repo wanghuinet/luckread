@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/analytics-operation-policy.v1.json",
+  "title": "LuckRead Analytics API Operation Policy",
+  "version": "1.0.0",
+  "domain": "analytics",
+  "purpose": "Define the bounded public telemetry event intake through W01 and W11 without accepting authoritative social mutations.",
+  "invariants": [
+    "Analytics measurements never become business source-of-truth records.",
+    "Client-facing ingestion accepts content impression, reading and video telemetry only; social facts remain W05-owned.",
+    "All request batches are capped by bytes and event count, rate limited at W01 and deduplicated by W11.",
+    "D1-05 is accessed by W11 only; no new Queue or Worker is introduced."
+  ],
+  "operations": [
+    {
+      "operationId": "postAnalyticsEvents",
+      "method": "POST",
+      "path": "/analytics/events",
+      "visibility": "public_or_authenticated",
+      "capability": "analytics_event_ingest",
+      "status": "CONTRACTED_PARTIAL",
+      "authorization": {
+        "required": false,
+        "permission": "analytics.events.ingest",
+        "scope": "allowlisted_telemetry_only; optional authenticated actor"
+      },
+      "resource": {
+        "class": "BOUNDED_BATCH_WRITE",
+        "d1ReadMax": 0,
+        "d1WriteMax": 1,
+        "d1WriteRowsMax": 90,
+        "rpcMax": 1,
+        "requestBodyBytesMax": 65536,
+        "responseBytesMax": 4096
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "deduplicateBy": [
+          "eventId",
+          "dedupeKey"
+        ]
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "endpoint",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false,
+        "semantic": "eventId and dedupeKey are persisted uniqueness keys; replay does not double-count"
+      },
+      "security": [
+        "client_event_allowlist",
+        "social_events_rejected",
+        "server_derived_actor",
+        "no_end_user_credentials_forwarded",
+        "bounded_body_and_batch",
+        "no_identity_session_persistence"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "permission": "PASS",
+        "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "PASS",
+        "securityE2E": "MISSING"
+      },
+      "transportContract": "contracts/transport/W01-W11-analytics-event-ingress.v1.json"
+    }
+  ]
+}

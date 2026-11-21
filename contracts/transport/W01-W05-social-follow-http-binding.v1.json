@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W01-W05-social-follow-http-binding.v1.json",
+  "title": "W01 to W05 Social Follow Internal HTTP Binding",
+  "version": "1.0.0",
+  "status": "CONTRACTED_AUTHORITY_ADMITTED",
+  "featureId": "SOCIAL-001",
+  "operationIds": [
+    "follow",
+    "unfollow"
+  ],
+  "caller": {
+    "logicalWorker": "W01",
+    "role": "Public API / Gateway",
+    "authority": "Public wire boundary"
+  },
+  "callee": {
+    "logicalWorker": "W05",
+    "role": "Social / Community / Messaging / Notification",
+    "authority": "Social Follow relation in D1-02"
+  },
+  "transport": {
+    "kind": "Cloudflare Worker Service Binding HTTP",
+    "binding": "W05_SOCIAL",
+    "targetWorker": "luckread-w05",
+    "publicExposure": false,
+    "newWorker": false,
+    "newDatabase": false
+  },
+  "authorityChain": {
+    "authentication": {
+      "source": "W01 authenticated Payload server principal",
+      "sessionValidation": "Existing W01→W02 authenticated-principal/session-authority path",
+      "clientWritable": false
+    },
+    "principal": {
+      "userIdHeader": "X-LuckRead-Principal-User-Id",
+      "source": "W01 verified server principal",
+      "clientWritable": false
+    },
+    "target": {
+      "field": "targetUserId",
+      "source": "canonical public request target resolved against ENT-USER",
+      "clientWritable": true,
+      "authoritativeInterpretation": "W05 MUST resolve/validate the target against admitted identity/policy authority before mutation."
+    },
+    "provenance": {
+      "headers": {
+        "X-LuckRead-Caller": "W01",
+        "X-LuckRead-Transport-Version": "1.0",
+        "X-LuckRead-Correlation-Id": "required"
+      },
+      "clientWritable": false
+    }
+  },
+  "operations": [
+    {
+      "operationId": "follow",
+      "method": "POST",
+      "publicPath": "/api/v1/social/follows",
+      "internalPath": "/internal/social/follows",
+      "principalRequired": true,
+      "d1ReadMax": 1,
+      "d1WriteMax": 1,
+      "asyncEventMax": 1,
+      "idempotency": "Idempotency-Key",
+      "cache": "NO_STORE",
+      "auditRequired": true
+    },
+    {
+      "operationId": "unfollow",
+      "method": "DELETE",
+      "publicPath": "/api/v1/social/follows",
+      "internalPath": "/internal/social/follows",
+      "principalRequired": true,
+      "d1ReadMax": 0,
+      "d1WriteMax": 1,
+      "asyncEventMax": 1,
+      "idempotency": "Idempotency-Key",
+      "cache": "NO_STORE",
+      "auditRequired": true
+    }
+  ],
+  "headers": {
+    "requiredOnEveryCall": {
+      "X-LuckRead-Caller": "W01",
+      "X-LuckRead-Transport-Version": "1.0",
+      "X-LuckRead-Correlation-Id": "required"
+    },
+    "principal": {
+      "X-LuckRead-Principal-User-Id": "required",
+      "source": "W01 authenticated principal; never public request body"
+    },
+    "forwarded": [
+      "targetUserId",
+      "Idempotency-Key"
+    ],
+    "forbidden": [
+      "Authorization bearer credential",
+      "client-supplied actorUserId as authority",
+      "client-supplied account state as authority",
+      "client-supplied permission decision as authority",
+      "client-supplied block/privacy/anti-abuse decision as authority",
+      "client-supplied follower/following counters"
+    ]
+  },
+  "failurePolicy": {
+    "timeoutMs": 2000,
+    "automaticRetries": 0,
+    "failClosed": [
+      "missing W05_SOCIAL binding",
+      "missing caller marker",
+      "unsupported transport version",
+      "missing principal user id",
+      "missing correlation id",
+      "invalid targetUserId",
+      "missing trusted policy input at the authoritative Follow admission boundary",
+      "invalid W05 response envelope"
+    ],
+    "statusMapping": {
+      "unauthenticated": 401,
+      "permissionDenied": 403,
+      "notFound": 404,
+      "missingPrecondition": 428,
+      "preconditionFailed": 412,
+      "invalidState": 409,
+      "rateLimited": 429
+    }
+  },
+  "security": {
+    "trustBoundary": "W05 is private and reachable through the admitted W01 Service Binding.",
+    "noEndUserTokenForwarding": true,
+    "principalProvenanceRequired": true,
+    "targetNotAuthority": true,
+    "policyDecisionServerDerived": true,
+    "failClosedOnMissingPolicy": true,
+    "noCrossD1TableAccess": true
+  },
+  "topologyConstraints": {
+    "workerCountDelta": 0,
+    "databaseCountDelta": 0,
+    "newPayloadCollections": 0,
+    "crossD1Transactions": 0,
+    "newPublicOperationIds": 0
+  },
+  "sourceRefs": [
+    "contracts/transport/SOCIAL-001-follow-trusted-admission-input.v1.json",
+    "contracts/transport/SOCIAL-001-follow-trusted-authority-binding.v1.json",
+    "contracts/api/interaction-operation-policy.v1.json",
+    "contracts/authz/permissions.json",
+    "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+    "docs/04-WORKER-MASTER-v1.0.md",
+    "workers/W05-social/wrangler.jsonc",
+    "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+  ],
+  "implementationStatus": {
+    "serviceBindingConfig": "NOT_IMPLEMENTED",
+    "w01Runtime": "NOT_IMPLEMENTED",
+    "w05Runtime": "NOT_IMPLEMENTED",
+    "deploymentEvidence": "MISSING",
+    "securityE2E": "MISSING",
+    "implementationAuthorization": false
+  },
+  "remainingAuthorityInputs": [
+    "actorAccountState",
+    "targetFollowability",
+    "blockPolicy",
+    "privacyScope",
+    "antiAbuseAdmission"
+  ],
+  "nonGoals": [
+    "No new Worker or D1.",
+    "No Payload Collection.",
+    "No direct W05→W02/W06 business RPC for policy lookup.",
+    "No new public operation.",
+    "No runtime Follow handler.",
+    "No Mapping 0 GREEN claim.",
+    "No runtime GREEN without executable evidence."
+  ],
+  "verificationRequirements": [
+    "W01 source proof for server-derived principal forwarding",
+    "W05 source proof for caller/provenance validation",
+    "W01→W05 Service Binding deployment evidence",
+    "positive follow/unfollow transport evidence",
+    "401/403/404/409/429 negative evidence",
+    "no Authorization header forwarding evidence",
+    "correlation/requestId preservation evidence",
+    "fail-closed behavior when policy authority input is missing"
+  ]
+}

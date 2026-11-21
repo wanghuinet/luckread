@@ -1,0 +1,24 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "luckread-w10",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": false,
+  "vars": {
+    "MEMBERSHIP_RENEWAL_ENABLED": "false"
+  },
+  "services": [
+    {
+      "binding": "W07_COMMERCE",
+      "service": "luckread-w07"
+    }
+  ],
+  "workflows": [
+    {
+      "name": "luckread-membership-renewal",
+      "binding": "MEMBERSHIP_RENEWAL_WORKFLOW",
+      "class_name": "MembershipRenewalWorkflow",
+      "schedules": ["* * * * *"]
+    }
+  ]
+}

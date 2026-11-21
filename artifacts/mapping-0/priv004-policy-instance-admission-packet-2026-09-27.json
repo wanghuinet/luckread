@@ -1,0 +1,73 @@
+{
+  "version": "1.0.0",
+  "status": "PRODUCTION_INSTANCE_ADMITTED",
+  "featureId": "PRIV-004",
+  "authorityContract": "contracts/privacy/PRIV-004-retention-policy-authority.v1.json",
+  "purposeBinding": {
+    "operationId": "authRegister",
+    "purpose": "ACCOUNT_REGISTRATION",
+    "retentionClass": "LEGAL_AUDIT",
+    "entityId": "ENT-CONSENT"
+  },
+  "requiredApprovedInstance": {
+    "policyId": "REQUIRED",
+    "policyVersion": "REQUIRED",
+    "owner": "REQUIRED",
+    "scope": "REQUIRED",
+    "environment": "REQUIRED",
+    "status": "MUST_BE_APPROVED_OR_ACTIVE",
+    "effectiveFrom": "REQUIRED",
+    "effectiveTo": "OPTIONAL",
+    "rule": {
+      "mode": "REQUIRED",
+      "durationSeconds": "REQUIRED_WHEN_MODE_DURATION",
+      "fixedUntil": "REQUIRED_WHEN_MODE_FIXED_UNTIL"
+    },
+    "sourceAuthority": "REQUIRED",
+    "approvalRef": "REQUIRED",
+    "rollbackVersion": "REQUIRED"
+  },
+  "admissionRules": [
+    "The instance must bind to ACCOUNT_REGISTRATION and LEGAL_AUDIT.",
+    "The instance must be approved or active before runtime use.",
+    "Exactly one deterministic retention rule mode must be present.",
+    "The client must not select or override the rule.",
+    "The selected policyVersion is persisted immutably on ENT-CONSENT.",
+    "No AUTH-001 runtime registration may persist ENT-CONSENT while the applicable policy instance is absent or unresolved.",
+    "Approval and provenance must be traceable to a current repository artifact."
+  ],
+  "missingInputs": [],
+  "nonAuthorizations": [
+    "The 730-day value is an internally approved engineering production policy, not a jurisdiction-specific legal requirement.",
+    "No public privacy notice or compliance representation may treat 730 days as a universal legal mandate without separate legal/compliance review.",
+    "No new Worker/D1/Queue or Payload Core change is authorized by this admission.",
+    "No Mapping 0 GREEN or Evidence Registry promotion is implied by policy admission alone."
+  ],
+  "governanceBaseline": {
+    "status": "ADMITTED",
+    "policy": "docs/176-PRIVACY-DATA-RETENTION-POLICY-v0.1.md",
+    "changeControl": "docs/change-control/CC-MAPPING-0-PRIVACY-DATA-RETENTION-POLICY-BASELINE-2026-09-27.md",
+    "admittedMainSha": "e5d1dea7531791892831d7c3f6c00e1cf8474fac",
+    "boundary": "Governance baseline plus an explicitly admitted production engineering policy; legal/jurisdiction-specific interpretation remains outside this artifact and can replace the policy through normal versioned authority."
+  },
+  "admissionMode": "PRODUCTION_ENGINEERING_AUTHORITY",
+  "admittedInstance": {
+    "path": "artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json",
+    "policyId": "PRIV-004-ACCOUNT-REGISTRATION-PROD",
+    "policyVersion": "PROD-2026-09-28.1",
+    "environment": "PRODUCTION",
+    "status": "APPROVED_INTERNAL_ENGINEERING_PRODUCTION_AUTHORITY",
+    "rule": {
+      "mode": "DURATION",
+      "durationSeconds": 63072000
+    },
+    "effectiveFrom": "2026-09-28T00:00:00Z",
+    "effectiveTo": null
+  },
+  "productionMissingInputs": [],
+  "runtimeAuthorization": {
+    "development": "AUTH-001 development/integration validation may use the same deterministic policy rule.",
+    "production": "AUTHORIZED",
+    "authorizationBoundary": "Production runtime may use this explicitly admitted engineering policy instance. This does not constitute jurisdiction-specific legal advice or a legal retention mandate."
+  }
+}

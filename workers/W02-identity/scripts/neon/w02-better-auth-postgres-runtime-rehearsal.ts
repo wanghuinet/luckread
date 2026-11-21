@@ -1,0 +1,1471 @@
+import assert from 'node:assert/strict'
+import { createHmac, randomUUID } from 'node:crypto'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { AccountStateTransitionError } from '../../src/account/account-state-transition.js'
+import { handleMfaEnrollmentStartRequest } from '../../src/auth/mfa-enrollment-start.js'
+import { handleMfaEnrollmentConfirmRequest } from '../../src/auth/mfa-enrollment-confirm.js'
+import { handleMfaStatusRequest } from '../../src/auth/mfa-status.js'
+import { buildLuckReadAuth } from '../../src/auth/better-auth.js'
+import { buildMfaAuditEvent } from '../../src/auth/mfa-audit-events.js'
+import { handleCurrentUserSessionList } from '../../src/auth/session-list.js'
+import { handleCurrentUserSessionLogout } from '../../src/auth/session-logout.js'
+import { resolveBetterAuthPrincipal } from '../../src/auth/principal.js'
+import w02Worker from '../../src/index.js'
+import { getW02PostgresRuntime } from '../../src/neon/runtime.js'
+import { handleCurrentUserSessionRevoke } from '../../src/auth/session-revoke.js'
+import {
+  auth,
+  postgresLifecycleAdapters,
+  postgresPool,
+} from '../../src/auth/neon-postgres-runtime-test.config.js'
+import { createPostgresMfaEnrollmentStartStore } from '../../src/neon/mfa-enrollment-start-postgres.js'
+import { createPostgresMfaEnrollmentConfirmStore } from '../../src/neon/mfa-enrollment-confirm-postgres.js'
+import {
+  createPostgresMfaFactorStateStore,
+  createPostgresMfaStatusStore,
+} from '../../src/neon/mfa-factor-state-postgres.js'
+import { createPostgresMfaAuditOperationReceiptStore } from '../../src/neon/mfa-audit-operation-receipts-postgres.js'
+import { createPostgresSessionListStore } from '../../src/neon/session-list-postgres.js'
+import { createPostgresSessionLogoutStore } from '../../src/neon/session-logout-postgres-store.js'
+import { createPostgresSessionRevocationStore } from '../../src/neon/session-revocation-postgres-store.js'
+import { createPostgresPrincipalAuthorityStore } from '../../src/neon/principal-authority-postgres.js'
+
+const scriptDir = path.dirname(fileURLToPath(import.meta.url))
+const workerRoot = path.resolve(scriptDir, '../..')
+const reportPath = path.join(workerRoot, 'artifacts/neon/w02-better-auth-postgres-runtime-rehearsal.json')
+
+function totpCodeForUri(uriValue: string): { code: string; timeStep: number } {
+  const uri = new URL(uriValue)
+  assert.equal(uri.protocol, 'otpauth:')
+  assert.equal(uri.hostname.toLowerCase(), 'totp')
+  const secret = (uri.searchParams.get('secret') ?? '').replace(/=+$/g, '').toUpperCase()
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  const bytes: number[] = []
+  let bits = 0
+  let accumulator = 0
+  for (const character of secret) {
+    const digit = alphabet.indexOf(character)
+    assert.ok(digit >= 0, 'TOTP URI must contain a valid Base32 secret')
+    accumulator = (accumulator << 5) | digit
+    bits += 5
+    if (bits >= 8) {
+      bits -= 8
+      bytes.push((accumulator >> bits) & 0xff)
+    }
+  }
+  const digits = Number(uri.searchParams.get('digits') ?? '6')
+  const period = Number(uri.searchParams.get('period') ?? '30')
+  const algorithm = (uri.searchParams.get('algorithm') ?? 'SHA1').toUpperCase()
+  assert.equal(digits, 6)
+  assert.equal(period, 30)
+  assert.equal(algorithm, 'SHA1')
+  const timeStep = Math.floor(Date.now() / (period * 1000))
+  const counter = Buffer.alloc(8)
+  counter.writeBigUInt64BE(BigInt(timeStep))
+  const digest = createHmac('sha1', Buffer.from(bytes)).update(counter).digest()
+  const offset = digest[digest.length - 1]! & 0x0f
+  const binary = ((digest[offset]! & 0x7f) << 24) |
+    ((digest[offset + 1]! & 0xff) << 16) |
+    ((digest[offset + 2]! & 0xff) << 8) |
+    (digest[offset + 3]! & 0xff)
+  return { code: String(binary % (10 ** digits)).padStart(digits, '0'), timeStep }
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+const withTimeout = async <T>(label: string, action: () => Promise<T>, timeoutMs = 20_000): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  console.info(JSON.stringify({ event: 'w02.pg.runtime.step.started', step: label }))
+  try {
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('W02_RUNTIME_STEP_TIMEOUT:' + label)), timeoutMs)
+    })
+    const result = await Promise.race([action(), timeout])
+    console.info(JSON.stringify({ event: 'w02.pg.runtime.step.passed', step: label }))
+    return result
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: 'w02.pg.runtime.step.failed',
+      step: label,
+      errorType: error instanceof Error ? error.name : 'UNKNOWN',
+    }))
+    throw error
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+const nonce = randomUUID().replaceAll('-', '').slice(0, 18).toLowerCase()
+const email = 'w02-pg-' + nonce + '@example.test'
+const username = 'w02pg' + nonce
+const password = 'W02-Pg-Rehearsal-' + randomUUID().replaceAll('-', '').slice(0, 20)
+let userId: string | undefined
+const syntheticSessionIds: string[] = []
+let signedIn = false
+let signedOut = false
+let revocationTargetSessionId: string | undefined
+let logoutSessionId: string | undefined
+let mfaEnrollmentStarted = false
+let mfaEnrollmentConfirmed = false
+const workerEntryEmail = 'w02-worker-' + nonce + '@example.test'
+const workerEntryUsername = 'w02worker' + nonce
+const workerEntryPassword = 'W02-Worker-Entry-' + randomUUID().replaceAll('-', '').slice(0, 20)
+let workerEntryUserId: string | undefined
+let workerRuntimePool: ReturnType<typeof getW02PostgresRuntime>['pool'] | undefined
+let workerEntryEmailDeliveryAccepted = false
+let workerEntryEmailVerificationPassed = false
+let workerEntryLoginSessionPassed = false
+let workerEntryPrincipalPassed = false
+const workerEntryD1Accesses = { prepare: 0, batch: 0 }
+let primaryError: unknown
+let report: Record<string, unknown> | undefined
+let cleanupVerified = false
+
+try {
+  const signUp = await withTimeout('sign-up-email', () => auth.api.signUpEmail({
+    body: {
+      name: 'W02 PostgreSQL Runtime Rehearsal',
+      email,
+      password,
+      username,
+    },
+    returnHeaders: true,
+  }))
+
+  const user = signUp.response.user
+  assert.ok(user?.id, 'Better Auth registration must return a persisted user')
+  userId = String(user.id)
+  assert.equal(user.email, email)
+  assert.equal(user.username, username)
+  assert.equal(user.accountState, 'PENDING_VERIFICATION')
+  assert.equal(Number(user.accountStateVersion), 1)
+
+  const initialLifecycle = await postgresPool.query(
+    'SELECT account_state AS "accountState", account_state_version AS "accountStateVersion" ' +
+      'FROM "user" WHERE id = $1',
+    [userId],
+  )
+  assert.equal(initialLifecycle.rows[0]?.accountState, 'PENDING_VERIFICATION')
+  assert.equal(Number(initialLifecycle.rows[0]?.accountStateVersion), 1)
+
+  // Better Auth's user-create hook must materialize the canonical L1 role
+  // through the PostgreSQL adapter before registration is considered ready.
+  const baseRole = await postgresPool.query(
+    'SELECT id, role_id AS "roleId", scope_type AS "scopeType", scope_id AS "scopeId", status ' +
+      'FROM role_assignments WHERE subject_id = $1 AND id = $2',
+    [userId, 'base-user-' + userId],
+  )
+  assert.equal(baseRole.rowCount, 1, 'registration hook must persist the deterministic L1 role assignment')
+  assert.deepEqual(baseRole.rows[0], {
+    id: 'base-user-' + userId,
+    roleId: 'user',
+    scopeType: 'global',
+    scopeId: null,
+    status: 'ACTIVE',
+  })
+
+  const baseRoleVersion = await postgresPool.query<{ roleVersion: number }>(
+    'SELECT role_version AS "roleVersion" FROM role_authorization_versions WHERE subject_id = $1',
+    [userId],
+  )
+  assert.equal(baseRoleVersion.rowCount, 1, 'L1 role creation must advance the authorization version')
+  assert.equal(Number(baseRoleVersion.rows[0]?.roleVersion), 1)
+
+  const credential = await postgresPool.query(
+    'SELECT provider_id, password FROM "account" WHERE user_id = $1 AND provider_id = $2',
+    [userId, 'credential'],
+  )
+  assert.equal(credential.rowCount, 1, 'registration must persist one credential account')
+  assert.equal(typeof credential.rows[0]?.password, 'string')
+  assert.ok(credential.rows[0].password.length > 20, 'credential hash must be persisted, not a plaintext password')
+
+  // The registration write itself must persist the canonical pending
+  // lifecycle baseline. Do not repair or overwrite it in the rehearsal.
+  const pending = await postgresPool.query(
+    'SELECT email_verified AS "emailVerified", account_state AS "accountState", account_state_version AS "accountStateVersion" ' +
+      'FROM "user" WHERE id = $1',
+    [userId],
+  )
+  assert.equal(pending.rowCount, 1)
+  assert.equal(pending.rows[0]?.emailVerified, false)
+  assert.equal(pending.rows[0]?.accountState, 'PENDING_VERIFICATION')
+  assert.equal(Number(pending.rows[0]?.accountStateVersion), 1)
+
+  await assert.rejects(
+    postgresLifecycleAdapters.afterEmailVerified(userId),
+    (error: unknown) =>
+      error instanceof AccountStateTransitionError && error.code === 'PRECONDITION_FAILED',
+    'activation must fail closed before Better Auth email verification is persisted',
+  )
+
+  const rejectedActivation = await postgresPool.query(
+    'SELECT account_state AS "accountState", account_state_version AS "accountStateVersion" ' +
+      'FROM "user" WHERE id = $1',
+    [userId],
+  )
+  assert.equal(rejectedActivation.rows[0]?.accountState, 'PENDING_VERIFICATION')
+  assert.equal(Number(rejectedActivation.rows[0]?.accountStateVersion), 1)
+
+  const verificationAt = new Date().toISOString()
+  const verified = await postgresPool.query(
+    'UPDATE "user" SET email_verified = TRUE WHERE id = $1',
+    [userId],
+  )
+  assert.equal(verified.rowCount, 1, 'verified flag must be persisted before lifecycle activation')
+
+  // Exercise the same injected callback used as Better Auth's
+  // afterEmailVerification hook. Two concurrent deliveries must converge on
+  // one account-state transition, one verified_user role and one AUTH-013 journal event.
+  const activations = await withTimeout('email-verification-activation-concurrency', () =>
+    Promise.all([
+      postgresLifecycleAdapters.afterEmailVerified(userId!, verificationAt),
+      postgresLifecycleAdapters.afterEmailVerified(userId!, verificationAt),
+    ]),
+  )
+  assert.equal(activations.filter((result) => result.activated).length, 1)
+  assert.equal(activations.filter((result) => !result.activated).length, 1)
+  assert.ok(activations.every((result) => result.accountState === 'ACTIVE'))
+  assert.ok(activations.every((result) => result.accountStateVersion === 2))
+
+  const activationReplay = await withTimeout('email-verification-activation-replay', () =>
+    postgresLifecycleAdapters.afterEmailVerified(userId!, verificationAt),
+  )
+  assert.equal(activationReplay.activated, false)
+  assert.equal(activationReplay.accountState, 'ACTIVE')
+  assert.equal(activationReplay.accountStateVersion, 2)
+
+  const account = await postgresPool.query(
+    'SELECT account_state AS "accountState", account_state_version AS "accountStateVersion", email_verified AS "emailVerified" ' +
+      'FROM "user" WHERE id = $1',
+    [userId],
+  )
+  assert.equal(account.rows[0]?.accountState, 'ACTIVE')
+  assert.equal(Number(account.rows[0]?.accountStateVersion), 2)
+  assert.equal(account.rows[0]?.emailVerified, true)
+
+  const role = await postgresPool.query(
+    'SELECT id, role_id AS "roleId", scope_type AS "scopeType", scope_id AS "scopeId", status ' +
+      'FROM role_assignments WHERE subject_id = $1 AND id = $2',
+    [userId, 'verified-user-' + userId],
+  )
+  assert.equal(role.rowCount, 1, 'activation must persist the deterministic L2 role assignment')
+  assert.deepEqual(role.rows[0], {
+    id: 'verified-user-' + userId,
+    roleId: 'verified_user',
+    scopeType: 'global',
+    scopeId: null,
+    status: 'ACTIVE',
+  })
+
+  const roleVersion = await postgresPool.query<{ roleVersion: number }>(
+    'SELECT role_version AS "roleVersion" FROM role_authorization_versions WHERE subject_id = $1',
+    [userId],
+  )
+  assert.equal(roleVersion.rowCount, 1, 'existing authorization-version trigger must observe the L2 grant')
+  assert.equal(
+    Number(roleVersion.rows[0]?.roleVersion),
+    2,
+    'the L1 registration hook and L2 verification hook must each advance the canonical role version once',
+  )
+
+  const journal = await postgresPool.query<{ eventId: string; sourceVersion: number; status: string; payload: string }>(
+    'SELECT event_id AS "eventId", source_version AS "sourceVersion", status, payload ' +
+      'FROM auth_013_publication_journal WHERE resource_id = $1 AND event_type = $2',
+    [userId, 'identity.account_state_changed'],
+  )
+  assert.equal(journal.rowCount, 1, 'concurrent activation must create exactly one AUTH-013 journal row')
+  assert.equal(journal.rows[0]?.sourceVersion, 2)
+  assert.equal(journal.rows[0]?.status, 'PENDING')
+  const event = JSON.parse(journal.rows[0]?.payload ?? '{}')
+  assert.deepEqual(event, {
+    eventId: journal.rows[0]?.eventId,
+    eventType: 'identity.account_state_changed',
+    schemaVersion: '1.0',
+    producer: 'W02',
+    resourceType: 'User',
+    resourceId: userId,
+    occurredAt: verificationAt,
+    publishedAt: verificationAt,
+    correlationId: journal.rows[0]?.eventId,
+    causationId: journal.rows[0]?.eventId,
+    idempotencyKey: 'auth013-' + userId + '-1',
+    attempt: 1,
+    sourceVersion: 2,
+    actor: { actorId: userId, actorType: 'user' },
+    before: { accountState: 'PENDING_VERIFICATION', accountStateVersion: 1 },
+    after: { accountState: 'ACTIVE', accountStateVersion: 2 },
+    reason: 'email_verified',
+  })
+
+  const signIn = await withTimeout('sign-in-email', () => auth.api.signInEmail({
+    body: { email, password, rememberMe: true },
+    returnHeaders: true,
+  }))
+  assert.equal(signIn.response.user.id, userId)
+  assert.equal(typeof signIn.response.token, 'string')
+  assert.ok(signIn.response.token.length > 20)
+  signedIn = true
+
+  const headerSource = signIn.headers as Headers & { getSetCookie?: () => string[] }
+  const setCookies = headerSource.getSetCookie?.() ?? [signIn.headers.get('set-cookie') ?? '']
+  const cookieHeader = setCookies
+    .map((value) => value.split(';', 1)[0])
+    .filter((value) => value.includes('='))
+    .join('; ')
+  assert.ok(cookieHeader.length > 0, 'sign-in must issue a session cookie')
+
+  const sessionHeaders = new Headers({ cookie: cookieHeader })
+  const session = await withTimeout('get-session', () => auth.api.getSession({ headers: sessionHeaders }))
+  assert.equal(session?.user.id, userId, 'Better Auth must read the PostgreSQL-backed session')
+  if (!session?.session || typeof session.session.id !== 'string') {
+    throw new Error('W02_PG_RUNTIME_SESSION_ID_MISSING')
+  }
+  const currentSessionId = session.session.id
+
+  // Exercise the complete principal boundary with one provider-matched
+  // Better Auth session reader and PostgreSQL account/RoleAssignment store.
+  // Both session and principal authorities are explicitly injected from the Neon test database.
+  const principalEnv = {} as Parameters<typeof resolveBetterAuthPrincipal>[0]
+  const principalAuthorityStore = createPostgresPrincipalAuthorityStore(postgresPool)
+  const resolvedPrincipal = await withTimeout('postgres-principal-authority-resolution', () =>
+    resolveBetterAuthPrincipal(
+      principalEnv,
+      new Request('https://luckread.com/internal/auth/principal', { headers: sessionHeaders }),
+      new Date().toISOString(),
+      {
+        store: principalAuthorityStore,
+        getSession: (headers) => auth.api.getSession({ headers, query: {} }),
+      },
+    ),
+  )
+  assert.ok(resolvedPrincipal, 'PostgreSQL principal store must resolve the real Better Auth session')
+  assert.equal(resolvedPrincipal.userId, userId)
+  assert.equal(resolvedPrincipal.accountState, 'ACTIVE')
+  assert.equal(resolvedPrincipal.accountStateVersion, 2)
+  assert.equal(resolvedPrincipal.layer, 'L2')
+  assert.deepEqual(resolvedPrincipal.roleAssignments, [
+    {
+      id: 'base-user-' + userId,
+      roleId: 'user',
+      scopeType: 'global',
+      scopeId: null,
+    },
+    {
+      id: 'verified-user-' + userId,
+      roleId: 'verified_user',
+      scopeType: 'global',
+      scopeId: null,
+    },
+  ])
+
+  const sessionRows = await postgresPool.query(
+    'SELECT COUNT(*)::integer AS count FROM "session" WHERE user_id = $1',
+    [userId],
+  )
+  assert.equal(Number(sessionRows.rows[0]?.count), 1, 'sign-in must persist exactly one session')
+
+  // Exercise the private W01 -> W02 MFA status handler with a PostgreSQL
+  // read store and a real Better Auth PostgreSQL session. The response is
+  // restricted to the public status DTO and does not touch D1.
+  const mfaStatusEnv = {} as Parameters<typeof handleMfaStatusRequest>[0]
+  const mfaStatusRequest = new Request(
+    'https://luckread-w02.internal/internal/auth/mfa/status',
+    {
+      method: 'POST',
+      headers: {
+        cookie: cookieHeader,
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+      },
+    },
+  )
+  const mfaStatusStore = createPostgresMfaStatusStore(postgresPool)
+  const mfaStatusResponse = await withTimeout('auth007-postgres-mfa-status-handler', () =>
+    handleMfaStatusRequest(mfaStatusEnv, mfaStatusRequest, {
+      store: mfaStatusStore,
+      resolvePrincipal: async (_env, request) => {
+        const activeSession = await auth.api.getSession({ headers: request.headers, query: {} })
+        if (!activeSession?.user?.id) return null
+        return {
+          userId: String(activeSession.user.id),
+          accountState: String(activeSession.user.accountState ?? 'PENDING_VERIFICATION'),
+        }
+      },
+    }),
+  )
+  assert.equal(mfaStatusResponse.status, 200, 'PostgreSQL MFA status handler must succeed')
+  const mfaStatusPayload = await mfaStatusResponse.json() as {
+    data: { enabled: boolean; verified: boolean; enrolledAt: string | null }
+  }
+  assert.deepEqual(mfaStatusPayload, {
+    data: { enabled: false, verified: false, enrolledAt: null },
+  })
+  assert.deepEqual(Object.keys(mfaStatusPayload.data).sort(), ['enabled', 'enrolledAt', 'verified'])
+  assert.ok(!JSON.stringify(mfaStatusPayload).match(/secret|backup|recovery|lockedUntil|lastAccepted/i))
+
+  // Add two disposable native Better Auth session rows with deterministic
+  // timestamps so the PostgreSQL-backed endpoint can prove keyset paging.
+  const sessionListNow = new Date().toISOString()
+  const fixtureBase = Date.parse(sessionListNow) + 2_000
+  for (const [index, offset] of [2_000, 1_000].entries()) {
+    const fixtureId = 'session-list-' + nonce + '-' + index
+    syntheticSessionIds.push(fixtureId)
+    const createdAt = new Date(fixtureBase - (2_000 - offset)).toISOString().slice(0, 19) +
+      (index === 0 ? '.654321Z' : '.123456Z')
+    const expiresAt = new Date(Date.parse(sessionListNow) + 24 * 60 * 60 * 1000).toISOString()
+    await postgresPool.query(
+      'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, user_id) ' +
+        'VALUES ($1, $2, $3, $4, $4, $5)',
+      [fixtureId, expiresAt, 'session-list-token-' + nonce + '-' + index, createdAt, userId],
+    )
+  }
+
+  const expiredSessionId = 'session-list-expired-' + nonce
+  syntheticSessionIds.push(expiredSessionId)
+  const expiredCreatedAt = new Date(Date.parse(sessionListNow) - 120_000).toISOString()
+  const expiredAt = new Date(Date.parse(sessionListNow) - 60_000).toISOString()
+  await postgresPool.query(
+    'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, user_id) ' +
+      'VALUES ($1, $2, $3, $4, $4, $5)',
+    [
+      expiredSessionId,
+      expiredAt,
+      'session-list-token-expired-' + nonce,
+      expiredCreatedAt,
+      userId,
+    ],
+  )
+
+  const sessionListEnv = {
+    AUTH_SESSION_READ_LIMITER: {
+      limit: async (_input: { key: string }) => ({ success: true }),
+    },
+  }
+  const sessionListStore = createPostgresSessionListStore(postgresPool)
+  const sessionListRequest = (body: unknown) => new Request(
+    'https://luckread-w02.internal/internal/auth/session/list',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: cookieHeader },
+      body: JSON.stringify(body),
+    },
+  )
+  const firstPageResponse = await withTimeout('auth010-postgres-session-list-first-page', () =>
+    handleCurrentUserSessionList(sessionListEnv, sessionListRequest({ limit: 2 }), {
+      store: sessionListStore,
+      getSession: (headers) => auth.api.getSession({ headers, query: {} }) as Promise<{
+        user?: { id?: unknown }
+        session?: { id?: unknown }
+      } | null>,
+    }),
+  )
+  const firstPage = await firstPageResponse.json() as {
+    items: Array<{ sessionId: string; createdAt: string; expiresAt: string; lastSeenAt: null }>
+    currentSessionId: string
+    nextCursor: string | null
+  }
+  assert.equal(firstPageResponse.status, 200, 'PostgreSQL session list first page must succeed')
+  assert.deepEqual(firstPage.items.map((item) => item.sessionId), syntheticSessionIds.slice(0, 2))
+  assert.ok(!firstPage.items.some((item) => item.sessionId === expiredSessionId))
+  assert.ok(firstPage.items[0]?.createdAt.endsWith('.654321Z'))
+  assert.ok(firstPage.items[1]?.createdAt.endsWith('.123456Z'))
+  assert.equal(firstPage.currentSessionId, currentSessionId)
+  assert.ok(firstPage.nextCursor?.startsWith('s1.'), 'first page must return a keyset cursor')
+  assert.ok(firstPage.items.every((item) =>
+    !Object.hasOwn(item, 'token') && !Object.hasOwn(item, 'userId'),
+  ), 'session list must not project credentials or account ownership fields')
+  assert.ok(!JSON.stringify(firstPage).includes('session-list-token-' + nonce))
+
+  const secondPageResponse = await withTimeout('auth010-postgres-session-list-next-page', () =>
+    handleCurrentUserSessionList(sessionListEnv, sessionListRequest({
+      limit: 2,
+      cursor: firstPage.nextCursor,
+    }), {
+      store: sessionListStore,
+      getSession: (headers) => auth.api.getSession({ headers, query: {} }) as Promise<{
+        user?: { id?: unknown }
+        session?: { id?: unknown }
+      } | null>,
+    }),
+  )
+  const secondPage = await secondPageResponse.json() as {
+    items: Array<{ sessionId: string }>
+    currentSessionId: string
+    nextCursor: string | null
+  }
+  assert.equal(secondPageResponse.status, 200)
+  assert.deepEqual(secondPage.items.map((item) => item.sessionId), [currentSessionId])
+  assert.equal(secondPage.currentSessionId, currentSessionId)
+  assert.equal(secondPage.nextCursor, null)
+
+  const missingAccount = await sessionListStore.list({
+    userId: 'missing-session-owner-' + nonce,
+    now: sessionListNow,
+    limit: 2,
+    cursor: null,
+  })
+  assert.equal(missingAccount.permissionGranted, false)
+  assert.deepEqual(missingAccount.rows, [])
+
+  await postgresPool.query('DELETE FROM "session" WHERE id = ANY($1::text[])', [syntheticSessionIds])
+  syntheticSessionIds.length = 0
+
+  // Exercise the full revoke HTTP handler through the injected PostgreSQL
+  // command store. The caller's native Better Auth session must remain valid,
+  // while the target session and durable AUTH-010 journal change atomically.
+  revocationTargetSessionId = 'session-revoke-target-' + nonce
+  syntheticSessionIds.push(revocationTargetSessionId)
+  const revokeCreatedAt = new Date().toISOString()
+  const revokeExpiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+  await postgresPool.query(
+    'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, user_id) ' +
+      'VALUES ($1, $2, $3, $4, $4, $5)',
+    [
+      revocationTargetSessionId,
+      revokeExpiresAt,
+      'session-revoke-token-' + nonce,
+      revokeCreatedAt,
+      userId,
+    ],
+  )
+
+  const sessionRevokeEnv = {
+    AUTH_SESSION_WRITE_LIMITER: {
+      limit: async (_input: { key: string }) => ({ success: true }),
+    },
+  }
+  const sessionRevokeStore = createPostgresSessionRevocationStore(postgresPool)
+  const sessionRevokeRequest = () => new Request(
+    'https://luckread-w02.internal/internal/auth/session/revoke-by-id',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        cookie: cookieHeader,
+        'X-LuckRead-Request-Id': 'req_auth010_revoke_' + nonce,
+        'X-LuckRead-Correlation-Id': 'auth010-revoke-trace-' + nonce,
+      },
+      body: JSON.stringify({ sessionId: revocationTargetSessionId }),
+    },
+  )
+  const sessionRevokeDependencies = {
+    store: sessionRevokeStore,
+    getSession: (headers: Headers) => auth.api.getSession({ headers, query: {} }) as Promise<{
+      user?: { id?: unknown }
+      session?: { id?: unknown }
+    } | null>,
+  }
+  const revokeResponse = await withTimeout('auth010-postgres-session-revoke-handler', () =>
+    handleCurrentUserSessionRevoke(sessionRevokeEnv, sessionRevokeRequest(), sessionRevokeDependencies),
+  )
+  assert.equal(revokeResponse.status, 200, 'PostgreSQL session revocation handler must succeed')
+  assert.deepEqual(await revokeResponse.json(), { revoked: true })
+
+  const revokedTarget = await postgresPool.query(
+    'SELECT COUNT(*)::integer AS count FROM "session" WHERE id = $1 AND user_id = $2',
+    [revocationTargetSessionId, userId],
+  )
+  assert.equal(Number(revokedTarget.rows[0]?.count), 0, 'target session must be deleted by the command transaction')
+
+  const revokeJournal = await postgresPool.query<{ payload: string }>(
+    'SELECT payload FROM auth_010_session_revocation_journal ' +
+      'WHERE resource_id = $1 AND event_type = $2',
+    [revocationTargetSessionId, 'user.session.revoked'],
+  )
+  assert.equal(revokeJournal.rowCount, 1, 'session delete must commit exactly one AUTH-010 audit row')
+  const revokeEvent = JSON.parse(revokeJournal.rows[0]?.payload ?? '{}')
+  assert.equal(revokeEvent.actor.actorId, userId)
+  assert.equal(revokeEvent.resourceId, revocationTargetSessionId)
+  assert.equal(revokeEvent.payload.operationId, 'authSessionRevoke')
+  assert.equal(revokeEvent.payload.reasonCode, 'USER_INITIATED')
+  assert.equal(revokeEvent.correlationId, 'req_auth010_revoke_' + nonce)
+  assert.ok(!JSON.stringify(revokeEvent).includes('session-revoke-token-' + nonce))
+
+  const revokeReplayResponse = await withTimeout('auth010-postgres-session-revoke-replay', () =>
+    handleCurrentUserSessionRevoke(sessionRevokeEnv, sessionRevokeRequest(), sessionRevokeDependencies),
+  )
+  assert.equal(revokeReplayResponse.status, 200)
+  assert.deepEqual(await revokeReplayResponse.json(), { revoked: true })
+  const revokeReplayJournal = await postgresPool.query(
+    'SELECT COUNT(*)::integer AS count FROM auth_010_session_revocation_journal ' +
+      'WHERE resource_id = $1 AND event_type = $2',
+    [revocationTargetSessionId, 'user.session.revoked'],
+  )
+  assert.equal(Number(revokeReplayJournal.rows[0]?.count), 1, 'retry must not create a second logical event')
+
+  const currentSessionAfterRevoke = await auth.api.getSession({ headers: sessionHeaders })
+  assert.equal(currentSessionAfterRevoke?.session.id, currentSessionId, 'revoking another session must preserve the caller session')
+
+  // Exercise the complete current-session logout HTTP handler with the
+  // PostgreSQL store. The handler must atomically remove the authenticated
+  // native session, persist USER_LOGOUT audit intent, and expire cookies.
+  logoutSessionId = currentSessionId
+  const sessionLogoutEnv = {
+    AUTH_SESSION_WRITE_LIMITER: {
+      limit: async (_input: { key: string }) => ({ success: true }),
+    },
+  }
+  const sessionLogoutStore = createPostgresSessionLogoutStore(postgresPool)
+  const sessionLogoutRequest = () => new Request(
+    'https://luckread-w02.internal/internal/auth/session/logout',
+    {
+      method: 'POST',
+      headers: {
+        cookie: cookieHeader,
+        origin: 'https://luckread.com',
+        'X-LuckRead-Request-Id': 'req_auth010_logout_' + nonce,
+        'X-LuckRead-Correlation-Id': 'auth010-logout-trace-' + nonce,
+      },
+    },
+  )
+  const sessionLogoutDependencies = {
+    auth,
+    store: sessionLogoutStore,
+    getSession: (headers: Headers) => auth.api.getSession({
+      headers,
+      query: { disableCookieCache: true, disableRefresh: true },
+    }) as Promise<{
+      user?: { id?: unknown }
+      session?: { id?: unknown }
+    } | null>,
+  }
+  const logoutResponse = await withTimeout('auth010-postgres-session-logout-handler', () =>
+    handleCurrentUserSessionLogout(sessionLogoutEnv, sessionLogoutRequest(), sessionLogoutDependencies),
+  )
+  assert.equal(logoutResponse.status, 200, 'PostgreSQL current-session logout handler must succeed')
+  assert.ok(logoutResponse.headers.get('set-cookie')?.includes('Max-Age=0'),
+    'logout must expire Better Auth session cookies')
+  signedOut = true
+
+  const revokedSession = await withTimeout(
+    'verify-session-revoked',
+    () => auth.api.getSession({ headers: sessionHeaders }),
+  )
+  assert.equal(revokedSession, null, 'logout handler must revoke the PostgreSQL-backed session')
+
+  const logoutJournal = await postgresPool.query<{ payload: string }>(
+    'SELECT payload FROM auth_010_session_revocation_journal ' +
+      'WHERE resource_id = $1 AND event_type = $2',
+    [currentSessionId, 'user.session.revoked'],
+  )
+  assert.equal(logoutJournal.rowCount, 1, 'current-session logout must commit exactly one AUTH-010 audit row')
+  const logoutEvent = JSON.parse(logoutJournal.rows[0]?.payload ?? '{}')
+  assert.equal(logoutEvent.actor.actorId, userId)
+  assert.equal(logoutEvent.resourceId, currentSessionId)
+  assert.equal(logoutEvent.payload.operationId, 'authLogout')
+  assert.equal(logoutEvent.payload.reasonCode, 'USER_LOGOUT')
+  assert.equal(logoutEvent.correlationId, 'req_auth010_logout_' + nonce)
+  assert.ok(!JSON.stringify(logoutEvent).includes('better-auth.session_token'))
+
+  const logoutReplay = await sessionLogoutStore.logout({
+    userId,
+    sessionId: currentSessionId,
+    now: new Date().toISOString(),
+    correlationId: 'req_auth010_logout_' + nonce,
+    causationId: 'auth010-logout-trace-' + nonce,
+  })
+  assert.deepEqual(logoutReplay, { status: 'NOT_FOUND_OR_NOT_OWNED' })
+  const logoutReplayJournal = await postgresPool.query(
+    'SELECT COUNT(*)::integer AS count FROM auth_010_session_revocation_journal ' +
+      'WHERE resource_id = $1 AND event_type = $2',
+    [currentSessionId, 'user.session.revoked'],
+  )
+  assert.equal(Number(logoutReplayJournal.rows[0]?.count), 1,
+    'replayed logout must not create a second logical event')
+
+  const afterSignOut = await postgresPool.query(
+    'SELECT COUNT(*)::integer AS count FROM "session" WHERE user_id = $1',
+    [userId],
+  )
+  assert.equal(Number(afterSignOut.rows[0]?.count), 0)
+
+  // Exercise the actual W01 -> W02 MFA enrollment-start HTTP handler against
+  // Better Auth's native PostgreSQL adapter. This happens after the logout
+  // assertion so the factor lifecycle cannot interfere with AUTH-010 evidence.
+  const enrollmentSignIn = await withTimeout('mfa-enrollment-start-sign-in', () =>
+    auth.api.signInEmail({
+      body: { email, password, rememberMe: true },
+      returnHeaders: true,
+    }),
+  )
+  assert.equal(enrollmentSignIn.response.user.id, userId)
+  const enrollmentCookieSource = enrollmentSignIn.headers as Headers & { getSetCookie?: () => string[] }
+  const enrollmentCookieHeader = (enrollmentCookieSource.getSetCookie?.() ??
+    [enrollmentSignIn.headers.get('set-cookie') ?? ''])
+    .map((value) => value.split(';', 1)[0])
+    .filter((value) => value.includes('='))
+    .join('; ')
+  assert.ok(enrollmentCookieHeader.length > 0, 'MFA enrollment sign-in must issue a session cookie')
+
+  const mfaEnrollmentEnv = {
+    AUTH_SESSION_WRITE_LIMITER: {
+      limit: async (_input: { key: string }) => ({ success: true }),
+    },
+  }
+  const mfaEnrollmentStore = createPostgresMfaEnrollmentStartStore(postgresPool)
+  const mfaEnrollmentRequest = () => new Request(
+    'https://luckread-w02.internal/internal/auth/mfa/enrollment/start',
+    {
+      method: 'POST',
+      headers: {
+        cookie: enrollmentCookieHeader,
+        origin: 'https://luckread.com',
+        'content-type': 'application/json',
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'Idempotency-Key': 'mfa-enrollment-start-' + nonce,
+        'X-LuckRead-Correlation-Id': 'mfa-enrollment-trace-' + nonce,
+        'X-LuckRead-Request-Id': 'req_mfa_enrollment_' + nonce,
+      },
+      body: JSON.stringify({ currentPassword: password }),
+    },
+  )
+  const mfaEnrollmentDependencies = {
+    auth,
+    store: mfaEnrollmentStore,
+    resolvePrincipal: async (_env: unknown, request: Request) => {
+      const activeSession = await auth.api.getSession({ headers: request.headers, query: {} })
+      if (!activeSession?.user?.id) return null
+      return {
+        userId: String(activeSession.user.id),
+        accountState: String(activeSession.user.accountState ?? 'PENDING_VERIFICATION'),
+      }
+    },
+  }
+  const mfaEnrollmentResponse = await withTimeout('auth007-postgres-enrollment-start-handler', () =>
+    handleMfaEnrollmentStartRequest(
+      mfaEnrollmentEnv,
+      mfaEnrollmentRequest(),
+      mfaEnrollmentDependencies,
+    ),
+  )
+  assert.equal(mfaEnrollmentResponse.status, 200, 'PostgreSQL MFA enrollment-start handler must succeed')
+  const mfaEnrollmentPayload = await mfaEnrollmentResponse.json() as {
+    data?: { totpUri?: unknown; recoveryCodes?: unknown[] }
+  }
+  assert.equal(typeof mfaEnrollmentPayload.data?.totpUri, 'string')
+  assert.ok(
+    String(mfaEnrollmentPayload.data?.totpUri).startsWith('otpauth://totp/'),
+    'MFA enrollment must return the Better Auth TOTP URI to the authenticated caller',
+  )
+  assert.ok(
+    Array.isArray(mfaEnrollmentPayload.data?.recoveryCodes) &&
+      mfaEnrollmentPayload.data.recoveryCodes.length >= 1 &&
+      mfaEnrollmentPayload.data.recoveryCodes.every((code) => typeof code === 'string'),
+    'MFA enrollment must return one-time recovery codes to the authenticated caller',
+  )
+
+  const enrollmentAccount = await postgresPool.query<{ enrollmentKeyHash: string | null }>(
+    'SELECT mfa_enrollment_key_hash AS "enrollmentKeyHash" FROM "user" WHERE id = $1',
+    [userId],
+  )
+  assert.equal(enrollmentAccount.rowCount, 1)
+  assert.match(enrollmentAccount.rows[0]?.enrollmentKeyHash ?? '', /^[a-f0-9]{64}$/,
+    'only the hashed enrollment idempotency key may be persisted')
+  const enrollmentFactor = await postgresPool.query<{ userId: string; secret: string }>(
+    'SELECT "userId", secret FROM "twoFactor" WHERE "userId" = $1',
+    [userId],
+  )
+  assert.equal(enrollmentFactor.rowCount, 1, 'Better Auth PostgreSQL adapter must persist the pending TOTP factor')
+  assert.equal(enrollmentFactor.rows[0]?.userId, userId)
+  assert.ok(enrollmentFactor.rows[0]?.secret, 'pending factor secret must be persisted by Better Auth')
+  const enrollmentJournal = await postgresPool.query<{ payload: string }>(
+    'SELECT payload FROM auth_007_mfa_publication_journal ' +
+      'WHERE resource_id = $1 AND event_type = $2',
+    [userId, 'auth.mfa.enrollment_started'],
+  )
+  assert.equal(enrollmentJournal.rowCount, 1, 'reservation and enrollment_started audit must commit atomically')
+  const enrollmentEvent = JSON.parse(enrollmentJournal.rows[0]?.payload ?? '{}')
+  assert.equal(enrollmentEvent.payload.operationId, 'authMfaEnrollmentStart')
+  assert.equal(enrollmentEvent.payload.result, 'started')
+  assert.equal(enrollmentEvent.payload.factorState, 'PENDING_VERIFICATION')
+  assert.ok(!JSON.stringify(enrollmentEvent).includes(password))
+  assert.ok(!JSON.stringify(enrollmentEvent).includes(String(mfaEnrollmentPayload.data?.totpUri)))
+  for (const code of mfaEnrollmentPayload.data?.recoveryCodes ?? []) {
+    assert.ok(!JSON.stringify(enrollmentEvent).includes(String(code)))
+  }
+
+  const competingReservation = await mfaEnrollmentStore.reserve({
+    userId,
+    keyHash: 'b'.repeat(64),
+    event: buildMfaAuditEvent({
+      eventType: 'auth.mfa.enrollment_started',
+      operationId: 'authMfaEnrollmentStart',
+      userId,
+      occurredAt: new Date().toISOString(),
+      result: 'started',
+      reasonCode: 'USER_INITIATED',
+      factorState: 'PENDING_VERIFICATION',
+    }),
+  })
+  assert.equal(competingReservation, false, 'a competing enrollment key must not replace the pending factor')
+  const enrollmentJournalCount = await postgresPool.query<{ count: number }>(
+    'SELECT COUNT(*)::integer AS count FROM auth_007_mfa_publication_journal ' +
+      'WHERE resource_id = $1 AND event_type = $2',
+    [userId, 'auth.mfa.enrollment_started'],
+  )
+  assert.equal(Number(enrollmentJournalCount.rows[0]?.count), 1,
+    'a rejected competing reservation must not append a second started event')
+
+  await mfaEnrollmentStore.releaseReservationIfNoFactor(userId, enrollmentAccount.rows[0]!.enrollmentKeyHash!)
+  const protectedEnrollmentReservation = await postgresPool.query<{ enrollmentKeyHash: string | null }>(
+    'SELECT mfa_enrollment_key_hash AS "enrollmentKeyHash" FROM "user" WHERE id = $1',
+    [userId],
+  )
+  assert.equal(
+    protectedEnrollmentReservation.rows[0]?.enrollmentKeyHash,
+    enrollmentAccount.rows[0]?.enrollmentKeyHash,
+    'a materialized TOTP factor must prevent reservation release',
+  )
+  mfaEnrollmentStarted = true
+
+  // Use the existing pending factor to exercise the complete confirmation
+  // boundary through Better Auth + PostgreSQL stores, including the same
+  // provider-backed durable receipt hooks used by W02.
+  const mfaConfirmReceiptStore = createPostgresMfaAuditOperationReceiptStore(postgresPool)
+  let mfaConfirmAuth: ReturnType<typeof buildLuckReadAuth>
+  mfaConfirmAuth = buildLuckReadAuth(
+    mfaEnrollmentEnv,
+    postgresPool,
+    'postgres-rehearsal',
+    createPostgresMfaFactorStateStore(postgresPool),
+    postgresLifecycleAdapters,
+    mfaConfirmReceiptStore,
+    async (headers) => {
+      const activeSession = await mfaConfirmAuth.api.getSession({ headers, query: {} })
+      return activeSession?.user?.id ? String(activeSession.user.id) : null
+    },
+  )
+  const totp = totpCodeForUri(String(mfaEnrollmentPayload.data?.totpUri))
+  const confirmKey = 'mfa-enrollment-confirm-' + nonce
+  const confirmCode = totp.code
+  const mfaEnrollmentConfirmRequest = (code: string, cookieHeader = enrollmentCookieHeader) => new Request(
+    'https://luckread-w02.internal/internal/auth/mfa/enrollment/confirm',
+    {
+      method: 'POST',
+      headers: {
+        cookie: cookieHeader,
+        origin: 'https://luckread.com',
+        'content-type': 'application/json',
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'Idempotency-Key': confirmKey,
+        'X-LuckRead-Correlation-Id': 'mfa-enrollment-confirm-trace-' + nonce,
+        'X-LuckRead-Request-Id': 'req_mfa_enrollment_confirm_' + nonce,
+      },
+      body: JSON.stringify({ code }),
+    },
+  )
+  const mfaEnrollmentConfirmDependencies = {
+    auth: mfaConfirmAuth,
+    store: createPostgresMfaEnrollmentConfirmStore(postgresPool),
+    receiptStore: mfaConfirmReceiptStore,
+    statusStore: createPostgresMfaStatusStore(postgresPool),
+    resolvePrincipal: async (_env: unknown, request: Request) => {
+      const activeSession = await mfaConfirmAuth.api.getSession({ headers: request.headers, query: {} })
+      if (!activeSession?.user?.id || !activeSession.session?.id) return null
+      return {
+        userId: String(activeSession.user.id),
+        email: String(activeSession.user.email ?? email),
+        sessionId: String(activeSession.session.id),
+        accountState: String(activeSession.user.accountState ?? 'PENDING_VERIFICATION'),
+        accountStateVersion: Number(activeSession.user.accountStateVersion ?? 1),
+        layer: 'L2',
+        roleAssignments: [],
+      }
+    },
+  }
+  const mfaEnrollmentConfirmResponse = await withTimeout('auth007-postgres-enrollment-confirm-handler', () =>
+    handleMfaEnrollmentConfirmRequest(
+      mfaEnrollmentEnv,
+      mfaEnrollmentConfirmRequest(confirmCode),
+      mfaEnrollmentConfirmDependencies,
+    ),
+  )
+  assert.equal(mfaEnrollmentConfirmResponse.status, 200,
+    'PostgreSQL MFA enrollment-confirm handler must verify the pending factor')
+  const confirmPayload = await mfaEnrollmentConfirmResponse.json() as {
+    data?: { enabled?: boolean; verified?: boolean; enrolledAt?: string | null }
+  }
+  assert.deepEqual(confirmPayload.data && {
+    enabled: confirmPayload.data.enabled,
+    verified: confirmPayload.data.verified,
+  }, { enabled: true, verified: true })
+  assert.equal(typeof confirmPayload.data?.enrolledAt, 'string')
+  assert.ok(!JSON.stringify(confirmPayload).includes(confirmCode),
+    'the confirmation response must not echo the TOTP code')
+  const confirmCookieSource = mfaEnrollmentConfirmResponse.headers as Headers & { getSetCookie?: () => string[] }
+  const confirmCookies = confirmCookieSource.getSetCookie?.() ??
+    [mfaEnrollmentConfirmResponse.headers.get('set-cookie') ?? '']
+  assert.ok(confirmCookies.some((cookie) => cookie.length > 0),
+    'successful enrollment confirmation must forward the rotated HTTP-only session cookie')
+  assert.ok(confirmCookies.every((cookie) => !cookie.includes(confirmCode)),
+    'the TOTP code must never appear in a session cookie')
+
+  // Enabling MFA revokes pre-existing sessions in the PG lifecycle trigger.
+  // The exact replay must use the freshly rotated cookie returned here.
+  const rotatedCookiePairs = new Map<string, string>()
+  for (const setCookie of confirmCookies) {
+    const pair = setCookie.split(';', 1)[0]?.trim() ?? ''
+    const separator = pair.indexOf('=')
+    if (separator > 0 && pair.slice(separator + 1).length > 0) {
+      rotatedCookiePairs.set(pair.slice(0, separator), pair)
+    }
+  }
+  const rotatedSessionCookieHeader = [...rotatedCookiePairs.values()].join('; ')
+  assert.ok(rotatedSessionCookieHeader.length > 0,
+    'the enrollment-confirm response must provide a usable rotated session cookie')
+
+  const confirmKeyHash = await sha256Hex(confirmKey)
+  const confirmRequestHash = await sha256Hex(confirmKey + String.fromCharCode(0) + confirmCode)
+  const confirmedUser = await postgresPool.query<{
+    enabled: boolean
+    enrollmentKeyHash: string | null
+    confirmationKeyHash: string | null
+    confirmationRequestHash: string | null
+    enrolledAt: Date | string | null
+  }>(
+    'SELECT two_factor_enabled AS enabled, mfa_enrollment_key_hash AS "enrollmentKeyHash", ' +
+      'mfa_enrollment_confirm_key_hash AS "confirmationKeyHash", ' +
+      'mfa_enrollment_confirm_request_hash AS "confirmationRequestHash", ' +
+      'mfa_enrolled_at AS "enrolledAt" FROM "user" WHERE id = $1',
+    [userId],
+  )
+  assert.equal(confirmedUser.rowCount, 1)
+  assert.equal(confirmedUser.rows[0]?.enabled, true)
+  assert.equal(confirmedUser.rows[0]?.enrollmentKeyHash, null)
+  assert.equal(confirmedUser.rows[0]?.confirmationKeyHash, confirmKeyHash)
+  assert.equal(confirmedUser.rows[0]?.confirmationRequestHash, confirmRequestHash)
+  assert.ok(confirmedUser.rows[0]?.enrolledAt, 'PostgreSQL lifecycle trigger must persist the enrollment timestamp')
+
+  const verifiedFactor = await postgresPool.query<{
+    verified: boolean
+    lastAcceptedTotpTimeStep: string | number | null
+  }>(
+    'SELECT verified, "lastAcceptedTotpTimeStep" AS "lastAcceptedTotpTimeStep" ' +
+      'FROM "twoFactor" WHERE "userId" = $1',
+    [userId],
+  )
+  assert.equal(verifiedFactor.rows[0]?.verified, true)
+  assert.ok(verifiedFactor.rows[0]?.lastAcceptedTotpTimeStep !== null,
+    'the provider-backed replay guard must consume the verified TOTP time step')
+
+  const enrollmentReceipt = await postgresPool.query<{ status: string; eventPlan: string | null }>(
+    'SELECT status, event_plan AS "eventPlan" FROM auth_007_mfa_operation_receipts ' +
+      'WHERE resource_id = $1 AND operation_path = $2',
+    [userId, '/two-factor/verify-totp'],
+  )
+  assert.equal(enrollmentReceipt.rowCount, 1)
+  assert.equal(enrollmentReceipt.rows[0]?.status, 'EMITTED',
+    'the successful enrollment receipt must be reconciled to the existing MFA journal')
+  const enrollmentConfirmEvent = await postgresPool.query<{ payload: string }>(
+    'SELECT payload FROM auth_007_mfa_publication_journal ' +
+      'WHERE resource_id = $1 AND event_type = $2',
+    [userId, 'auth.mfa.enrollment_verified'],
+  )
+  assert.equal(enrollmentConfirmEvent.rowCount, 1,
+    'successful enrollment must publish one secret-free verified event')
+  const confirmEventPayload = enrollmentConfirmEvent.rows[0]?.payload ?? ''
+  for (const secretValue of [
+    password,
+    confirmCode,
+    String(mfaEnrollmentPayload.data?.totpUri),
+    ...((mfaEnrollmentPayload.data?.recoveryCodes ?? []).map(String)),
+    enrollmentCookieHeader,
+  ]) {
+    assert.ok(!confirmEventPayload.includes(secretValue),
+      'the MFA publication journal must not contain credentials, codes, secrets or cookies')
+  }
+
+  // Exact replay returns the read-back without invoking Better Auth again;
+  // changing the code while reusing the same key is a hard conflict.
+  const replayResponse = await handleMfaEnrollmentConfirmRequest(
+    mfaEnrollmentEnv,
+    mfaEnrollmentConfirmRequest(confirmCode, rotatedSessionCookieHeader),
+    mfaEnrollmentConfirmDependencies,
+  )
+  assert.equal(replayResponse.status, 200, 'same-key/same-code confirmation replay must be idempotent')
+  const replayConflictCode = String((Number(confirmCode) + 1) % 1_000_000).padStart(6, '0')
+  const replayConflictResponse = await handleMfaEnrollmentConfirmRequest(
+    mfaEnrollmentEnv,
+    mfaEnrollmentConfirmRequest(replayConflictCode, rotatedSessionCookieHeader),
+    mfaEnrollmentConfirmDependencies,
+  )
+  assert.equal(replayConflictResponse.status, 409,
+    'same-key/different-code confirmation replay must be rejected')
+
+  mfaEnrollmentConfirmed = true
+
+  // W01 owns public registration; use the existing Better Auth-backed
+  // synthetic registration fixture, then exercise W01->W02 verification
+  // delivery and the actual W02 Worker verification/login/session routes.
+  const workerEntryFixture = await withTimeout('worker-entry-fixture-sign-up', () =>
+    auth.api.signUpEmail({
+      body: {
+        name: 'W02 Worker Entry PostgreSQL Rehearsal',
+        email: workerEntryEmail,
+        password: workerEntryPassword,
+        username: workerEntryUsername,
+      },
+      returnHeaders: true,
+    }),
+  )
+  workerEntryUserId = String(workerEntryFixture.response.user.id)
+  assert.equal(workerEntryFixture.response.user.email, workerEntryEmail)
+  assert.equal(workerEntryFixture.response.user.username, workerEntryUsername)
+
+  const workerD1Sentinel = {
+    prepare() {
+      workerEntryD1Accesses.prepare += 1
+      throw new Error('W02 Neon Worker entrypoint must not access legacy D1_01')
+    },
+    batch() {
+      workerEntryD1Accesses.batch += 1
+      throw new Error('W02 Neon Worker entrypoint must not write legacy D1_01')
+    },
+  }
+  const allowAuthRateLimit = { async limit() { return { success: true } } }
+  const noopQueue = { async send(_message: unknown) { return undefined } }
+  const workerEnv = {
+    W02_DATABASE_DRIVER: 'neon',
+    HYPERDRIVE: { connectionString: process.env.W02_RUNTIME_DATABASE_URL },
+    D1_01: workerD1Sentinel,
+    AUTH_SESSION_READ_LIMITER: allowAuthRateLimit,
+    AUTH_SESSION_WRITE_LIMITER: allowAuthRateLimit,
+    AUTH013_QUEUE: noopQueue,
+    AUTH013_PROJECTION_QUEUE: noopQueue,
+    RESEND_API_KEY: 're_w02_local_pg18_only',
+    AUTH_EMAIL_FROM: 'LuckRead PostgreSQL Rehearsal <no-reply@example.test>',
+  } as never
+  workerRuntimePool = getW02PostgresRuntime(workerEnv).pool
+
+  const pendingWorkerEntryUpdate = await workerRuntimePool.query(
+    'UPDATE "user" SET email_verified = FALSE, account_state = $1, account_state_version = 1 WHERE id = $2',
+    ['PENDING_VERIFICATION', workerEntryUserId],
+  )
+  assert.equal(pendingWorkerEntryUpdate.rowCount, 1)
+
+  const pendingWorkerEntryUser = await workerRuntimePool.query<{
+    emailVerified: boolean
+    accountState: string
+  }>(
+    'SELECT email_verified AS "emailVerified", account_state AS "accountState" ' +
+      'FROM "user" WHERE id = $1',
+    [workerEntryUserId],
+  )
+  assert.equal(pendingWorkerEntryUser.rowCount, 1)
+  assert.equal(pendingWorkerEntryUser.rows[0]?.emailVerified, false)
+  assert.equal(pendingWorkerEntryUser.rows[0]?.accountState, 'PENDING_VERIFICATION')
+
+  const originalFetch = globalThis.fetch
+  let capturedVerificationUrl: string | undefined
+  let resendRequests = 0
+  let verificationSendResponse: Response
+  try {
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      resendRequests += 1
+      assert.equal(String(input), 'https://api.resend.com/emails')
+      assert.equal(init?.method, 'POST')
+      const mail = JSON.parse(String(init?.body ?? '{}')) as {
+        to?: string[]
+        text?: string
+        from?: string
+      }
+      assert.deepEqual(mail.to, [workerEntryEmail])
+      assert.equal(mail.from, 'LuckRead PostgreSQL Rehearsal <no-reply@example.test>')
+      const match = (mail.text ?? '').match(
+        /https:\/\/luckread\.com\/api\/auth\/verify-email\?[^\s]+/,
+      )
+      assert.ok(match?.[0], 'W02 must send a usable Better Auth verification URL')
+      capturedVerificationUrl = match[0]
+      return new Response(JSON.stringify({ id: 're_w02_pg18_' + nonce }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }) as typeof fetch
+
+    verificationSendResponse = await w02Worker.fetch(
+      new Request('https://luckread.com/api/auth/send-verification-email', {
+        method: 'POST',
+        headers: {
+          origin: 'https://luckread.com',
+          'content-type': 'application/json',
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'w02-worker-verification-' + nonce,
+        },
+        body: JSON.stringify({
+          email: workerEntryEmail,
+          callbackURL: 'https://luckread.com/login?verified=1',
+        }),
+      }),
+      workerEnv,
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+  assert.ok(verificationSendResponse!.status >= 200 && verificationSendResponse!.status < 300)
+  assert.equal(resendRequests, 1)
+  assert.ok(capturedVerificationUrl)
+  workerEntryEmailDeliveryAccepted = true
+
+  const verificationResponse = await withTimeout('worker-entry-email-verification', () =>
+    w02Worker.fetch(
+      new Request(capturedVerificationUrl!, {
+        method: 'GET',
+        headers: {
+          origin: 'https://luckread.com',
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'w02-worker-verify-' + nonce,
+        },
+      }),
+      workerEnv,
+    ),
+  )
+  assert.ok(
+    verificationResponse.status >= 200 && verificationResponse.status < 400,
+    'the W02 Better Auth verification URL must complete or redirect after Neon persistence',
+  )
+
+  const verifiedWorkerEntryUser = await workerRuntimePool.query<{
+    emailVerified: boolean
+    accountState: string
+    accountStateVersion: number
+  }>(
+    'SELECT email_verified AS "emailVerified", account_state AS "accountState", ' +
+      'account_state_version AS "accountStateVersion" FROM "user" WHERE id = $1',
+    [workerEntryUserId],
+  )
+  assert.equal(verifiedWorkerEntryUser.rows[0]?.emailVerified, true)
+  assert.equal(verifiedWorkerEntryUser.rows[0]?.accountState, 'ACTIVE')
+  assert.equal(Number(verifiedWorkerEntryUser.rows[0]?.accountStateVersion), 2)
+
+  const verifiedWorkerEntryRole = await workerRuntimePool.query(
+    "SELECT role_id FROM role_assignments WHERE subject_id = $1 AND role_id = 'verified_user' " +
+      "AND status = 'ACTIVE'",
+    [workerEntryUserId],
+  )
+  assert.equal(verifiedWorkerEntryRole.rowCount, 1)
+  const workerEntryJournal = await workerRuntimePool.query(
+    "SELECT COUNT(*)::integer AS count FROM auth_013_publication_journal " +
+      "WHERE resource_id = $1 AND event_type = 'identity.account_state_changed'",
+    [workerEntryUserId],
+  )
+  assert.equal(Number(workerEntryJournal.rows[0]?.count), 1)
+  workerEntryEmailVerificationPassed = true
+
+  const workerSignInResponse = await withTimeout('worker-entry-sign-in-email', () =>
+    w02Worker.fetch(
+      new Request('https://luckread.com/api/auth/sign-in/email', {
+        method: 'POST',
+        headers: {
+          origin: 'https://luckread.com',
+          'content-type': 'application/json',
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'w02-worker-sign-in-' + nonce,
+        },
+        body: JSON.stringify({
+          email: workerEntryEmail,
+          password: workerEntryPassword,
+          rememberMe: true,
+        }),
+      }),
+      workerEnv,
+    ),
+  )
+  assert.equal(workerSignInResponse.status, 200)
+  const workerSignInPayload = await workerSignInResponse.json() as Record<string, unknown>
+  const workerSignInData = workerSignInPayload.data &&
+    typeof workerSignInPayload.data === 'object'
+    ? workerSignInPayload.data as Record<string, unknown>
+    : workerSignInPayload
+  const workerSignInUser = workerSignInData.user as { id?: unknown; email?: unknown } | undefined
+  assert.equal(workerSignInUser?.id, workerEntryUserId)
+  assert.equal(workerSignInUser?.email, workerEntryEmail)
+
+  const workerSignInHeaders = workerSignInResponse.headers as Headers & {
+    getSetCookie?: () => string[]
+  }
+  const workerSetCookies = workerSignInHeaders.getSetCookie?.() ??
+    [workerSignInResponse.headers.get('set-cookie') ?? '']
+  const workerCookieHeader = workerSetCookies
+    .map((value) => value.split(';', 1)[0].trim())
+    .filter((value) => value.includes('='))
+    .join('; ')
+  assert.ok(workerCookieHeader.length > 0)
+
+  const workerSessionResponse = await w02Worker.fetch(
+    new Request('https://luckread.com/api/auth/get-session', {
+      method: 'GET',
+      headers: {
+        origin: 'https://luckread.com',
+        cookie: workerCookieHeader,
+      },
+    }),
+    workerEnv,
+  )
+  assert.equal(workerSessionResponse.status, 200)
+  const workerSessionPayload = await workerSessionResponse.json() as Record<string, unknown>
+  const workerSessionData = workerSessionPayload.data &&
+    typeof workerSessionPayload.data === 'object'
+    ? workerSessionPayload.data as Record<string, unknown>
+    : workerSessionPayload
+  const workerSessionUser = workerSessionData.user as { id?: unknown } | undefined
+  const workerSession = workerSessionData.session as { id?: unknown } | undefined
+  assert.equal(workerSessionUser?.id, workerEntryUserId)
+  assert.equal(typeof workerSession?.id, 'string')
+  const workerSessionId = String(workerSession?.id)
+
+  const workerPrincipalResponse = await w02Worker.fetch(
+    new Request('https://luckread-w02.internal/internal/auth/principal', {
+      method: 'POST',
+      headers: {
+        origin: 'https://luckread.com',
+        cookie: workerCookieHeader,
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'w02-worker-principal-' + nonce,
+      },
+    }),
+    workerEnv,
+  )
+  assert.equal(workerPrincipalResponse.status, 200)
+  const workerPrincipal = await workerPrincipalResponse.json() as {
+    active: boolean
+    userId: string
+    email: string
+    sessionId: string
+    accountState: string
+    accountStateVersion: number
+    layer: string
+  }
+  assert.equal(workerPrincipal.active, true)
+  assert.equal(workerPrincipal.userId, workerEntryUserId)
+  assert.equal(workerPrincipal.email, workerEntryEmail)
+  assert.equal(workerPrincipal.sessionId, workerSessionId)
+  assert.equal(workerPrincipal.accountState, 'ACTIVE')
+  assert.equal(workerPrincipal.accountStateVersion, 2)
+  assert.equal(workerPrincipal.layer, 'L2')
+
+  const workerSessionRows = await workerRuntimePool.query(
+    'SELECT COUNT(*)::integer AS count FROM "session" WHERE user_id = $1',
+    [workerEntryUserId],
+  )
+  assert.equal(Number(workerSessionRows.rows[0]?.count), 1)
+  assert.equal(workerEntryD1Accesses.prepare, 0)
+  assert.equal(workerEntryD1Accesses.batch, 0)
+  workerEntryLoginSessionPassed = true
+  workerEntryPrincipalPassed = true
+
+  report = {
+    reportVersion: 8,
+    status: 'W02_BETTER_AUTH_POSTGRES_RUNTIME_REHEARSAL_PASS',
+    scope: 'Better Auth core PostgreSQL runtime and the real W02 Worker entrypoint in Neon mode: W01-to-W02 verification-mail service call, Better Auth verification URL callback, sign-in, session read and W01 principal resolution; existing provider-bound principal, L1/L2 role materialization, AUTH-013 activation, AUTH-007 MFA, and AUTH-010 rehearsals remain covered; D1 production remains authoritative.',
+    betterAuthVersion: '1.7.8',
+    adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus W02 PostgreSQL identity lifecycle, AUTH-007 MFA status/enrollment-start/enrollment-confirm and durable receipt hooks, AUTH-010 session-list, atomic session-revocation and current-session logout adapters',
+    operationsVerified: [
+      'SIGN_UP_EMAIL',
+      'BASE_USER_L1_ROLE_PERSISTED',
+      'AUTHZ_ROLE_VERSION_ADVANCED_ON_REGISTRATION',
+      'CREDENTIAL_ACCOUNT_PERSISTED',
+      'EMAIL_VERIFICATION_REQUIRED',
+      'EMAIL_VERIFICATION_ACTIVATION_PRECONDITION',
+      'EMAIL_VERIFICATION_ACTIVATION',
+      'VERIFIED_USER_L2_ROLE_PERSISTED',
+      'AUTH013_PUBLICATION_JOURNAL_PERSISTED',
+      'CONCURRENT_ACTIVATION_IDEMPOTENCY',
+      'SIGN_IN_EMAIL',
+      'SESSION_PERSISTED',
+      'GET_SESSION',
+      'POSTGRES_PRINCIPAL_AUTHORITY_STORE',
+      'AUTH007_MFA_STATUS_HTTP_HANDLER',
+      'AUTH007_MFA_STATUS_SECRET_FREE_PROJECTION',
+      'AUTH007_MFA_ENROLLMENT_START_HTTP_HANDLER',
+      'AUTH007_MFA_ENROLLMENT_RESERVATION_AND_AUDIT_ATOMIC',
+      'AUTH007_MFA_ENROLLMENT_SECRET_AND_RECOVERY_CODE_RESPONSE',
+      'AUTH007_MFA_ENROLLMENT_COMPETING_RESERVATION_REJECTED',
+      'AUTH007_MFA_ENROLLMENT_RESERVATION_RELEASE_GUARDED_BY_FACTOR',
+      'AUTH007_MFA_ENROLLMENT_CONFIRM_HTTP_HANDLER',
+      'AUTH007_MFA_ENROLLMENT_CONFIRM_FACTOR_READBACK',
+      'AUTH007_MFA_ENROLLMENT_CONFIRM_REPLAY_GUARD',
+      'AUTH007_MFA_ENROLLMENT_CONFIRM_RECEIPT_AND_JOURNAL',
+      'AUTH007_MFA_ENROLLMENT_CONFIRM_IDEMPOTENT_REPLAY',
+      'AUTH010_SESSION_LIST_FIRST_PAGE',
+      'AUTH010_SESSION_LIST_KEYSET_PAGINATION',
+      'AUTH010_SESSION_LIST_NO_SECRET_PROJECTION',
+      'AUTH010_SESSION_LIST_UNAUTHORIZED_SUBJECT',
+      'AUTH010_SESSION_REVOKE_HTTP_HANDLER',
+      'AUTH010_SESSION_REVOKE_ATOMIC_AUDIT',
+      'AUTH010_SESSION_REVOKE_IDEMPOTENT_REPLAY',
+      'AUTH010_SESSION_LOGOUT_HTTP_HANDLER',
+      'AUTH010_SESSION_LOGOUT_ATOMIC_AUDIT',
+      'AUTH010_SESSION_LOGOUT_COOKIE_CLEARING',
+      'AUTH010_SESSION_LOGOUT_IDEMPOTENT_REPLAY',
+      'SIGN_OUT',
+      'SESSION_REVOKED',
+      'W02_NEON_WORKER_ENTRYPOINT_VERIFICATION_EMAIL',
+      'W02_NEON_WORKER_ENTRYPOINT_EMAIL_VERIFICATION_CALLBACK',
+      'W02_NEON_WORKER_ENTRYPOINT_SIGN_IN',
+      'W02_NEON_WORKER_ENTRYPOINT_SESSION_READ',
+      'W02_NEON_WORKER_ENTRYPOINT_W01_PRINCIPAL_RESOLUTION',
+      'W02_NEON_WORKER_ENTRYPOINT_NO_D1_FALLBACK',
+    ],
+    signedUp: true,
+    activationConcurrencyWinners: activations.filter((result) => result.activated).length,
+    activationReplaySafe: !activationReplay.activated,
+    signedIn,
+    signedOut,
+    principalAuthorityResolved: true,
+    mfaEnrollmentStarted,
+    mfaEnrollmentConfirmed,
+    workerEntryEmailDeliveryAccepted,
+    workerEntryEmailVerificationPassed,
+    workerEntryLoginSessionPassed,
+    workerEntryPrincipalPassed,
+    workerEntryD1Accesses,
+    testUserRowsRemaining: 0,
+    productionAuthorityChanged: false,
+    neonConnectionAttempted: false,
+    cloudflareD1Touched: false,
+    workerBindingsChanged: false,
+    businessDataImported: false,
+  }
+
+} catch (error) {
+  primaryError = error
+} finally {
+  let cleanupUserId = userId
+  try {
+    if (!cleanupUserId) {
+      const byEmail = await postgresPool.query(
+        'SELECT id FROM "user" WHERE email = $1 LIMIT 1',
+        [email],
+      )
+      if (typeof byEmail.rows[0]?.id === 'string') cleanupUserId = byEmail.rows[0].id
+    }
+
+    let cleanupWorkerEntryUserId = workerEntryUserId
+    if (!cleanupWorkerEntryUserId) {
+      const byWorkerEmail = await postgresPool.query(
+        'SELECT id FROM "user" WHERE email = $1 LIMIT 1',
+        [workerEntryEmail],
+      )
+      if (typeof byWorkerEmail.rows[0]?.id === 'string') {
+        cleanupWorkerEntryUserId = byWorkerEmail.rows[0].id
+      }
+    }
+    await postgresPool.query('DELETE FROM "verification" WHERE identifier = $1', [workerEntryEmail])
+    if (cleanupWorkerEntryUserId) {
+      await postgresPool.query(
+        'DELETE FROM auth_013_publication_journal WHERE resource_id = $1',
+        [cleanupWorkerEntryUserId],
+      )
+      await postgresPool.query('DELETE FROM "twoFactor" WHERE "userId" = $1', [cleanupWorkerEntryUserId])
+      await postgresPool.query('DELETE FROM "session" WHERE user_id = $1', [cleanupWorkerEntryUserId])
+      await postgresPool.query('DELETE FROM "account" WHERE user_id = $1', [cleanupWorkerEntryUserId])
+      await postgresPool.query('DELETE FROM role_assignments WHERE subject_id = $1', [cleanupWorkerEntryUserId])
+      await postgresPool.query('DELETE FROM role_authorization_versions WHERE subject_id = $1', [cleanupWorkerEntryUserId])
+      await postgresPool.query('DELETE FROM "user" WHERE id = $1', [cleanupWorkerEntryUserId])
+      const workerResidual = await postgresPool.query(
+        'SELECT ' +
+          '(SELECT COUNT(*) FROM "user" WHERE id = $1 OR email = $2) AS users, ' +
+          '(SELECT COUNT(*) FROM "account" WHERE user_id = $1) AS accounts, ' +
+          '(SELECT COUNT(*) FROM "session" WHERE user_id = $1) AS sessions, ' +
+          '(SELECT COUNT(*) FROM "verification" WHERE identifier = $2) AS verifications, ' +
+          '(SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id = $1) AS journals, ' +
+          '(SELECT COUNT(*) FROM role_assignments WHERE subject_id = $1) AS role_assignments, ' +
+          '(SELECT COUNT(*) FROM role_authorization_versions WHERE subject_id = $1) AS role_versions',
+        [cleanupWorkerEntryUserId, workerEntryEmail],
+      )
+      if (Object.values(workerResidual.rows[0] ?? {}).some((value) => Number(value) !== 0)) {
+        throw new Error('W02_WORKER_ENTRY_SYNTHETIC_CLEANUP_FAILED')
+      }
+    }
+    await postgresPool.query('DELETE FROM "verification" WHERE identifier = $1', [email])
+    if (logoutSessionId) {
+      await postgresPool.query(
+        'DELETE FROM auth_010_session_revocation_journal WHERE resource_id = $1',
+        [logoutSessionId],
+      )
+    }
+    if (syntheticSessionIds.length > 0) {
+      await postgresPool.query(
+        'DELETE FROM auth_010_session_revocation_journal WHERE resource_id = ANY($1::text[])',
+        [syntheticSessionIds],
+      )
+      await postgresPool.query('DELETE FROM "session" WHERE id = ANY($1::text[])', [syntheticSessionIds])
+      syntheticSessionIds.length = 0
+    }
+    if (cleanupUserId) {
+      await postgresPool.query(
+        'DELETE FROM auth_013_publication_journal WHERE resource_id = $1',
+        [cleanupUserId],
+      )
+      await postgresPool.query(
+        'DELETE FROM auth_007_mfa_operation_receipts WHERE resource_id = $1',
+        [cleanupUserId],
+      )
+      await postgresPool.query(
+        'DELETE FROM auth_007_mfa_publication_journal WHERE resource_id = $1',
+        [cleanupUserId],
+      )
+      await postgresPool.query('DELETE FROM "twoFactor" WHERE "userId" = $1', [cleanupUserId])
+      await postgresPool.query('DELETE FROM "session" WHERE user_id = $1', [cleanupUserId])
+      await postgresPool.query('DELETE FROM "account" WHERE user_id = $1', [cleanupUserId])
+      await postgresPool.query('DELETE FROM role_assignments WHERE subject_id = $1', [cleanupUserId])
+      await postgresPool.query('DELETE FROM role_authorization_versions WHERE subject_id = $1', [cleanupUserId])
+      await postgresPool.query('DELETE FROM "user" WHERE id = $1', [cleanupUserId])
+    }
+
+    const remaining = await postgresPool.query(
+      `SELECT
+        (SELECT COUNT(*) FROM "user" WHERE email = $1) AS users,
+        (SELECT COUNT(*) FROM "account" WHERE user_id = COALESCE($2, '')) AS accounts,
+        (SELECT COUNT(*) FROM "session" WHERE user_id = COALESCE($2, '')) AS sessions,
+        (SELECT COUNT(*) FROM "verification" WHERE identifier = $1) AS verifications,
+        (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id = COALESCE($2, '')) AS journals,
+        (SELECT COUNT(*) FROM auth_007_mfa_publication_journal WHERE resource_id = COALESCE($2, '')) AS mfa_journals,
+        (SELECT COUNT(*) FROM auth_007_mfa_operation_receipts WHERE resource_id = COALESCE($2, '')) AS mfa_receipts,
+        (SELECT COUNT(*) FROM "twoFactor" WHERE "userId" = COALESCE($2, '')) AS mfa_factors,
+        (SELECT COUNT(*) FROM role_assignments WHERE subject_id = COALESCE($2, '')) AS role_assignments,
+        (SELECT COUNT(*) FROM role_authorization_versions WHERE subject_id = COALESCE($2, '')) AS role_versions,
+        (SELECT COUNT(*) FROM auth_010_session_revocation_journal WHERE resource_id = COALESCE($3, '')) AS session_revocation_journals,
+        (SELECT COUNT(*) FROM auth_010_session_revocation_journal WHERE resource_id = COALESCE($4, '')) AS session_logout_journals`,
+      [email, cleanupUserId ?? null, revocationTargetSessionId ?? null, logoutSessionId ?? null],
+    )
+    if (Object.values(remaining.rows[0] ?? {}).some((value) => Number(value) !== 0)) {
+      throw new Error('W02_RUNTIME_SYNTHETIC_CLEANUP_FAILED')
+    }
+    cleanupVerified = true
+  } catch (cleanupError) {
+    if (!primaryError) primaryError = cleanupError
+  }
+
+  try {
+    await workerRuntimePool?.end()
+  } catch (poolError) {
+    if (!primaryError) primaryError = poolError
+  }
+
+  try {
+    await postgresPool.end()
+  } catch (poolError) {
+    if (!primaryError) primaryError = poolError
+  }
+}
+
+if (primaryError) throw primaryError
+if (!report) throw new Error('W02_RUNTIME_REHEARSAL_REPORT_NOT_CREATED')
+if (!cleanupVerified) throw new Error('W02_RUNTIME_REHEARSAL_CLEANUP_NOT_VERIFIED')
+
+mkdirSync(path.dirname(reportPath), { recursive: true })
+writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n')
+process.stdout.write(JSON.stringify(report, null, 2) + '\n')

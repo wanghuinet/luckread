@@ -1,0 +1,590 @@
+'use client'
+
+import { ChangeEvent, FormEvent, Fragment, useCallback, useEffect, useState } from 'react'
+
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+
+import CreatorContentOrganizationMembers from './CreatorContentOrganizationMembers'
+import styles from './creator-center.module.css'
+
+type OrganizationState =
+  | 'DRAFT'
+  | 'PENDING_REVIEW'
+  | 'REJECTED'
+  | 'APPROVED'
+  | 'SCHEDULED'
+  | 'PUBLISHED'
+  | 'UNPUBLISHED'
+  | 'ARCHIVED'
+  | 'DELETED'
+  | 'RESTORED'
+
+type OrganizationItem = {
+  id: string
+  state: OrganizationState
+  version: number
+  etag: string
+  title: string
+  description: string
+  coverRef?: string | null
+  updatedAt: string
+}
+
+type OrganizationPage = {
+  items: OrganizationItem[]
+  nextCursor: string | null
+  hasMore: boolean
+}
+
+type Kind = 'series' | 'collections'
+
+const kindMeta: Record<Kind, { label: string; eyebrow: string; singular: string; path: string }> = {
+  series: { label: '系列', eyebrow: 'SERIES', singular: '系列', path: '/api/v1/series' },
+  collections: { label: '合集', eyebrow: 'COLLECTION', singular: '合集', path: '/api/v1/collections' },
+}
+
+const emptyForm = {
+  title: '',
+  description: '',
+  coverRef: '',
+}
+
+function redirectToLogin(loginPath: '/admin/login' | '/login') {
+  const returnTo = window.location.pathname + window.location.search + window.location.hash
+  window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
+}
+
+async function readPage(
+  kind: Kind,
+  signal: AbortSignal,
+  loginPath: '/admin/login' | '/login',
+  cursor: string | null = null,
+) {
+  const params = new URLSearchParams({ limit: '20' })
+  if (cursor) params.set('cursor', cursor)
+  const { response, data } = await fetchJson<{ data?: OrganizationPage; error?: { message?: string } }>(
+    kindMeta[kind].path + '?' + params.toString(),
+    {
+      credentials: 'include',
+      headers: { accept: 'application/json' },
+      cache: 'no-store',
+      signal,
+    },
+  )
+  if (response.status === 401) {
+    redirectToLogin(loginPath)
+    throw new Error('AUTH_REQUIRED')
+  }
+  if (!response.ok || !data?.data || !Array.isArray(data.data.items)) {
+    throw new Error(getApiErrorMessage(data, 'ORGANIZATION_LOAD_FAILED'))
+  }
+  return data.data
+}
+
+export default function CreatorContentOrganization({
+  loginPath = '/login',
+}: {
+  loginPath?: '/admin/login' | '/login'
+}) {
+  const [kind, setKind] = useState<Kind>('series')
+  const [pages, setPages] = useState<Record<Kind, OrganizationPage>>({
+    series: { items: [], nextCursor: null, hasMore: false },
+    collections: { items: [], nextCursor: null, hasMore: false },
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [form, setForm] = useState(emptyForm)
+  const [formOpen, setFormOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [actionId, setActionId] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null)
+  const [editingOrganizationId, setEditingOrganizationId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState(emptyForm)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [coverUploading, setCoverUploading] = useState(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    let cancelled = false
+    void Promise.all([
+      readPage('series', controller.signal, loginPath),
+      readPage('collections', controller.signal, loginPath),
+    ])
+      .then(([series, collections]) => {
+        if (cancelled) return
+        setPages({ series, collections })
+        setError('')
+      })
+      .catch((cause: unknown) => {
+        if (cancelled || controller.signal.aborted) return
+        setError(cause instanceof Error && cause.message === 'AUTH_REQUIRED' ? '' : '系列与合集暂时无法加载。')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [loginPath, reloadKey])
+
+  async function loadMoreOrganizations() {
+    const page = pages[kind]
+    if (!page.hasMore || !page.nextCursor || loading || loadingMore) return
+    setLoadingMore(true)
+    setError('')
+    const controller = new AbortController()
+    try {
+      const next = await readPage(kind, controller.signal, loginPath, page.nextCursor)
+      if (controller.signal.aborted) return
+      setPages((current) => ({
+        ...current,
+        [kind]: {
+          items: [...current[kind].items, ...next.items],
+          nextCursor: next.nextCursor,
+          hasMore: next.hasMore,
+        },
+      }))
+    } catch (cause) {
+      if (controller.signal.aborted) return
+      if (cause instanceof Error && cause.message === 'AUTH_REQUIRED') return
+      setError(cause instanceof Error ? cause.message : '更多内容组织暂时无法加载。')
+    } finally {
+      if (!controller.signal.aborted) setLoadingMore(false)
+      controller.abort()
+    }
+  }
+
+  function openCreate(nextKind: Kind) {
+    setKind(nextKind)
+    setForm(emptyForm)
+    setFormOpen(true)
+  }
+
+  async function createOrganization(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!form.title.trim() || saving) return
+
+    setSaving(true)
+    setError('')
+    try {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>(kindMeta[kind].path, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'Idempotency-Key': 'content-organization:' + crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          title: form.title.trim(),
+          description: form.description.trim(),
+          coverRef: form.coverRef.trim() ? form.coverRef.trim() : null,
+        }),
+      })
+      if (response.status === 401) {
+        redirectToLogin(loginPath)
+        return
+      }
+      if (!response.ok) throw new Error(getApiErrorMessage(data, '创建失败'))
+      setFormOpen(false)
+      setForm(emptyForm)
+      setReloadKey((value) => value + 1)
+    } catch (cause) {
+      if (cause instanceof Error && cause.message === 'AUTH_REQUIRED') return
+      setError(cause instanceof Error ? cause.message : '创建失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function openEdit(item: OrganizationItem) {
+    setEditingOrganizationId(item.id)
+    setEditForm({
+      title: item.title,
+      description: item.description,
+      coverRef: item.coverRef ?? '',
+    })
+    setError('')
+  }
+
+  function closeEdit() {
+    if (savingEdit) return
+    setEditingOrganizationId(null)
+    setEditForm(emptyForm)
+  }
+
+  async function uploadOrganizationCover(event: ChangeEvent<HTMLInputElement>, target: 'create' | 'edit') {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('组织封面必须是图片文件。')
+      return
+    }
+
+    setCoverUploading(true)
+    setError('')
+    try {
+      const formData = new FormData()
+      formData.append('_payload', JSON.stringify({ alt: file.name }))
+      formData.append('file', file)
+      const { response, data } = await fetchJson<{ doc?: { url?: string }; url?: string; error?: { message?: string } }>('/api/v1/media', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Idempotency-Key': 'content-organization-cover-upload:' + crypto.randomUUID() },
+        body: formData,
+      })
+      if (response.status === 401) {
+        redirectToLogin(loginPath)
+        return
+      }
+      const url = data?.doc?.url ?? data?.url
+      if (!response.ok || typeof url !== 'string' || !url) {
+        throw new Error(getApiErrorMessage(data, '组织封面上传失败'))
+      }
+      if (target === 'create') {
+        setForm((current) => ({ ...current, coverRef: url }))
+      } else {
+        setEditForm((current) => ({ ...current, coverRef: url }))
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '组织封面上传失败')
+    } finally {
+      setCoverUploading(false)
+    }
+  }
+
+  async function updateOrganization(item: OrganizationItem, event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editForm.title.trim() || savingEdit || coverUploading) return
+
+    setSavingEdit(true)
+    setError('')
+    try {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>(kindMeta[kind].path + '/' + encodeURIComponent(item.id), {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'If-Match': item.etag,
+          'Idempotency-Key': 'content-organization-update:' + crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          title: editForm.title.trim(),
+          description: editForm.description.trim(),
+          coverRef: editForm.coverRef.trim() ? editForm.coverRef.trim() : null,
+        }),
+      })
+      if (response.status === 401) {
+        redirectToLogin(loginPath)
+        return
+      }
+      if (!response.ok) throw new Error(getApiErrorMessage(data, '保存失败'))
+      setEditingOrganizationId(null)
+      setEditForm(emptyForm)
+      setSelectedOrganizationId(null)
+      setReloadKey((value) => value + 1)
+    } catch (cause) {
+      if (cause instanceof Error && cause.message === 'AUTH_REQUIRED') return
+      setError(cause instanceof Error ? cause.message : '保存失败')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  async function deleteOrganization(item: OrganizationItem) {
+    if (actionId || !window.confirm('确定删除“' + item.title + '”吗？')) return
+
+    setActionId(item.id)
+    setError('')
+    try {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>(kindMeta[kind].path + '/' + encodeURIComponent(item.id), {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'If-Match': item.etag,
+          'Idempotency-Key': 'content-organization-delete:' + crypto.randomUUID(),
+        },
+      })
+      if (response.status === 401) {
+        redirectToLogin(loginPath)
+        return
+      }
+      if (!response.ok) throw new Error(getApiErrorMessage(data, '删除失败'))
+      setReloadKey((value) => value + 1)
+    } catch (cause) {
+      if (cause instanceof Error && cause.message === 'AUTH_REQUIRED') return
+      setError(cause instanceof Error ? cause.message : '删除失败')
+    } finally {
+      setActionId(null)
+    }
+  }
+
+  const activePage = pages[kind]
+  const activeMeta = kindMeta[kind]
+  const handleOrganizationChanged = useCallback((organizationId: string, etag: string, version: number) => {
+    setPages((current) => ({
+      ...current,
+      [kind]: {
+        ...current[kind],
+        items: current[kind].items.map((item) =>
+          item.id === organizationId ? { ...item, etag, version } : item,
+        ),
+      },
+    }))
+  }, [kind])
+
+  return (
+    <section className={styles.sectionBlock} id="content-organization">
+      <div className={styles.sectionTitle}>
+        <div>
+          <span className={styles.eyebrow}>CONTENT ORGANIZATION</span>
+          <h2>系列与合集</h2>
+          <p>直接使用 W03 Content 的 Series / Collection 权威数据，不在 Creator Studio 复制另一套内容关系。</p>
+        </div>
+        <div className={styles.sectionActions}>
+          <button className={styles.secondaryButton + ' btn'} onClick={() => openCreate('series')} type="button">新建系列</button>
+          <button className={styles.secondaryButton + ' btn'} onClick={() => openCreate('collections')} type="button">新建合集</button>
+          {activePage.hasMore ? (
+            <button
+              className={styles.secondaryButton + ' btn'}
+              disabled={loadingMore || loading}
+              onClick={() => void loadMoreOrganizations()}
+              type="button"
+            >
+              {loadingMore ? '加载中…' : '加载更多'}
+            </button>
+          ) : null}
+          <button className={styles.secondaryButton + ' btn'} onClick={() => setReloadKey((value) => value + 1)} type="button">刷新</button>
+        </div>
+      </div>
+
+      {formOpen ? (
+        <form className={styles.audiencePanel} onSubmit={createOrganization}>
+          <div className={styles.audienceListHeader}>
+            <strong>新建{activeMeta.singular}</strong>
+            <button className={styles.secondaryButton + ' btn'} onClick={() => setFormOpen(false)} type="button">取消</button>
+          </div>
+          <label className={styles.filterSelect}>
+            <span>类型</span>
+            <select onChange={(event) => setKind(event.target.value as Kind)} value={kind}>
+              <option value="series">系列</option>
+              <option value="collections">合集</option>
+            </select>
+          </label>
+          <label className={styles.filterSelect}>
+            <span>名称</span>
+            <input
+              maxLength={256}
+              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+              placeholder={'输入' + activeMeta.singular + '名称'}
+              value={form.title}
+            />
+          </label>
+          <label className={styles.filterSelect}>
+            <span>简介</span>
+            <textarea
+              maxLength={2000}
+              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+              placeholder="可选：写一句简介"
+              rows={3}
+              value={form.description}
+            />
+          </label>
+          <div className={styles.filterSelect}>
+            <span>封面</span>
+            {form.coverRef ? (
+              <div className={styles.contentListThumb}>
+                <img alt={activeMeta.singular + '封面预览'} loading="lazy" src={form.coverRef} />
+              </div>
+            ) : (
+              <span>尚未设置封面</span>
+            )}
+            <div className={styles.sectionActions}>
+              <label className={styles.secondaryButton + ' btn'}>
+                <span>{coverUploading ? '上传中…' : '上传图片封面'}</span>
+                <input
+                  accept="image/*"
+                  disabled={coverUploading || saving}
+                  hidden
+                  onChange={(event) => void uploadOrganizationCover(event, 'create')}
+                  type="file"
+                />
+              </label>
+              {form.coverRef ? (
+                <button
+                  className={styles.secondaryButton + ' btn'}
+                  disabled={coverUploading || saving}
+                  onClick={() => setForm((current) => ({ ...current, coverRef: '' }))}
+                  type="button"
+                >
+                  清除封面
+                </button>
+              ) : null}
+            </div>
+          </div>
+          <button className={styles.primaryButton + ' btn'} disabled={!form.title.trim() || saving || coverUploading} type="submit">
+            {saving ? '创建中…' : '创建'}
+          </button>
+        </form>
+      ) : null}
+
+      {error ? <div className={styles.audienceState} role="alert">{error}</div> : null}
+
+      <div className={styles.audienceTabs} role="tablist" aria-label="内容组织类型">
+        {(['series', 'collections'] as Kind[]).map((value) => (
+          <button
+            aria-selected={kind === value}
+            className={kind === value ? styles.audienceTabActive : styles.audienceTab}
+            key={value}
+            onClick={() => { setKind(value); setSelectedOrganizationId(null) }}
+            role="tab"
+            type="button"
+          >
+            {kindMeta[value].label} <span>{pages[value].items.length}{pages[value].hasMore ? '+' : ''}</span>
+          </button>
+        ))}
+      </div>
+
+      {loading ? <p className={styles.audienceState} role="status">正在加载系列与合集…</p> : null}
+
+      {!loading && activePage.items.length === 0 ? (
+        <div className={styles.contentManageEmpty}>
+          <strong>还没有{activeMeta.label}</strong>
+          <span>创建后可继续进入成员与顺序管理。</span>
+        </div>
+      ) : null}
+
+      {!loading && activePage.items.length > 0 ? (
+        <div className={styles.audienceList}>
+          {activePage.items.map((item) => (
+            <Fragment key={item.id}>
+              <article className={styles.contentListItem}>
+              {item.coverRef ? (
+                <div className={styles.contentListThumb} aria-hidden="true">
+                  <img alt="" loading="lazy" src={item.coverRef} />
+                </div>
+              ) : null}
+              <div className={styles.contentListMain}>
+                <div className={styles.contentMeta}>
+                  <span>{activeMeta.label}</span>
+                  <span>{item.state}</span>
+                  <span>v{item.version}</span>
+                </div>
+                <h3>{item.title}</h3>
+                {item.description ? <p>{item.description}</p> : null}
+                <time dateTime={item.updatedAt}>
+                  更新于 {new Date(item.updatedAt).toLocaleString('zh-CN', { hour12: false })}
+                </time>
+              </div>
+              <div className={styles.contentListActions}>
+                <button
+                  className={styles.secondaryButton}
+                  disabled={actionId !== null || !['DRAFT', 'REJECTED', 'UNPUBLISHED', 'RESTORED'].includes(item.state)}
+                  onClick={() => openEdit(item)}
+                  type="button"
+                >
+                  编辑
+                </button>
+                <button
+                  className={styles.secondaryButton}
+                  disabled={actionId !== null}
+                  onClick={() => setSelectedOrganizationId((current) => current === item.id ? null : item.id)}
+                  type="button"
+                >
+                  {selectedOrganizationId === item.id ? '收起成员' : '成员管理'}
+                </button>
+                <button
+                  className={styles.secondaryButton}
+                  disabled={actionId !== null}
+                  onClick={() => void deleteOrganization(item)}
+                  type="button"
+                >
+                  {actionId === item.id ? '处理中…' : '删除'}
+                </button>
+              </div>
+              </article>
+              {editingOrganizationId === item.id ? (
+                <form className={styles.audiencePanel} onSubmit={(event) => void updateOrganization(item, event)}>
+                  <div className={styles.audienceListHeader}>
+                    <strong>编辑{activeMeta.singular}</strong>
+                    <button className={styles.secondaryButton + ' btn'} disabled={savingEdit} onClick={closeEdit} type="button">取消</button>
+                  </div>
+                  <label className={styles.filterSelect}>
+                    <span>名称</span>
+                    <input
+                      autoFocus
+                      maxLength={512}
+                      onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))}
+                      value={editForm.title}
+                    />
+                  </label>
+                  <label className={styles.filterSelect}>
+                    <span>简介</span>
+                    <textarea
+                      maxLength={4096}
+                      onChange={(event) => setEditForm((current) => ({ ...current, description: event.target.value }))}
+                      rows={3}
+                      value={editForm.description}
+                    />
+                  </label>
+                  <div className={styles.filterSelect}>
+                    <span>封面</span>
+                    {editForm.coverRef ? (
+                      <div className={styles.contentListThumb}>
+                        <img alt={activeMeta.singular + '封面预览'} loading="lazy" src={editForm.coverRef} />
+                      </div>
+                    ) : (
+                      <span>尚未设置封面</span>
+                    )}
+                    <div className={styles.sectionActions}>
+                      <label className={styles.secondaryButton + ' btn'}>
+                        <span>{coverUploading ? '上传中…' : '上传图片封面'}</span>
+                        <input
+                          accept="image/*"
+                          disabled={coverUploading || savingEdit}
+                          hidden
+                          onChange={(event) => void uploadOrganizationCover(event, 'edit')}
+                          type="file"
+                        />
+                      </label>
+                      {editForm.coverRef ? (
+                        <button
+                          className={styles.secondaryButton + ' btn'}
+                          disabled={coverUploading || savingEdit}
+                          onClick={() => setEditForm((current) => ({ ...current, coverRef: '' }))}
+                          type="button"
+                        >
+                          清除封面
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                  <button className={styles.primaryButton + ' btn'} disabled={!editForm.title.trim() || savingEdit || coverUploading} type="submit">
+                    {savingEdit ? '保存中…' : '保存'}
+                  </button>
+                </form>
+              ) : null}
+              {selectedOrganizationId === item.id ? (
+              <CreatorContentOrganizationMembers
+                key={item.id + ':' + item.etag}
+                kind={kind}
+                loginPath={loginPath}
+                onChanged={handleOrganizationChanged}
+                organization={item}
+              />
+            ) : null}
+            </Fragment>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  )
+}

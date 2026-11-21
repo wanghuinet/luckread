@@ -1,0 +1,531 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/candidates/pay-002/order-commerce-api.v1.json",
+  "title": "Commerce Purchase Order Create / Read API Candidate",
+  "version": "1.0.0",
+  "status": "CONTRACT_ADMITTED_RUNTIME_PENDING",
+  "operations": [
+    {
+      "operationId": "createCommerceOrder",
+      "method": "POST",
+      "path": "/commerce/orders",
+      "auth": {
+        "required": true,
+        "permission": "order.create",
+        "scope": "own",
+        "permissionStatus": "ADMITTED"
+      },
+      "request": {
+        "headers": {
+          "Idempotency-Key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "required": true
+          }
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "items"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 50,
+              "items": {
+                "type": "object",
+                "required": [
+                  "itemRef",
+                  "quantity"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "itemRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "Opaque item/offer reference. W07 must resolve item kind, version and current eligibility through the authoritative owner; client claims do not prove an item is purchasable."
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  }
+                }
+              }
+            }
+          },
+          "rules": [
+            "customerId, itemType, itemVersion, currency, prices, discount, tax, totals, payment status and provider identifiers are not accepted from the client.",
+            "Repeated itemRef entries in one request are rejected; clients must send one line with the combined quantity.",
+            "For idempotency hashing, unique items are sorted by itemRef using deterministic code-unit ordering; changing only the order of the items array does not change basket identity.",
+            "The same authenticated customer + operation + Idempotency-Key + semantic request hash replays the first completed response; key reuse with a different request hash is rejected.",
+            "This paid-checkout path rejects any zero-priced item and any computed order total below one minor currency unit until a separate zero-charge fulfillment contract is admitted.",
+            "Item kind, immutable item version, currency, unit price, discounts and tax are server-resolved. Unsupported or unresolved items fail closed."
+          ]
+        }
+      },
+      "success": {
+        "status": 201,
+        "idempotent": true,
+        "responseDTO": "CommerceOrderResponse"
+      },
+      "errors": [
+        "AUTH_REQUIRED",
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND",
+        "VALIDATION_FAILED",
+        "RATE_LIMITED",
+        "PRECONDITION_REQUIRED",
+        "IDEMPOTENCY_KEY_REUSE_CONFLICT",
+        "IDEMPOTENCY_IN_PROGRESS",
+        "CONFLICT",
+        "SERVICE_UNAVAILABLE"
+      ],
+      "auditRequired": true,
+      "concurrency": {
+        "strategy": "ATOMIC_CREATE_AND_IDEMPOTENCY_RECORD_IN_D1_04"
+      },
+      "candidateStatus": "CONTRACTED_PENDING_RUNTIME"
+    },
+    {
+      "operationId": "getCommerceOrder",
+      "method": "GET",
+      "path": "/commerce/orders/{orderId}",
+      "auth": {
+        "required": true,
+        "permission": "order.read",
+        "scope": "own",
+        "permissionStatus": "ADMITTED"
+      },
+      "request": {
+        "path": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "required": true
+          }
+        }
+      },
+      "success": {
+        "status": 200,
+        "responseDTO": "CommerceOrderResponse"
+      },
+      "errors": [
+        "AUTH_REQUIRED",
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND",
+        "VALIDATION_FAILED",
+        "RATE_LIMITED"
+      ],
+      "auditRequired": false,
+      "scopeRules": [
+        "Resource owner is bound to the authenticated server principal.",
+        "An inaccessible order is returned as RESOURCE_NOT_FOUND to avoid cross-owner resource enumeration."
+      ],
+      "candidateStatus": "CONTRACTED_PENDING_RUNTIME"
+    }
+  ],
+  "dtoSchemas": {
+    "CommerceOrderLineResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "itemRef",
+        "quantity",
+        "unitAmountMinor",
+        "lineSubtotalMinor",
+        "lineDiscountMinor",
+        "lineTaxMinor",
+        "lineTotalMinor"
+      ],
+      "properties": {
+        "itemRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "unitAmountMinor": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lineSubtotalMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lineDiscountMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lineTaxMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lineTotalMinor": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "invariants": [
+        "lineSubtotalMinor = unitAmountMinor * quantity",
+        "lineTotalMinor = lineSubtotalMinor - lineDiscountMinor + lineTaxMinor"
+      ]
+    },
+    "CommerceOrderData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "orderId",
+        "status",
+        "version",
+        "currency",
+        "subtotalMinor",
+        "discountMinor",
+        "taxMinor",
+        "totalMinor",
+        "items",
+        "createdAt",
+        "updatedAt"
+      ],
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "CREATED",
+            "PENDING_PAYMENT",
+            "CONFIRMED",
+            "PROCESSING",
+            "COMPLETED",
+            "CANCELLED",
+            "FAILED"
+          ]
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "subtotalMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "discountMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "taxMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalMinor": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/dtoSchemas/CommerceOrderLineResponse"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "invariants": [
+        "totalMinor = subtotalMinor - discountMinor + taxMinor",
+        "All amounts use integer minor units and one explicit currency."
+      ]
+    },
+    "CommerceOrderResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "data",
+        "requestId"
+      ],
+      "properties": {
+        "data": {
+          "$ref": "#/dtoSchemas/CommerceOrderData"
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "entityMappings": {
+    "version": "1.0.0",
+    "CommerceOrderResponse": {
+      "data": {
+        "kind": "nested-dto",
+        "dtoSchema": "CommerceOrderData"
+      },
+      "requestId": {
+        "kind": "transport-generated",
+        "source": "W07 response envelope",
+        "persisted": false
+      }
+    },
+    "CommerceOrderData": {
+      "orderId": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-ORDER-ID",
+        "table": "orders",
+        "column": "order_id"
+      },
+      "status": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-STATUS",
+        "table": "orders",
+        "column": "status"
+      },
+      "version": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-VERSION",
+        "table": "orders",
+        "column": "version"
+      },
+      "currency": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-CURRENCY",
+        "table": "orders",
+        "column": "currency"
+      },
+      "subtotalMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-SUBTOTAL-MINOR",
+        "table": "orders",
+        "column": "subtotal_minor"
+      },
+      "discountMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-DISCOUNT-MINOR",
+        "table": "orders",
+        "column": "discount_minor"
+      },
+      "taxMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-TAX-MINOR",
+        "table": "orders",
+        "column": "tax_minor"
+      },
+      "totalMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-TOTAL-MINOR",
+        "table": "orders",
+        "column": "total_minor"
+      },
+      "items": {
+        "kind": "related-entity-collection",
+        "entityId": "ENT-ORDER-LINE",
+        "table": "order_lines",
+        "parentTable": "orders",
+        "parentColumn": "order_id",
+        "childColumn": "order_id",
+        "dtoSchema": "CommerceOrderLineResponse",
+        "ordering": "order_line_id ASC"
+      },
+      "createdAt": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-CREATED-AT",
+        "table": "orders",
+        "column": "created_at"
+      },
+      "updatedAt": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-UPDATED-AT",
+        "table": "orders",
+        "column": "updated_at"
+      }
+    },
+    "CommerceOrderLineResponse": {
+      "itemRef": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-ITEM-REF",
+        "table": "order_lines",
+        "column": "item_ref"
+      },
+      "quantity": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-QUANTITY",
+        "table": "order_lines",
+        "column": "quantity"
+      },
+      "unitAmountMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-UNIT-AMOUNT-MINOR",
+        "table": "order_lines",
+        "column": "unit_amount_minor"
+      },
+      "lineSubtotalMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-LINE-SUBTOTAL-MINOR",
+        "table": "order_lines",
+        "column": "line_subtotal_minor"
+      },
+      "lineDiscountMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-LINE-DISCOUNT-MINOR",
+        "table": "order_lines",
+        "column": "line_discount_minor"
+      },
+      "lineTaxMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-LINE-TAX-MINOR",
+        "table": "order_lines",
+        "column": "line_tax_minor"
+      },
+      "lineTotalMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-LINE-TOTAL-MINOR",
+        "table": "order_lines",
+        "column": "line_total_minor"
+      }
+    },
+    "createRequest": {
+      "items[].itemRef": {
+        "kind": "authoritative-offer-resolution",
+        "source": "client DTO",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-ITEM-REF",
+        "table": "order_lines",
+        "column": "item_ref",
+        "persistedDirectly": false,
+        "requirement": "Resolve the current purchasable offer and immutable version before creating an OrderLine."
+      },
+      "items[].quantity": {
+        "kind": "validated-input",
+        "source": "client DTO",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-QUANTITY",
+        "table": "order_lines",
+        "column": "quantity",
+        "persistedAfterResolution": true
+      },
+      "Idempotency-Key": {
+        "kind": "idempotency-scope-key",
+        "source": "request header",
+        "table": "order_create_idempotency",
+        "customerScope": "authenticated principal",
+        "operationColumn": "operation_key",
+        "operationValue": "POST /v1/commerce/orders",
+        "keyColumn": "idempotency_key"
+      },
+      "customerId": {
+        "kind": "server-derived",
+        "source": "authenticated W01 principal",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-CUSTOMER-ID",
+        "table": "orders",
+        "column": "customer_id",
+        "clientSupplied": false,
+        "publicResponse": false
+      }
+    },
+    "excludedPersistenceFields": [
+      {
+        "source": "orders.customer_id",
+        "reason": "Server-side owner isolation only; never included in public Order DTOs."
+      },
+      {
+        "source": "orders.confirmed_at",
+        "reason": "Lifecycle audit field not included in the admitted response DTO."
+      },
+      {
+        "source": "orders.cancelled_at",
+        "reason": "Lifecycle audit field not included in the admitted response DTO."
+      },
+      {
+        "source": "orders.failure_code",
+        "reason": "Internal failure classification not included in the admitted response DTO."
+      },
+      {
+        "source": "order_lines.order_line_id",
+        "reason": "Internal persistence identity; the response DTO exposes no physical row identifier."
+      },
+      {
+        "source": "order_lines.item_type",
+        "reason": "Internal item classification; not exposed until a separate DTO admission."
+      },
+      {
+        "source": "order_lines.item_version",
+        "reason": "Immutable commercial version is kept as internal snapshot evidence."
+      },
+      {
+        "source": "order_lines.item_snapshot_json",
+        "reason": "Bounded internal commercial snapshot; not exposed as raw persistence JSON."
+      },
+      {
+        "source": "order_create_idempotency.*",
+        "reason": "Internal replay/recovery metadata; never returned as an entity or direct DTO field."
+      }
+    ]
+  },
+  "globalInvariants": [
+    "Canonical OpenAPI, operation policy and permission/role mapping are admitted; public runtime handlers remain disabled until PAY-002 item-resolution, persistence, idempotency and security evidence pass.",
+    "The /commerce/orders namespace intentionally separates purchase Orders from the existing OrderExecution confirm/cancel/execution routes defined by docs/127-COMMERCE-ORDER-FULFILLMENT-API-CONTRACT-v1.0.md.",
+    "D1-04 is the Order and financial-fact domain; D1-01 remains subscription and entitlement authority.",
+    "Provider references, raw webhook payloads, customerId, internal D1 columns, ledger rows and entitlement snapshots never appear in public DTOs.",
+    "No order is marked paid from client input. A paid state requires the admitted PAY-001 provider reconciliation contract.",
+    "No order create is admitted until W07 can resolve an authoritative purchasable item/offer and immutable price version."
+  ],
+  "greenEvidence": {
+    "canonicalOpenAPI": "required",
+    "operationPolicy": "required",
+    "permissionRegistry": "required",
+    "itemCatalogResolution": "required",
+    "entityFieldPersistenceMapping": "required",
+    "idempotencyReplayAndConflict": "required",
+    "antiAbuseAndBodyLimit": "required",
+    "runtimeSecurityConcurrencyE2E": "required",
+    "evidenceRegistry": "required"
+  },
+  "nonGoals": [
+    "Canonical OpenAPI is contractually admitted, but no public runtime route is enabled or deployed by this PR.",
+    "No database migration or remote D1 mutation.",
+    "No payment confirmation/capture, financial posting, refund, subscription mutation or entitlement grant.",
+    "No new Worker, D1, Queue, Service Binding, dependency or Payload Core modification.",
+    "This candidate remains outside executable route code; contract admission does not authorize runtime implementation or production writes."
+  ]
+}

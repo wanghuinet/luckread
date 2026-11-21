@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/alignment/feature-inventory.v1.schema.json",
+  "title": "Luckread Feature Inventory v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "status", "sourceOfTruth", "generatedBy", "features"],
+  "properties": {
+    "version": {"const": "1.0.0"},
+    "status": {"enum": ["DISCOVERED", "NOT_GREEN", "BLOCKED"]},
+    "sourceOfTruth": {"const": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"},
+    "generatedBy": {"type": "string", "minLength": 1},
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["featureId", "name", "sourceRef", "alignmentState"],
+        "properties": {
+          "featureId": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]+-[0-9]{3,}$"},
+          "name": {"type": "string", "minLength": 1},
+          "sourceRef": {"type": "string", "minLength": 1},
+          "alignmentState": {"enum": ["DISCOVERED", "MAPPED", "UNRESOLVED", "CONFLICT"]}
+        }
+      }
+    }
+  }
+}

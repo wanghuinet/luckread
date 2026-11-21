@@ -1,0 +1,77 @@
+{
+  "version": "1.0.0",
+  "auditType": "AUTH_002_E5_MIGRATION_SOURCE_AUTHORITY_AUDIT",
+  "generatedAt": "2026-09-20",
+  "repository": "wanghuinet/luckread",
+  "sourceHead": "6747007147920fa2b9d19b976fe1525bd5d19435",
+  "featureId": "AUTH-002",
+  "migrationId": "MIG-AUTH-002-SESSION-V1",
+  "target": {
+    "table": "auth_session_state",
+    "columns": [
+      "session_id",
+      "user_id",
+      "device_id",
+      "token_version",
+      "refresh_credential_hash",
+      "revoked_at",
+      "last_seen_at"
+    ],
+    "indexes": [
+      "auth_session_state_user_id_idx",
+      "auth_session_state_device_id_idx",
+      "auth_session_state_token_version_idx",
+      "auth_session_state_revoked_at_idx"
+    ]
+  },
+  "findings": [
+    {
+      "id": "E5-SRC-001",
+      "result": "NO_CURRENT_GENERATED_ADDITIVE_MIGRATION_SOURCE_FOUND",
+      "evidence": [
+        "workers/W01-payload/src/migrations/20250929_111647.ts",
+        "workers/W01-payload/src/migrations/index.ts",
+        "contracts/migration/AUTH-002-migration-generation-runbook.v1.md",
+        "contracts/migration/AUTH-002-migration-generation-admission.v1.md",
+        "contracts/migration/AUTH-002-006-migration-manifest.v1.json"
+      ],
+      "detail": "Current W01 committed migration source contains the existing Payload baseline migration only. The approved AUTH-002 extension migration is contracted but has no committed additive migration source."
+    },
+    {
+      "id": "E5-SRC-002",
+      "result": "GENERATED_FULL_SCHEMA_SNAPSHOT_REJECTED_FOR_ADDITIVE_USE",
+      "evidence": [
+        "docs/change-control/CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20.md"
+      ],
+      "detail": "The previously generated Payload migration artifact recreates existing Payload tables and therefore cannot be admitted as an additive second migration."
+    },
+    {
+      "id": "E5-SRC-003",
+      "result": "HAND_AUTHORED_DDL_NOT_ADMITTED",
+      "evidence": [
+        "contracts/migration/AUTH-002-migration-generation-runbook.v1.md",
+        "contracts/migration/AUTH-002-migration-generation-admission.v1.md"
+      ],
+      "detail": "Current migration governance requires generation from the frozen W01 configuration and approved contract input and explicitly rejects hand-authoring DDL."
+    },
+    {
+      "id": "E5-SRC-004",
+      "result": "NO_SECOND_SESSION_AUTHORITY",
+      "evidence": [
+        "contracts/persistence/AUTH-002-session-real-evidence-reconciliation.v1.md",
+        "contracts/persistence/AUTH-002-006-persistence-closure-contract.v1.md"
+      ],
+      "detail": "Introducing a Payload collection solely to force generation would create a new persisted authority and is not justified by the current contract."
+    }
+  ],
+  "disposition": "WAIT_AUTHORITY_DECISION",
+  "requiredDecision": "Explicitly admit a deterministic generation path for the contracted auth_session_state extension without creating a second business/session authority and without hand-authored DDL.",
+  "forbiddenActions": [
+    "hand-author ALTER/CREATE TABLE migration",
+    "add duplicate sessions collection/table merely to obtain generated SQL",
+    "modify Payload core",
+    "change canonical AUTH-002 contract by inference",
+    "apply remote D1 migration before the generation path is admitted and reviewed"
+  ],
+  "antiLoop": "Reuse this audit until the W01 migration source, AUTH-002 migration contract, or approved generation path changes."
+}

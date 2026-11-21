@@ -1,0 +1,58 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-09-21",
+  "sourceHead": "75d94885010d99c88764eaa2a00cf6d556ff1125",
+  "scope": "AUTH-002 E6 wire/input closure sufficiency audit",
+  "status": "BLOCKED_INPUTS_CONFIRMED",
+  "antiLoop": true,
+  "E6_WIRE_001": {
+    "status": "OPEN",
+    "conclusion": "No existing exact canonical refresh Request/Response/Error Wire Schema was found. The current OpenAPI entry exists only as DISCOVERY_DRAFT.",
+    "reusableAuthorityFound": [
+      "auth-operation-policy.v1.json: operation, method/path, auth mode, permission, resource and security policy",
+      "authLogin OpenAPI response: accessToken, refreshToken, expiresIn, layer (not a separate refresh-operation contract)"
+    ],
+    "missingInputs": [
+      "canonical request DTO identity and exact request schema",
+      "canonical response DTO identity and exact response schema",
+      "canonical error DTO/status mapping for expiry, revocation and reuse",
+      "exact refresh credential carrier semantics",
+      "explicit route admission from DISCOVERY_DRAFT to canonical Wire Authority"
+    ],
+    "prohibitedInference": [
+      "Do not synthesize refresh schema from authLogin response",
+      "Do not synthesize from Payload native refresh behavior",
+      "Do not promote the current Discovery Draft to canonical Wire Authority"
+    ],
+    "pathBaseNormalization": {
+      "status": "PASS_VERIFIED",
+      "evidence": "artifacts/mapping-0/b01-api-path-normalization-audit-2026-09-20.json",
+      "rule": "API Inventory /v1/auth/refresh; OpenAPI server /api/v1 + operation path /auth/refresh; Auth Policy /auth/refresh are representation layers, not alternate routes.",
+      "activeBlocker": false
+    }
+  },
+  "E6_WIRE_002": {
+    "status": "OPEN",
+    "conclusion": "No existing AUTH-002 contract defines the source or transport for ENT-SESSION-F-DEVICE-ID. ENT-DEVICE-RECORD is PROPOSED with no field contract and cannot fill the gap.",
+    "reusableAuthorityFound": [
+      "AUTH-002 session field contract: deviceId is required, immutable and privacy-sensitive",
+      "AUTH-002 minimum integration contract: device binding is required and must be privacy-safe/server-bound",
+      "L5/L6 registry: session-device-bind-01 and device lifecycle capabilities (not a transport/source contract)"
+    ],
+    "missingInputs": [
+      "authoritative device-binding source",
+      "transport semantics at login/session issuance",
+      "ownership/control semantics for the bound value"
+    ],
+    "prohibitedInference": [
+      "Do not invent X-Device-Id",
+      "Do not add login request deviceId by inference",
+      "Do not derive from IP, User-Agent, fingerprint, cookie or other uncontracted attributes",
+      "Do not create ENT-DEVICE-RECORD solely to close this gap"
+    ]
+  },
+  "decision": "Two blockers remain genuine contract-input gaps. API path/base-path normalization itself is resolved and is no longer an E6 blocker.",
+  "noRuntimeCodeChange": true,
+  "noD1Mutation": true,
+  "noMappingPromotion": true
+}

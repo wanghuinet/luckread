@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/capability/feature-entity-persistence-registry.v1.schema.json",
+  "title": "Luckread Feature Entity Persistence Registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "status", "sourceOfTruth", "records"],
+  "properties": {
+    "version": {"const": "1.0"},
+    "status": {"enum": ["NOT_GREEN", "GREEN"]},
+    "sourceOfTruth": {"const": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"},
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["featureId", "domainId", "entityIds", "persistenceMode", "owner", "status", "evidenceRefs"],
+        "properties": {
+          "featureId": {"type": "string", "pattern": "^[A-Z][A-Z0-9]+-\\d+$"},
+          "domainId": {"type": "string", "minLength": 1},
+          "entityIds": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+          "persistenceMode": {"enum": ["NONE", "PAYLOAD_NATIVE", "LUCKREAD_EXTENSION", "DERIVED", "MIXED", "UNKNOWN"]},
+          "owner": {"type": "string", "minLength": 1},
+          "status": {"enum": ["UNMAPPED", "MAPPED", "VERIFIED", "BLOCKED"]},
+          "evidenceRefs": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true}
+        }
+      }
+    }
+  }
+}

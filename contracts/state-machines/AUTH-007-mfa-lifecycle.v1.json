@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/state-machines/AUTH-007-mfa-lifecycle.v1.json",
+  "title": "AUTH-007 MFA Factor, Challenge and Recovery Lifecycle",
+  "type": "object",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureId": "AUTH-007",
+  "x-luckread": {
+    "authoritativeWorker": "W02-identity",
+    "publicBoundary": "W01-payload",
+    "persistenceAuthority": "D1-01",
+    "directFrontendDatabaseAccess": false,
+    "stateDomains": [
+      {
+        "name": "factor",
+        "stateSource": "user.two_factor_enabled + user.mfa_enrolled_at + twoFactor.verified + twoFactor.lockedUntil",
+        "states": [
+          "DISABLED",
+          "PENDING_VERIFICATION",
+          "ENABLED",
+          "LOCKED"
+        ],
+        "derivedStateRules": [
+          {
+            "state": "DISABLED",
+            "when": "two_factor_enabled=0 and no verified factor is authoritative"
+          },
+          {
+            "state": "PENDING_VERIFICATION",
+            "when": "a factor exists with verified=0; this state grants no MFA assurance"
+          },
+          {
+            "state": "ENABLED",
+            "when": "two_factor_enabled=1 AND verified=1 AND mfa_enrolled_at is a valid timestamp AND lockedUntil is absent or expired"
+          },
+          {
+            "state": "LOCKED",
+            "when": "the authoritative factor has a future lockedUntil; verification must fail closed until lock expiry"
+          }
+        ]
+      },
+      {
+        "name": "signInChallenge",
+        "stateSource": "Better Auth signed two_factor challenge cookie and its server-side verification record",
+        "states": [
+          "ISSUED",
+          "CONSUMED",
+          "EXPIRED",
+          "REJECTED"
+        ],
+        "derivedStateRules": [
+          {
+            "state": "ISSUED",
+            "when": "a signed, identity-bound, purpose-bound challenge exists and has not expired or been consumed"
+          },
+          {
+            "state": "CONSUMED",
+            "when": "one valid TOTP or recovery-code verification completes the challenge exactly once"
+          },
+          {
+            "state": "EXPIRED",
+            "when": "the challenge expiry timestamp is not later than the authoritative current time"
+          },
+          {
+            "state": "REJECTED",
+            "when": "identity, account state, factor, code, replay guard, or challenge validation fails"
+          }
+        ]
+      }
+    ],
+    "securityInvariants": [
+      "Only W02 derives factor state from authoritative D1-01 records.",
+      "A pending or unverified factor never satisfies the L5-L8 MFA gate.",
+      "A privileged session must be created after verified MFA activation; pre-existing sessions are revoked on enable and disable.",
+      "Every accepted TOTP time-step is atomically consumed once per factor.",
+      "A sign-in challenge is identity-bound, purpose-bound, short-lived and single-use.",
+      "Recovery codes are encrypted at rest, consumed once, and replaced atomically on rotation.",
+      "Disable and recovery-code rotation require current-password reauthentication and valid TOTP step-up.",
+      "No client-supplied subject, role, layer, assurance flag, factor status, or challenge status is trusted.",
+      "MFA responses are no-store; factor secrets, plaintext recovery codes after issuance, replay state and lockout internals never appear in public DTOs."
+    ]
+  },
+  "x-transitions": [
+    {
+      "domain": "factor",
+      "from": "DISABLED",
+      "to": "PENDING_VERIFICATION",
+      "actor": "authenticated_active_user",
+      "guards": [
+        "current_password_valid",
+        "W01_service_boundary",
+        "Idempotency-Key valid",
+        "no already-enabled or verified factor"
+      ],
+      "effects": [
+        "create exactly one pending TOTP factor",
+        "return provisioning URI and recovery codes once",
+        "keep privileged MFA assurance false"
+      ]
+    },
+    {
+      "domain": "factor",
+      "from": "PENDING_VERIFICATION",
+      "to": "ENABLED",
+      "actor": "authenticated_active_user",
+      "guards": [
+        "six_digit_TOTP_valid",
+        "TOTP_time_step_atomically_consumed",
+        "factor belongs to authenticated subject",
+        "authoritative read-back shows enabled=1, verified=1 and a valid enrollment timestamp"
+      ],
+      "effects": [
+        "mark the same factor verified",
+        "stamp enrollment time",
+        "revoke all pre-existing sessions",
+        "require a fresh login before privileged authority is restored"
+      ]
+    },
+    {
+      "domain": "factor",
+      "from": "ENABLED",
+      "to": "DISABLED",
+      "actor": "authenticated_active_user",
+      "guards": [
+        "current_password_valid",
+        "valid TOTP step-up",
+        "account state ACTIVE"
+      ],
+      "effects": [
+        "remove or disable the current factor",
+        "clear the enrollment timestamp and pending idempotency markers",
+        "revoke all existing sessions",
+        "deny privileged authority until MFA is re-enrolled and verified"
+      ]
+    },
+    {
+      "domain": "factor",
+      "from": "ENABLED",
+      "to": "ENABLED",
+      "transition": "rotate_recovery_codes",
+      "actor": "authenticated_active_user",
+      "guards": [
+        "current_password_valid",
+        "valid TOTP step-up",
+        "account state ACTIVE"
+      ],
+      "effects": [
+        "atomically replace the full recovery-code set",
+        "invalidate every prior recovery code",
+        "return the new plaintext set exactly once",
+        "never return stored recovery-code material in status or audit responses"
+      ]
+    },
+    {
+      "domain": "signInChallenge",
+      "from": "ISSUED",
+      "to": "CONSUMED",
+      "actor": "anonymous_challenged_identity",
+      "guards": [
+        "valid signed two_factor challenge",
+        "challenge unexpired and bound to this identity",
+        "account state ACTIVE",
+        "valid fresh TOTP time-step or unused recovery code",
+        "trust-device bypass not requested or accepted"
+      ],
+      "effects": [
+        "consume the challenge and factor proof once",
+        "issue the authenticated browser cookie or native session header only",
+        "never include the session credential in JSON"
+      ]
+    },
+    {
+      "domain": "signInChallenge",
+      "from": "ISSUED",
+      "to": "EXPIRED",
+      "actor": "system",
+      "guards": [
+        "challenge expiry timestamp reached"
+      ],
+      "effects": [
+        "deny authentication",
+        "do not issue a session credential"
+      ]
+    },
+    {
+      "domain": "signInChallenge",
+      "from": "ISSUED",
+      "to": "REJECTED",
+      "actor": "system",
+      "guards": [
+        "invalid code, inactive account, replay, malformed challenge or exhausted attempt budget"
+      ],
+      "effects": [
+        "deny authentication",
+        "increment or honor authoritative attempt/lockout controls",
+        "return a bounded public error without factor or account-enumeration details"
+      ]
+    }
+  ],
+  "x-forbidden": [
+    {
+      "domain": "factor",
+      "from": "DISABLED",
+      "to": "ENABLED",
+      "reason": "MFA cannot become effective without successful verification of the pending factor."
+    },
+    {
+      "domain": "signInChallenge",
+      "from": "CONSUMED",
+      "to": "CONSUMED",
+      "reason": "challenge replay is forbidden."
+    },
+    {
+      "domain": "signInChallenge",
+      "from": "EXPIRED",
+      "to": "CONSUMED",
+      "reason": "expired challenges cannot authenticate."
+    },
+    {
+      "domain": "signInChallenge",
+      "from": "REJECTED",
+      "to": "CONSUMED",
+      "reason": "a rejected challenge cannot later be reused."
+    }
+  ],
+  "x-guarded-forbidden": [
+    {
+      "domain": "factor",
+      "from": "PENDING_VERIFICATION",
+      "to": "ENABLED",
+      "unless": [
+        "server-verified six-digit TOTP",
+        "atomic TOTP time-step replay guard accepted",
+        "same authenticated factor and ACTIVE identity read back"
+      ],
+      "reason": "The conditional transition is allowed only with the listed guards; client-supplied assurance flags never satisfy them."
+    },
+    {
+      "domain": "factor",
+      "from": "ENABLED",
+      "to": "DISABLED",
+      "unless": [
+        "current-password reauthentication",
+        "valid TOTP step-up",
+        "ACTIVE account state"
+      ],
+      "reason": "Disable is denied unless all step-up and account-state checks succeed."
+    }
+  ],
+  "reconciliation": {
+    "contractRefs": [
+      "contracts/api/AUTH-007-mfa-totp-contract.v1.json",
+      "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+      "contracts/api/auth-operation-policy.v1.json",
+      "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+      "workers/W02-identity/src/auth/totp-replay-guard.ts"
+    ],
+    "statusRule": "This state machine is contracted but not verified until production D1 migration/read-back, live W01/W02 integration, positive/negative/replay/concurrency security E2E, audit-event admission and final Mapping 0 evidence are accepted.",
+    "note": "This contract describes the intended factor/challenge transitions; it does not assert that production schema or runtime acceptance has already occurred."
+  }
+}

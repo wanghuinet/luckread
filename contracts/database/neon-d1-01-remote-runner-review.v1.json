@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-01-remote-runner-review.v1.json",
+  "version": "1.0.0",
+  "status": "AI_REVIEW_PASS_NO_BLOCKING_FINDINGS",
+  "repository": "wanghuinet/luckread",
+  "target": {
+    "domainId": "D1-01",
+    "databaseName": "luckread",
+    "postgresMajor": 18,
+    "scope": "schema-only",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "review": {
+    "reviewer": "GPT-6",
+    "reviewType": "GPT-6 code-path audit plus current-SHA CI evidence reconciliation",
+    "reviewedAt": "2026-11-18",
+    "reviewedMainSha": "f0b7bba6641663b5d2e403ac4de74e263d3dc060",
+    "implementationMergeSha": "62e2a8264cc0c6c128a2290e281dba16a8257d6e",
+    "postflightTargetFixMergeSha": "c57fe841bb861c9310c361266396f9ffe6a00de1",
+    "result": "NO_BLOCKING_FINDINGS",
+    "reviewedFiles": [
+      {
+        "path": ".github/workflows/neon-d1-01-full-local-rehearsal.yml",
+        "gitBlobSha1": "0c118fed0b9d94ad86346122edf0fb651ef9cc12"
+      },
+      {
+        "path": ".github/workflows/neon-d1-01-migration-ledger.yml",
+        "gitBlobSha1": "a014ec0480c23471707f61361e62f6b58456e90a"
+      },
+      {
+        "path": ".github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml",
+        "gitBlobSha1": "00d4acb8ac2bb26c3248caebcdfef550a5075a6a"
+      },
+      {
+        "path": ".github/workflows/neon-w01-payload-postgres-runtime-rehearsal.yml",
+        "gitBlobSha1": "14f290497d4177f47d07872bed58482b3a874647"
+      },
+      {
+        "path": ".github/workflows/w01-auth-me-import-verification.yml",
+        "gitBlobSha1": "1b14e7a1ba11e8b47296cb4c2f76beb223bbcdb7"
+      },
+      {
+        "path": "contracts/database/neon-d1-01-migration-manifest.v1.json",
+        "gitBlobSha1": "71ad261a25671cbc6b050cb0b29c4f38c8adf348"
+      },
+      {
+        "path": "contracts/database/neon-schema-migration-ledger.v1.json",
+        "gitBlobSha1": "8e0ed38ab3d30fa9994a80cb0361f914bf51f5f0"
+      },
+      {
+        "path": "scripts/neon/assert-d1-01-migration-ledger-ready.mjs",
+        "gitBlobSha1": "9079276205d81fe1e9224a7e04602908822c057c"
+      },
+      {
+        "path": "scripts/neon/d1-01-migration-manifest.mjs",
+        "gitBlobSha1": "28d509d18669dd6d2da143df58e8949bbcb87191"
+      },
+      {
+        "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
+        "gitBlobSha1": "b8cdec415ee4106d0b0618197b12b61d8656a2c9"
+      },
+      {
+        "path": "scripts/neon/d1-01/verify-combined-local-rehearsal.mjs",
+        "gitBlobSha1": "b002a89f6e8f9dafc67bb7e74b9ef408719b7c7f"
+      },
+      {
+        "path": "scripts/neon/plan-d1-01-schema-migrations.mjs",
+        "gitBlobSha1": "651e318e744d5b8ec513e9ad4e6f010273e94e07"
+      },
+      {
+        "path": "scripts/neon/plan-d1-01-schema-migrations.test.mjs",
+        "gitBlobSha1": "45be1292046aa94f91c4fc6cef02b0e20a0c6718"
+      },
+      {
+        "path": "scripts/neon/remote-runner-review.mjs",
+        "gitBlobSha1": "149fc4b626d89b553c451513f1a7892ed84ca045"
+      },
+      {
+        "path": "scripts/neon/remote-runner-review.test.mjs",
+        "gitBlobSha1": "2adc585ff515c961af10810c258955b0585be4a7"
+      },
+      {
+        "path": "scripts/neon/run-schema-migrations.mjs",
+        "gitBlobSha1": "8c1f1efef8a5789e8ab1103352a2b6223b9c63bc"
+      },
+      {
+        "path": "scripts/neon/run-schema-migrations.test.mjs",
+        "gitBlobSha1": "c5c91870d9d7f2f1dbc467014ef12d06eda8722d"
+      },
+      {
+        "path": "workers/W01-payload/scripts/neon/rehearse-auth001-registration-neon-postgres-runtime.mjs",
+        "gitBlobSha1": "5b4f6c00378f217fd2a6f76fe0519792366432b1"
+      },
+      {
+        "path": "workers/W01-payload/src/app/auth/register/route.ts",
+        "gitBlobSha1": "bfc5b15c24ed9b69eb78e64f34482acac85d09bd"
+      },
+      {
+        "path": "workers/W01-payload/src/auth/registration-persistence.ts",
+        "gitBlobSha1": "4ee38a33868b0c7fd779eb58f314ef59086c9bd2"
+      },
+      {
+        "path": "workers/W01-payload/src/migrations/20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts",
+        "gitBlobSha1": "77ae87a7ecb6275d64c149b02347d1e4464491cc"
+      },
+      {
+        "path": "workers/W01-payload/src/neon-postgres-migrations-d1-01/0001_w01_auth001_registration_batch.sql",
+        "gitBlobSha1": "849545097a33ccebcc28b6fdddc340cbbde9a0d2"
+      },
+      {
+        "path": "workers/W01-payload/src/types/pg.d.ts",
+        "gitBlobSha1": "6f47e0a98cbc16ab0584ed9ebba18fd67f709b92"
+      },
+      {
+        "path": "workers/W01-payload/src/auth/w02-session-client.ts",
+        "gitBlobSha1": "3ef07386cc4ca6a4b787369a938b3e644328bc12"
+      },
+      {
+        "path": "workers/W01-payload/tests/int/auth-registration-idempotency.int.spec.ts",
+        "gitBlobSha1": "86885de99023038a1055e048317eadcf843d4088"
+      },
+      {
+        "path": "workers/W02-identity/src/index.ts",
+        "gitBlobSha1": "30913059d04d6e13146970209921cc7ccf024120"
+      },
+      {
+        "path": "workers/W02-identity/src/neon/registration-rollback-postgres.ts",
+        "gitBlobSha1": "6b77b983b65e9c0b491da4c3c8aa0bb0037380ac"
+      },
+      {
+        "path": "workers/W02-identity/src/neon/runtime.ts",
+        "gitBlobSha1": "b696cce0f890b017b3f28862154bfd4a41d3f2c7"
+      },
+      {
+        "path": "workers/W02-identity/src/auth/registration-identity-confirmation-route.test.ts",
+        "gitBlobSha1": "b9661f2b48f1f7c8cc5adab49c31756e2b195bff"
+      }
+    ],
+    "controlsChecked": [
+      "remote target host/database/port allowlist and PostgreSQL 18 identity guard",
+      "TLS verify-full, certificate/hostname validation and channel binding requirement",
+      "main-only workflow_dispatch and exact D1-01 confirmation token",
+      "transaction-scoped advisory lock held for the complete migration run",
+      "W01 Payload baseline is reconciled and recorded; it is not replayed by the shared SQL executor",
+      "strict ordered manifest, artifact and manifest-entry checksums, and ordered ledger-prefix validation",
+      "one PostgreSQL transaction per SQL migration including its ledger insert",
+      "retry resumes only from an exact successful ledger prefix",
+      "append-only migration provenance ledger and owner/database constraints",
+      "postflight ownership, schema, extension and empty-business-table checks",
+      "no Cloudflare D1 mutation, business data import, or production cutover",
+      "the shared ledger contract remains globally remoteApplyReady=false; D1-01 and D1-02 are independently reviewed and eligible, while D1-03 through D1-05 remain NOT_IMPLEMENTED and blocked",
+      "D1-02's separate review record, exact target, source blob pins and release state are reconciled; D1-01 remains valid after D1-02 is released."
+    ],
+    "findings": [],
+    "limitations": [
+      "PR #1629 and PR #1630 have no submitted GitHub review records; this is a GPT-6 code review record, not a human approval or GitHub APPROVE review.",
+      "The same GPT-6 agent authored the D1-01 release-gate patch and performed this review; this is not an independent third-party review.",
+      "Remote Neon DDL has not been executed. Remote apply remains a separate manually dispatched action and must produce fresh postflight evidence.",
+      "The remote runner has only been exercised against disposable PostgreSQL 18 in CI; no claim of remote Neon execution success is made."
+    ],
+    "formalGitHubReviewSubmissions": 0,
+    "followUpReview": {
+      "reviewedAt": "2026-11-18",
+      "scope": "Current-source D1-01/W01 AUTH-001 follow-up audit. The fifteen-entry D1-01 migration manifest retains the first fourteen applied ledger rows as an exact prefix; W01 AUTH-001 registration batch SQL is the fifteenth entry at append-only order 700 (not order 150). W01 registration uses its existing provider-neutral Neon persistence Store for registration-envelope idempotency, reservation/completion, and consent persistence through the existing D1-01 Neon Hyperdrive. After Better Auth signup, W01 confirms persisted identity only through its existing W01-to-W02 Service Binding: it sends the W01 caller and transport-version headers, W02 enforces that caller boundary, and W02's existing Neon PostgreSQL registrationRollbackStore performs the parameterized identity lookup and returns the narrow identity DTO. The W01 route fails closed on confirmation errors, releases the registration reservation, and does not query W02's user table through Payload. Current W01/W02 source, route tests, and the 700-order manifest position were inspected; the prior top-level order-150 description was stale and is corrected.",
+      "result": "NO_NEW_BLOCKING_FINDINGS",
+      "formalGitHubReviewSubmissions": 0,
+      "limitations": "GPT-6 code-path audit, not a human GitHub approval or an independent third-party review; formalGitHubReviewSubmissions remains zero. The 15-entry manifest and current W01/W02 source pins are bound to reviewed main SHA f0b7bba6641663b5d2e403ac4de74e263d3dc060. Current-head CI must still validate all source pins, the exact fifteenth-entry manifest, and the disposable PostgreSQL 18 runtime rehearsal. Remote Neon DDL has not been executed; remote apply remains a separate manual workflow_dispatch requiring the exact confirmation token. Production D1 remains authoritative until a separate cutover authorization."
+    }
+  },
+  "verificationEvidence": {
+    "fullD1_01LocalPostgres18Rehearsal": {
+      "runId": 44272534619,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/44272534619"
+    },
+    "w02BetterAuthPostgres18": {
+      "runId": 42458291621,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291621"
+    },
+    "remoteRunnerGuardsNoCredentials": {
+      "runId": 44272534820,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/44272534820",
+      "remoteApplyJob": "skipped"
+    },
+    "contractAdmission": {
+      "runId": 42458291617,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291617"
+    },
+    "mapping0StructuralGate": {
+      "runId": 42458291520,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291520"
+    }
+  },
+  "safety": {
+    "remoteNeonDdlExecuted": false,
+    "productionD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false,
+    "manualWorkflowDispatchRequired": true,
+    "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_01_LUCKREAD"
+  },
+  "findings": [],
+  "followUpReview": {
+    "reviewedAt": "2026-11-18",
+    "scope": "Current-source D1-01/W01 AUTH-001 follow-up audit. The fifteen-entry D1-01 migration manifest retains the first fourteen applied ledger rows as an exact prefix; W01 AUTH-001 registration batch SQL is the fifteenth entry at append-only order 700 (not order 150). W01 registration uses its existing provider-neutral Neon persistence Store for registration-envelope idempotency, reservation/completion, and consent persistence through the existing D1-01 Neon Hyperdrive. After Better Auth signup, W01 confirms persisted identity only through its existing W01-to-W02 Service Binding: it sends the W01 caller and transport-version headers, W02 enforces that caller boundary, and W02's existing Neon PostgreSQL registrationRollbackStore performs the parameterized identity lookup and returns the narrow identity DTO. The W01 route fails closed on confirmation errors, releases the registration reservation, and does not query W02's user table through Payload. Current W01/W02 source, route tests, and the 700-order manifest position were inspected; the prior top-level order-150 description was stale and is corrected.",
+    "result": "NO_NEW_BLOCKING_FINDINGS",
+    "formalGitHubReviewSubmissions": 0,
+    "limitations": "GPT-6 code-path audit, not a human GitHub approval or an independent third-party review; formalGitHubReviewSubmissions remains zero. The 15-entry manifest and current W01/W02 source pins are bound to reviewed main SHA f0b7bba6641663b5d2e403ac4de74e263d3dc060. Current-head CI must still validate all source pins, the exact fifteenth-entry manifest, and the disposable PostgreSQL 18 runtime rehearsal. Remote Neon DDL has not been executed; remote apply remains a separate manual workflow_dispatch requiring the exact confirmation token. Production D1 remains authoritative until a separate cutover authorization."
+  },
+  "limitations": [
+    "The AUTH-001 PostgreSQL migration is staged in the D1-01 shared manifest and has local PostgreSQL 18 evidence only; remote Neon application and production Worker cutover are not performed by PR validation."
+  ]
+}

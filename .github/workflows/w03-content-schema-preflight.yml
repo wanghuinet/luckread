@@ -1,0 +1,267 @@
+name: W03 Content Schema Read-only Preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact reviewed commit containing W03 migrations 0001-0013
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  EXPECTED_DB_ID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  EXPECTED_DB_NAME: luckreadpro
+  EXPECTED_WORKER: luckread-w03
+  EXPECTED_BINDING: D1_02
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Validate source SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+
+      - name: Checkout exact reviewed source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Verify source, physical D1 binding, and migration sequence
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const config = JSON.parse(fs.readFileSync('workers/W03-content/wrangler.jsonc', 'utf8'));
+          if (config.name !== process.env.EXPECTED_WORKER || config.main !== 'src/index.ts') throw new Error('Unexpected W03 worker identity');
+          const bindings = (config.d1_databases ?? []).filter((x) => x.binding === process.env.EXPECTED_BINDING);
+          if (bindings.length !== 1 || bindings[0].database_name !== process.env.EXPECTED_DB_NAME ||
+              bindings[0].database_id !== process.env.EXPECTED_DB_ID) throw new Error('W03 D1_02 binding does not match the reviewed target');
+          const expected = ['0001_content_core.sql','0002_content_2_0_types_media.sql','0003_creator_list_pagination_index.sql',
+            '0004_content_revision_history.sql','0005_content_stable_slug.sql','0006_content_relationships.sql',
+            '0007_content_series.sql','0008_series_membership_ordering.sql','0009_content_collections.sql',
+            '0010_collection_membership_ordering.sql','0011_content_scheduled_publish.sql',
+            '0012_content_snowflake_id_allocator.sql','0013_content_access_mode.sql'];
+          const actual = fs.readdirSync('workers/W03-content/migrations').filter((name) => /^\d{4}_.+\.sql$/.test(name)).sort();
+          if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error('W03 migration sequence differs from reviewed 0001-0013 chain');
+          console.log(JSON.stringify({sourceSha: process.env.SOURCE_SHA, worker: config.name,
+            binding: process.env.EXPECTED_BINDING, databaseName: process.env.EXPECTED_DB_NAME,
+            databaseId: process.env.EXPECTED_DB_ID, migrationCount: actual.length}));
+          NODE
+
+      - name: Verify migration chain against isolated SQLite
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          files = sorted(Path('workers/W03-content/migrations').glob('[0-9][0-9][0-9][0-9]_*.sql'))
+          db = sqlite3.connect(':memory:')
+          db.execute('PRAGMA foreign_keys = ON')
+          for path in files:
+              db.executescript(path.read_text())
+          required = {
+              'contents': {'slug', 'scheduled_at', 'media_refs_json', 'access_mode'},
+              'content_revisions': {'id', 'content_id', 'revision', 'slug', 'etag', 'access_mode'},
+              'content_relationships': {'relationship_id', 'relation_type', 'position'},
+              'content_series': {'id', 'owner_user_id', 'state'},
+              'content_collections': {'id', 'owner_user_id', 'state'},
+              'content_id_snowflake_state': {'id', 'last_timestamp_ms', 'sequence'},
+          }
+          for table, columns in required.items():
+              present = {row[1] for row in db.execute(f'PRAGMA table_info("{table}")')}
+              missing = columns - present
+              if missing:
+                  raise SystemExit(f'{table} missing columns: {sorted(missing)}')
+          if db.execute('SELECT id, last_timestamp_ms, sequence FROM content_id_snowflake_state').fetchall() != [(1, -1, 4095)]:
+              raise SystemExit('Unexpected initial Snowflake allocator state')
+          print('W03_MIGRATIONS_0001_0013_STATIC=PASS')
+          PY
+
+      - name: Capture remote D1-02 ledger and schema with SELECT statements only
+        working-directory: workers/W03-content
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          run_read() {
+            local output_file="$1" label="$2" sql="$3"
+            local stderr_file rc
+            stderr_file="$(mktemp)"
+            set +e
+            npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc --command "$sql" > "$output_file" 2> "$stderr_file"
+            rc=$?
+            set -e
+            if [ "$rc" -ne 0 ]; then
+              echo "::error title=Read-only D1 preflight failed::$label exited with code $rc"
+              sed -E 's/(Bearer )[[:alnum:]_.-]+/\1[REDACTED]/g; s/(api[_ -]?token[=: ]+)[^[:space:]]+/\1[REDACTED]/Ig' "$stderr_file" | tail -n 80
+              sed -E 's/(Bearer )[[:alnum:]_.-]+/\1[REDACTED]/g; s/(api[_ -]?token[=: ]+)[^[:space:]]+/\1[REDACTED]/Ig' "$output_file" | tail -n 80
+              rm -f "$stderr_file"
+              exit "$rc"
+            fi
+            rm -f "$stderr_file"
+          }
+          run_read /tmp/w03-history.json "Read migration ledger" "SELECT name FROM d1_migrations ORDER BY name;"
+          for table in contents content_revisions content_relationships content_series content_collections content_id_snowflake_state; do
+            run_read "/tmp/w03-columns-$table.json" "Inspect table columns" "SELECT '$table' AS table_name, name AS column_name FROM pragma_table_info('$table');"
+          done
+          run_read /tmp/w03-objects.json "Inspect W03 tables and triggers" \
+            "SELECT name AS table_name, CASE WHEN type='table' THEN '__TABLE__' ELSE '__TRIGGER__' END AS column_name
+             FROM sqlite_master
+             WHERE (type='table' AND name IN ('contents','content_revisions','content_relationships','content_series','content_collections','content_mutation_idempotency','content_outbox_events','content_txn_guard','content_id_snowflake_state'))
+                OR (type='trigger' AND name IN ('contents_after_insert_outbox','contents_after_update_outbox'));"
+
+      - name: Classify remote schema without performing writes
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/w03-content-schema-preflight
+          node <<'NODE'
+          const fs = require('node:fs');
+          const reportPath = 'artifacts/mapping-0/w03-content-schema-preflight/report.json';
+          const expected = ['0001_content_core.sql','0002_content_2_0_types_media.sql','0003_creator_list_pagination_index.sql',
+            '0004_content_revision_history.sql','0005_content_stable_slug.sql','0006_content_relationships.sql',
+            '0007_content_series.sql','0008_series_membership_ordering.sql','0009_content_collections.sql',
+            '0010_collection_membership_ordering.sql','0011_content_scheduled_publish.sql',
+            '0012_content_snowflake_id_allocator.sql','0013_content_access_mode.sql'];
+          const report = {result: 'PREFLIGHT_BLOCKED', sourceSha: process.env.SOURCE_SHA,
+            databaseName: process.env.EXPECTED_DB_NAME, databaseId: process.env.EXPECTED_DB_ID,
+            worker: process.env.EXPECTED_WORKER, binding: process.env.EXPECTED_BINDING,
+            readOnly: true, migrationExecution: false, deploymentExecution: false};
+          const save = () => fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
+          function rowsFrom(file) {
+            const root = JSON.parse(fs.readFileSync(file, 'utf8')); const rows = [];
+            function visit(value) {
+              if (Array.isArray(value)) { for (const item of value) visit(item); return; }
+              if (!value || typeof value !== 'object') return;
+              if (Array.isArray(value.results)) for (const row of value.results) if (row && typeof row === 'object') rows.push(row);
+              for (const [key, child] of Object.entries(value)) if (key !== 'results') visit(child);
+            }
+            visit(root); return rows;
+          }
+          try {
+            const allApplied = rowsFrom('/tmp/w03-history.json').map((row) => row.name).filter((name) => typeof name === 'string').sort();
+            if (new Set(allApplied).size !== allApplied.length) throw new Error('Migration ledger contains duplicate names');
+            // D1-02 is shared by subsystems; compare only exact W03 migration identities.
+            const applied = allApplied.filter((name) => expected.includes(name));
+            if (JSON.stringify(applied) !== JSON.stringify(expected.slice(0, applied.length))) throw new Error('W03 history is not a prefix of the reviewed chain: ' + JSON.stringify(applied));
+            const schema = ['contents','content_revisions','content_relationships','content_series','content_collections','content_id_snowflake_state']
+              .flatMap((table) => rowsFrom('/tmp/w03-columns-' + table + '.json')).concat(rowsFrom('/tmp/w03-objects.json'));
+            const tables = new Set(schema.filter((row) => row.column_name === '__TABLE__').map((row) => row.table_name));
+            const triggers = new Set(schema.filter((row) => row.column_name === '__TRIGGER__').map((row) => row.table_name));
+            const columns = (table) => new Set(schema.filter((row) => row.table_name === table && !String(row.column_name).startsWith('__')).map((row) => row.column_name));
+            const missing = (requirements) => Object.entries(requirements).flatMap(([table, names]) =>
+              !tables.has(table) ? [table + ' table'] : names.filter((name) => !columns(table).has(name)).map((name) => table + '.' + name));
+            const baseTables = ['contents','content_mutation_idempotency','content_outbox_events','content_txn_guard'];
+            const missingBaseTables = baseTables.filter((name) => !tables.has(name));
+            const missingBaseTriggers = ['contents_after_insert_outbox','contents_after_update_outbox'].filter((name) => !triggers.has(name));
+            const hasAccessMode = columns('contents').has('access_mode') || columns('content_revisions').has('access_mode');
+            let state;
+            if (applied.length === 13) {
+              const absent = missing({
+                contents:['slug','scheduled_at','media_refs_json','access_mode'],
+                content_revisions:['id','content_id','revision','content_version','actor_user_id','operation','state','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at','access_mode'],
+                content_relationships:['relationship_id','source_id','target_id','relation_type','position','status'],
+                content_series:['id','owner_user_id','creator_id','state'],
+                content_collections:['id','owner_user_id','creator_id','state'],
+                content_id_snowflake_state:['id','last_timestamp_ms','sequence']
+              });
+              if (absent.length || missingBaseTables.length || missingBaseTriggers.length) {
+                throw new Error('Ledger is current but schema is incomplete: ' + JSON.stringify({absent,missingBaseTables,missingBaseTriggers}));
+              }
+              state = 'CURRENT_0001_0013';
+            } else if (applied.length === 12) {
+              const absent = missing({
+                contents:['id','content_type','owner_user_id','creator_id','state','version','revision','slug','scheduled_at','title','body_ref','media_refs_json','etag','created_at','updated_at'],
+                content_revisions:['id','content_id','revision','content_version','actor_user_id','operation','state','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at'],
+                content_relationships:['relationship_id','source_id','target_id','relation_type','position','status'],
+                content_series:['id','owner_user_id','creator_id','state'],
+                content_collections:['id','owner_user_id','creator_id','state'],
+                content_id_snowflake_state:['id','last_timestamp_ms','sequence']
+              });
+              if (absent.length || missingBaseTables.length || missingBaseTriggers.length || hasAccessMode) {
+                throw new Error('Remote schema does not match post-0012 state: ' + JSON.stringify({absent,missingBaseTables,missingBaseTriggers,hasAccessMode}));
+              }
+              state = 'PENDING_0013';
+            } else if (applied.length === 11) {
+              const absent = missing({
+                contents:['id','content_type','owner_user_id','creator_id','state','version','revision','slug','scheduled_at','title','body_ref','media_refs_json','etag','created_at','updated_at'],
+                content_revisions:['id','content_id','revision','content_version','actor_user_id','operation','state','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at'],
+                content_relationships:['relationship_id','source_id','target_id','relation_type','position','status'],
+                content_series:['id','owner_user_id','creator_id','state'],
+                content_collections:['id','owner_user_id','creator_id','state']
+              });
+              if (absent.length || missingBaseTables.length || missingBaseTriggers.length ||
+                  tables.has('content_id_snowflake_state') || hasAccessMode) {
+                throw new Error('Remote schema does not match post-0011 state: ' + JSON.stringify({absent,missingBaseTables,missingBaseTriggers,hasAllocator:tables.has('content_id_snowflake_state'),hasAccessMode}));
+              }
+              state = 'PENDING_0012_0013';
+            } else if ([2,3].includes(applied.length)) {
+              const unexpectedTables = ['content_revisions','content_relationships','content_series','content_collections','content_id_snowflake_state'].filter((name) => tables.has(name));
+              const unexpectedColumns = ['slug','scheduled_at'].filter((name) => columns('contents').has(name));
+              if (!tables.has('contents') || missingBaseTables.length || missingBaseTriggers.length || unexpectedTables.length || unexpectedColumns.length) {
+                throw new Error('Remote schema does not match reviewed pre-0004 state: ' + JSON.stringify({missingBaseTables,missingBaseTriggers,unexpectedTables,unexpectedColumns}));
+              }
+              state = 'PENDING_LEGACY_0004_0013';
+            } else {
+              throw new Error('Only reviewed W03 migration histories 0001-0003, 0001-0011, 0001-0012, or 0001-0013 are admitted; found ' + JSON.stringify(applied));
+            }
+            report.result = 'PREFLIGHT_PASS';
+            report.schemaState = state;
+            report.appliedW03Migrations = applied;
+            report.pendingW03Migrations = expected.slice(applied.length);
+            report.allDatabaseMigrationCount = allApplied.length;
+            report.recommendation = state === 'CURRENT_0001_0013'
+              ? 'No W03 migration is pending.'
+              : 'Schema matches a reviewed state; any migration requires separate explicit approval.';
+            save(); console.log(JSON.stringify(report, null, 2));
+          } catch (error) {
+            report.error = error instanceof Error ? error.message : String(error);
+            save(); console.error(JSON.stringify(report, null, 2)); process.exitCode = 1;
+          }
+          NODE
+
+      - name: Capture read-only provenance
+        if: always()
+        run: |
+          mkdir -p artifacts/mapping-0/w03-content-schema-preflight
+          test -f artifacts/mapping-0/w03-content-schema-preflight/report.json || \
+            printf '{"result":"PREFLIGHT_BLOCKED","readOnly":true,"migrationExecution":false,"deploymentExecution":false}\n' \
+            > artifacts/mapping-0/w03-content-schema-preflight/report.json
+          cat > artifacts/mapping-0/w03-content-schema-preflight/provenance.txt <<EOF
+          workflow=W03 Content Schema Read-only Preflight
+          run_id=$GITHUB_RUN_ID
+          run_attempt=$GITHUB_RUN_ATTEMPT
+          run_url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          source_sha=${{ inputs.source_sha }}
+          worker=$EXPECTED_WORKER
+          d1_binding=$EXPECTED_BINDING
+          database_name=$EXPECTED_DB_NAME
+          database_id=$EXPECTED_DB_ID
+          read_only=true
+          migration_execution=false
+          deployment_execution=false
+          EOF
+
+      - name: Upload preflight evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w03-content-schema-preflight-${{ github.run_id }}
+          path: artifacts/mapping-0/w03-content-schema-preflight/
+          if-no-files-found: error
+          retention-days: 30

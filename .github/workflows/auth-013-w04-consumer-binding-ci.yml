@@ -1,0 +1,60 @@
+name: AUTH-013 W04 Consumer Binding CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "workers/W04-feed-search/**"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-deploy-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run workers/W04-feed-search/src/auth-013-projection.test.ts workers/W04-feed-search/src/following-feed.test.ts
+      - run: npx tsc --noEmit
+      - name: Validate fixed topology and admitted bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs')
+          const w=fs.readFileSync('workers/W04-feed-search/wrangler.jsonc','utf8')
+          for (const value of [
+            '"name": "luckread-w04"',
+            '"binding": "AUTH013_W04_DERIVED_PROJECTION"',
+            '"id": "32f7e407128a43d59720d5d46736e084"',
+            '"queue": "luckread-auth013-account-state-projection"',
+            '"dead_letter_queue": "luckread-auth013-account-state-projection-dlq"'
+          ]) if(!w.includes(value)) throw new Error('Missing binding assertion: '+value)
+          if(w.includes('d1_databases')) throw new Error('W04 must not gain D1')
+          NODE
+      - name: Deploy W04 with admitted bindings
+        working-directory: workers/W04-feed-search
+        run: npx --yes wrangler@4.116.0 deploy
+      - name: Verify live consumer and run controlled projection evidence
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: node scripts/auth013-w04-runtime-evidence.mjs
+
+      - name: Upload runtime evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-013-w04-runtime-evidence
+          path: auth013-w04-runtime-evidence.json

@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-09-20",
+  "sourceRun": 35462001907,
+  "sourceHead": "2a328994b3588298c4879764404df7614322d096",
+  "purpose": "Current R4 downstream gap clustering. Planning/audit artifact only; does not promote implementation, persistence, runtime, or evidence status.",
+  "counts": {
+    "totalFeatures": 449,
+    "ready": 0,
+    "blocked": 449,
+    "missingEntityBinding": 440,
+    "persistenceNotVerified": 9
+  },
+  "persistenceNotVerified": [
+    {"featureId":"AUTH-001","entityIds":["ENT-USER"]},
+    {"featureId":"AUTH-002","entityIds":["ENT-CREDENTIAL","ENT-IDENTITY","ENT-SESSION"]},
+    {"featureId":"AUTH-003","entityIds":["ENT-CREDENTIAL","ENT-IDENTITY"]},
+    {"featureId":"AUTH-004","entityIds":["ENT-CREDENTIAL","ENT-SESSION","ENT-VERIFICATION"]},
+    {"featureId":"AUTH-005","entityIds":["ENT-CREDENTIAL","ENT-IDENTITY","ENT-VERIFICATION"]},
+    {"featureId":"AUTH-006","entityIds":["ENT-CREDENTIAL","ENT-IDENTITY","ENT-VERIFICATION"]},
+    {"featureId":"AUTH-010","entityIds":["ENT-SESSION"]},
+    {"featureId":"AUTH-011","entityIds":["ENT-SESSION"]},
+    {"featureId":"USER-001","entityIds":["ENT-USER"]}
+  ],
+  "persistenceEntityCoverage": {
+    "ENT-CREDENTIAL": 5,
+    "ENT-IDENTITY": 4,
+    "ENT-SESSION": 4,
+    "ENT-VERIFICATION": 3,
+    "ENT-USER": 2
+  },
+  "closureOrder": [
+    "Establish controlled authoritative persistence/schema evidence before promoting any migration/persistence status.",
+    "Close Entity binding for features still lacking canonical entity authority.",
+    "Only then promote runtime/security/integration/Evidence Registry status on the same tested SHA."
+  ],
+  "safetyConstraints": [
+    "No hand-authored DDL.",
+    "No remote D1 migration execution while W01 migration admission remains BLOCKED_EXTERNAL.",
+    "No Mapping-0 GREEN inferred from entity names, examples, or persistence mappings.",
+    "Existing feature/contract statuses remain unchanged by this artifact."
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0.0",
+  "evidenceId": "EVD-AUTH002-B27-MIGRATION-EXECUTION-HISTORICAL-001",
+  "featureId": "AUTH-002",
+  "claimId": "AUTH-002::MIGRATION_EXECUTION",
+  "type": "INTEGRATION_TEST",
+  "source": "GitHub Actions AUTH-002 E5 Remote Migration Execution",
+  "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/35552919573",
+  "artifactRef": "https://github.com/wanghuinet/luckread/actions/runs/35552919573/artifacts/10618729380",
+  "artifactId": "10618729380",
+  "artifactSha256": "c9bfcadba7ade81c8002786e6f323a5849c13dfb6f2390aeef44ea27584c44a1",
+  "jobId": "106190897137",
+  "timestamp": "2026-09-21T02:05:36Z",
+  "environment": "CONTROLLED_REMOTE_D1",
+  "databaseName": "luckread",
+  "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+  "migrationId": "20260921_003203_MIG_AUTH_002_SESSION_V1",
+  "migrationSource": {
+    "path": "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
+    "historicalBlobSha": "2b43a7b08fe7c5be98793da7eb07ddd2cf9e6921",
+    "currentBlobSha": "2b43a7b08fe7c5be98793da7eb07ddd2cf9e6921",
+    "unchanged": true
+  },
+  "historicalExecution": {
+    "runId": "35552919573",
+    "testedCommitSha": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
+    "requestedSourceSha": "fe1f2784d21f3f629bbad0baa971f1aa56520914"
+  },
+  "preconditionResult": "PASS — controlled D1 baseline present; duplicate session migration was not previously recorded.",
+  "executionResult": "PASS — migration executed once and completed successfully.",
+  "postconditionResult": "PASS — migration ledger recorded the target migration; auth_session_state exists with the contracted 7 columns and 4 required secondary indexes; foreign-key count is 0; native users and users_sessions schemas are unchanged; forbidden secret columns are absent.",
+  "provenanceResult": "PASS — workflow manifest binds run, environment, database and exact tested commit; artifact digest is recorded.",
+  "authorizationDisposition": "EXECUTION_WAS_NOT_AUTHORIZED_AT_TIME_OF_EXECUTION; NO_RETROACTIVE_AUTHORIZATION_GRANTED",
+  "admissionDecision": "TECHNICAL_EXECUTION_EVIDENCE_ACCEPTED_FOR_MIGRATION_EXECUTION_CLAIM",
+  "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+  "freshnessBasis": "The migration execution unit is bound to the exact historical tested commit and migration source blob. The migration file is byte-identical on current main; later migration-index changes do not alter this migration unit.",
+  "contractChange": "NONE",
+  "runtimeRerun": "NOT_PERFORMED",
+  "remoteReapplication": "PROHIBITED",
+  "productionDeployment": "NOT_PERFORMED",
+  "mapping0Promotion": "NOT_GRANTED",
+  "authorityDecisionRef": "docs/change-control/CC-MAPPING-0-AUTH-002-HISTORICAL-MIGRATION-EVIDENCE-ADMISSION-2026-09-28.md"
+}

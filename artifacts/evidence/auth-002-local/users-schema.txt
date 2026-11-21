@@ -1,0 +1,10 @@
+0|id|INTEGER|1||1
+1|updated_at|TEXT|1|strftime('%Y-%m-%dT%H:%M:%fZ', 'now')|0
+2|created_at|TEXT|1|strftime('%Y-%m-%dT%H:%M:%fZ', 'now')|0
+3|email|TEXT|1||0
+4|reset_password_token|TEXT|0||0
+5|reset_password_expiration|TEXT|0||0
+6|salt|TEXT|0||0
+7|hash|TEXT|0||0
+8|login_attempts|numeric|0|0|0
+9|lock_until|TEXT|0||0

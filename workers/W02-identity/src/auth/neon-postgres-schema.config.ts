@@ -1,0 +1,27 @@
+/**
+ * Schema-generation-only Better Auth configuration.
+ *
+ * This module reuses W02's canonical Better Auth options/plugins and injects a
+ * local PostgreSQL pool for the pinned Better Auth CLI. It is not imported by
+ * the Worker entrypoint. The schema-only profile explicitly selects PostgreSQL
+ * and no longer constructs or requires a legacy D1 test binding.
+ */
+import { Pool } from 'pg'
+
+import { buildLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+
+const schemaEnvironment = {
+  CLOUDFLARE_ENV: 'production',
+} satisfies BetterAuthEnv
+
+const postgresPool = new Pool({
+  host: process.env.W02_SCHEMA_PGHOST ?? '127.0.0.1',
+  port: Number(process.env.W02_SCHEMA_PGPORT ?? '5432'),
+  user: process.env.W02_SCHEMA_PGUSER ?? 'schema_generator',
+  password: process.env.W02_SCHEMA_PGPASSWORD ?? 'local-schema-only',
+  database: process.env.W02_SCHEMA_PGDATABASE ?? 'luckread_schema',
+  max: 1,
+  connectionTimeoutMillis: 5_000,
+})
+
+export const auth = buildLuckReadAuth(schemaEnvironment, postgresPool, 'postgres')

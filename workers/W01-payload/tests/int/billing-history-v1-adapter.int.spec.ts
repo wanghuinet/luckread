@@ -1,0 +1,164 @@
+import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
+const refundRoute = read('src/app/api/v1/payments/refunds/route.ts')
+const paymentsRoute = read('src/app/api/v1/payments/history/route.ts')
+const billingRoute = read('src/app/api/v1/billing/documents/route.ts')
+const commerceClient = read('src/commerce/w07-commerce-client.ts')
+const w07ReadRuntime = read('../W07-subscription-commerce/src/billing-read-http-runtime.ts')
+const billingHistoryPostgresPersistence = read('../W07-subscription-commerce/src/billing-history-postgres-persistence.ts')
+const billingPostgresPersistence = read('../W07-subscription-commerce/src/billing-document-postgres-persistence.ts')
+const billingMigration = read('../W07-subscription-commerce/migrations-d1-04/0006_refunds_billing_documents.sql')
+const orderRuntime = read('../W07-subscription-commerce/src/order-http-runtime.ts')
+const webhookRuntime = read('../W07-subscription-commerce/src/payment-webhook-http-runtime.ts')
+const apiInventory = JSON.parse(read('../../contracts/api/api-inventory.v1.json'))
+const operationPolicy = JSON.parse(read('../../contracts/openapi/v1/operation-policy.json'))
+const openapi = read('../../contracts/openapi/v1/openapi.yaml')
+const sourcePolicy = JSON.parse(read('../../contracts/api/commerce-operation-policy.v1.json'))
+const binding = JSON.parse(read('../../contracts/transport/W01-W07-membership-commerce-http-binding.v1.json'))
+const routing = JSON.parse(read('../../contracts/transport/public-worker-terminal-routing.v1.json'))
+const authzPermissions = JSON.parse(read('../../contracts/authz/permissions.json'))
+const casl = read('../W08-creator/src/authz/casl-policy.ts')
+const openapiSync = read('../../scripts/sync-rc-openapi.mjs')
+
+describe('public customer payment and billing history adapters', () => {
+  it('requires W02 session and W08 own-Payment authorization before reading refund history', () => {
+    const session = refundRoute.indexOf('resolveCookieSubscriptionPrincipal(request)')
+    const authz = refundRoute.indexOf('authorizePaymentReadPermission(request, principal)', refundRoute.indexOf('export async function GET'))
+    const call = refundRoute.indexOf("pathname: '/commerce/payments/refunds' + query")
+    expect(session).toBeGreaterThan(-1)
+    expect(authz).toBeGreaterThan(session)
+    expect(call).toBeGreaterThan(authz)
+    expect(refundRoute).toContain("pathname: '/commerce/payments/refunds'")
+    expect(refundRoute).toContain("pathname: '/commerce/payments/refunds' + query")
+    expect(refundRoute).not.toContain('D1_04')
+    expect(refundRoute).not.toContain('HYPERSWITCH_API_KEY')
+  })
+
+  it('requires W02 session and W08 payment.read permission before reading payment history and billing documents', () => {
+    for (const [route, path] of [
+      [paymentsRoute, '/commerce/payments/history'],
+      [billingRoute, '/commerce/billing/documents'],
+    ]) {
+      const session = route.indexOf('resolveCookieSubscriptionPrincipal(request)')
+      const authz = route.indexOf('authorizePaymentReadPermission(request, principal)')
+      const call = route.indexOf('callW07Subscription({')
+      expect(session).toBeGreaterThan(-1)
+      expect(authz).toBeGreaterThan(session)
+      expect(call).toBeGreaterThan(authz)
+      expect(route).toContain(path)
+      expect(route).toContain("headers.set('cache-control', 'no-store')")
+      expect(route).not.toContain('D1_04')
+      expect(route).not.toContain('HYPERSWITCH_API_KEY')
+    }
+  })
+
+  it('checks Payment owner in W08 and grants payment.read only through the own-payment CASL condition', () => {
+    expect(commerceClient).toContain("action: 'payment.read'")
+    expect(commerceClient).toContain("resourceType: 'Payment'")
+    expect(commerceClient).toContain("resourceAttributes: { ownerId: principal.userId }")
+    expect(casl).toContain("grant('payment.read', 'Payment', selfOwnerCondition(input.subjectId))")
+    expect(authzPermissions['x-permissions']).toContainEqual(expect.objectContaining({
+      name: 'payment.read', resource: 'payment', action: 'read', minLayer: 'L2', scope: 'own',
+    }))
+    for (const role of ['verified_user', 'admin', 'super_admin']) {
+      const definition = authzPermissions['x-role-permissions'].roles.find((item: { role: string }) => item.role === role)
+      expect(definition?.permissions).toContain('payment.read')
+    }
+  })
+
+  it('re-queries every billing domain by server-derived customerId and uses bounded keyset pagination', () => {
+    expect(w07ReadRuntime).toContain('listBillingDocumentsForCustomer')
+    expect(w07ReadRuntime).toContain('listPaymentHistoryForCustomer')
+    expect(w07ReadRuntime).toContain('listRefundHistoryForCustomer')
+    expect(w07ReadRuntime).not.toContain('getW07PaymentWebhookDatabase')
+    expect(w07ReadRuntime).toContain('getW07PaymentWebhookPostgresPool')
+    expect(w07ReadRuntime).not.toContain('D1Database')
+    expect(w07ReadRuntime).not.toContain('env.D1_04')
+    expect(w07ReadRuntime).toContain('listBillingDocumentsForCustomerPostgres')
+    expect(w07ReadRuntime).toContain('listPaymentHistoryForCustomerPostgres')
+    expect(w07ReadRuntime).toContain('listRefundHistoryForCustomerPostgres')
+    expect(w07ReadRuntime).toContain('(pool, customerId, limit, cursor)')
+    expect(billingHistoryPostgresPersistence).toContain('FROM billing_documents WHERE customer_id = $1')
+    expect(billingHistoryPostgresPersistence).toContain('ORDER BY issued_at DESC, document_id DESC LIMIT $2')
+    expect(billingHistoryPostgresPersistence).toContain('FROM payments p WHERE p.customer_id = $1')
+    expect(billingHistoryPostgresPersistence).toContain('ORDER BY p.created_at DESC, p.payment_id DESC LIMIT $2')
+    expect(billingHistoryPostgresPersistence).toContain('FROM refunds WHERE customer_id = $1')
+    expect(billingHistoryPostgresPersistence).toContain('ORDER BY created_at DESC, refund_id DESC LIMIT $2')
+    expect(billingHistoryPostgresPersistence).not.toContain('OFFSET')
+  })
+
+  it('creates invoice snapshots from PostgreSQL orders and receipts only after signed successful payment state', () => {
+    expect(orderRuntime).toContain('issueInvoiceForOrderPostgres')
+    expect(orderRuntime).not.toContain('resolveW07DatabaseDriver')
+    expect(orderRuntime).not.toContain('D1Database')
+    expect(orderRuntime).toContain('getW07PaymentWebhookPostgresPool')
+    expect(orderRuntime).toContain('getCommerceOrderPostgres')
+    expect(orderRuntime).toContain('await issueInvoice(pool, customerId, result.data.orderId)')
+    expect(orderRuntime).not.toContain('issueInvoice(database!')
+    expect(webhookRuntime).toContain('isSignedPaymentSucceededEvent(rawBody)')
+    expect(webhookRuntime).not.toContain('issueReceiptForPaidPayment(')
+    expect(webhookRuntime).not.toContain('webhookDatabase = neonDatabase ?? env.D1_04')
+    expect(webhookRuntime).not.toContain('selectedWebhookDatabase')
+    expect(webhookRuntime).toContain('getWebhookPostgresPool')
+    expect(webhookRuntime).toContain('issueReceiptForPaidPaymentPostgres')
+    expect(webhookRuntime).toContain('await issueReceipt(postgresPool, paymentId, env.HYPERSWITCH_MERCHANT_ID)')
+    expect(billingPostgresPersistence).toContain('FOR UPDATE')
+    expect(billingPostgresPersistence).toContain('INSERT INTO billing_documents')
+    expect(billingPostgresPersistence).toContain('ROLLBACK')
+    expect(billingPostgresPersistence).toContain('ON CONFLICT (document_type,order_id) DO NOTHING')
+    expect(billingPostgresPersistence).toContain('FROM billing_documents WHERE customer_id = $1 AND document_type = $2 AND order_id = $3')
+    expect(billingPostgresPersistence).toContain('issueInvoiceForOrderPostgres')
+    expect(billingPostgresPersistence).toContain('ON CONFLICT (document_type,order_id) DO NOTHING')
+    expect(billingMigration).toContain("document_type IN ('INVOICE','RECEIPT')")
+  })
+
+  it('keeps the inventory, canonical commerce policy source, consolidated policy, W07 binding and terminal routing aligned', () => {
+    const endpoints = apiInventory.domains.subscription_entitlement_payment.endpoint_groups
+    for (const endpoint of [
+      'POST /v1/payments/refunds',
+      'GET /v1/payments/refunds',
+      'GET /v1/payments/history',
+      'GET /v1/billing/documents',
+    ]) expect(endpoints).toContain(endpoint)
+
+    for (const operationId of [
+      'postPaymentsRefunds',
+      'getPaymentsRefunds',
+      'getPaymentsHistory',
+      'getBillingDocuments',
+    ]) {
+      expect(sourcePolicy.operations.find((item: { operationId: string }) => item.operationId === operationId)).toBeTruthy()
+      const operation = operationPolicy.operations.find((item: { operationId: string }) => item.operationId === operationId)
+      expect(operation).toMatchObject({
+        permissions: [operationId === 'postPaymentsRefunds' ? 'payment.refund' : 'payment.read'],
+        'x-luckread-contract-status': 'CONTRACTED_PARTIAL',
+        'x-luckread-source': 'contracts/api/commerce-operation-policy.v1.json',
+      })
+      expect(binding.operations.find((item: { operationId: string }) => item.operationId === operationId)).toBeTruthy()
+    }
+
+    const paths = routing.routes.find((item: { operationIdFamily: string }) => item.operationIdFamily === 'membership')?.publicPaths ?? []
+    for (const path of [
+      '/api/v1/payments/refunds',
+      '/api/v1/payments/history',
+      '/api/v1/billing/documents',
+    ]) expect(paths).toContain(path)
+
+    for (const path of ['/payments/history', '/billing/documents', '/payments/refunds']) {
+      const start = openapi.indexOf(`  ${path}:`)
+      const next = openapi.indexOf('\n  /', start + 1)
+      const block = openapi.slice(start, next < 0 ? openapi.length : next)
+      const get = block.indexOf('    get:')
+      expect(block.slice(get)).toContain("        '200':")
+    }
+    expect(openapiSync).toContain('buildCommerceOpenApiOperation')
+    expect(openapiSync).toContain("operationId === 'postPaymentsRefunds'")
+    expect(openapiSync).toContain('getPaymentsHistory:')
+    expect(openapiSync).toContain('getPaymentsRefunds:')
+    expect(openapiSync).toContain('getBillingDocuments:')
+    expect(openapiSync).toContain("Object.prototype.hasOwnProperty.call(itemSchemas, operationId)")
+  })
+})
