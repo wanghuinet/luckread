@@ -39,6 +39,7 @@ export interface MessagingStore {
     items: MessagingMessageRow[]; nextCursor: string | null; hasMore: boolean
   }>
   sendMessage(actorUserId: string, conversationId: string, clientMessageId: string, body: string, attachments?: MessagingAttachment[]): Promise<MessagingMessageRow>
+  canReadAttachment(actorUserId: string, conversationId: string, mediaId: string): Promise<boolean>
   markRead(actorUserId: string, conversationId: string, sequence: string): Promise<void>
 }
 export class MessagingStoreError extends Error {
