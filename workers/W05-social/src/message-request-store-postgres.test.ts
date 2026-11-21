@@ -14,7 +14,7 @@ const pending = {
 describe('W05 PostgreSQL message request store', () => {
   it('creates a bounded first-contact request after block and mutual-follow checks', async () => {
     const { db, client } = executor([
-      { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [{ count: 2 }] }, { rows: [pending] }, { rows: [] },
+      { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [{ count: 2 }] }, { rows: [pending] }, { rows: [] },
     ])
     const store = createPostgresMessageRequestStore(db as never)
     await expect(store.createRequest('user-a', 'user-b', 'request-key-1', 'Hello')).resolves.toEqual(pending)
@@ -32,7 +32,7 @@ describe('W05 PostgreSQL message request store', () => {
     expect(client.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK')
   })
   it('enforces the daily outgoing request quota', async () => {
-    const { db, client } = executor([{ rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [{ count: 10 }] }, { rows: [] }])
+    const { db, client } = executor([{ rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [{ count: 10 }] }, { rows: [] }])
     const store = createPostgresMessageRequestStore(db as never)
     await expect(store.createRequest('user-a', 'user-b', 'request-key-2', 'Hello')).rejects.toMatchObject({ code: 'RATE_LIMITED', status: 429 })
     expect(client.query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO social_message_requests'))).toBe(false)
