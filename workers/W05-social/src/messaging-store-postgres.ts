@@ -53,6 +53,16 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
                   OR (actor_user_id = $2 AND target_user_id = $1))
               LIMIT 1`, [actorUserId, recipientUserId])
           if (blocked.rows.length) throw new MessagingStoreError('PERMISSION_DENIED', 403)
+          // Phase 1 admission is deliberately closed: only mutual followers may open/reopen a DM.
+          // Message requests and recipient-configurable contact policies are a later phase.
+          const mutualFollow = await client.query(
+            `SELECT 1 FROM social_follow_relationships outgoing
+              JOIN social_follow_relationships incoming
+                ON incoming.follower_user_id = outgoing.target_user_id
+               AND incoming.target_user_id = outgoing.follower_user_id
+             WHERE outgoing.follower_user_id = $1 AND outgoing.target_user_id = $2
+             LIMIT 1`, [actorUserId, recipientUserId])
+          if (!mutualFollow.rows.length) throw new MessagingStoreError('CONTACT_POLICY_DENIED', 403)
           const created = await client.query<{ conversation_id: string }>(
             `INSERT INTO social_conversations
               (conversation_id, conversation_type, direct_pair_key, created_by_user_id, last_sequence, created_at, updated_at)
