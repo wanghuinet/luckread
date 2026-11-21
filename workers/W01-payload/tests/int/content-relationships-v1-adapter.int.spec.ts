@@ -35,7 +35,8 @@ describe('v1 content relationship adapters', () => {
     expect(route).toContain("callW05Social")
     expect(route).toContain("/quote-post-preflight")
     expect(route).toContain("relationType === 'quote-post'")
-    expect(route.indexOf('await callW05Social')).toBeLessThan(route.indexOf('await callW03Content'))
+    const postRoute = route.slice(route.indexOf('export async function POST'))
+    expect(postRoute.indexOf('await callW05Social')).toBeLessThan(postRoute.indexOf('await callW03Content'))
   })
 
   it('exposes authenticated relationship revocation and invalidates public cache', () => {
