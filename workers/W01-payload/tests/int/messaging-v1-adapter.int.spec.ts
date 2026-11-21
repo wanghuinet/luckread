@@ -30,6 +30,7 @@ describe('v1 messaging adapters', () => {
     expect(messages).toContain('/messages')
     expect(messages).toContain("method: 'GET'")
     expect(messages).toContain("method: 'POST'")
+    expect(messages).toContain("(url.search || '')")
     expect(messages).toContain('encodeURIComponent(conversationId)')
   })
 
