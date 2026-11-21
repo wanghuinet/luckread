@@ -189,6 +189,9 @@
         "DELETE /v1/push/endpoints/{installationId}",
         "GET /v1/notification-preferences",
         "GET /v1/notifications",
+        "PATCH /v1/conversations",
+        "PATCH /v1/conversations/{conversationId}/messages",
+        "PATCH /v1/conversations/{conversationId}/read",
         "PATCH /v1/notification-preferences",
         "PATCH /v1/notifications",
         "POST /v1/notifications/read-all",
@@ -329,8 +332,8 @@
       "required": true,
       "endpoint_groups": [
         "GET /v1/conversations",
-        "POST /v1/conversations",
         "GET /v1/conversations/{conversationId}/messages",
+        "POST /v1/conversations",
         "POST /v1/conversations/{conversationId}/messages",
         "POST /v1/conversations/{conversationId}/read"
       ]

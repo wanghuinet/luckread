@@ -794,6 +794,32 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "listNotifications",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.read.self"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "listNotificationsOp",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.read.self"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "getMyCreatorApplication",
       "auth": {
         "mode": "authenticated"
@@ -1247,7 +1273,7 @@
       "x-luckread-source": "contracts/api/notification-preferences.v1.json"
     },
     {
-      "operationId": "listNotifications",
+      "operationId": "listNotificationsOpOp",
       "auth": {
         "mode": "permission"
       },
@@ -1631,6 +1657,45 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "batchUpdateNotifications",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.update.self"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "batchUpdateNotificationsOp",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.update.self"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "batchUpdateNotificationsOpOp",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.update.self"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "patchCreatorProfile",
       "auth": {
         "mode": "permission"
@@ -1711,7 +1776,7 @@
       "x-luckread-source": "contracts/api/notification-preferences.v1.json"
     },
     {
-      "operationId": "batchUpdateNotifications",
+      "operationId": "batchUpdateNotificationsOpOpOp",
       "auth": {
         "mode": "permission"
       },
@@ -2341,6 +2406,45 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "postConversations",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "postConversationsConversationIdMessages",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "listNotificationsOpOpOp",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.read.self"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
       "stateMachine": "none"
     },
     {

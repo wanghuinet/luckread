@@ -1776,6 +1776,16 @@ paths:
           description: Notifications updated.
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+
+    post:
+      tags: [Contents]
+      summary: Discovery draft for POST undefined
+      operationId: postConversations
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /creators/me:
     get:
       tags: [Creators]
@@ -11003,6 +11013,16 @@ components:
           description: Notifications updated.
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+
+    post:
+      tags: [Contents]
+      summary: Discovery draft for POST undefined
+      operationId: postConversationsConversationIdMessages
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /creators/me:
     get:
       tags: [Creators]
