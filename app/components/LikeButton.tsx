@@ -207,9 +207,16 @@ function LikeButton({ iconColor, textColor, likes, contentId, initialLiked }: { 
     ];
 
     return (
-        <TouchableOpacity 
-            className="flex-row items-center gap-1.5" 
-            disabled={!contentId || isLoadingLike || isSavingLike}
+        <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={isLiked ? "Unlike" : "Like"}
+            accessibilityHint={isLiked ? "Removes your like from this post" : "Likes this post"}
+            accessibilityState={{
+                disabled: !contentId?.trim() || isLoadingLike || isSavingLike,
+                selected: isLiked,
+            }}
+            className="flex-row items-center gap-1.5"
+            disabled={!contentId?.trim() || isLoadingLike || isSavingLike}
             onPress={handlePress}
             activeOpacity={0.7}
         >
