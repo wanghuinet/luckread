@@ -15,10 +15,16 @@ describe('v1 messaging adapters', () => {
     for (const source of [conversations, messages, readCursor, requests, requestAction]) {
       expect(source).toContain('resolveCookieSocialPrincipal')
       expect(source).toContain('callW05Social')
-      expect(source).not.toContain('getPayload(')
       expect(source).not.toContain('HYPERDRIVE')
       expect(source).not.toContain('D1Database')
     }
+  })
+
+  it('keeps Payload access limited to verifying uploaded attachment ownership in W01', () => {
+    expect(messages).toContain('validateOwnedMessageAttachments')
+    expect(messages).toContain("collection: 'media'")
+    expect(messages).toContain('ownerUserId')
+    for (const source of [conversations, readCursor, requests, requestAction]) expect(source).not.toContain('getPayload(')
   })
 
   it('maps recipient identity through the canonical social profile identity resolver', () => {
@@ -53,6 +59,18 @@ describe('v1 messaging adapters', () => {
     expect(requestAction).toContain('/internal/messaging/requests/')
     expect(requestAction).toContain('encodeURIComponent(requestId)')
     expect(requestAction).toContain("['accept', 'decline', 'cancel']")
+  })
+
+  it('streams message attachments only after W05 conversation authorization', () => {
+    const privateAttachment = route('src/app/api/v1/conversations/[conversationId]/attachments/[mediaId]/route.ts')
+    expect(privateAttachment).toContain('resolveCookieSocialPrincipal')
+    expect(privateAttachment).toContain('callW05Social')
+    expect(privateAttachment).toContain('/attachments/')
+    expect(privateAttachment).toContain('/authorize')
+    expect(privateAttachment).toContain('bucket.head(key)')
+    expect(privateAttachment).toContain('bucket.get(key')
+    expect(privateAttachment).toContain("headers.set('cache-control', 'private, no-store')")
+    expect(privateAttachment).not.toContain('searchParams.get(\'url\')')
   })
 
   it('does not implement a second persistence path in W01', () => {

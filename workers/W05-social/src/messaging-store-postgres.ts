@@ -1,4 +1,4 @@
-import { MessagingStoreError, type MessagingMessageRow, type MessagingStore } from './messaging-store.js'
+import { MessagingStoreError, type MessagingAttachment, type MessagingMessageRow, type MessagingStore } from './messaging-store.js'
 
 type QueryResult<Row> = Readonly<{ rows: Row[]; rowCount?: number | null }>
 interface PgClient {
@@ -35,7 +35,7 @@ async function withTransaction<T>(db: MessagingPostgresExecutor, run: (client: P
   } finally { client.release() }
 }
 const messageSelect = `message_id, conversation_id, sender_user_id, sequence::text AS sequence,
-  body, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at`
+  body, COALESCE(attachments, '[]'::jsonb) AS attachments, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at`
 export function createPostgresMessagingStore(db: MessagingPostgresExecutor): MessagingStore {
   return {
     async createDirectConversation(actorUserId, recipientUserId) {
@@ -222,8 +222,8 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
         throw new MessagingStoreError()
       }
     },
-    async sendMessage(actorUserId, conversationId, clientMessageId, body) {
-      if (!validId(conversationId) || !validId(clientMessageId) || body.length < 1 || body.length > 10000) {
+    async sendMessage(actorUserId, conversationId, clientMessageId, body, attachments: MessagingAttachment[] = []) {
+      if (!validId(conversationId) || !validId(clientMessageId) || body.length > 10000 || (!body && attachments.length === 0) || attachments.length > 4) {
         throw new MessagingStoreError('VALIDATION_FAILED', 422)
       }
       try {
@@ -252,7 +252,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
               WHERE sender_user_id = $1 AND client_message_id = $2 LIMIT 1`,
             [actorUserId, clientMessageId])
           if (prior.rows[0]) {
-            if (prior.rows[0].conversation_id !== conversationId || prior.rows[0].body !== body) throw new MessagingStoreError('CONFLICT', 409)
+            if (prior.rows[0].conversation_id !== conversationId || prior.rows[0].body !== body || JSON.stringify(prior.rows[0].attachments ?? []) !== JSON.stringify(attachments)) throw new MessagingStoreError('CONFLICT', 409)
             return prior.rows[0]
           }
           const sequenceResult = await client.query<{ last_sequence: string }>(
@@ -263,10 +263,10 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
           if (!sequence) throw new MessagingStoreError()
           const inserted = await client.query<MessageRow>(
             `INSERT INTO social_messages
-              (message_id, conversation_id, sender_user_id, sequence, client_message_id, body, created_at)
-             VALUES ($1, $2, $3, $4::bigint, $5, $6, CURRENT_TIMESTAMP)
+              (message_id, conversation_id, sender_user_id, sequence, client_message_id, body, attachments, created_at)
+             VALUES ($1, $2, $3, $4::bigint, $5, $6, $7::jsonb, CURRENT_TIMESTAMP)
              RETURNING ${messageSelect}`,
-            [crypto.randomUUID(), conversationId, actorUserId, sequence, clientMessageId, body])
+            [crypto.randomUUID(), conversationId, actorUserId, sequence, clientMessageId, body, JSON.stringify(attachments)])
           const message = inserted.rows[0]
           if (!message) throw new MessagingStoreError()
           await client.query(
@@ -294,12 +294,42 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
                 )
               LIMIT 1`, [actorUserId, clientMessageId])
           if (prior.rows[0]) {
-            if (prior.rows[0].conversation_id === conversationId && prior.rows[0].body === body) return prior.rows[0]
+            if (prior.rows[0].conversation_id === conversationId && prior.rows[0].body === body && JSON.stringify(prior.rows[0].attachments ?? []) === JSON.stringify(attachments)) return prior.rows[0]
             throw new MessagingStoreError('CONFLICT', 409)
           }
         } catch (retryError) {
           if (retryError instanceof MessagingStoreError) throw retryError
         }
+        throw new MessagingStoreError()
+      }
+    },
+    async canReadAttachment(actorUserId, conversationId, mediaId) {
+      if (!validId(conversationId) || !validId(mediaId)) throw new MessagingStoreError('VALIDATION_FAILED', 422)
+      try {
+        const result = await db.query(
+          `SELECT 1
+             FROM social_conversation_memberships mine
+             JOIN social_conversation_memberships peer
+               ON peer.conversation_id = mine.conversation_id
+              AND peer.user_id <> mine.user_id
+              AND peer.left_at IS NULL
+             JOIN social_messages message
+               ON message.conversation_id = mine.conversation_id
+              AND message.recalled_at IS NULL
+              AND message.attachments @> jsonb_build_array(jsonb_build_object('mediaId', $3::text))
+            WHERE mine.conversation_id = $1
+              AND mine.user_id = $2
+              AND mine.left_at IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM social_user_interactions blocked
+                 WHERE blocked.relation_type = 'block'
+                   AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                     OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+              )
+            LIMIT 1`,
+          [conversationId, actorUserId, mediaId])
+        return result.rows.length > 0
+      } catch {
         throw new MessagingStoreError()
       }
     },

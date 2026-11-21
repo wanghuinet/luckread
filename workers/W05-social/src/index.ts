@@ -917,8 +917,22 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         let body: unknown
         try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
         if (!body || typeof body !== 'object' || Array.isArray(body)) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
-        const data = await sendMessage(dependencies.messagingStore, actorUserId, conversationId, idempotencyKey, (body as { body?: unknown }).body)
+        const data = await sendMessage(dependencies.messagingStore, actorUserId, conversationId, idempotencyKey, (body as { body?: unknown }).body, (body as { attachments?: unknown }).attachments)
         return json({ data, requestId: createRequestId() }, 201)
+      }
+
+      const messagingAttachmentAuthorizeMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/attachments\/([^/]+)\/authorize$/.exec(url.pathname)
+      if (messagingAttachmentAuthorizeMatch) {
+        if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const conversationId = decodePathPart(messagingAttachmentAuthorizeMatch[1] ?? '')
+        const mediaId = decodePathPart(messagingAttachmentAuthorizeMatch[2] ?? '')
+        if (!conversationId || !mediaId) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        if (!dependencies.messagingStore) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
+        const allowed = await dependencies.messagingStore.canReadAttachment(actorUserId, conversationId, mediaId)
+        if (!allowed) throw new MessagingRuntimeError('NOT_FOUND', 404)
+        return json({ data: { allowed: true }, requestId: createRequestId() })
       }
 
       const messagingReadMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/read$/.exec(url.pathname)

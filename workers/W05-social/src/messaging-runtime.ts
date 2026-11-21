@@ -1,8 +1,9 @@
-import { MessagingStoreError, type MessagingStore } from './messaging-store.js'
+import { MessagingStoreError, type MessagingAttachment, type MessagingStore } from './messaging-store.js'
 export class MessagingRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code); this.name = 'MessagingRuntimeError' }
 }
 const MAX_LIMIT = 50
+const MAX_ATTACHMENTS = 4
 function requireId(value: string, code = 'VALIDATION_FAILED'): string {
   const normalized = value.trim()
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(normalized)) throw new MessagingRuntimeError(code, code === 'UNAUTHENTICATED' ? 401 : 422)
@@ -19,6 +20,30 @@ function storeCall<T>(operation: () => Promise<T>): Promise<T> {
   return operation().catch(error => {
     if (error instanceof MessagingStoreError) throw new MessagingRuntimeError(error.code, error.status)
     throw error
+  })
+}
+function normalizeAttachments(value: unknown): MessagingAttachment[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value) || value.length > MAX_ATTACHMENTS) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+  const seen = new Set<string>()
+  return value.map((raw) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+    const item = raw as Record<string, unknown>
+    const mediaId = typeof item.mediaId === 'string' ? item.mediaId.trim() : ''
+    const filename = typeof item.filename === 'string' ? item.filename.trim() : ''
+    const mimeType = typeof item.mimeType === 'string' ? item.mimeType.toLowerCase().trim() : ''
+    const filesize = item.filesize
+    const width = item.width === null ? null : item.width
+    const height = item.height === null ? null : item.height
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(mediaId) || seen.has(mediaId) ||
+      !filename || filename.length > 255 || !['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'].includes(mimeType) ||
+      typeof filesize !== 'number' || !Number.isSafeInteger(filesize) || filesize < 1 || filesize > 20 * 1024 * 1024 ||
+      (width !== null && (typeof width !== 'number' || !Number.isSafeInteger(width) || width < 1 || width > 100000)) ||
+      (height !== null && (typeof height !== 'number' || !Number.isSafeInteger(height) || height < 1 || height > 100000))) {
+      throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+    }
+    seen.add(mediaId)
+    return { mediaId, filename, mimeType, filesize, width: width as number | null, height: height as number | null }
   })
 }
 export async function createDirectConversation(store: MessagingStore | undefined, actorValue: string, recipientValue: string) {
@@ -43,15 +68,16 @@ export async function listMessagesAfter(store: MessagingStore | undefined, actor
   }
   return storeCall(() => store.listMessagesAfter(requireId(actorValue, 'UNAUTHENTICATED'), requireId(conversationId), afterSequence, limit(rawLimit)))
 }
-export async function sendMessage(store: MessagingStore | undefined, actorValue: string, conversationId: string, idempotencyKey: string, bodyValue: unknown) {
+export async function sendMessage(store: MessagingStore | undefined, actorValue: string, conversationId: string, idempotencyKey: string, bodyValue: unknown, attachmentsValue?: unknown) {
   if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
   const actor = requireId(actorValue, 'UNAUTHENTICATED')
   const conversation = requireId(conversationId)
   const key = requireId(idempotencyKey)
   if (typeof bodyValue !== 'string') throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
   const body = bodyValue.normalize('NFC').trim()
-  if (!body || body.length > 10000) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
-  return storeCall(() => store.sendMessage(actor, conversation, key, body))
+  const attachments = normalizeAttachments(attachmentsValue)
+  if (body.length > 10000 || (!body && !attachments.length)) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+  return storeCall(() => store.sendMessage(actor, conversation, key, body, attachments))
 }
 export async function markConversationRead(store: MessagingStore | undefined, actorValue: string, conversationId: string, sequenceValue: unknown) {
   if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
