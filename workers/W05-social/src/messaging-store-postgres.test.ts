@@ -81,6 +81,72 @@ describe('W05 PostgreSQL messaging store', () => {
     expect(client.query.mock.calls.at(-1)?.[0]).toBe('COMMIT')
   })
 
+  it('rejects sends after a Block and never inserts a message', async () => {
+    const { db, client } = executor([
+      { rows: [] },
+      { rows: [{ conversation_id: 'conversation-1' }] },
+      { rows: [] },
+      { rows: [{ user_id: 'user-b' }] },
+      { rows: [{ blocked: 1 }] },
+      { rows: [] },
+    ])
+    const store = createPostgresMessagingStore(db as never)
+    await expect(store.sendMessage('user-a', 'conversation-1', 'client-2', 'hello'))
+      .rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO social_messages'))).toBe(false)
+    expect(client.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK')
+  })
+
+  it('rejects reuse of an idempotency key with a different payload', async () => {
+    const prior = {
+      message_id: 'message-1', conversation_id: 'conversation-1', sender_user_id: 'user-a',
+      sequence: '1', body: 'original', created_at: '2026-11-21T00:00:00.000Z',
+    }
+    const { db, client } = executor([
+      { rows: [] },
+      { rows: [{ conversation_id: 'conversation-1' }] },
+      { rows: [prior] },
+      { rows: [] },
+    ])
+    const store = createPostgresMessagingStore(db as never)
+    await expect(store.sendMessage('user-a', 'conversation-1', 'client-1', 'changed'))
+      .rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO social_messages'))).toBe(false)
+    expect(client.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK')
+  })
+
+  it('paginates message history with a strict before-sequence cursor', async () => {
+    const rows = [
+      { message_id: 'message-8', conversation_id: 'conversation-1', sender_user_id: 'user-a', sequence: '8', body: 'eight', created_at: '2026-11-21T00:00:08.000Z' },
+      { message_id: 'message-7', conversation_id: 'conversation-1', sender_user_id: 'user-b', sequence: '7', body: 'seven', created_at: '2026-11-21T00:00:07.000Z' },
+      { message_id: 'message-6', conversation_id: 'conversation-1', sender_user_id: 'user-a', sequence: '6', body: 'six', created_at: '2026-11-21T00:00:06.000Z' },
+    ]
+    const { db } = executor([], [{ rows: [{ member: 1 }] }, { rows }])
+    const store = createPostgresMessagingStore(db as never)
+    const page = await store.listMessages('user-a', 'conversation-1', '9', 2)
+    expect(page.items.map(item => item.sequence)).toEqual(['8', '7'])
+    expect(page).toMatchObject({ nextCursor: '7', hasMore: true })
+    expect(db.query.mock.calls[1]?.[0]).toContain('sequence < $2::bigint')
+    expect(db.query.mock.calls[1]?.[0]).toContain('ORDER BY sequence DESC LIMIT $3')
+    expect(db.query.mock.calls[1]?.[1]).toEqual(['conversation-1', '9', 3])
+  })
+
+  it('hides message history when the actor is not an active conversation member', async () => {
+    const { db } = executor([], [{ rows: [] }])
+    const store = createPostgresMessagingStore(db as never)
+    await expect(store.listMessages('user-outsider', 'conversation-1', null, 30))
+      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(db.query).toHaveBeenCalledOnce()
+  })
+
+  it('rejects malformed conversation cursors before querying the database', async () => {
+    const { db } = executor([], [{ rows: [] }])
+    const store = createPostgresMessagingStore(db as never)
+    await expect(store.listConversations('user-a', 'not-a-cursor', 30))
+      .rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
+    expect(db.query).not.toHaveBeenCalled()
+  })
+
   it('advances read cursors monotonically and caps them at the conversation sequence', async () => {
     const { db } = executor([], [{ rows: [], rowCount: 1 }])
     const store = createPostgresMessagingStore(db as never)
