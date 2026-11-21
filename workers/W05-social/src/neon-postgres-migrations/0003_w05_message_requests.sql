@@ -22,4 +22,16 @@ CREATE INDEX ix_social_message_requests_recipient_pending
   WHERE status = 'pending';
 CREATE INDEX ix_social_message_requests_sender
   ON social_message_requests(sender_user_id, created_at DESC, request_id DESC);
+CREATE TABLE social_message_request_audit (
+  audit_id TEXT PRIMARY KEY NOT NULL,
+  request_id TEXT NOT NULL REFERENCES social_message_requests(request_id) ON DELETE RESTRICT,
+  actor_user_id TEXT NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('created', 'accepted', 'declined', 'cancelled')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX ix_social_message_request_audit_request
+  ON social_message_request_audit(request_id, created_at ASC, audit_id ASC);
+CREATE INDEX ix_social_message_request_audit_actor
+  ON social_message_request_audit(actor_user_id, created_at DESC);
 COMMIT;
