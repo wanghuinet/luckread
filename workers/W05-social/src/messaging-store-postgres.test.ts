@@ -61,8 +61,8 @@ describe('W05 PostgreSQL messaging store', () => {
     const { db, client } = executor([
       { rows: [] },
       { rows: [{ conversation_id: 'conversation-1' }] },
-      { rows: [] },
       { rows: [{ user_id: 'user-b' }] },
+      { rows: [] },
       { rows: [] },
       { rows: [{ last_sequence: '1' }] },
       { rows: [message] },
@@ -84,6 +84,8 @@ describe('W05 PostgreSQL messaging store', () => {
     const { db, client } = executor([
       { rows: [] },
       { rows: [{ conversation_id: 'conversation-1' }] },
+      { rows: [{ user_id: 'user-b' }] },
+      { rows: [] },
       { rows: [message] },
       { rows: [] },
     ])
@@ -97,7 +99,6 @@ describe('W05 PostgreSQL messaging store', () => {
     const { db, client } = executor([
       { rows: [] },
       { rows: [{ conversation_id: 'conversation-1' }] },
-      { rows: [] },
       { rows: [{ user_id: 'user-b' }] },
       { rows: [{ blocked: 1 }] },
       { rows: [] },
@@ -117,6 +118,8 @@ describe('W05 PostgreSQL messaging store', () => {
     const { db, client } = executor([
       { rows: [] },
       { rows: [{ conversation_id: 'conversation-1' }] },
+      { rows: [{ user_id: 'user-b' }] },
+      { rows: [] },
       { rows: [prior] },
       { rows: [] },
     ])
