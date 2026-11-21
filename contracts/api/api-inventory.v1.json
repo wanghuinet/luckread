@@ -330,9 +330,12 @@
       "endpoint_groups": [
         "GET /v1/conversations",
         "GET /v1/conversations/{conversationId}/messages",
+        "GET /v1/message-requests",
         "POST /v1/conversations",
         "POST /v1/conversations/{conversationId}/messages",
-        "POST /v1/conversations/{conversationId}/read"
+        "POST /v1/conversations/{conversationId}/read",
+        "POST /v1/message-requests",
+        "POST /v1/message-requests/{requestId}/{action}"
       ]
     }
   },

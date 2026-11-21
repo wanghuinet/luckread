@@ -140,6 +140,10 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
       const conversation = await createDirectConversation(user.id);
       router.push({ pathname: '/messages/[conversationId]', params: { conversationId: conversation.conversationId, participantName: user.name } } as never);
     } catch (cause) {
+      if (cause instanceof Error && cause.message === 'CONTACT_POLICY_DENIED') {
+        router.push({ pathname: '/messages/new-request', params: { recipientUserId: user.id, participantName: user.name } } as never);
+        return;
+      }
       Alert.alert('无法发起私信', cause instanceof Error ? cause.message : '请稍后重试。');
     }
   }, [router, user.id, user.name]);
