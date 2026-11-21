@@ -1711,6 +1711,7 @@ paths:
       responses:
         '200': { description: Conversation page }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
     post:
       tags: [Messaging]
       operationId: createMessagingConversation
@@ -1727,6 +1728,7 @@ paths:
       responses:
         '201': { description: Conversation created or retrieved }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
   /conversations/{conversationId}/messages:
     parameters:
       - name: conversationId
@@ -1744,6 +1746,7 @@ paths:
           schema: { type: string, pattern: '^[0-9]+
         '200': { description: Message page }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
     post:
       tags: [Messaging]
       operationId: sendMessagingMessage
@@ -1762,6 +1765,7 @@ paths:
       responses:
         '201': { description: Persisted message }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
   /conversations/{conversationId}/read:
     parameters:
       - name: conversationId
@@ -1784,6 +1788,7 @@ paths:
       responses:
         '204': { description: Read cursor advanced }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
   /notifications:
     get:
       tags: [Notifications]
