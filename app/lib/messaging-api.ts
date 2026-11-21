@@ -1,12 +1,17 @@
 import { apiRequest, createIdempotencyKey } from './api-client';
+import { uploadMediaFile, type LocalMediaFile } from './publish-api';
 
 export type MessagingConversation = {
   conversation_id: string; participant_user_id: string; updated_at: string; last_sequence: string;
   last_message_id: string | null; last_message_body: string | null; last_message_sender_user_id: string | null;
   last_message_created_at: string | null; last_read_sequence: string; unread_count: number;
 };
+export type MessagingAttachment = {
+  mediaId: string; filename: string; mimeType: string; filesize: number; width: number | null; height: number | null;
+};
 export type MessagingMessage = {
-  message_id: string; conversation_id: string; sender_user_id: string; sequence: string; body: string; created_at: string;
+  message_id: string; conversation_id: string; sender_user_id: string; sequence: string; body: string;
+  attachments?: MessagingAttachment[]; created_at: string;
 };
 type Page<T> = { items: T[]; nextCursor: string | null; hasMore: boolean };
 type Envelope<T> = { data?: T; error?: { code?: string; message?: string }; requestId?: string };
@@ -42,10 +47,29 @@ export async function fetchMessagesAfter(conversationId: string, afterSequence: 
     '/conversations/' + encodeURIComponent(conversationId) + '/messages?' + query.toString(), { method: 'GET', signal },
   ));
 }
-export async function sendDirectMessage(conversationId: string, body: string, idempotencyKey = createIdempotencyKey()): Promise<MessagingMessage> {
+export async function uploadMessageAttachment(file: LocalMediaFile) {
+  if (!file.size || file.size > 20 * 1024 * 1024) throw new Error('附件不能超过 20 MB。');
+  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+  if (!allowed.includes(file.mimeType.toLowerCase())) throw new Error('仅支持 JPG、PNG、WebP、GIF 和 PDF。');
+  const media = await uploadMediaFile(file);
+  return {
+    mediaId: media.id,
+    filename: media.filename,
+    mimeType: media.mimeType.toLowerCase(),
+    filesize: media.filesize ?? file.size,
+    width: file.width ?? null,
+    height: file.height ?? null,
+  } satisfies MessagingAttachment;
+}
+export async function sendDirectMessage(
+  conversationId: string,
+  body: string,
+  idempotencyKey = createIdempotencyKey(),
+  attachments: MessagingAttachment[] = [],
+): Promise<MessagingMessage> {
   return unwrap<MessagingMessage>(await apiRequest<Envelope<MessagingMessage>>(
     '/conversations/' + encodeURIComponent(conversationId) + '/messages',
-    { method: 'POST', body: JSON.stringify({ body }), idempotencyKey },
+    { method: 'POST', body: JSON.stringify({ body, attachments }), idempotencyKey },
   ));
 }
 export async function markConversationRead(conversationId: string, sequence: string) {
