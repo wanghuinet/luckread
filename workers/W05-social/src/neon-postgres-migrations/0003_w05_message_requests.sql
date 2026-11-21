@@ -15,7 +15,7 @@ CREATE TABLE social_message_requests (
   UNIQUE (sender_user_id, client_request_id)
 );
 CREATE UNIQUE INDEX ux_social_message_requests_pending_pair
-  ON social_message_requests(sender_user_id, recipient_user_id)
+  ON social_message_requests(LEAST(sender_user_id, recipient_user_id), GREATEST(sender_user_id, recipient_user_id))
   WHERE status = 'pending';
 CREATE INDEX ix_social_message_requests_recipient_pending
   ON social_message_requests(recipient_user_id, created_at DESC, request_id DESC)
