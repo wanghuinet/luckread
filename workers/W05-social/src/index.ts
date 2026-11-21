@@ -14,7 +14,7 @@ import {
   unfavorite,
 } from './favorite-runtime.js'
 import { ShareRuntimeError, createShare, resolveShare } from './share-runtime.js'
-import { RepostRuntimeError, createRepost, removeRepost } from './repost-runtime.js'
+import { RepostRuntimeError, assertQuotePostAllowed, createRepost, removeRepost } from './repost-runtime.js'
 import { ProfilePinRuntimeError, getProfilePinReference, pinProfileContent, unpinProfileContent } from './profile-pin-runtime.js'
 import { BlockMuteRuntimeError, listRelations, parseBlockMuteListLimit, removeRelation, setRelation } from './block-mute-runtime.js'
 import type { BlockMuteListReadStore } from './block-mute-list-read-store.js'
@@ -366,6 +366,30 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
       const url = new URL(request.url)
       const isBatchSocialRead = url.pathname === '/internal/social/contents/summary-batch'
       await enforceRateLimit(request, env, request.method === 'GET' || isBatchSocialRead ? 'read:' + url.pathname.split('/').slice(0, 4).join('/') : 'write:' + url.pathname.split('/').slice(0, 4).join('/'))
+
+      const quotePostPreflightMatch = /^\/internal\/social\/content\/([^/]+)\/quote-post-preflight$/.exec(url.pathname)
+      if (quotePostPreflightMatch) {
+        const contentId = decodePathPart(quotePostPreflightMatch[1] ?? '')
+        if (contentId === null) throw new RepostRuntimeError('VALIDATION_FAILED', 400)
+        if (request.method !== 'POST') {
+          return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        }
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+        if (!idempotencyKey) throw new RepostRuntimeError('PRECONDITION_REQUIRED', 428)
+        if (idempotencyKey.length > 256) throw new RepostRuntimeError('VALIDATION_FAILED', 400)
+        const store = dependencies.repostStore
+        if (!store) throw new RepostRuntimeError('SERVICE_UNAVAILABLE', 503)
+        await assertQuotePostAllowed(
+          env.W03_CONTENT,
+          actorUserId,
+          contentId,
+          request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+          store,
+        )
+        return json({ data: { allowed: true }, requestId: createRequestId() })
+      }
 
       const repostMatch = /^\/internal\/social\/content\/([^/]+)\/reposts$/.exec(url.pathname)
       if (repostMatch) {
