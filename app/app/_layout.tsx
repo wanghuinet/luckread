@@ -98,7 +98,10 @@ export default function RootLayout() {
       syncInFlight = true;
       // Permission reconciliation never displays a system prompt.
       void syncPushEndpointForAuthenticatedUser(userId, devicePushToken)
-        .catch(() => undefined)
+        .catch((error: unknown) => {
+          // Keep startup resilient, but make failed endpoint registration observable.
+          posthog?.captureException(error);
+        })
         .finally(() => {
           syncInFlight = false;
           if (active && syncQueued) {
