@@ -1260,7 +1260,7 @@
     {
       "operationId": "listMessageRequests",
       "auth": {
-        "mode": "permission"
+        "mode": "authenticated"
       },
       "permissions": [],
       "auditRequired": false,
@@ -2840,12 +2840,12 @@
     {
       "operationId": "createMessageRequest",
       "auth": {
-        "mode": "permission"
+        "mode": "authenticated"
       },
       "permissions": [],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
@@ -2853,7 +2853,7 @@
     {
       "operationId": "respondToMessageRequest",
       "auth": {
-        "mode": "permission"
+        "mode": "authenticated"
       },
       "permissions": [],
       "auditRequired": true,
