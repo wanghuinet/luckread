@@ -94,7 +94,7 @@ export default function Messages() {
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}
           contentContainerStyle={{ flexGrow: 1 }}
-          ListFooterComponent={conversations.isFetchingNextPage ? <View className="py-4"><ActivityIndicator color="#1d9bf0" /></View> : null}
+          ListFooterComponent={conversations.isFetchingNextPage ? <View className="py-4"><ActivityIndicator color="#1d9bf0" /></View> : undefined}
           ListEmptyComponent={
             <View className="flex-1 items-center justify-center px-8 py-20">
               <View className="h-16 w-16 items-center justify-center rounded-full bg-sky-50 dark:bg-sky-950/40">

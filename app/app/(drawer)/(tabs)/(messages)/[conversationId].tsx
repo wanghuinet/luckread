@@ -87,7 +87,7 @@ export default function ConversationScreen() {
           inverted
           onEndReached={loadOlder}
           onEndReachedThreshold={0.3}
-          ListFooterComponent={messagesQuery.isFetchingNextPage ? <View className="py-4"><ActivityIndicator color="#1d9bf0" /></View> : null}
+          ListFooterComponent={messagesQuery.isFetchingNextPage ? <View className="py-4"><ActivityIndicator color="#1d9bf0" /></View> : undefined}
           keyExtractor={(item) => item.message_id}
           renderItem={({ item }: { item: MessagingMessage }) => {
             const own = Boolean(userId && item.sender_user_id === userId);

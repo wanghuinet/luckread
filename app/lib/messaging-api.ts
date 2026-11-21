@@ -24,8 +24,8 @@ export async function fetchConversations(cursor: string | null = null, signal?: 
   if (cursor) query.set('cursor', cursor);
   return unwrap(await apiRequest<Envelope<Page<MessagingConversation>>>('/conversations?' + query.toString(), { method: 'GET', signal }));
 }
-export async function createDirectConversation(recipientUserId: string) {
-  return unwrap(await apiRequest<Envelope<{ conversationId: string }>>('/conversations', {
+export async function createDirectConversation(recipientUserId: string): Promise<{ conversationId: string }> {
+  return unwrap<{ conversationId: string }>(await apiRequest<Envelope<{ conversationId: string }>>('/conversations', {
     method: 'POST', body: JSON.stringify({ recipientUserId }), idempotencyKey: false,
   }));
 }
