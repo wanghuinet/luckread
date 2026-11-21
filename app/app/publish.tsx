@@ -208,9 +208,10 @@ function PublishScreenContent() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const navigation = useNavigation();
-  const params = useLocalSearchParams<{ contentId?: string | string[]; draftId?: string | string[] }>();
+  const params = useLocalSearchParams<{ contentId?: string | string[]; draftId?: string | string[]; quoteContentId?: string | string[] }>();
   const contentId = Array.isArray(params.contentId) ? params.contentId[0] : params.contentId;
   const draftId = Array.isArray(params.draftId) ? params.draftId[0] : params.draftId;
+  const quoteContentId = Array.isArray(params.quoteContentId) ? params.quoteContentId[0] : params.quoteContentId;
   const authStatus = useAuthStore((state) => state.status);
   const user = useAuthStore((state) => state.user);
 
@@ -225,6 +226,9 @@ function PublishScreenContent() {
   const [mediaWarning, setMediaWarning] = useState<'NUDITY' | 'VIOLENCE' | 'SENSITIVE' | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(Boolean(contentId));
+  const [quoteTarget, setQuoteTarget] = useState<ContentRecord | null>(null);
+  const [loadingQuote, setLoadingQuote] = useState(Boolean(quoteContentId));
+  const quoteRelationshipKeyRef = useRef<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [publishPending, setPublishPending] = useState(false);
@@ -501,6 +505,34 @@ function PublishScreenContent() {
     if (!contentId && !draftId) draftSaveRestoreCompleteRef.current = true;
     void loadExistingContent();
   }, [contentId, draftId, loadExistingContent]);
+
+  useEffect(() => {
+    let active = true;
+    if (!quoteContentId) {
+      setQuoteTarget(null);
+      setLoadingQuote(false);
+      return () => { active = false; };
+    }
+    setLoadingQuote(true);
+    void apiRequest<Record<string, unknown>>('/contents/' + encodeURIComponent(quoteContentId), { method: 'GET' })
+      .then((result) => {
+        if (!active) return;
+        if (!result.response.ok) throw new Error(apiFailureDiagnostic(result, '无法加载要引用的原帖。'));
+        const target = unwrapContent(result.data);
+        if (!target || target.id !== quoteContentId || target.contentType !== 'post' || target.state !== 'PUBLISHED' || target.accessMode !== 'PUBLIC') {
+          throw new Error('这条动态目前不可引用。');
+        }
+        setQuoteTarget(target);
+        setErrorMessage('');
+      })
+      .catch((error) => {
+        if (!active) return;
+        setQuoteTarget(null);
+        setErrorMessage(error instanceof Error ? error.message : '无法加载要引用的原帖。');
+      })
+      .finally(() => { if (active) setLoadingQuote(false); });
+    return () => { active = false; };
+  }, [quoteContentId]);
 
   const uploadAsset = useCallback(async (asset: ComposerAsset) => {
     let uploaded = asset.uploaded;
@@ -1771,6 +1803,14 @@ function PublishScreenContent() {
 
   const submit = useCallback(async () => {
     const trimmedBody = body.trim();
+    if (quoteContentId && (!quoteTarget || quoteTarget.id !== quoteContentId || loadingQuote)) {
+      setErrorMessage('请先加载并确认可引用的原帖。');
+      return;
+    }
+    if (quoteContentId && scheduleEnabled) {
+      setErrorMessage('引用动态暂不支持定时发布，请关闭定时发布后重试。');
+      return;
+    }
     if (!trimmedBody) {
       setErrorMessage('Write something before publishing.');
       return;
@@ -2111,6 +2151,24 @@ function PublishScreenContent() {
         ));
       }
 
+      if (quoteContentId) {
+        const relationshipKey = quoteRelationshipKeyRef.current || createIdempotencyKey();
+        quoteRelationshipKeyRef.current = relationshipKey;
+        const relationship = await apiRequest<Record<string, unknown>>(
+          '/contents/' + encodeURIComponent(draft.id) + '/relationships',
+          {
+            method: 'POST',
+            body: JSON.stringify({ targetContentId: quoteContentId, relationType: 'quote-post' }),
+            idempotencyKey: relationshipKey,
+          },
+        );
+        if (!relationship.response.ok) {
+          setPublishPending(true);
+          throw new Error(apiFailureDiagnostic(relationship, '动态已发布，但引用关系尚未保存。请重试完成引用。'));
+        }
+        quoteRelationshipKeyRef.current = null;
+      }
+
       if (scheduleEnabled) {
         submitAttemptRef.current = null;
         recordRef.current = null;
@@ -2155,7 +2213,7 @@ function PublishScreenContent() {
     } finally {
       setBusy(false);
     }
-  }, [accessMode, assets, body, contentId, coverRef, mediaWarning, pollDurationMinutes, pollEnabled, pollOptions, publishPending, replyAudience, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens, user?.id]);
+  }, [accessMode, assets, body, contentId, coverRef, loadingQuote, mediaWarning, pollDurationMinutes, pollEnabled, pollOptions, publishPending, quoteContentId, quoteTarget, replyAudience, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens, user?.id]);
 
   if (authStatus !== 'authenticated') {
     return (
@@ -2175,7 +2233,7 @@ function PublishScreenContent() {
 
   return (
     <View style={[styles.page, isDark && { backgroundColor: '#000000' }]}>
-      <Stack.Screen options={{ title: contentId ? 'Edit post' : 'New post', headerShown: false }} />
+      <Stack.Screen options={{ title: contentId ? 'Edit post' : quoteContentId ? 'Quote post' : 'New post', headerShown: false }} />
       <View style={[styles.header, isDark && { backgroundColor: '#000000', borderBottomColor: '#27272a' }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close composer" disabled={busy || loadingEdit} onPress={() => { void closeComposer(); }} style={[styles.iconButton, (busy || loadingEdit) && styles.disabledButton]}>
           <Feather name="x" size={22} color={isDark ? '#e5e7eb' : '#111827'} />
@@ -2190,12 +2248,12 @@ function PublishScreenContent() {
             <Feather name="calendar" size={19} color={isDark ? '#e5e7eb' : '#344054'} />
           </Pressable>
         ) : null}
-        <Text style={[styles.headerTitle, isDark && { color: '#f9fafb' }]}>{contentId ? 'Edit post' : 'New post'}</Text>
+        <Text style={[styles.headerTitle, isDark && { color: '#f9fafb' }]}>{contentId ? 'Edit post' : quoteContentId ? 'Quote post' : 'New post'}</Text>
         <Pressable
           accessibilityRole="button"
           onPress={() => { void submit(); }}
-          disabled={busy || loadingEdit || !body.trim()}
-          style={[styles.publishButton, (busy || loadingEdit || !body.trim()) && styles.disabledButton]}
+          disabled={busy || loadingEdit || loadingQuote || !body.trim()}
+          style={[styles.publishButton, (busy || loadingEdit || loadingQuote || !body.trim()) && styles.disabledButton]}
         >
           {busy ? <ActivityIndicator color="#ffffff" size="small" /> : <Text style={styles.publishButtonText}>{publishPending ? (scheduleEnabled ? 'Retry schedule' : 'Retry publish') : contentId ? 'Save' : scheduleEnabled ? 'Schedule' : 'Post'}</Text>}
         </Pressable>
@@ -2213,6 +2271,21 @@ function PublishScreenContent() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[styles.scrollContent, isDark && { backgroundColor: '#000000' }]}
         >
+          {quoteContentId ? (
+            <View style={{ marginBottom: 16, padding: 14, borderWidth: 1, borderColor: isDark ? '#3f3f46' : '#e4e7ec', borderRadius: 14, backgroundColor: isDark ? '#111113' : '#f9fafb' }}>
+              <Text style={{ color: isDark ? '#d4d4d8' : '#475467', fontSize: 13, fontWeight: '700', marginBottom: 8 }}>引用原帖</Text>
+              {loadingQuote ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><ActivityIndicator size="small" color={PRIMARY} /><Text style={{ color: isDark ? '#a1a1aa' : '#667085' }}>正在加载原帖…</Text></View>
+              ) : quoteTarget ? (
+                <Pressable accessibilityRole="link" onPress={() => router.push(('/post/' + encodeURIComponent(quoteTarget.id)) as never)}>
+                  <Text numberOfLines={4} style={{ color: isDark ? '#f4f4f5' : '#101828', fontSize: 14, lineHeight: 20 }}>{quoteTarget.title || '原帖内容'}</Text>
+                  <Text style={{ color: isDark ? '#a1a1aa' : '#667085', fontSize: 12, marginTop: 6 }}>查看原帖 · 不复制原文，保留原始内容关系</Text>
+                </Pressable>
+              ) : (
+                <Text style={{ color: '#dc2626', fontSize: 13 }}>原帖不可引用，请返回信息流重新选择。</Text>
+              )}
+            </View>
+          ) : null}
           <TextInput
             ref={bodyInputRef}
             accessibilityLabel="Post text"
