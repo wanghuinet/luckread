@@ -164,6 +164,15 @@ export function validateManifestShape(manifest) {
       dependsOn: ['d1-02-w03-content-schema-v1', 'd1-02-w05-social-schema-v1'],
       expectedTableCount: 0,
     },
+    {
+      migrationId: 'd1-02-w03-content-quote-post-relationship-v1',
+      order: 4,
+      ownerWorker: 'W03',
+      kind: 'POSTGRESQL_SQL',
+      artifactPaths: ['workers/W03-content/src/neon-postgres-migrations/0003_w03_content_quote_post_relationship.sql'],
+      dependsOn: ['d1-02-w03-content-snowflake-timestamp-bigint-v1'],
+      expectedTableCount: 0,
+    },
   ]
   if (!Array.isArray(entries) || canonicalJson(entries) !== canonicalJson(expected)) {
     errors.push('manifest entries must contain only W03 first and W05 second with exact committed PostgreSQL artifacts')
@@ -176,7 +185,7 @@ export function validateManifestShape(manifest) {
       manifest?.expected?.snowflakeAllocatorRows !== 1 ||
       manifest?.expected?.foreignKeys !== 0 ||
       manifest?.expected?.d1_03EndpointTable !== false ||
-      manifest?.expected?.migrationLedgerRows !== 3) {
+      manifest?.expected?.migrationLedgerRows !== 4) {
     errors.push('manifest object inventory or empty-data invariants do not match the approved D1-02 contract')
   }
   if (errors.length) return { valid: false, errors }
