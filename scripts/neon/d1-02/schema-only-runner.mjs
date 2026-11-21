@@ -164,19 +164,28 @@ export function validateManifestShape(manifest) {
       dependsOn: ['d1-02-w03-content-schema-v1', 'd1-02-w05-social-schema-v1'],
       expectedTableCount: 0,
     },
+    {
+      migrationId: 'd1-02-w05-messaging-core-v1',
+      order: 4,
+      ownerWorker: 'W05',
+      kind: 'POSTGRESQL_SQL',
+      artifactPaths: ['workers/W05-social/src/neon-postgres-migrations/0002_w05_messaging_core.sql'],
+      dependsOn: ['d1-02-w03-content-schema-v1', 'd1-02-w05-social-schema-v1', 'd1-02-w03-content-snowflake-timestamp-bigint-v1'],
+      expectedTableCount: 3,
+    },
   ]
   if (!Array.isArray(entries) || canonicalJson(entries) !== canonicalJson(expected)) {
     errors.push('manifest entries must contain only W03 first and W05 second with exact committed PostgreSQL artifacts')
   }
-  if (manifest?.expected?.tables !== 28 ||
-      manifest?.expected?.explicitIndexes !== 63 ||
+  if (manifest?.expected?.tables !== 31 ||
+      manifest?.expected?.explicitIndexes !== 65 ||
       manifest?.expected?.triggers !== 9 ||
       manifest?.expected?.triggerFunctions !== 10 ||
       manifest?.expected?.businessRows !== 0 ||
       manifest?.expected?.snowflakeAllocatorRows !== 1 ||
       manifest?.expected?.foreignKeys !== 0 ||
       manifest?.expected?.d1_03EndpointTable !== false ||
-      manifest?.expected?.migrationLedgerRows !== 3) {
+      manifest?.expected?.migrationLedgerRows !== 4) {
     errors.push('manifest object inventory or empty-data invariants do not match the approved D1-02 contract')
   }
   if (errors.length) return { valid: false, errors }

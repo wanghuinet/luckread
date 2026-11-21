@@ -24,8 +24,8 @@ export function buildW05PostgresMigration({ inventory, socialContract, readSourc
 
   const owner = inventory.owners?.find((item) => item.worker === 'W05')
   if (!owner || owner.migrationDirectory !== 'workers/W05-social/migrations' ||
-      !Array.isArray(owner.sqlMigrations) || owner.sqlMigrations.length !== 16) {
-    fail('W05 must own exactly the frozen sixteen D1-02 source migrations')
+      !Array.isArray(owner.sqlMigrations) || owner.sqlMigrations.length !== 15) {
+    fail('W05 must own exactly the frozen fifteen D1-02 source migrations')
   }
 
   const includedBindings = owner.physicalBindings?.filter((item) => item.included === true) ?? []
@@ -100,13 +100,12 @@ export function buildW05PostgresMigration({ inventory, socialContract, readSourc
     'social_notification_preferences', 'social_reposts', 'social_profile_pins',
     'social_polls', 'social_poll_options', 'social_poll_votes',
     'social_content_reply_policies', 'social_notification_push_outbox',
-    'social_notification_push_deliveries', 'social_conversations',
-    'social_conversation_memberships', 'social_messages',
+    'social_notification_push_deliveries',
   ].sort()
   const actualTables = [...sql.matchAll(/^CREATE TABLE ([a-z_][a-z0-9_]*)/gim)]
     .map((match) => match[1]).sort()
   if (JSON.stringify(actualTables) !== JSON.stringify(expectedTables)) {
-    fail('native schema must create exactly the twenty-two W05-owned D1-02 tables')
+    fail('native schema must create exactly the nineteen W05-owned D1-02 tables')
   }
 
   const expectedIndexes = [
@@ -129,7 +128,6 @@ export function buildW05PostgresMigration({ inventory, socialContract, readSourc
     'ix_social_notification_push_outbox_status_created',
     'ix_social_notification_push_deliveries_due',
     'ix_social_notification_push_deliveries_endpoint', 'uq_social_notification_push_ticket',
-    'ix_social_conversations_updated', 'ix_social_conversation_memberships_user',
   ]
   const actualIndexes = [...sql.matchAll(/^CREATE (?:UNIQUE )?INDEX ([a-z_][a-z0-9_]*)/gim)]
     .map((match) => match[1])
@@ -172,7 +170,7 @@ export function buildW05PostgresMigration({ inventory, socialContract, readSourc
     '-- GENERATED FILE. Do not hand-edit.',
     '-- Regenerate with workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.mjs.',
     '-- Template: workers/W05-social/scripts/neon/templates/d1-02-social-postgres.sql.',
-    '-- Source authority: W05 / D1-02; application runtime uses the existing Neon Hyperdrive binding; this artifact is schema-only.',
+    '-- Source authority: W05 / D1-02; Cloudflare D1 remains the current runtime authority.',
     ''
   ].join('\n')
 

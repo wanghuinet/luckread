@@ -52,7 +52,7 @@
     },
     {
       "worker": "W05",
-      "role": "Authoritative social graph, interactions, discussions, messaging, notifications and push-delivery schema",
+      "role": "Authoritative social graph, interactions, discussions, notifications and push-delivery schema",
       "wrangler": "workers/W05-social/wrangler.jsonc",
       "migrationDirectory": "workers/W05-social/migrations",
       "physicalBindings": [
@@ -73,8 +73,7 @@
         }
       ],
       "referenceContracts": [
-        "contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json",
-        "contracts/persistence/MESSAGING-DIRECT-CONVERSATION-persistence.v1.json"
+        "contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json"
       ],
       "sqlMigrations": [
         "20260930_001_social_001_follow_v1.sql",
@@ -91,8 +90,7 @@
         "20261019_015_social_reply_audience_v1.sql",
         "20261022_016_social_discovery_scan_idx.sql",
         "20261104_017_notification_push_delivery_v1.sql",
-        "20261105_018_social_poll_duration_minutes.sql",
-        "20261121_019_messaging_core_v1.sql"
+        "20261105_018_social_poll_duration_minutes.sql"
       ]
     }
   ],

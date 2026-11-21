@@ -42,7 +42,7 @@ test('D1-02 contract freezes the two owner source sets and excludes D1-03', () =
   assert.equal(contract.owners[0].worker, 'W03')
   assert.equal(contract.owners[0].sqlMigrations.length, 15)
   assert.equal(contract.owners[1].worker, 'W05')
-  assert.equal(contract.owners[1].sqlMigrations.length, 16)
+  assert.equal(contract.owners[1].sqlMigrations.length, 15)
 
   const w05Bindings = contract.owners[1].physicalBindings
   assert.deepEqual(
@@ -141,9 +141,9 @@ test('repository inventory resolves exactly 30 current D1-02 migration sources w
   const result = buildD1_02Inventory({ contract, readSource, listSqlFiles })
   assert.deepEqual(result.failures, [])
   assert.equal(result.report.status, 'SOURCE_INVENTORY_VALID_PORTABILITY_REVIEW_REQUIRED')
-  assert.equal(result.report.migrationSummary.migrationCount, 31)
+  assert.equal(result.report.migrationSummary.migrationCount, 30)
   assert.equal(result.report.ownerSummaries.find((item) => item.worker === 'W03').migrationCount, 15)
-  assert.equal(result.report.ownerSummaries.find((item) => item.worker === 'W05').migrationCount, 16)
+  assert.equal(result.report.ownerSummaries.find((item) => item.worker === 'W05').migrationCount, 15)
   assert.equal(result.report.ownerSummaries.find((item) => item.worker === 'W05').runtimeProvider, 'neon')
   assert.equal(result.report.safety.neonConnectionAttempted, false)
   assert.equal(result.report.safety.remoteDdlExecuted, false)
