@@ -53,6 +53,19 @@
         "d1-02-w05-social-schema-v1"
       ],
       "expectedTableCount": 0
+    },
+    {
+      "migrationId": "d1-02-w03-content-quote-post-relationship-v1",
+      "order": 4,
+      "ownerWorker": "W03",
+      "kind": "POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W03-content/src/neon-postgres-migrations/0003_w03_d1_02_content_quote_post_relationship.sql"
+      ],
+      "dependsOn": [
+        "d1-02-w03-content-snowflake-timestamp-bigint-v1"
+      ],
+      "expectedTableCount": 0
     }
   ],
   "expected": {
@@ -64,7 +77,7 @@
     "snowflakeAllocatorRows": 1,
     "foreignKeys": 0,
     "d1_03EndpointTable": false,
-    "migrationLedgerRows": 3
+    "migrationLedgerRows": 4
   },
   "safetyInvariants": [
     "Apply only the committed PostgreSQL-native W03 artifact followed by the committed PostgreSQL-native W05 artifact.",
