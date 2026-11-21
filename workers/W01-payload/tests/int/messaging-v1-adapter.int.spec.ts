@@ -8,9 +8,11 @@ describe('v1 messaging adapters', () => {
   const conversations = route('src/app/api/v1/conversations/route.ts')
   const messages = route('src/app/api/v1/conversations/[conversationId]/messages/route.ts')
   const readCursor = route('src/app/api/v1/conversations/[conversationId]/read/route.ts')
+  const requests = route('src/app/api/v1/message-requests/route.ts')
+  const requestAction = route('src/app/api/v1/message-requests/[requestId]/[action]/route.ts')
 
   it('uses the authenticated Better Auth-backed social principal for every operation', () => {
-    for (const source of [conversations, messages, readCursor]) {
+    for (const source of [conversations, messages, readCursor, requests, requestAction]) {
       expect(source).toContain('resolveCookieSocialPrincipal')
       expect(source).toContain('callW05Social')
       expect(source).not.toContain('getPayload(')
@@ -39,6 +41,18 @@ describe('v1 messaging adapters', () => {
     expect(readCursor).toContain('/read')
     expect(readCursor).toContain("method: 'POST'")
     expect(readCursor).toContain('encodeURIComponent(conversationId)')
+  })
+
+  it('forwards incoming and outgoing message request operations to W05 with canonical recipient identity', () => {
+    expect(requests).toContain('resolveCookieSocialPrincipal')
+    expect(requests).toContain('resolveSocialProfileIdentityId')
+    expect(requests).toContain("pathname: '/internal/messaging/requests'")
+    expect(requests).toContain("method: 'GET'")
+    expect(requests).toContain("method: 'POST'")
+    expect(requestAction).toContain('resolveCookieSocialPrincipal')
+    expect(requestAction).toContain('/internal/messaging/requests/')
+    expect(requestAction).toContain('encodeURIComponent(requestId)')
+    expect(requestAction).toContain("['accept', 'decline', 'cancel']")
   })
 
   it('does not implement a second persistence path in W01', () => {
