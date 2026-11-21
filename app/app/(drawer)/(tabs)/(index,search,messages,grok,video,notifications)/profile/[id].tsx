@@ -59,7 +59,6 @@ import { useAuthStore } from '~/store/auth-store';
 import { readSessionToken } from '~/lib/secure-session';
 import { fetchUserLikedContentsPage, fetchUserProfileContentPage, fetchUserRepliesPage } from '~/lib/social-screen-api';
 import { createDirectConversation } from '~/lib/messaging-api';
-import Messages from "~/assets/svg/tabs/messages.svg"
 
 const PULL_TO_REFRESH_THRESHOLD = 70; 
 const PULL_TO_REFRESH_VISIBLE_THRESHOLD = 10; 
