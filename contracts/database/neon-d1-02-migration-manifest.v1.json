@@ -60,7 +60,7 @@
       "ownerWorker": "W03",
       "kind": "POSTGRESQL_SQL",
       "artifactPaths": [
-        "workers/W03-content/src/neon-postgres-migrations/0003_w03_d1_02_content_quote_post_relationship.sql"
+        "workers/W03-content/src/neon-postgres-migrations/0003_w03_content_quote_post_relationship.sql"
       ],
       "dependsOn": [
         "d1-02-w03-content-snowflake-timestamp-bigint-v1"
