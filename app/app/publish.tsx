@@ -2624,15 +2624,17 @@ function PublishScreenContent() {
           </View>
         </KeyboardAwareScrollView>
       )}
-      <PostThreadComposer
-        visible={threadComposerVisible}
-        initialText={body}
-        onClose={() => setThreadComposerVisible(false)}
-        onComplete={(firstContentId) => {
-          setThreadComposerVisible(false);
-          router.replace(('/?published=' + encodeURIComponent(firstContentId) + '&refresh=' + Date.now()) as never);
-        }}
-      />
+      {threadComposerVisible ? (
+        <PostThreadComposer
+          visible={threadComposerVisible}
+          initialText={body}
+          onClose={() => setThreadComposerVisible(false)}
+          onComplete={(firstContentId) => {
+            setThreadComposerVisible(false);
+            router.replace(('/?published=' + encodeURIComponent(firstContentId) + '&refresh=' + Date.now()) as never);
+          }}
+        />
+      ) : null}
       <PublishMediaActionSheet
         visible={mediaActionsVisible}
         disabled={busy || loadingEdit || publishPending || assets.length >= MAX_MEDIA_ITEMS}
