@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StatusBar, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchMessages, markConversationRead, sendDirectMessage, type MessagingMessage } from '~/lib/messaging-api';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchMessages, fetchMessagesAfter, markConversationRead, sendDirectMessage, type MessagingMessage } from '~/lib/messaging-api';
 import { createIdempotencyKey } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
 
@@ -17,6 +18,16 @@ export default function ConversationScreen() {
   const isDark = colorScheme === 'dark';
   const userId = useAuthStore((state) => state.user?.id);
   const [draft, setDraft] = useState('');
+  const [isFocused, setIsFocused] = useState(true);
+  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
+  useFocusEffect(useCallback(() => {
+    setIsFocused(true);
+    return () => setIsFocused(false);
+  }, []));
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', setAppState);
+    return () => subscription.remove();
+  }, []);
   const pendingSend = useRef<{ body: string; key: string } | null>(null);
   const messagesQuery = useInfiniteQuery({
     queryKey: ['messaging', 'messages', conversationId],
@@ -28,6 +39,39 @@ export default function ConversationScreen() {
   });
   // The API returns newest-first pages; an inverted list keeps the newest message at the bottom.
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
+  const latestSequence = messages.reduce((latest, message) =>
+    BigInt(message.sequence) > BigInt(latest) ? message.sequence : latest, '0');
+  const incrementalQuery = useQuery({
+    queryKey: ['messaging', 'messages-after', conversationId, latestSequence],
+    queryFn: ({ signal }) => fetchMessagesAfter(conversationId, latestSequence, signal),
+    enabled: Boolean(conversationId) && messagesQuery.isSuccess && isFocused && appState === 'active',
+    refetchInterval: isFocused && appState === 'active' ? 4_000 : false,
+    refetchIntervalInBackground: false,
+    staleTime: 0,
+  });
+  useEffect(() => {
+    const incoming = incrementalQuery.data?.items ?? [];
+    if (!incoming.length) return;
+    queryClient.setQueryData<typeof messagesQuery.data>(
+      ['messaging', 'messages', conversationId],
+      (current) => {
+        if (!current?.pages.length) return current;
+        const known = new Set(current.pages.flatMap((page) => page.items.map((item) => item.message_id)));
+        const additions = incoming.filter((item) => !known.has(item.message_id));
+        if (!additions.length) return current;
+        const pages = [...current.pages];
+        const firstPage = pages[0];
+        if (firstPage) {
+          pages[0] = {
+            ...firstPage,
+            items: [...firstPage.items, ...additions].sort((left, right) =>
+              BigInt(left.sequence) > BigInt(right.sequence) ? -1 : BigInt(left.sequence) < BigInt(right.sequence) ? 1 : 0),
+          };
+        }
+        return { ...current, pages };
+      },
+    );
+  }, [incrementalQuery.data, conversationId, queryClient]);
   const loadOlder = () => {
     if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage && !messagesQuery.isFetching) {
       void messagesQuery.fetchNextPage();
