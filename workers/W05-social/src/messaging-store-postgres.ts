@@ -303,6 +303,36 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
         throw new MessagingStoreError()
       }
     },
+    async canReadAttachment(actorUserId, conversationId, mediaId) {
+      if (!validId(conversationId) || !validId(mediaId)) throw new MessagingStoreError('VALIDATION_FAILED', 422)
+      try {
+        const result = await db.query(
+          `SELECT 1
+             FROM social_conversation_memberships mine
+             JOIN social_conversation_memberships peer
+               ON peer.conversation_id = mine.conversation_id
+              AND peer.user_id <> mine.user_id
+              AND peer.left_at IS NULL
+             JOIN social_messages message
+               ON message.conversation_id = mine.conversation_id
+              AND message.recalled_at IS NULL
+              AND message.attachments @> jsonb_build_array(jsonb_build_object('mediaId', $3::text))
+            WHERE mine.conversation_id = $1
+              AND mine.user_id = $2
+              AND mine.left_at IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM social_user_interactions blocked
+                 WHERE blocked.relation_type = 'block'
+                   AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                     OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+              )
+            LIMIT 1`,
+          [conversationId, actorUserId, mediaId])
+        return result.rows.length > 0
+      } catch {
+        throw new MessagingStoreError()
+      }
+    },
     async markRead(actorUserId, conversationId, sequence) {
       if (!validId(conversationId) || !/^(0|[1-9][0-9]{0,17})$/.test(sequence)) {
         throw new MessagingStoreError('VALIDATION_FAILED', 422)
