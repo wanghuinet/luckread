@@ -20,10 +20,13 @@ async function loadInitialContent(requestHeaders: Headers, locale: PublicLocale)
     // Use the same public W01 API entry and shared transport as browser clients.
     // The contents API owns anonymous read rate limiting for this request.
     const { response, data: payload } = await fetchJson<{ data?: HomeContentPage }>(request)
-    if (!response.ok) return { items: [], nextCursor: null, hasMore: false }
+    if (!response.ok) return { items: [], nextCursor: null, hasMore: false, loadError: true }
     const page = payload?.data
-    return { items: Array.isArray(page?.items) ? page.items : [], nextCursor: page?.nextCursor ?? null, hasMore: page?.hasMore === true }
-  } catch { return { items: [], nextCursor: null, hasMore: false } }
+    if (!page || !Array.isArray(page.items) || typeof page.hasMore !== 'boolean') {
+      return { items: [], nextCursor: null, hasMore: false, loadError: true }
+    }
+    return { items: page.items, nextCursor: page.nextCursor ?? null, hasMore: page.hasMore }
+  } catch { return { items: [], nextCursor: null, hasMore: false, loadError: true } }
 }
 
 export default async function TwitterCloneHomePage({ searchParams }: { searchParams?: Promise<{ feed?: string | string[] }> } = {}) {
