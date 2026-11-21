@@ -2,7 +2,7 @@ import { apiRequest, createIdempotencyKey, getApiBaseUrl } from './api-client';
 import { uploadMediaFile, type LocalMediaFile } from './publish-api';
 
 export type MessagingConversation = {
-  conversation_id: string; participant_user_id: string; updated_at: string; last_sequence: string;
+  conversation_id: string; conversation_type: 'direct' | 'group'; group_name: string | null; member_count: number; participant_user_id: string | null; updated_at: string; last_sequence: string;
   last_message_id: string | null; last_message_body: string | null; last_message_sender_user_id: string | null;
   last_message_created_at: string | null; last_read_sequence: string; unread_count: number;
 };
@@ -33,6 +33,35 @@ export async function createDirectConversation(recipientUserId: string): Promise
   return unwrap<{ conversationId: string }>(await apiRequest<Envelope<{ conversationId: string }>>('/conversations', {
     method: 'POST', body: JSON.stringify({ recipientUserId }), idempotencyKey: false,
   }));
+}
+export type MessagingConversationMember = {
+  user_id: string; member_role: 'owner' | 'member'; joined_at: string;
+};
+export async function createGroupConversation(name: string, memberUserIds: string[]): Promise<{ conversationId: string }> {
+  return unwrap(await apiRequest<Envelope<{ conversationId: string }>>('/conversations/groups', {
+    method: 'POST', body: JSON.stringify({ name, memberUserIds }),
+  }));
+}
+export async function fetchConversationMembers(conversationId: string, signal?: AbortSignal): Promise<MessagingConversationMember[]> {
+  return unwrap(await apiRequest<Envelope<MessagingConversationMember[]>>(
+    '/conversations/' + encodeURIComponent(conversationId) + '/members', { method: 'GET', signal },
+  ));
+}
+export async function addGroupMembers(conversationId: string, memberUserIds: string[]): Promise<{ addedCount: number }> {
+  return unwrap(await apiRequest<Envelope<{ addedCount: number }>>(
+    '/conversations/' + encodeURIComponent(conversationId) + '/members',
+    { method: 'POST', body: JSON.stringify({ memberUserIds }) },
+  ));
+}
+export async function removeGroupMember(conversationId: string, memberUserId: string): Promise<void> {
+  await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/members/' + encodeURIComponent(memberUserId), {
+    method: 'DELETE',
+  });
+}
+export async function leaveGroupConversation(conversationId: string): Promise<void> {
+  await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/leave', {
+    method: 'POST', body: JSON.stringify({ }), idempotencyKey: false,
+  });
 }
 export async function fetchMessages(conversationId: string, beforeSequence: string | null = null, signal?: AbortSignal): Promise<Page<MessagingMessage>> {
   const query = new URLSearchParams({ limit: '50' });
