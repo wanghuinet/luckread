@@ -185,14 +185,6 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
              WHERE c.conversation_id = $1 AND m.user_id = $2 AND m.left_at IS NULL
              FOR UPDATE OF c`, [conversationId, actorUserId])
           if (!conversation.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
-          const prior = await client.query<MessageRow>(
-            `SELECT ${messageSelect} FROM social_messages
-              WHERE sender_user_id = $1 AND client_message_id = $2 LIMIT 1`,
-            [actorUserId, clientMessageId])
-          if (prior.rows[0]) {
-            if (prior.rows[0].conversation_id !== conversationId || prior.rows[0].body !== body) throw new MessagingStoreError('CONFLICT', 409)
-            return prior.rows[0]
-          }
           const peer = await client.query<{ user_id: string }>(
             `SELECT user_id FROM social_conversation_memberships
               WHERE conversation_id = $1 AND user_id <> $2 AND left_at IS NULL LIMIT 1`,
@@ -205,6 +197,15 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
                   OR (actor_user_id = $2 AND target_user_id = $1))
               LIMIT 1`, [actorUserId, peer.rows[0].user_id])
           if (blocked.rows.length) throw new MessagingStoreError('PERMISSION_DENIED', 403)
+          // Check current access before returning an idempotent retry result.
+          const prior = await client.query<MessageRow>(
+            `SELECT ${messageSelect} FROM social_messages
+              WHERE sender_user_id = $1 AND client_message_id = $2 LIMIT 1`,
+            [actorUserId, clientMessageId])
+          if (prior.rows[0]) {
+            if (prior.rows[0].conversation_id !== conversationId || prior.rows[0].body !== body) throw new MessagingStoreError('CONFLICT', 409)
+            return prior.rows[0]
+          }
           const sequenceResult = await client.query<{ last_sequence: string }>(
             `UPDATE social_conversations SET last_sequence = last_sequence + 1, updated_at = CURRENT_TIMESTAMP
               WHERE conversation_id = $1 RETURNING last_sequence::text AS last_sequence`,
