@@ -1843,6 +1843,46 @@ paths:
         '201': { description: Persisted message }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '4XX': { $ref: '#/components/responses/ClientError' }
+  /conversations/{conversationId}/messages/{messageId}:
+    parameters:
+      - name: conversationId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+      - name: messageId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    patch:
+      tags: [Messaging]
+      operationId: editMessagingMessage
+      summary: Edit the authenticated sender's active message
+      description: Only the original sender may edit a message. The conversation membership and block policy are revalidated at mutation time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              additionalProperties: false
+              properties:
+                body: { type: string, minLength: 1, maxLength: 10000 }
+      responses:
+        '200': { description: Updated message with editedAt timestamp }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { description: Message not found or not editable by this actor }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+    delete:
+      tags: [Messaging]
+      operationId: recallMessagingMessage
+      summary: Recall the authenticated sender's message
+      description: Creates a stable timeline tombstone, clears message body and attachment references, and revokes private attachment reads.
+      responses:
+        '200': { description: Recalled message tombstone }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { description: Message not found or not recallable by this actor }
+        '4XX': { $ref: '#/components/responses/ClientError' }
   /conversations/{conversationId}/read:
     parameters:
       - name: conversationId

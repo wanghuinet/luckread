@@ -7,12 +7,13 @@ const route = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8
 describe('v1 messaging adapters', () => {
   const conversations = route('src/app/api/v1/conversations/route.ts')
   const messages = route('src/app/api/v1/conversations/[conversationId]/messages/route.ts')
+  const messageAction = route('src/app/api/v1/conversations/[conversationId]/messages/[messageId]/route.ts')
   const readCursor = route('src/app/api/v1/conversations/[conversationId]/read/route.ts')
   const requests = route('src/app/api/v1/message-requests/route.ts')
   const requestAction = route('src/app/api/v1/message-requests/[requestId]/[action]/route.ts')
 
   it('uses the authenticated Better Auth-backed social principal for every operation', () => {
-    for (const source of [conversations, messages, readCursor, requests, requestAction]) {
+    for (const source of [conversations, messages, messageAction, readCursor, requests, requestAction]) {
       expect(source).toContain('resolveCookieSocialPrincipal')
       expect(source).toContain('callW05Social')
       expect(source).not.toContain('HYPERDRIVE')
@@ -40,6 +41,16 @@ describe('v1 messaging adapters', () => {
     expect(messages).toContain("method: 'POST'")
     expect(messages).toContain("(url.search || '')")
     expect(messages).toContain('encodeURIComponent(conversationId)')
+  })
+
+  it('forwards owner message edits and recalls to W05 without introducing W01 persistence', () => {
+    expect(messageAction).toContain('resolveCookieSocialPrincipal')
+    expect(messageAction).toContain('callW05Social')
+    expect(messageAction).toContain("method: 'PATCH'")
+    expect(messageAction).toContain("method: 'DELETE'")
+    expect(messageAction).toContain('/messages/')
+    expect(messageAction).toContain('encodeURIComponent(messageId)')
+    expect(messageAction).not.toMatch(/INSERT INTO|UPDATE social_|SELECT .* FROM social_/i)
   })
 
   it('forwards the authenticated read-cursor mutation only to W05', () => {

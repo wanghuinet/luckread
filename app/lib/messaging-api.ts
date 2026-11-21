@@ -11,7 +11,7 @@ export type MessagingAttachment = {
 };
 export type MessagingMessage = {
   message_id: string; conversation_id: string; sender_user_id: string; sequence: string; body: string;
-  attachments?: MessagingAttachment[]; created_at: string;
+  attachments?: MessagingAttachment[]; created_at: string; edited_at?: string | null; recalled_at?: string | null;
 };
 type Page<T> = { items: T[]; nextCursor: string | null; hasMore: boolean };
 type Envelope<T> = { data?: T; error?: { code?: string; message?: string }; requestId?: string };
@@ -70,6 +70,18 @@ export async function sendDirectMessage(
   return unwrap<MessagingMessage>(await apiRequest<Envelope<MessagingMessage>>(
     '/conversations/' + encodeURIComponent(conversationId) + '/messages',
     { method: 'POST', body: JSON.stringify({ body, attachments }), idempotencyKey },
+  ));
+}
+export async function editDirectMessage(conversationId: string, messageId: string, body: string): Promise<MessagingMessage> {
+  return unwrap<MessagingMessage>(await apiRequest<Envelope<MessagingMessage>>(
+    '/conversations/' + encodeURIComponent(conversationId) + '/messages/' + encodeURIComponent(messageId),
+    { method: 'PATCH', body: JSON.stringify({ body }) },
+  ));
+}
+export async function recallDirectMessage(conversationId: string, messageId: string): Promise<MessagingMessage> {
+  return unwrap<MessagingMessage>(await apiRequest<Envelope<MessagingMessage>>(
+    '/conversations/' + encodeURIComponent(conversationId) + '/messages/' + encodeURIComponent(messageId),
+    { method: 'DELETE' },
   ));
 }
 export function getMessageAttachmentUrl(conversationId: string, mediaId: string): string {

@@ -186,6 +186,21 @@
       ]
     },
     {
+      "operationId": "recallMessagingMessage",
+      "method": "DELETE",
+      "path": "/v1/conversations/{conversationId}/messages/{messageId}",
+      "openapiPath": "/conversations/{conversationId}/messages/{messageId}",
+      "domain": "messaging",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/conversations/{conversationId}/messages/{messageId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "deleteDeveloperApiKeysKeyId",
       "method": "DELETE",
       "path": "/v1/developer/api-keys/{keyId}",
@@ -1784,6 +1799,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#patch:/contents/{contentId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "editMessagingMessage",
+      "method": "PATCH",
+      "path": "/v1/conversations/{conversationId}/messages/{messageId}",
+      "openapiPath": "/conversations/{conversationId}/messages/{messageId}",
+      "domain": "messaging",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#patch:/conversations/{conversationId}/messages/{messageId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"

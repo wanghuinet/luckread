@@ -79,6 +79,17 @@ export async function sendMessage(store: MessagingStore | undefined, actorValue:
   if (body.length > 10000 || (!body && !attachments.length)) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
   return storeCall(() => store.sendMessage(actor, conversation, key, body, attachments))
 }
+export async function editMessage(store: MessagingStore | undefined, actorValue: string, conversationId: string, messageId: string, bodyValue: unknown) {
+  if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
+  if (typeof bodyValue !== 'string') throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+  const body = bodyValue.normalize('NFC').trim()
+  if (!body || body.length > 10000) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+  return storeCall(() => store.editMessage(requireId(actorValue, 'UNAUTHENTICATED'), requireId(conversationId), requireId(messageId), body))
+}
+export async function recallMessage(store: MessagingStore | undefined, actorValue: string, conversationId: string, messageId: string) {
+  if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return storeCall(() => store.recallMessage(requireId(actorValue, 'UNAUTHENTICATED'), requireId(conversationId), requireId(messageId)))
+}
 export async function markConversationRead(store: MessagingStore | undefined, actorValue: string, conversationId: string, sequenceValue: unknown) {
   if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
   const sequence = typeof sequenceValue === 'string' ? sequenceValue : typeof sequenceValue === 'number' && Number.isSafeInteger(sequenceValue) ? String(sequenceValue) : ''

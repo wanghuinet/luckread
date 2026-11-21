@@ -35,7 +35,9 @@ async function withTransaction<T>(db: MessagingPostgresExecutor, run: (client: P
   } finally { client.release() }
 }
 const messageSelect = `message_id, conversation_id, sender_user_id, sequence::text AS sequence,
-  body, COALESCE(attachments, '[]'::jsonb) AS attachments, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at`
+  body, COALESCE(attachments, '[]'::jsonb) AS attachments, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
+  CASE WHEN edited_at IS NULL THEN NULL ELSE to_char(edited_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS edited_at,
+  CASE WHEN recalled_at IS NULL THEN NULL ELSE to_char(recalled_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS recalled_at`
 export function createPostgresMessagingStore(db: MessagingPostgresExecutor): MessagingStore {
   return {
     async createDirectConversation(actorUserId, recipientUserId) {
@@ -179,7 +181,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
         if (!membership.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
         const result = await db.query<MessageRow>(
           `SELECT ${messageSelect} FROM social_messages
-            WHERE conversation_id = $1 AND recalled_at IS NULL
+            WHERE conversation_id = $1
               AND ($2::bigint IS NULL OR sequence < $2::bigint)
             ORDER BY sequence DESC LIMIT $3`,
           [conversationId, beforeSequence, limit + 1])
@@ -211,7 +213,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
         if (!membership.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
         const result = await db.query<MessageRow>(
           `SELECT ${messageSelect} FROM social_messages
-            WHERE conversation_id = $1 AND recalled_at IS NULL AND sequence > $2::bigint
+            WHERE conversation_id = $1 AND sequence > $2::bigint
             ORDER BY sequence ASC LIMIT $3`,
           [conversationId, afterSequence, limit + 1])
         const hasMore = result.rows.length > limit
@@ -330,6 +332,85 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
           [conversationId, actorUserId, mediaId])
         return result.rows.length > 0
       } catch {
+        throw new MessagingStoreError()
+      }
+    },
+    async editMessage(actorUserId, conversationId, messageId, body) {
+      if (!validId(conversationId) || !validId(messageId) || !body.trim() || body.length > 10000) {
+        throw new MessagingStoreError('VALIDATION_FAILED', 422)
+      }
+      try {
+        return await withTransaction(db, async client => {
+          const authorized = await client.query(
+            `SELECT 1
+               FROM social_conversation_memberships mine
+               JOIN social_conversation_memberships peer
+                 ON peer.conversation_id = mine.conversation_id AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+               JOIN social_messages message
+                 ON message.conversation_id = mine.conversation_id
+                AND message.message_id = $3
+                AND message.sender_user_id = mine.user_id
+                AND message.recalled_at IS NULL
+              WHERE mine.conversation_id = $1 AND mine.user_id = $2 AND mine.left_at IS NULL
+                AND NOT EXISTS (
+                  SELECT 1 FROM social_user_interactions blocked
+                   WHERE blocked.relation_type = 'block'
+                     AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                       OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                )
+              FOR UPDATE OF message`,
+            [conversationId, actorUserId, messageId])
+          if (!authorized.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
+          const updated = await client.query<MessageRow>(
+            `UPDATE social_messages SET body = $4, edited_at = CURRENT_TIMESTAMP
+              WHERE conversation_id = $1 AND message_id = $2 AND sender_user_id = $3 AND recalled_at IS NULL
+              RETURNING ${messageSelect}`,
+            [conversationId, messageId, actorUserId, body])
+          if (!updated.rows[0]) throw new MessagingStoreError('NOT_FOUND', 404)
+          await client.query('UPDATE social_conversations SET updated_at = CURRENT_TIMESTAMP WHERE conversation_id = $1', [conversationId])
+          return updated.rows[0]
+        })
+      } catch (error) {
+        if (error instanceof MessagingStoreError) throw error
+        throw new MessagingStoreError()
+      }
+    },
+    async recallMessage(actorUserId, conversationId, messageId) {
+      if (!validId(conversationId) || !validId(messageId)) throw new MessagingStoreError('VALIDATION_FAILED', 422)
+      try {
+        return await withTransaction(db, async client => {
+          const authorized = await client.query(
+            `SELECT 1
+               FROM social_conversation_memberships mine
+               JOIN social_conversation_memberships peer
+                 ON peer.conversation_id = mine.conversation_id AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+               JOIN social_messages message
+                 ON message.conversation_id = mine.conversation_id
+                AND message.message_id = $3
+                AND message.sender_user_id = mine.user_id
+                AND message.recalled_at IS NULL
+              WHERE mine.conversation_id = $1 AND mine.user_id = $2 AND mine.left_at IS NULL
+                AND NOT EXISTS (
+                  SELECT 1 FROM social_user_interactions blocked
+                   WHERE blocked.relation_type = 'block'
+                     AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                       OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                )
+              FOR UPDATE OF message`,
+            [conversationId, actorUserId, messageId])
+          if (!authorized.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
+          const updated = await client.query<MessageRow>(
+            `UPDATE social_messages
+                SET body = '', attachments = '[]'::jsonb, recalled_at = CURRENT_TIMESTAMP
+              WHERE conversation_id = $1 AND message_id = $2 AND sender_user_id = $3 AND recalled_at IS NULL
+              RETURNING ${messageSelect}`,
+            [conversationId, messageId, actorUserId])
+          if (!updated.rows[0]) throw new MessagingStoreError('NOT_FOUND', 404)
+          await client.query('UPDATE social_conversations SET updated_at = CURRENT_TIMESTAMP WHERE conversation_id = $1', [conversationId])
+          return updated.rows[0]
+        })
+      } catch (error) {
+        if (error instanceof MessagingStoreError) throw error
         throw new MessagingStoreError()
       }
     },

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createDirectConversation, listConversations, listMessages, listMessagesAfter, markConversationRead, sendMessage } from './messaging-runtime.js'
+import { createDirectConversation, editMessage, listConversations, listMessages, listMessagesAfter, markConversationRead, recallMessage, sendMessage } from './messaging-runtime.js'
 import type { MessagingStore } from './messaging-store.js'
 
 const store = (): MessagingStore => ({
@@ -11,6 +11,8 @@ const store = (): MessagingStore => ({
     message_id: 'message-1', conversation_id: 'conversation-1', sender_user_id: 'user-1',
     sequence: '1', body: 'hello', created_at: '2026-11-21T00:00:00.000Z',
   })),
+  editMessage: vi.fn(async () => ({ message_id: 'message-1', conversation_id: 'conversation-1', sender_user_id: 'user-1', sequence: '1', body: 'edited', created_at: '2026-11-21T00:00:00.000Z', edited_at: '2026-11-21T00:01:00.000Z' })),
+  recallMessage: vi.fn(async () => ({ message_id: 'message-1', conversation_id: 'conversation-1', sender_user_id: 'user-1', sequence: '1', body: '', attachments: [], created_at: '2026-11-21T00:00:00.000Z', recalled_at: '2026-11-21T00:01:00.000Z' })),
   markRead: vi.fn(async () => undefined),
 })
 
@@ -41,6 +43,20 @@ describe('messaging runtime', () => {
     await expect(sendMessage(source, 'user-1', 'conversation-1', 'client-key-1', ' hello ')).resolves.toMatchObject({ sequence: '1' })
     expect(source.sendMessage).toHaveBeenCalledWith('user-1', 'conversation-1', 'client-key-1', 'hello', [])
     await expect(sendMessage(source, 'user-1', 'conversation-1', '', 'hello')).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
+  })
+  it('validates and edits only non-empty bounded message bodies', async () => {
+    const source = store()
+    await expect(editMessage(source, 'user-1', 'conversation-1', 'message-1', ' revised text '))
+      .resolves.toMatchObject({ body: 'edited' })
+    expect(source.editMessage).toHaveBeenCalledWith('user-1', 'conversation-1', 'message-1', 'revised text')
+    await expect(editMessage(source, 'user-1', 'conversation-1', 'message-1', '   '))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 422 })
+  })
+  it('recalls a message through the authorized store operation', async () => {
+    const source = store()
+    await expect(recallMessage(source, 'user-1', 'conversation-1', 'message-1'))
+      .resolves.toMatchObject({ body: '', recalled_at: expect.any(String) })
+    expect(source.recallMessage).toHaveBeenCalledWith('user-1', 'conversation-1', 'message-1')
   })
   it('advances read state through the store contract', async () => {
     const source = store()

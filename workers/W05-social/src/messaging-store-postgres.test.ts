@@ -196,6 +196,39 @@ describe('W05 PostgreSQL messaging store', () => {
     expect(db.query).toHaveBeenCalledOnce()
   })
 
+  it('edits only a sender-owned active message after membership and block checks', async () => {
+    const { db, client } = executor([
+      { rows: [] }, // BEGIN
+      { rows: [{ allowed: 1 }] }, // active membership, sender ownership, unblocked peer
+      { rows: [{ message_id: 'message-1', conversation_id: 'conversation-1', sender_user_id: 'user-a', sequence: '1', body: 'edited', attachments: [], created_at: '2026-11-21T00:00:00.000Z', edited_at: '2026-11-21T00:01:00.000Z', recalled_at: null }] },
+      { rows: [] }, // conversation updated_at
+      { rows: [] }, // COMMIT
+    ])
+    const store = createPostgresMessagingStore(db as never)
+    await expect(store.editMessage('user-a', 'conversation-1', 'message-1', 'edited'))
+      .resolves.toMatchObject({ body: 'edited', edited_at: expect.any(String) })
+    expect(String(client.query.mock.calls[1]?.[0])).toContain('message.sender_user_id = mine.user_id')
+    expect(String(client.query.mock.calls[1]?.[0])).toContain("blocked.relation_type = 'block'")
+    expect(String(client.query.mock.calls[2]?.[0])).toContain('edited_at = CURRENT_TIMESTAMP')
+    expect(client.query.mock.calls.at(-1)?.[0]).toBe('COMMIT')
+  })
+
+  it('recalls a sender-owned message and clears attachment references atomically', async () => {
+    const { db, client } = executor([
+      { rows: [] }, // BEGIN
+      { rows: [{ allowed: 1 }] }, // authorization
+      { rows: [{ message_id: 'message-1', conversation_id: 'conversation-1', sender_user_id: 'user-a', sequence: '1', body: '', attachments: [], created_at: '2026-11-21T00:00:00.000Z', edited_at: null, recalled_at: '2026-11-21T00:01:00.000Z' }] },
+      { rows: [] }, // conversation updated_at
+      { rows: [] }, // COMMIT
+    ])
+    const store = createPostgresMessagingStore(db as never)
+    await expect(store.recallMessage('user-a', 'conversation-1', 'message-1'))
+      .resolves.toMatchObject({ body: '', attachments: [], recalled_at: expect.any(String) })
+    expect(String(client.query.mock.calls[2]?.[0])).toContain("attachments = '[]'::jsonb")
+    expect(String(client.query.mock.calls[2]?.[0])).toContain('recalled_at = CURRENT_TIMESTAMP')
+    expect(client.query.mock.calls.at(-1)?.[0]).toBe('COMMIT')
+  })
+
   it('authorizes attachment reads only for an active unblocked conversation member and referenced media', async () => {
     const { db } = executor([], [{ rows: [{ allowed: 1 }] }])
     const store = createPostgresMessagingStore(db as never)

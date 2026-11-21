@@ -328,9 +328,11 @@
     "messaging": {
       "required": true,
       "endpoint_groups": [
+        "DELETE /v1/conversations/{conversationId}/messages/{messageId}",
         "GET /v1/conversations",
         "GET /v1/conversations/{conversationId}/messages",
         "GET /v1/message-requests",
+        "PATCH /v1/conversations/{conversationId}/messages/{messageId}",
         "POST /v1/conversations",
         "POST /v1/conversations/{conversationId}/messages",
         "POST /v1/conversations/{conversationId}/read",
