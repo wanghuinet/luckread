@@ -6,19 +6,26 @@ const connectionString = process.env.MESSAGING_TEST_DATABASE_URL
 if (!connectionString) throw new Error('MESSAGING_TEST_DATABASE_URL is required')
 const pool = new Pool({ connectionString, max: 2 })
 try {
+  // Rehearse against the real W05 D1-02 baseline, then apply the additive messaging migration.
+  const baseline = readFileSync(resolve('workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql'), 'utf8')
+  await pool.query(baseline)
   const migration = readFileSync(resolve('workers/W05-social/src/neon-postgres-migrations/0002_w05_messaging_core.sql'), 'utf8')
   await pool.query(migration)
 
   const tables = await pool.query(
     "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='public' ORDER BY tablename",
   )
-  const expectedTables = [
+  const tableNames = tables.rows.map(row => row.tablename)
+  const expectedMessagingTables = [
     'social_conversation_memberships',
     'social_conversations',
     'social_messages',
   ]
-  if (JSON.stringify(tables.rows.map(row => row.tablename)) !== JSON.stringify(expectedTables)) {
-    throw new Error('Messaging migration did not create the exact three-table schema')
+  if (tableNames.length !== 22 || expectedMessagingTables.some(name => !tableNames.includes(name))) {
+    throw new Error('W05 baseline plus messaging migration must produce 22 tables including all three messaging tables')
+  }
+  if (!tableNames.includes('social_user_interactions')) {
+    throw new Error('Messaging block enforcement must share the authoritative W05 social interaction table')
   }
 
   const sequenceType = await pool.query(
@@ -46,7 +53,14 @@ try {
   )
   if (Number(rows.rows[0]?.count) !== 0) throw new Error('Schema rehearsal must not import business rows')
 
-  console.log('W05_MESSAGING_PHASE1_POSTGRES18_REHEARSAL_PASS')
+  const baselineCounts = await pool.query(
+    'SELECT (SELECT count(*) FROM social_user_interactions) AS interactions, (SELECT count(*) FROM social_notifications) AS notifications',
+  )
+  if (Number(baselineCounts.rows[0]?.interactions) !== 0 || Number(baselineCounts.rows[0]?.notifications) !== 0) {
+    throw new Error('W05 baseline fixtures must remain empty')
+  }
+
+  console.log('W05_MESSAGING_PHASE1_POSTGRES18_REHEARSAL_PASS ' + JSON.stringify({ tables: tableNames.length, messagingTables: expectedMessagingTables.length, baselineBlockTable: true, businessRows: 0 }))
 } finally {
   await pool.end()
 }
