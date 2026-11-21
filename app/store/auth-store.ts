@@ -2,12 +2,19 @@ import { create } from 'zustand';
 
 import { apiRequest, clearPendingMutationKeys, getApiErrorMessage } from '../lib/api-client';
 import {
+  activateStoredAccount,
+  assertStoredAccountCapacity,
+  clearActiveAccountSelection,
   clearStoredSession,
+  getActiveStoredAccountId,
+  listStoredAccounts,
   readCachedUser,
   readSessionToken,
+  removeStoredAccount,
+  saveAccountSession,
   saveCachedUser,
-  saveSessionToken,
   type LuckReadUser,
+  type StoredLuckReadAccount,
 } from '../lib/secure-session';
 import { unregisterPushEndpointForUser } from '../lib/push-notifications';
 
@@ -34,8 +41,11 @@ const readAuthErrorCode = (value: unknown): string | undefined => {
 type AuthStore = {
   status: AuthStatus;
   user: LuckReadUser | null;
+  accounts: StoredLuckReadAccount[];
   bootstrap: () => Promise<void>;
   login: (identity: string, credential: string) => Promise<void>;
+  switchAccount: (userId: string) => Promise<void>;
+  removeAccount: (userId: string) => Promise<void>;
   logout: () => Promise<void>;
   invalidateSession: () => Promise<void>;
 };
@@ -69,43 +79,66 @@ const validUser = (value: unknown): value is LuckReadUser => {
 export const useAuthStore = create<AuthStore>((set, get) => ({
   status: 'loading',
   user: null,
+  accounts: [],
 
   bootstrap: async () => {
     let token: string | null = null;
     let cachedUser: LuckReadUser | null = null;
+    let accounts: StoredLuckReadAccount[] = [];
     try {
-      [token, cachedUser] = await Promise.all([readSessionToken(), readCachedUser()]);
+      [token, cachedUser, accounts] = await Promise.all([
+        readSessionToken(),
+        readCachedUser(),
+        listStoredAccounts(),
+      ]);
     } catch {
-      set({ status: 'anonymous', user: null });
-      return;
-    }
-    if (!token) {
-      clearPendingMutationKeys();
-      set({ status: 'anonymous', user: null });
+      set({ status: 'anonymous', user: null, accounts: [] });
       return;
     }
 
-    // A cached identity keeps the app usable during a temporary network outage.
-    // The server remains authoritative for every protected operation.
-    set({ status: 'authenticated', user: cachedUser });
+    if (!token) {
+      clearPendingMutationKeys();
+      set({ status: 'anonymous', user: null, accounts });
+      return;
+    }
+
+    // Migrate installations that still have the former single-session keys.
+    // The credential is moved into the account-specific SecureStore slot.
+    const activeAccountId = await getActiveStoredAccountId();
+    if (cachedUser && (!activeAccountId || !accounts.some((account) => account.id === activeAccountId))) {
+      try {
+        await saveAccountSession(cachedUser, token);
+        accounts = await listStoredAccounts();
+      } catch {
+        set({ status: 'anonymous', user: null, accounts });
+        return;
+      }
+    }
+
+    set({ status: 'authenticated', user: cachedUser, accounts });
 
     try {
       const { response, data } = await apiRequest<SessionPayload>('/auth/session', { method: 'GET' });
       if (response.status === 401) {
-        await clearStoredSession();
+        const currentAccountId = await getActiveStoredAccountId();
+        if (currentAccountId) await removeStoredAccount(currentAccountId);
+        else await clearStoredSession();
         clearPendingMutationKeys();
-        set({ status: 'anonymous', user: null });
+        set({ status: 'anonymous', user: null, accounts: await listStoredAccounts() });
         return;
       }
 
       const user = (data as SessionPayload | null)?.data?.user;
       if (response.ok && validUser(user)) {
+        if (cachedUser && cachedUser.id !== user.id) {
+          throw new Error('The active session identity did not match its saved account.');
+        }
         await saveCachedUser(user);
-        set({ status: 'authenticated', user });
+        set({ status: 'authenticated', user, accounts: await listStoredAccounts() });
       }
     } catch {
-      // Keep the cached session candidate; protected APIs will reject stale credentials.
-      set({ status: 'authenticated', user: cachedUser });
+      // Keep the cached session candidate; protected APIs still enforce server authority.
+      set({ status: 'authenticated', user: cachedUser, accounts: await listStoredAccounts() });
     }
   },
 
@@ -115,10 +148,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       throw new Error('Enter your email and password.');
     }
 
+    await assertStoredAccountCapacity(normalizedIdentity);
+
     const { response, data } = await apiRequest<LoginPayload>('/auth/login', {
       method: 'POST',
       auth: false,
       idempotencyKey: false,
+      // Assign the freshly-issued credential to its own account slot below.
+      persistSessionCredential: false,
       body: JSON.stringify({ identity: normalizedIdentity, credential }),
     });
 
@@ -135,40 +172,101 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       throw new Error('The sign-in response was incomplete. Please try again.');
     }
 
-    // W01 delivers the opaque native credential in a response header, not JSON.
-    const token = await readSessionToken();
+    const token = response.headers.get('X-LuckRead-Session-Token');
     if (!token) {
       throw new Error('Sign-in succeeded without a native session credential.');
     }
-    await saveCachedUser(user);
-    // A new login may switch users even if the old session wasn't explicitly
-    // logged out first; pending retry keys must never cross that boundary.
+
+    await saveAccountSession(user, token);
     clearPendingMutationKeys();
-    set({ status: 'authenticated', user });
+    set({ status: 'authenticated', user, accounts: await listStoredAccounts() });
+  },
+
+  switchAccount: async (userId) => {
+    const previousAccountId = await getActiveStoredAccountId();
+    const previousUser = get().user;
+    if (previousAccountId === userId && previousUser?.id === userId) return;
+
+    set({ status: 'loading', user: null });
+    try {
+      await activateStoredAccount(userId);
+      clearPendingMutationKeys();
+
+      const { response, data } = await apiRequest<SessionPayload>('/auth/session', { method: 'GET' });
+      const user = (data as SessionPayload | null)?.data?.user;
+      if (response.status === 401) {
+        throw new AuthStoreError('这个账号的登录状态已失效，请重新登录。', 401, 'SESSION_EXPIRED');
+      }
+      if (!response.ok) {
+        throw new AuthStoreError(
+          getApiErrorMessage(data, '切换账号暂时无法完成，请稍后重试。', response.status),
+          response.status,
+          readAuthErrorCode(data),
+        );
+      }
+      if (!validUser(user) || user.id !== userId) {
+        throw new AuthStoreError('服务器返回的账号身份与所选账号不一致。', 401, 'SESSION_IDENTITY_MISMATCH');
+      }
+
+      await saveCachedUser(user);
+      set({ status: 'authenticated', user, accounts: await listStoredAccounts() });
+    } catch (cause) {
+      let restoredUser: LuckReadUser | null = null;
+      if (previousAccountId) {
+        try {
+          await activateStoredAccount(previousAccountId);
+          restoredUser = await readCachedUser();
+        } catch {
+          await clearActiveAccountSelection().catch(() => undefined);
+        }
+      } else {
+        await clearActiveAccountSelection().catch(() => undefined);
+      }
+      clearPendingMutationKeys();
+      set({
+        status: restoredUser ? 'authenticated' : 'anonymous',
+        user: restoredUser,
+        accounts: await listStoredAccounts().catch(() => []),
+      });
+      throw cause;
+    }
+  },
+
+  removeAccount: async (userId) => {
+    const activeAccountId = await getActiveStoredAccountId();
+    await removeStoredAccount(userId);
+    const accounts = await listStoredAccounts();
+    if (activeAccountId === userId) {
+      clearPendingMutationKeys();
+      set({ status: 'anonymous', user: null, accounts });
+    } else {
+      set({ accounts });
+    }
   },
 
   logout: async () => {
+    const currentUserId = get().user?.id;
     try {
       const token = await readSessionToken();
       if (token) {
-        const userId = get().user?.id;
-        if (userId) {
-          // Remove the account-scoped push endpoint before revoking the session.
-          // A transient notification-service failure must never block logout.
-          await unregisterPushEndpointForUser(userId).catch(() => undefined);
+        if (currentUserId) {
+          await unregisterPushEndpointForUser(currentUserId).catch(() => undefined);
         }
         await apiRequest<unknown>('/auth/logout', { method: 'POST', idempotencyKey: false });
       }
     } finally {
-      await clearStoredSession();
+      if (currentUserId) await removeStoredAccount(currentUserId);
+      else await clearStoredSession();
       clearPendingMutationKeys();
-      set({ status: 'anonymous', user: null });
+      set({ status: 'anonymous', user: null, accounts: await listStoredAccounts() });
     }
   },
 
   invalidateSession: async () => {
-    await clearStoredSession();
+    const activeAccountId = await getActiveStoredAccountId();
+    if (activeAccountId) await removeStoredAccount(activeAccountId);
+    else await clearStoredSession();
     clearPendingMutationKeys();
-    set({ status: 'anonymous', user: null });
+    set({ status: 'anonymous', user: null, accounts: await listStoredAccounts() });
   },
 }));
