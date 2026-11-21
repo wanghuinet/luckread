@@ -85,6 +85,7 @@ export default function ConversationScreen() {
           contentContainerStyle={{ paddingHorizontal: 14, paddingVertical: 16, flexGrow: 1 }}
           data={messages}
           inverted
+          maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
           onEndReached={loadOlder}
           onEndReachedThreshold={0.3}
           ListFooterComponent={messagesQuery.isFetchingNextPage ? <View className="py-4"><ActivityIndicator color="#1d9bf0" /></View> : undefined}
