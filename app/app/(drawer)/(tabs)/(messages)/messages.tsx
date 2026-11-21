@@ -5,7 +5,33 @@ import { useRouter } from 'expo-router';
 import { useAuthStore } from '~/store/auth-store';
 import { useColorScheme } from 'nativewind';
 import { useQuery } from '@tanstack/react-query';
-import { fetchConversations } from '~/lib/messaging-api';
+import { fetchConversations, type MessagingConversation } from '~/lib/messaging-api';
+import { resolvePublicProfileById } from '~/lib/content-adapter';
+
+
+function ConversationRow({ item, onPress }: { item: MessagingConversation; onPress: () => void }) {
+  const profile = useQuery({
+    queryKey: ['public-profile', item.participant_user_id],
+    queryFn: ({ signal }) => resolvePublicProfileById(item.participant_user_id, signal),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const displayName = profile.data?.displayName?.trim() ||
+    (profile.data?.username ? '@' + profile.data.username : 'LuckRead 用户');
+
+  return (
+    <Pressable onPress={onPress} className="flex-row items-center border-b border-neutral-100 px-4 py-4 dark:border-neutral-800">
+      <View className="h-12 w-12 items-center justify-center rounded-full bg-sky-50 dark:bg-sky-950/40">
+        <Feather name="user" size={22} color="#1d9bf0" />
+      </View>
+      <View className="ml-3 flex-1">
+        <Text className="font-semibold text-neutral-900 dark:text-white" numberOfLines={1}>{displayName}</Text>
+        <Text className="mt-1 text-sm text-neutral-500" numberOfLines={1}>{item.last_message_body || '开始聊天'}</Text>
+      </View>
+      <Feather name="chevron-right" size={18} color="#9ca3af" />
+    </Pressable>
+  );
+}
 
 export default function Messages() {
   const { colorScheme } = useColorScheme();
@@ -66,19 +92,10 @@ export default function Messages() {
             </View>
           }
           renderItem={({ item }) => (
-            <Pressable
+            <ConversationRow
+              item={item}
               onPress={() => router.push(('/messages/' + item.conversation_id) as never)}
-              className="flex-row items-center border-b border-neutral-100 px-4 py-4 dark:border-neutral-800"
-            >
-              <View className="h-12 w-12 items-center justify-center rounded-full bg-sky-50 dark:bg-sky-950/40">
-                <Feather name="user" size={22} color="#1d9bf0" />
-              </View>
-              <View className="ml-3 flex-1">
-                <Text className="font-semibold text-neutral-900 dark:text-white" numberOfLines={1}>{item.participant_user_id}</Text>
-                <Text className="mt-1 text-sm text-neutral-500" numberOfLines={1}>{item.last_message_body || '开始聊天'}</Text>
-              </View>
-              <Feather name="chevron-right" size={18} color="#9ca3af" />
-            </Pressable>
+            />
           )}
         />
       )}
