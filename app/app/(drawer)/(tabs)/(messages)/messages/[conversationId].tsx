@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchMessages, fetchMessagesAfter, markConversationRead, sendDirectMessage, type MessagingMessage } from '~/lib/messaging-api';
+import { fetchMessages, fetchMessagesAfter, markConversationRead, sendDirectMessage } from '~/lib/messaging-api';
 import { createIdempotencyKey } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
 
@@ -136,12 +136,6 @@ export default function ConversationScreen() {
         .catch(() => undefined);
     }
   }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence]);
-
-  const send = () => {
-    const value = draft.trim();
-    if (!value || sendMutation.isPending) return;
-    sendMutation.mutate(value);
-  };
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
