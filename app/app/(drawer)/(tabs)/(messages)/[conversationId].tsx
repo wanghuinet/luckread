@@ -40,9 +40,9 @@ export default function ConversationScreen() {
       }
       return sendDirectMessage(conversationId, body, pendingSend.current.key);
     },
-    onSuccess: async () => {
-      pendingSend.current = null;
-      setDraft('');
+    onSuccess: async (_message, sentBody) => {
+      if (pendingSend.current?.body === sentBody) pendingSend.current = null;
+      setDraft((current) => current.trim() === sentBody ? '' : current);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] }),
         queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] }),
@@ -105,6 +105,7 @@ export default function ConversationScreen() {
         <TextInput
           value={draft}
           onChangeText={setDraft}
+          editable={!sendMutation.isPending}
           placeholder="发送消息…"
           placeholderTextColor="#9ca3af"
           multiline
