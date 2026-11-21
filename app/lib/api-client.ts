@@ -52,6 +52,8 @@ type ApiRequestOptions = RequestInit & {
   idempotencyKey?: string | false;
   /** Set false for public authentication endpoints such as login. */
   auth?: boolean;
+  /** Set false when the caller must assign a newly-issued credential to a specific account slot. */
+  persistSessionCredential?: boolean;
 };
 
 type RecoveryDefaults = {
@@ -457,7 +459,14 @@ export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
 ): Promise<ApiResult<T>> {
-  const { auth = true, idempotencyKey, onUploadProgress, headers: inputHeaders, ...init } = options;
+  const {
+    auth = true,
+    idempotencyKey,
+    onUploadProgress,
+    persistSessionCredential = true,
+    headers: inputHeaders,
+    ...init
+  } = options;
   const headers = new Headers(inputHeaders || {});
   headers.set('Accept', 'application/json');
 
@@ -544,7 +553,7 @@ export async function apiRequest<T>(
   let outcome: MutationOutcome = 'transient';
   try {
     const renewedCredential = response.headers.get('X-LuckRead-Session-Token');
-    if (renewedCredential) await saveSessionToken(renewedCredential);
+    if (renewedCredential && persistSessionCredential) await saveSessionToken(renewedCredential);
 
     let data: T | ApiErrorBody | null = null;
     try {
