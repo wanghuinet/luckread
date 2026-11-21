@@ -15,10 +15,16 @@ describe('v1 messaging adapters', () => {
     for (const source of [conversations, messages, readCursor, requests, requestAction]) {
       expect(source).toContain('resolveCookieSocialPrincipal')
       expect(source).toContain('callW05Social')
-      expect(source).not.toContain('getPayload(')
       expect(source).not.toContain('HYPERDRIVE')
       expect(source).not.toContain('D1Database')
     }
+  })
+
+  it('keeps Payload access limited to verifying uploaded attachment ownership in W01', () => {
+    expect(messages).toContain('validateOwnedMessageAttachments')
+    expect(messages).toContain("collection: 'media'")
+    expect(messages).toContain('ownerUserId')
+    for (const source of [conversations, readCursor, requests, requestAction]) expect(source).not.toContain('getPayload(')
   })
 
   it('maps recipient identity through the canonical social profile identity resolver', () => {
