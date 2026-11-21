@@ -6,7 +6,7 @@
     {
       "method": "GET",
       "path": "/v1/conversations",
-      "operationId": "messagingConversationList",
+      "operationId": "listMessagingConversations",
       "auth": "required",
       "query": [
         "cursor",
@@ -16,7 +16,7 @@
     {
       "method": "POST",
       "path": "/v1/conversations",
-      "operationId": "messagingDirectConversationCreate",
+      "operationId": "createMessagingConversation",
       "auth": "required",
       "body": [
         "recipientUserId"
@@ -25,7 +25,7 @@
     {
       "method": "GET",
       "path": "/v1/conversations/{conversationId}/messages",
-      "operationId": "messagingMessageList",
+      "operationId": "listMessagingMessages",
       "auth": "required",
       "query": [
         "beforeSequence",
@@ -35,7 +35,7 @@
     {
       "method": "POST",
       "path": "/v1/conversations/{conversationId}/messages",
-      "operationId": "messagingMessageSend",
+      "operationId": "sendMessagingMessage",
       "auth": "required",
       "headers": [
         "Idempotency-Key"
@@ -47,7 +47,7 @@
     {
       "method": "POST",
       "path": "/v1/conversations/{conversationId}/read",
-      "operationId": "messagingConversationRead",
+      "operationId": "markMessagingConversationRead",
       "auth": "required",
       "body": [
         "sequence"
