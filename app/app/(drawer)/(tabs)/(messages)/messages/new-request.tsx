@@ -49,6 +49,8 @@ export default function NewMessageRequestScreen() {
         <TextInput
           value={body}
           onChangeText={setBody}
+          accessibilityLabel="私信请求内容"
+          editable={!mutation.isPending}
           multiline
           maxLength={1000}
           autoFocus
