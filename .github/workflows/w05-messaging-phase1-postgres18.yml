@@ -39,7 +39,8 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - name: Install W05 PostgreSQL driver from its owning package
+        run: npm install --prefix workers/W05-social --no-save --ignore-scripts
       - name: Rehearse additive messaging schema on disposable PostgreSQL 18
         env:
           MESSAGING_TEST_DATABASE_URL: postgresql://postgres:local-test-only@127.0.0.1:5432/luckread_messaging_test
