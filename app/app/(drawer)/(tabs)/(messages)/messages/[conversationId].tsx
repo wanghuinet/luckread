@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, type AppStateStatus, ActivityIndicator, Pressable, StatusBar, Text, View } from 'react-native';
+import { Alert, AppState, type AppStateStatus, ActivityIndicator, Modal, Pressable, StatusBar, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { Chat, type IMessage } from '@kesha-antonov/react-native-chat';
@@ -8,7 +8,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  fetchMessages, fetchMessagesAfter, getMessageAttachmentUrl, markConversationRead, sendDirectMessage, uploadMessageAttachment,
+  editDirectMessage, fetchMessages, fetchMessagesAfter, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
   type MessagingAttachment,
 } from '~/lib/messaging-api';
 import type { LocalMediaFile } from '~/lib/publish-api';
@@ -72,6 +72,8 @@ export default function ConversationScreen() {
   const user = useAuthStore((state) => state.user);
   const userId = user?.id;
   const [draft, setDraft] = useState('');
+  const [editTarget, setEditTarget] = useState<{ messageId: string; body: string } | null>(null);
+  const [editDraft, setEditDraft] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [isPicking, setIsPicking] = useState(false);
   const [isFocused, setIsFocused] = useState(true);
@@ -102,12 +104,14 @@ export default function ConversationScreen() {
       .map((attachment) => getMessageAttachmentUrl(message.conversation_id, attachment.mediaId));
     return {
       _id: message.message_id,
-      text: [
-        message.body,
-        ...attachments.filter((attachment) => !attachment.mimeType.startsWith('image/'))
-          .map((attachment) => '📎 ' + attachment.filename),
-      ].filter(Boolean).join('\n'),
-      ...(imageUrls.length ? { image: JSON.stringify(imageUrls) } : {}),
+      text: message.recalled_at
+        ? (message.sender_user_id === userId ? '你撤回了一条消息' : '对方撤回了一条消息')
+        : [
+            message.body,
+            ...attachments.filter((attachment) => !attachment.mimeType.startsWith('image/'))
+              .map((attachment) => '📎 ' + attachment.filename),
+          ].filter(Boolean).join('\n') + (message.edited_at ? '  （已编辑）' : ''),
+      ...(!message.recalled_at && imageUrls.length ? { image: JSON.stringify(imageUrls) } : {}),
       createdAt: new Date(message.created_at),
       user: {
         _id: message.sender_user_id,
@@ -236,6 +240,52 @@ export default function ConversationScreen() {
     },
   });
 
+  const applyMessageUpdate = useCallback((updated: import('~/lib/messaging-api').MessagingMessage) => {
+    queryClient.setQueryData<typeof messagesQuery.data>(
+      ['messaging', 'messages', conversationId],
+      (current) => {
+        if (!current?.pages.length) return current;
+        return {
+          ...current,
+          pages: current.pages.map((page) => ({
+            ...page,
+            items: page.items.map((item) => item.message_id === updated.message_id ? updated : item),
+          })),
+        };
+      },
+    );
+    void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+  }, [conversationId, queryClient]);
+
+  const editMutation = useMutation({
+    mutationFn: () => {
+      if (!editTarget) throw new Error('请选择要编辑的消息。');
+      return editDirectMessage(conversationId, editTarget.messageId, editDraft);
+    },
+    onSuccess: (updated) => {
+      applyMessageUpdate(updated);
+      setEditTarget(null);
+      setEditDraft('');
+    },
+  });
+  const recallMutation = useMutation({
+    mutationFn: (messageId: string) => recallDirectMessage(conversationId, messageId),
+    onSuccess: applyMessageUpdate,
+  });
+
+  const handleLongPressMessage = useCallback((_context: unknown, selected: IMessage) => {
+    const original = messages.find((message) => message.message_id === String(selected._id));
+    if (!original || original.sender_user_id !== userId || original.recalled_at) return;
+    Alert.alert('消息操作', '选择对这条消息执行的操作。', [
+      { text: '编辑', onPress: () => { setEditTarget({ messageId: original.message_id, body: original.body }); setEditDraft(original.body); } },
+      { text: '撤回', style: 'destructive', onPress: () => Alert.alert('撤回这条消息？', '撤回后，双方都无法再查看消息内容和附件。', [
+        { text: '取消', style: 'cancel' },
+        { text: '确认撤回', style: 'destructive', onPress: () => recallMutation.mutate(original.message_id) },
+      ]) },
+      { text: '取消', style: 'cancel' },
+    ]);
+  }, [messages, recallMutation, userId]);
+
   const readyAttachments = pendingAttachments
     .filter((item) => item.status === 'ready' && item.attachment)
     .map((item) => item.attachment!);
@@ -320,6 +370,7 @@ export default function ConversationScreen() {
               enableGestureHandlerRootView={false}
               attachments={false}
               renderMessageImage={(props) => <PrivateMessageImages currentMessage={props.currentMessage} />}
+              onLongPressMessage={handleLongPressMessage}
               audioRecording={false}
               videoRecording={false}
               reply={{ isEnabled: false }}
@@ -350,6 +401,32 @@ export default function ConversationScreen() {
         </>
       )}
       {sendMutation.isError ? <Text className="px-4 py-2 text-sm text-red-500">发送失败，草稿已保留，请检查网络后重试。</Text> : null}
+      {recallMutation.isError ? <Text className="px-4 py-2 text-sm text-red-500">撤回失败，请重试。</Text> : null}
+      <Modal visible={Boolean(editTarget)} transparent animationType="fade" onRequestClose={() => setEditTarget(null)}>
+        <View className="flex-1 justify-center bg-black/50 px-6">
+          <View className="rounded-2xl bg-white p-4 dark:bg-neutral-900">
+            <Text className="mb-3 text-lg font-bold text-neutral-900 dark:text-white">编辑消息</Text>
+            <TextInput
+              value={editDraft}
+              onChangeText={setEditDraft}
+              multiline
+              maxLength={10000}
+              autoFocus
+              placeholder="编辑消息内容"
+              placeholderTextColor="#9ca3af"
+              className="min-h-28 rounded-xl border border-neutral-200 p-3 text-base text-neutral-900 dark:border-neutral-700 dark:text-white"
+              style={{ textAlignVertical: 'top' }}
+            />
+            {editMutation.isError ? <Text className="mt-2 text-sm text-red-500">保存失败，请检查网络后重试。</Text> : null}
+            <View className="mt-4 flex-row justify-end gap-3">
+              <Pressable onPress={() => { setEditTarget(null); setEditDraft(''); }} className="rounded-full px-4 py-2"><Text className="font-semibold text-neutral-600 dark:text-neutral-300">取消</Text></Pressable>
+              <Pressable disabled={editMutation.isPending || !editDraft.trim() || editDraft.trim() === editTarget?.body} onPress={() => editMutation.mutate()} className="rounded-full bg-sky-500 px-5 py-2 disabled:opacity-50">
+                {editMutation.isPending ? <ActivityIndicator size="small" color="#fff" /> : <Text className="font-semibold text-white">保存</Text>}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
