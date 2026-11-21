@@ -363,7 +363,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
     <View className="mt-3 border-t border-neutral-200 dark:border-neutral-800 px-3 pb-5">
       <View className="flex-row items-center justify-between py-3">
         <Text className="text-lg font-extrabold text-black dark:text-white">Replies</Text>
-        <TouchableOpacity accessibilityRole="button" onPress={refreshComments} disabled={refreshing || loading}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={refreshing || loading ? "Refreshing replies" : "Refresh replies"} accessibilityHint="Reloads the replies for this post" accessibilityState={{ disabled: refreshing || loading, busy: refreshing || loading }} onPress={refreshComments} disabled={refreshing || loading}>
           <Feather name="refresh-cw" size={17} color="#536471" />
         </TouchableOpacity>
       </View>
@@ -384,6 +384,9 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
           <Text className="text-xs text-neutral-500">{body.length}/10000</Text>
           <TouchableOpacity
             accessibilityRole="button"
+            accessibilityLabel={submitting ? "Posting comment" : "Post comment"}
+            accessibilityHint="Publishes your reply to this post"
+            accessibilityState={{ disabled: !body.trim() || submitting, busy: submitting }}
             className={`rounded-full px-4 py-2 ${body.trim() && !submitting ? 'bg-sky-500' : 'bg-neutral-300 dark:bg-neutral-700'}`}
             disabled={!body.trim() || submitting}
             onPress={() => void submitComment()}
@@ -397,7 +400,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
         <View className="mt-3">
           <Text accessibilityRole="alert" className="text-sm text-rose-600">{message}</Text>
           {!loading && comments.length === 0 ? (
-            <TouchableOpacity className="mt-2 self-start" onPress={() => void loadComments()}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Retry loading replies" accessibilityHint="Attempts to load replies again" onPress={() => void loadComments()}>
               <Text className="font-semibold text-sky-500">Retry</Text>
             </TouchableOpacity>
           ) : null}
@@ -454,6 +457,8 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
                 <View className="mt-2 flex-row items-center gap-4">
                   <TouchableOpacity
                     accessibilityRole="button"
+                    accessibilityLabel={`Reply to ${authorName}`}
+                    accessibilityHint="Opens the reply composer for this comment"
                     className="self-start"
                     onPress={() => beginReply(comment)}
                   >
@@ -462,6 +467,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
                   <TouchableOpacity
                     accessibilityRole="button"
                     accessibilityLabel={likedComments[comment.id] ? 'Unlike reply' : 'Like reply'}
+                    accessibilityState={{ disabled: likingCommentId !== null, selected: likedComments[comment.id] === true, busy: likingCommentId === comment.id }}
                     disabled={likingCommentId !== null}
                     onPress={() => void toggleCommentLike(comment)}
                     className="flex-row items-center"
@@ -521,6 +527,8 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
       {hasMore && cursor ? (
         <TouchableOpacity
           accessibilityRole="button"
+          accessibilityLabel={loadingMore ? "Loading more replies" : "Load more replies"}
+          accessibilityState={{ disabled: loadingMore, busy: loadingMore }}
           className="items-center py-4"
           disabled={loadingMore}
           onPress={() => void loadComments(cursor)}
