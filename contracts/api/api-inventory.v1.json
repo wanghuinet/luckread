@@ -324,6 +324,16 @@
         "POST /v1/developer/oauth/authorize",
         "POST /v1/developer/webhooks"
       ]
+    },
+    "messaging": {
+      "required": true,
+      "endpoint_groups": [
+        "GET /v1/conversations",
+        "GET /v1/conversations/{conversationId}/messages",
+        "POST /v1/conversations",
+        "POST /v1/conversations/{conversationId}/messages",
+        "POST /v1/conversations/{conversationId}/read"
+      ]
     }
   },
   "endpoint_record_template": {

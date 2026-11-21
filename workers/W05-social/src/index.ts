@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { listContentLikers } from './like-list-runtime.js'
+import { MessagingRuntimeError, createDirectConversation, listConversations, listMessages, markConversationRead, sendMessage } from './messaging-runtime.js'
+import type { MessagingStore } from './messaging-store.js'
 import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js'
 import { CommentRuntimeError, createComment, deleteComment, listComments, parseCommentLimit, parseCommentSort, updateComment } from './comment-runtime.js'
 import { listProfileLikedContents, listProfileReplies, ProfileChannelRuntimeError } from './profile-channel-runtime.js'
@@ -297,6 +299,8 @@ function requireSocialClosureReadStore(source: SocialClosureReadStore | undefine
 export type W05SocialWorkerDependencies = Readonly<{
   /** W09-owned D1-03 endpoint mutations require the separately scoped Neon PostgreSQL executor. */
   pushEndpointDatabase?: PushEndpointPostgresExecutor
+  /** Authoritative W05 Neon Messaging Store; routes fail closed when absent. */
+  messagingStore?: MessagingStore
   /** Required Neon PostgreSQL follower/following list reader; missing composition fails closed. */
   followListReadStore?: FollowListReadStore
   /** Required Neon PostgreSQL Follow/Unfollow writer; mutation routes fail closed when absent. */
@@ -442,7 +446,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           })
         }
         await unpinProfileContent(actorUserId, contentId, store)
-        return new Response(null, { status: 204 })
+        return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       }
 
       const pinnedContentMatch = /^\/internal\/social\/users\/([^/]+)\/pinned-content$/.exec(url.pathname)
@@ -829,6 +833,63 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           return new Response(null, { status: 204 })
         }
         return new Response(null, { status: 405, headers: { Allow: 'PUT, DELETE' } })
+      }
+
+
+      if (url.pathname === '/internal/messaging/conversations') {
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        if (request.method === 'GET') {
+          return json({
+            data: await listConversations(dependencies.messagingStore, actorUserId, url.searchParams.get('cursor'), url.searchParams.get('limit')),
+            requestId: createRequestId(),
+          })
+        }
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'GET, POST' } })
+        let body: unknown
+        try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
+        if (!body || typeof body !== 'object' || Array.isArray(body) || typeof (body as { recipientUserId?: unknown }).recipientUserId !== 'string') {
+          throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        }
+        const data = await createDirectConversation(dependencies.messagingStore, actorUserId, (body as { recipientUserId: string }).recipientUserId)
+        return json({ data, requestId: createRequestId() }, 201)
+      }
+
+      const messagingMessagesMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/messages$/.exec(url.pathname)
+      if (messagingMessagesMatch) {
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const conversationId = decodePathPart(messagingMessagesMatch[1] ?? '')
+        if (!conversationId) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        if (request.method === 'GET') {
+          return json({
+            data: await listMessages(dependencies.messagingStore, actorUserId, conversationId, url.searchParams.get('beforeSequence'), url.searchParams.get('limit')),
+            requestId: createRequestId(),
+          })
+        }
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'GET, POST' } })
+        const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+        if (!idempotencyKey) throw new MessagingRuntimeError('PRECONDITION_REQUIRED', 428)
+        if (idempotencyKey.length > 128) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        let body: unknown
+        try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        const data = await sendMessage(dependencies.messagingStore, actorUserId, conversationId, idempotencyKey, (body as { body?: unknown }).body)
+        return json({ data, requestId: createRequestId() }, 201)
+      }
+
+      const messagingReadMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/read$/.exec(url.pathname)
+      if (messagingReadMatch) {
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const conversationId = decodePathPart(messagingReadMatch[1] ?? '')
+        if (!conversationId) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        let body: unknown
+        try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        await markConversationRead(dependencies.messagingStore, actorUserId, conversationId, (body as { sequence?: unknown }).sequence)
+        return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       }
 
       if (url.pathname === '/internal/social/notifications') {
@@ -1449,6 +1510,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
       })
     } catch (error) {
       if (
+        error instanceof MessagingRuntimeError ||
         error instanceof PushEndpointRuntimeError ||
         error instanceof CommentNotificationContextRuntimeError ||
         error instanceof SocialPollError ||

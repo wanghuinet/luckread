@@ -32,6 +32,8 @@ tags:
     description: Personalized and discovery feed operations.
   - name: Search
     description: Content search operations.
+  - name: Messaging
+    description: Direct conversations and durable text messages.
   - name: Notifications
     description: User notification operations.
   - name: Commerce
@@ -1694,6 +1696,110 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ListResponse' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+  /conversations:
+    get:
+      tags: [Messaging]
+      operationId: listMessagingConversations
+      summary: List the current user's direct conversations
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50 }
+      responses:
+        '200': { description: Conversation page }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+    post:
+      tags: [Messaging]
+      operationId: createMessagingConversation
+      summary: Create or retrieve a direct conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipientUserId]
+              properties:
+                recipientUserId:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                  pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$'
+      responses:
+        '201': { description: Conversation created or retrieved }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+  /conversations/{conversationId}/messages:
+    parameters:
+      - name: conversationId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [Messaging]
+      operationId: listMessagingMessages
+      summary: List messages in a direct conversation
+      parameters:
+        - name: beforeSequence
+          in: query
+          required: false
+          schema: { type: string, pattern: '^[1-9][0-9]{0,17}$' }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50 }
+      responses:
+        '200': { description: Message page }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+    post:
+      tags: [Messaging]
+      operationId: sendMessagingMessage
+      summary: Send an idempotent direct text message
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, minLength: 1, maxLength: 10000 }
+      responses:
+        '201': { description: Persisted message }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+  /conversations/{conversationId}/read:
+    parameters:
+      - name: conversationId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Messaging]
+      operationId: markMessagingConversationRead
+      summary: Advance the authenticated user's read cursor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sequence]
+              properties:
+                sequence: { type: string, pattern: '^(0|[1-9][0-9]{0,17})$' }
+      responses:
+        '204': { description: Read cursor advanced }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
         '4XX': { $ref: '#/components/responses/ClientError' }
   /notifications:
     get:

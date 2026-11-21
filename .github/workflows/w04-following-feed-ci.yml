@@ -58,11 +58,15 @@ jobs:
           workers/W04-feed-search/src/index.ts
           workers/W04-feed-search/src/search-trends.ts
 
+      - name: Setup supported pnpm for W01 adapter checks
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
       - name: Install locked W01 adapter test dependencies
         working-directory: workers/W01-payload
-        run: |
-          corepack enable
-          pnpm install --frozen-lockfile --ignore-scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run W01 public search adapter tests
         working-directory: workers/W01-payload
