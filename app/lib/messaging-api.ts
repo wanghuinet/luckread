@@ -1,4 +1,4 @@
-import { apiRequest, createIdempotencyKey } from './api-client';
+import { apiRequest, createIdempotencyKey, getApiBaseUrl } from './api-client';
 import { uploadMediaFile, type LocalMediaFile } from './publish-api';
 
 export type MessagingConversation = {
@@ -72,6 +72,11 @@ export async function sendDirectMessage(
     { method: 'POST', body: JSON.stringify({ body, attachments }), idempotencyKey },
   ));
 }
+export function getMessageAttachmentUrl(conversationId: string, mediaId: string): string {
+  return getApiBaseUrl() + '/v1/conversations/' + encodeURIComponent(conversationId) +
+    '/attachments/' + encodeURIComponent(mediaId);
+}
+
 export async function markConversationRead(conversationId: string, sequence: string) {
   return apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/read', {
     method: 'POST', body: JSON.stringify({ sequence }), idempotencyKey: false,
