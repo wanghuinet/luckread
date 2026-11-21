@@ -288,7 +288,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
             `INSERT INTO social_conversations
               (conversation_id, conversation_type, direct_pair_key, created_by_user_id, last_sequence, created_at, updated_at)
              VALUES ($1, 'direct', $2, $3, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-             ON CONFLICT (direct_pair_key) WHERE conversation_type = 'direct' DO UPDATE SET updated_at = social_conversations.updated_at
+             ON CONFLICT (direct_pair_key) WHERE conversation_type = 'direct' AND direct_pair_key IS NOT NULL DO UPDATE SET updated_at = social_conversations.updated_at
              RETURNING conversation_id`,
             [crypto.randomUUID(), directPairKey, actorUserId])
           const conversationId = created.rows[0]?.conversation_id
