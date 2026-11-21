@@ -230,8 +230,20 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
         // A concurrent retry can win the unique sender/client_message_id constraint.
         try {
           const prior = await db.query<MessageRow>(
-            `SELECT ${messageSelect} FROM social_messages WHERE sender_user_id = $1 AND client_message_id = $2 LIMIT 1`,
-            [actorUserId, clientMessageId])
+            `SELECT ${messageSelect}
+               FROM social_messages message
+               JOIN social_conversation_memberships mine
+                 ON mine.conversation_id = message.conversation_id AND mine.user_id = $1 AND mine.left_at IS NULL
+               JOIN social_conversation_memberships peer
+                 ON peer.conversation_id = message.conversation_id AND peer.user_id <> $1 AND peer.left_at IS NULL
+              WHERE message.sender_user_id = $1 AND message.client_message_id = $2
+                AND NOT EXISTS (
+                  SELECT 1 FROM social_user_interactions blocked
+                   WHERE blocked.relation_type = 'block'
+                     AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                       OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                )
+              LIMIT 1`, [actorUserId, clientMessageId])
           if (prior.rows[0]) {
             if (prior.rows[0].conversation_id === conversationId && prior.rows[0].body === body) return prior.rows[0]
             throw new MessagingStoreError('CONFLICT', 409)
