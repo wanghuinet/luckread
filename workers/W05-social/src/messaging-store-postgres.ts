@@ -66,7 +66,8 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
             `INSERT INTO social_conversation_memberships
               (conversation_id, user_id, member_role, joined_at, last_read_sequence)
              VALUES ($1, $2, 'owner', CURRENT_TIMESTAMP, 0), ($1, $3, 'member', CURRENT_TIMESTAMP, 0)
-             ON CONFLICT (conversation_id, user_id) DO NOTHING`,
+             ON CONFLICT (conversation_id, user_id) DO UPDATE
+                SET left_at = NULL, archived_at = NULL, joined_at = CURRENT_TIMESTAMP`,
             [conversationId, actorUserId, recipientUserId])
           return { conversationId }
         })
@@ -101,6 +102,13 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
                 ORDER BY sequence DESC LIMIT 1
              ) latest ON TRUE
             WHERE mine.user_id = $1 AND mine.left_at IS NULL
+              AND peer.user_id IS NOT NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM social_user_interactions blocked
+                 WHERE blocked.relation_type = 'block'
+                   AND ((blocked.actor_user_id = $1 AND blocked.target_user_id = peer.user_id)
+                     OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = $1))
+              )
               AND ($2::timestamptz IS NULL OR (c.updated_at, c.conversation_id) < ($2::timestamptz, $3::text))
             ORDER BY c.updated_at DESC, c.conversation_id DESC
             LIMIT $4`,
@@ -124,8 +132,16 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
       }
       try {
         const membership = await db.query(
-          `SELECT 1 FROM social_conversation_memberships
-            WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL LIMIT 1`,
+          `SELECT 1 FROM social_conversation_memberships mine
+             JOIN social_conversation_memberships peer
+               ON peer.conversation_id = mine.conversation_id AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+             WHERE mine.conversation_id = $1 AND mine.user_id = $2 AND mine.left_at IS NULL
+               AND NOT EXISTS (
+                 SELECT 1 FROM social_user_interactions blocked
+                  WHERE blocked.relation_type = 'block'
+                    AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                      OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+               ) LIMIT 1`,
           [conversationId, actorUserId])
         if (!membership.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
         const result = await db.query<MessageRow>(
@@ -220,7 +236,19 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
               SET last_read_sequence = GREATEST(m.last_read_sequence, LEAST($3::bigint, c.last_sequence))
              FROM social_conversations c
             WHERE m.conversation_id = $1 AND m.user_id = $2
-              AND m.conversation_id = c.conversation_id AND m.left_at IS NULL`,
+              AND m.conversation_id = c.conversation_id AND m.left_at IS NULL
+              AND EXISTS (
+                SELECT 1 FROM social_conversation_memberships peer
+                 WHERE peer.conversation_id = m.conversation_id AND peer.user_id <> m.user_id AND peer.left_at IS NULL
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM social_conversation_memberships peer
+                JOIN social_user_interactions blocked
+                  ON blocked.relation_type = 'block'
+                 AND ((blocked.actor_user_id = m.user_id AND blocked.target_user_id = peer.user_id)
+                   OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = m.user_id))
+                 WHERE peer.conversation_id = m.conversation_id AND peer.user_id <> m.user_id AND peer.left_at IS NULL
+              )`,
           [conversationId, actorUserId, sequence])
         if (!result.rowCount) throw new MessagingStoreError('NOT_FOUND', 404)
       } catch (error) {
