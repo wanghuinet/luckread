@@ -33,21 +33,21 @@ test('W05 schema source provenance remains pinned while the production runtime u
   const { sourceReport } = buildW05PostgresMigration({ inventory, socialContract, readSource, template })
   assert.equal(sourceReport.targetDatabase, 'luckreadpro')
   assert.equal(sourceReport.sourceOwner, 'W05')
-  assert.equal(sourceReport.migrationCount, 15)
+  assert.equal(sourceReport.migrationCount, 16)
   assert.equal(sourceReport.safety.d1_03SchemaImported, false)
   assert.equal(sourceReport.safety.productionCutoverAuthorized, false)
 })
 
 test('W05 migration source set is frozen and fully readable', () => {
   const { sourceReport } = buildW05PostgresMigration({ inventory, socialContract, readSource, template })
-  assert.equal(sourceReport.sourceMigrations.length, 15)
+  assert.equal(sourceReport.sourceMigrations.length, 16)
   assert.ok(sourceReport.sourceMigrations.every((row) => /^[a-f0-9]{64}$/.test(row.sha256)))
 })
 
-test('native schema defines the nineteen final-state W05 tables and thirty-five indexes', () => {
+test('native schema defines the twenty-two final-state W05 tables and thirty-seven indexes', () => {
   const { artifact } = buildW05PostgresMigration({ inventory, socialContract, readSource, template })
-  assert.equal([...artifact.matchAll(/^CREATE TABLE /gim)].length, 19)
-  assert.equal([...artifact.matchAll(/^CREATE (?:UNIQUE )?INDEX /gim)].length, 35)
+  assert.equal([...artifact.matchAll(/^CREATE TABLE /gim)].length, 22)
+  assert.equal([...artifact.matchAll(/^CREATE (?:UNIQUE )?INDEX /gim)].length, 37)
   assert.equal([...artifact.matchAll(/^CREATE TRIGGER /gim)].length, 1)
 })
 

@@ -64,7 +64,7 @@ export function verifyCombinedSchemaContract({ contract, inventory, loadArtifact
     const source = inventory.owners?.find((item) => item.worker === owner.worker)
     if (!source || source.migrationDirectory !== owner.migrationDirectory ||
         source.sqlMigrations?.length !== owner.migrationCount ||
-        owner.migrationCount !== 15) fail(owner.worker + ' migration source inventory drift')
+        owner.migrationCount !== (owner.worker === 'W03' ? 15 : 16)) fail(owner.worker + ' migration source inventory drift')
     const included = source.physicalBindings?.filter((item) => item.included === true) ?? []
     if (included.length !== 1 || included[0].binding !== owner.binding ||
         included[0].logicalDomain !== 'D1-02' || included[0].databaseName !== target.databaseName ||

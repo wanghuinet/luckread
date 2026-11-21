@@ -32,11 +32,11 @@
       "worker": "W05",
       "binding": "DB",
       "migrationDirectory": "workers/W05-social/migrations",
-      "migrationCount": 15,
+      "migrationCount": 16,
       "artifactPath": "workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql",
       "expected": {
-        "tables": 19,
-        "explicitIndexes": 35,
+        "tables": 22,
+        "explicitIndexes": 37,
         "triggers": 1,
         "triggerFunctions": 1
       }
@@ -44,9 +44,9 @@
   ],
   "combined": {
     "owners": 2,
-    "migrationSources": 30,
-    "tables": 28,
-    "explicitIndexes": 63,
+    "migrationSources": 31,
+    "tables": 31,
+    "explicitIndexes": 65,
     "triggers": 9,
     "triggerFunctions": 10
   },
