@@ -470,7 +470,7 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
               />
             </TouchableOpacity>
           </Animated.View>
-          {user.id !== currentUserId ? (
+          {currentUserId && user.id !== currentUserId ? (
             <View className="absolute bottom-0 right-0 flex-row items-center gap-2">
               <TouchableOpacity
                 accessibilityRole="button"
