@@ -59,7 +59,7 @@ export async function GET(
       id: mediaId,
       depth: 0,
       overrideAccess: true,
-    }).catch(() => null) as unknown as MediaRecord | null
+    }).catch((): null => null) as unknown as MediaRecord | null
     if (!media || String(media.id ?? '') !== mediaId ||
         typeof media.url !== 'string' || !isCanonicalMediaDeliveryUrl(media.url) ||
         typeof media.mimeType !== 'string' ||
