@@ -34,7 +34,7 @@ export default function ConversationScreen() {
   });
   useEffect(() => {
     const latest = messagesQuery.data?.items?.[0];
-    if (latest?.sequence) void markConversationRead(conversationId, latest.sequence);
+    if (latest?.sequence) void markConversationRead(conversationId, latest.sequence).catch(() => undefined);
   }, [conversationId, messagesQuery.data?.items]);
 
   const send = () => {
