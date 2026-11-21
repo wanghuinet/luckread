@@ -1710,7 +1710,7 @@ paths:
           schema: { type: integer, minimum: 1, maximum: 50 }
       responses:
         '200': { description: Conversation page }
-        '401': { $ref: '#/components/responses/Unauthorized' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
     post:
       tags: [Messaging]
       operationId: createMessagingConversation
@@ -1726,7 +1726,7 @@ paths:
                 recipientUserId: { type: string, minLength: 1 }
       responses:
         '201': { description: Conversation created or retrieved }
-        '401': { $ref: '#/components/responses/Unauthorized' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
   /conversations/{conversationId}/messages:
     parameters:
       - name: conversationId
@@ -1739,7 +1739,7 @@ paths:
       summary: List messages in a direct conversation
       responses:
         '200': { description: Message page }
-        '401': { $ref: '#/components/responses/Unauthorized' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
     post:
       tags: [Messaging]
       operationId: sendMessagingMessage
@@ -1757,7 +1757,7 @@ paths:
                 body: { type: string, minLength: 1, maxLength: 10000 }
       responses:
         '201': { description: Persisted message }
-        '401': { $ref: '#/components/responses/Unauthorized' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
   /conversations/{conversationId}/read:
     parameters:
       - name: conversationId
@@ -1779,7 +1779,7 @@ paths:
                 sequence: { type: string, pattern: '^[0-9]+$' }
       responses:
         '204': { description: Read cursor advanced }
-        '401': { $ref: '#/components/responses/Unauthorized' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
   /notifications:
     get:
       tags: [Notifications]
