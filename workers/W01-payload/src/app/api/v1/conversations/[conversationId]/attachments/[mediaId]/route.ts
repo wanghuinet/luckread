@@ -80,7 +80,7 @@ export async function GET(
     const bucket = (cloudflare.env as unknown as { R2?: R2Bucket }).R2
     if (!bucket) return unavailable(503, 'SERVICE_UNAVAILABLE')
 
-    const metadata = await bucket.head(key).catch(() => null)
+    const metadata = await bucket.head(key).catch((): null => null)
     if (!metadata || metadata.size !== media.filesize) return unavailable(404, 'NOT_FOUND')
     const expectedMime = media.mimeType.toLowerCase()
     const storedMime = metadata.httpMetadata?.contentType?.split(';', 1)[0]?.trim().toLowerCase()
