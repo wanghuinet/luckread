@@ -1,1 +1,0 @@
-Cleanup audit: Mapping 0 remains unchanged and fail-closed. Placeholder DTO drafts from this continuation are not canonical evidence and must be removed before the next mapping gate review.

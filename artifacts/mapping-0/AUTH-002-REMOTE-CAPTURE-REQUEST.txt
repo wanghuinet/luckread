@@ -1,8 +1,0 @@
-Controlled AUTH-002 remote schema evidence capture request. Read-only evidence collection only; no migration, DDL, INSERT, UPDATE, or DELETE.
-
-Current-head capture requested for the current authoritative main commit.
-Capture target commit: GITHUB_SHA resolved by the evidence workflow at execution time.
-Evidence environment: CONTROLLED_REMOTE_D1
-Database: luckread
-
-This request does not promote AUTH-002 and does not authorize runtime implementation.

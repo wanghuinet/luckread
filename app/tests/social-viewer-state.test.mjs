@@ -2,14 +2,13 @@ import { beforeEach, expect, mock, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
 let activeViewerId = 'viewer-a';
-const calls: Array<{ path: string; options: any }> = [];
-const serverLikes = new Map<string, boolean>();
-const serverFollows = new Map<string, boolean>();
+const calls = [];
+const serverLikes = new Map();
+const serverFollows = new Map();
 
 mock.module('../store/auth-store.ts', () => ({
   useAuthStore: Object.assign(
-    (selector: (state: { user: { id: string } | null }) => unknown) =>
-      selector({ user: activeViewerId ? { id: activeViewerId } : null }),
+    (selector) => selector({ user: activeViewerId ? { id: activeViewerId } : null }),
     {
       getState: () => ({ user: activeViewerId ? { id: activeViewerId } : null }),
     },
@@ -18,7 +17,7 @@ mock.module('../store/auth-store.ts', () => ({
 
 mock.module('../lib/api-client.ts', () => ({
   createIdempotencyKey: () => 'viewer-scope-test-key',
-  apiRequest: async (path: string, options: any = {}) => {
+  apiRequest: async (path, options = {}) => {
     calls.push({ path, options });
 
     if (path.startsWith('/interactions/likes?')) {
@@ -150,15 +149,15 @@ test('follow mutation reconciles only the initiating viewer cache', async () => 
   await refreshUserFollowStatus(targetId, 'viewer-a');
 
   activeViewerId = 'viewer-b';
-  serverFollows.set('viewer-b:' + targetId, true);
+  serverFollows.set('viewer-b:' + targetId, false);
   await refreshUserFollowStatus(targetId, 'viewer-b');
 
   activeViewerId = 'viewer-a';
   await expect(toggleUserFollow(targetId, 'viewer-a')).resolves.toMatchObject({ ok: true });
 
   expect(getUserFollowSnapshot(targetId, 'viewer-a').following).toBe(true);
-  expect(getUserFollowSnapshot(targetId, 'viewer-b').following).toBe(true);
-  expect(calls.filter((call) => call.path === '/social/follows/' + targetId)).toHaveLength(2);
+  expect(getUserFollowSnapshot(targetId, 'viewer-b').following).toBe(false);
+  expect(calls.filter((call) => call.path === '/social/follows/' + targetId && call.options.method === 'POST')).toHaveLength(1);
 });
 
 test('like and follow hooks resubscribe and re-read when the authenticated viewer changes', () => {
