@@ -39,7 +39,7 @@ describe('messaging runtime', () => {
   it('requires a stable idempotency key and valid text for send', async () => {
     const source = store()
     await expect(sendMessage(source, 'user-1', 'conversation-1', 'client-key-1', ' hello ')).resolves.toMatchObject({ sequence: '1' })
-    expect(source.sendMessage).toHaveBeenCalledWith('user-1', 'conversation-1', 'client-key-1', 'hello')
+    expect(source.sendMessage).toHaveBeenCalledWith('user-1', 'conversation-1', 'client-key-1', 'hello', [])
     await expect(sendMessage(source, 'user-1', 'conversation-1', '', 'hello')).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
   })
   it('advances read state through the store contract', async () => {
