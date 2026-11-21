@@ -142,7 +142,7 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
     } catch (cause) {
       Alert.alert('无法发起私信', cause instanceof Error ? cause.message : '请稍后重试。');
     }
-  }, [router, user.id]);
+  }, [router, user.id, user.name]);
 
   const handleShareProfile = useCallback(async () => {
     const url = buildPublicProfileUrl(user.public_profile_id);
