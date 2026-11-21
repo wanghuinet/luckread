@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StatusBar, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchMessages, markConversationRead, sendDirectMessage, type MessagingMessage } from '~/lib/messaging-api';
+import { createIdempotencyKey } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
 
 export default function ConversationScreen() {
@@ -16,6 +17,7 @@ export default function ConversationScreen() {
   const isDark = colorScheme === 'dark';
   const userId = useAuthStore((state) => state.user?.id);
   const [draft, setDraft] = useState('');
+  const pendingSend = useRef<{ body: string; key: string } | null>(null);
   const messagesQuery = useQuery({
     queryKey: ['messaging', 'messages', conversationId],
     queryFn: ({ signal }) => fetchMessages(conversationId, signal),
@@ -23,8 +25,14 @@ export default function ConversationScreen() {
   });
   const messages = useMemo(() => [...(messagesQuery.data?.items ?? [])].reverse(), [messagesQuery.data?.items]);
   const sendMutation = useMutation({
-    mutationFn: (body: string) => sendDirectMessage(conversationId, body),
+    mutationFn: (body: string) => {
+      if (!pendingSend.current || pendingSend.current.body !== body) {
+        pendingSend.current = { body, key: createIdempotencyKey() };
+      }
+      return sendDirectMessage(conversationId, body, pendingSend.current.key);
+    },
     onSuccess: async () => {
+      pendingSend.current = null;
       setDraft('');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] }),

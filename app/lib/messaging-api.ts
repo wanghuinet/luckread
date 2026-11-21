@@ -32,10 +32,10 @@ export async function fetchMessages(conversationId: string, signal?: AbortSignal
     '/conversations/' + encodeURIComponent(conversationId) + '/messages?limit=50', { method: 'GET', signal },
   ));
 }
-export async function sendDirectMessage(conversationId: string, body: string) {
+export async function sendDirectMessage(conversationId: string, body: string, idempotencyKey = createIdempotencyKey()) {
   return unwrap(await apiRequest<Envelope<MessagingMessage>>(
     '/conversations/' + encodeURIComponent(conversationId) + '/messages',
-    { method: 'POST', body: JSON.stringify({ body }), idempotencyKey: createIdempotencyKey() },
+    { method: 'POST', body: JSON.stringify({ body }), idempotencyKey },
   ));
 }
 export async function markConversationRead(conversationId: string, sequence: string) {
