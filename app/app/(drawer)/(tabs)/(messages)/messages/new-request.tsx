@@ -23,6 +23,16 @@ export default function NewMessageRequestScreen() {
     },
   });
   const canSend = Boolean(recipientUserId && body.trim() && !mutation.isPending);
+  const errorCode = mutation.error instanceof Error ? mutation.error.message : '';
+  const errorMessage = errorCode === 'RATE_LIMITED'
+    ? '今天发起的私信请求已达到上限，请明天再试。'
+    : errorCode === 'REQUEST_ALREADY_PENDING'
+      ? '你们之间已有一条待处理请求，请在“发出的请求”中查看。'
+      : errorCode === 'PERMISSION_DENIED'
+        ? '你无法向该用户发送请求。'
+        : errorCode === 'CONTACT_POLICY_ALREADY_OPEN'
+          ? '你们已互相关注，可以直接开始聊天。'
+          : errorCode || '发送失败，请稍后重试。';
   return (
     <View className="flex-1 bg-white dark:bg-black">
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
@@ -48,7 +58,7 @@ export default function NewMessageRequestScreen() {
           className="mt-5 min-h-36 rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
         />
         <Text className="mt-2 text-right text-xs text-neutral-400">{body.length}/1000</Text>
-        {mutation.isError ? <Text className="mt-3 text-sm text-red-500">{mutation.error instanceof Error ? mutation.error.message : '发送失败，请稍后重试。'}</Text> : null}
+        {mutation.isError ? <Text className="mt-3 text-sm text-red-500">{errorMessage}</Text> : null}
         <Text className="mt-5 text-xs leading-5 text-neutral-500">为减少骚扰，每位用户每天最多发起 10 条私信请求。请求只能发送一条开场消息，且对方可以拒绝或屏蔽你。</Text>
       </View>
     </View>
