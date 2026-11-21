@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, type AppStateStatus, ActivityIndicator, Image, Pressable, StatusBar, Text, View } from 'react-native';
+import { Alert, AppState, type AppStateStatus, ActivityIndicator, Pressable, StatusBar, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { Chat, type IMessage } from '@kesha-antonov/react-native-chat';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -48,7 +49,8 @@ function PrivateMessageImages({ currentMessage }: { currentMessage: IMessage }) 
         <Image
           key={uri}
           source={{ uri, headers }}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="none"
           style={{ width: imageUrls.length === 1 ? 224 : 108, height: 132, borderRadius: 10 }}
           accessibilityLabel="私信图片附件"
         />
