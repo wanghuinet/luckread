@@ -51,7 +51,11 @@ export default function ConversationScreen() {
   });
   useEffect(() => {
     const latest = messagesQuery.data?.pages?.[0]?.items?.[0];
-    if (latest?.sequence) void markConversationRead(conversationId, latest.sequence).catch(() => undefined);
+    if (latest?.sequence) {
+      void markConversationRead(conversationId, latest.sequence)
+        .then(() => queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] }))
+        .catch(() => undefined);
+    }
   }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence]);
 
   const send = () => {
