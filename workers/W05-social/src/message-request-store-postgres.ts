@@ -12,7 +12,7 @@ const validId = (value: string): boolean => /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.
 const requestSelect = `request_id, sender_user_id, recipient_user_id, initial_message, status,
   conversation_id, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
   CASE WHEN responded_at IS NULL THEN NULL ELSE to_char(responded_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS responded_at`
-const encodeCursor = (date: string, id: string) => btoa(date + '|' + id).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '')
+const encodeCursor = (date: string, id: string) => btoa(date + '|' + id).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 function decodeCursor(value: string | null): { date: string; id: string } | null {
   if (!value) return null
   if (value.length > 512 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new MessageRequestStoreError('INVALID_CURSOR', 400)
