@@ -717,6 +717,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
             { id: 'edit-own-post', title: 'Edit post' },
             { id: 'delete-own-post', title: 'Delete post', attributes: { destructive: true } },
         ] : []),
+        ...(itemData.contentId && itemData.contentType === 'post' ? [{ id: 'quote-post', title: 'Quote post' }] : []),
         { id: 'view-post', title: 'View post', attributes: { disabled: !itemData.contentId } },
         { id: 'interactions', title: 'View post interactions', attributes: { disabled: !itemData.contentId } },
         { id: 'report', title: 'Report post', attributes: { disabled: !itemData.contentId } },
@@ -732,6 +733,9 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
 
     const runMenuAction = (actionId: string) => {
         switch (actionId) {
+            case 'quote-post':
+                if (itemData.contentId) router.push({ pathname: '/publish', params: { quoteContentId: itemData.contentId } } as never);
+                break;
             case 'view-post': goToPost(); break;
             case 'pin-profile-post': toggleProfilePin(); break;
             case 'edit-own-post': beginEditOwnPost(); break;
