@@ -1280,3 +1280,23 @@ test('clears pending mutation keys when the authenticated identity changes', asy
 
   expect(seenKeys[1]).not.toBe(seenKeys[0]);
 });
+
+
+test('does not persist a newly-issued login credential before the auth store assigns its account slot', async () => {
+  pendingFetch = async () => new Response(JSON.stringify({ data: { user: { id: 'new-user' } } }), {
+    status: 200,
+    headers: { 'X-LuckRead-Session-Token': 'new-account-token' },
+  });
+
+  const result = await apiRequest('/auth/login', {
+    method: 'POST',
+    auth: false,
+    idempotencyKey: false,
+    persistSessionCredential: false,
+    body: JSON.stringify({ identity: 'new@example.com', credential: 'secret-not-logged' }),
+  });
+
+  expect(result.response.headers.get('X-LuckRead-Session-Token')).toBe('new-account-token');
+  expect(savedTokens).toEqual([]);
+  expect(storedToken).toBe('secure-test-token');
+});
