@@ -863,7 +863,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         return json({ data, requestId: createRequestId() }, 201)
       }
 
-      const messageRequestAction = /^\\/internal\\/messaging\\/requests\\/([^/]+)\\/(accept|decline|cancel)$/.exec(url.pathname)
+      const messageRequestAction = /^\/internal\/messaging\/requests\/([^/]+)\/(accept|decline|cancel)$/.exec(url.pathname)
       if (messageRequestAction) {
         if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
         const actorUserId = requirePrincipal(request)
