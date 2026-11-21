@@ -18,7 +18,9 @@ describe('W05 PostgreSQL messaging store', () => {
   it('creates a direct conversation and both memberships in one transaction', async () => {
     const { db, client } = executor([
       { rows: [] },
+      { rows: [] },
       { rows: [{ conversation_id: 'conversation-1' }] },
+      { rows: [] },
       { rows: [] },
     ])
     const store = createPostgresMessagingStore(db as never)
@@ -31,7 +33,7 @@ describe('W05 PostgreSQL messaging store', () => {
   })
 
   it('rejects a blocked recipient and rolls back without creating a conversation', async () => {
-    const { db, client } = executor([{ rows: [{ blocked: 1 }] }])
+    const { db, client } = executor([{ rows: [] }, { rows: [{ blocked: 1 }] }, { rows: [] }])
     const store = createPostgresMessagingStore(db as never)
     await expect(store.createDirectConversation('user-a', 'user-b'))
       .rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
@@ -45,12 +47,14 @@ describe('W05 PostgreSQL messaging store', () => {
       sequence: '1', body: 'hello', created_at: '2026-11-21T00:00:00.000Z',
     }
     const { db, client } = executor([
+      { rows: [] },
       { rows: [{ conversation_id: 'conversation-1' }] },
       { rows: [] },
       { rows: [{ user_id: 'user-b' }] },
       { rows: [] },
       { rows: [{ last_sequence: '1' }] },
       { rows: [message] },
+      { rows: [] },
       { rows: [] },
     ])
     const store = createPostgresMessagingStore(db as never)
@@ -66,8 +70,10 @@ describe('W05 PostgreSQL messaging store', () => {
       sequence: '1', body: 'hello', created_at: '2026-11-21T00:00:00.000Z',
     }
     const { db, client } = executor([
+      { rows: [] },
       { rows: [{ conversation_id: 'conversation-1' }] },
       { rows: [message] },
+      { rows: [] },
     ])
     const store = createPostgresMessagingStore(db as never)
     await expect(store.sendMessage('user-a', 'conversation-1', 'client-1', 'hello')).resolves.toEqual(message)
