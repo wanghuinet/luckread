@@ -69,6 +69,7 @@ describe('W05 Neon runtime composition', () => {
       'likeMutationStore',
       'likeStatusReadStore',
       'likeTargetContextReadStore',
+      'messageRequestStore',
       'messagingStore',
       'notificationEnqueueStore',
       'notificationPreferencesStore',

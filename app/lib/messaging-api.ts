@@ -53,3 +53,24 @@ export async function markConversationRead(conversationId: string, sequence: str
     method: 'POST', body: JSON.stringify({ sequence }), idempotencyKey: false,
   });
 }
+
+export type MessageRequest = {
+  request_id: string; sender_user_id: string; recipient_user_id: string; initial_message: string;
+  status: 'pending' | 'accepted' | 'declined' | 'cancelled'; conversation_id: string | null;
+  created_at: string; responded_at: string | null;
+};
+export async function fetchMessageRequests(direction: 'incoming' | 'outgoing', cursor: string | null = null, signal?: AbortSignal): Promise<Page<MessageRequest>> {
+  const query = new URLSearchParams({ direction, limit: '20' });
+  if (cursor) query.set('cursor', cursor);
+  return unwrap(await apiRequest<Envelope<Page<MessageRequest>>>('/message-requests?' + query.toString(), { method: 'GET', signal }));
+}
+export async function createMessageRequest(recipientUserId: string, body: string, idempotencyKey = createIdempotencyKey()): Promise<MessageRequest> {
+  return unwrap(await apiRequest<Envelope<MessageRequest>>('/message-requests', {
+    method: 'POST', body: JSON.stringify({ recipientUserId, body }), idempotencyKey,
+  }));
+}
+export async function respondToMessageRequest(requestId: string, action: 'accept' | 'decline' | 'cancel'): Promise<{ status: MessageRequest['status']; conversationId: string | null }> {
+  return unwrap(await apiRequest<Envelope<{ status: MessageRequest['status']; conversationId: string | null }>>(
+    '/message-requests/' + encodeURIComponent(requestId) + '/' + action, { method: 'POST', body: JSON.stringify({}), idempotencyKey: false },
+  ));
+}

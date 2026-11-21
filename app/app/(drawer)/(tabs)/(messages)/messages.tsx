@@ -4,8 +4,8 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '~/store/auth-store';
 import { useColorScheme } from 'nativewind';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { fetchConversations, type MessagingConversation } from '~/lib/messaging-api';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchConversations, fetchMessageRequests, respondToMessageRequest, type MessageRequest, type MessagingConversation } from '~/lib/messaging-api';
 import { resolvePublicProfileById } from '~/lib/content-adapter';
 
 
@@ -39,11 +39,59 @@ function ConversationRow({ item }: { item: MessagingConversation }) {
   );
 }
 
+
+function MessageRequestRow({ item, direction, busy, onAction }: {
+  item: MessageRequest; direction: 'incoming' | 'outgoing'; busy: boolean;
+  onAction: (requestId: string, action: 'accept' | 'decline' | 'cancel') => void;
+}) {
+  const peerId = direction === 'incoming' ? item.sender_user_id : item.recipient_user_id;
+  const profile = useQuery({
+    queryKey: ['public-profile', peerId],
+    queryFn: ({ signal }) => resolvePublicProfileById(peerId, signal),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const displayName = profile.data?.displayName?.trim() ||
+    (profile.data?.username ? '@' + profile.data.username : 'LuckRead 用户');
+  return (
+    <View className="border-b border-neutral-100 px-4 py-4 dark:border-neutral-800">
+      <View className="flex-row items-center">
+        <View className="h-10 w-10 items-center justify-center rounded-full bg-sky-50 dark:bg-sky-950/40">
+          <Feather name="user" size={20} color="#1d9bf0" />
+        </View>
+        <View className="ml-3 flex-1">
+          <Text className="font-semibold text-neutral-900 dark:text-white" numberOfLines={1}>{displayName}</Text>
+          <Text className="mt-1 text-sm text-neutral-500">{direction === 'incoming' ? '向你发送了私信请求' : '等待对方接受'}</Text>
+        </View>
+      </View>
+      <Text className="mt-3 rounded-2xl bg-neutral-100 px-3 py-3 text-sm leading-5 text-neutral-800 dark:bg-neutral-900 dark:text-neutral-200">{item.initial_message}</Text>
+      <View className="mt-3 flex-row justify-end gap-2">
+        {direction === 'incoming' ? (
+          <>
+            <Pressable disabled={busy} onPress={() => onAction(item.request_id, 'decline')} className="rounded-full border border-neutral-300 px-4 py-2 dark:border-neutral-700">
+              <Text className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">拒绝</Text>
+            </Pressable>
+            <Pressable disabled={busy} onPress={() => onAction(item.request_id, 'accept')} className="rounded-full bg-sky-500 px-4 py-2">
+              <Text className="text-sm font-semibold text-white">接受</Text>
+            </Pressable>
+          </>
+        ) : (
+          <Pressable disabled={busy} onPress={() => onAction(item.request_id, 'cancel')} className="rounded-full border border-neutral-300 px-4 py-2 dark:border-neutral-700">
+            <Text className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">撤回请求</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}
+
 export default function Messages() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = React.useState<'chats' | 'incoming' | 'outgoing'>('chats');
   const conversations = useInfiniteQuery({
     queryKey: ['messaging', 'conversations'],
     initialPageParam: null as string | null,
@@ -53,6 +101,26 @@ export default function Messages() {
     staleTime: 30_000,
   });
   const conversationItems = conversations.data?.pages.flatMap((page) => page.items) ?? [];
+  const direction = activeTab === 'outgoing' ? 'outgoing' : 'incoming';
+  const requests = useInfiniteQuery({
+    queryKey: ['messaging', 'requests', direction],
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam, signal }) => fetchMessageRequests(direction, pageParam, signal),
+    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
+    enabled: authStatus === 'authenticated' && activeTab !== 'chats',
+    staleTime: 15_000,
+  });
+  const requestItems = requests.data?.pages.flatMap((page) => page.items) ?? [];
+  const requestAction = useMutation({
+    mutationFn: ({ requestId, action }: { requestId: string; action: 'accept' | 'decline' | 'cancel' }) => respondToMessageRequest(requestId, action),
+    onSuccess: async (result) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['messaging', 'requests'] }),
+        queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] }),
+      ]);
+      if (result.conversationId) router.push({ pathname: '/messages/[conversationId]', params: { conversationId: result.conversationId } } as never);
+    },
+  });
   const loadMore = () => {
     if (conversations.hasNextPage && !conversations.isFetchingNextPage && !conversations.isFetching) {
       void conversations.fetchNextPage();
@@ -68,6 +136,19 @@ export default function Messages() {
           <Feather name="refresh-cw" size={20} color="#1d9bf0" />
         </Pressable>
       </View>
+      {authStatus === 'authenticated' ? (
+        <View className="flex-row border-b border-neutral-100 px-3 py-2 dark:border-neutral-800">
+          {([
+            ['chats', '会话'],
+            ['incoming', '收到的请求'],
+            ['outgoing', '发出的请求'],
+          ] as const).map(([key, label]) => (
+            <Pressable key={key} onPress={() => setActiveTab(key)} className={`mr-2 rounded-full px-3 py-2 ${activeTab === key ? 'bg-sky-500' : 'bg-neutral-100 dark:bg-neutral-900'}`}>
+              <Text className={`text-sm font-semibold ${activeTab === key ? 'text-white' : 'text-neutral-600 dark:text-neutral-300'}`}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       {authStatus !== 'authenticated' ? (
         <View className="flex-1 items-center justify-center px-8">
           <Feather name="lock" size={30} color="#1d9bf0" />
@@ -76,6 +157,32 @@ export default function Messages() {
             <Text className="font-bold text-white">登录</Text>
           </Pressable>
         </View>
+      ) : activeTab !== 'chats' ? (
+        requests.isLoading ? (
+          <View className="flex-1 items-center justify-center"><ActivityIndicator color="#1d9bf0" /></View>
+        ) : requests.isError ? (
+          <View className="flex-1 items-center justify-center px-8">
+            <Text className="text-sm text-neutral-500">暂时无法加载私信请求</Text>
+            <Pressable onPress={() => requests.refetch()} className="mt-3 rounded-full bg-sky-500 px-5 py-2.5"><Text className="font-bold text-white">重试</Text></Pressable>
+          </View>
+        ) : (
+          <FlatList
+            data={requestItems}
+            keyExtractor={(item) => item.request_id}
+            refreshing={requests.isRefetching}
+            onRefresh={() => requests.refetch()}
+            onEndReached={() => { if (requests.hasNextPage && !requests.isFetchingNextPage) void requests.fetchNextPage(); }}
+            onEndReachedThreshold={0.4}
+            ListHeaderComponent={requestAction.isError ? (
+              <View className="mx-4 mt-3 rounded-xl bg-red-50 px-3 py-2 dark:bg-red-950/30">
+                <Text className="text-sm text-red-600 dark:text-red-300">{requestAction.error instanceof Error ? requestAction.error.message : '操作失败，请稍后重试。'}</Text>
+              </View>
+            ) : undefined}
+            ListEmptyComponent={<View className="flex-1 items-center justify-center px-8 py-20"><Feather name="mail" size={30} color="#9ca3af" /><Text className="mt-4 text-base font-semibold text-neutral-900 dark:text-white">暂无私信请求</Text><Text className="mt-2 text-center text-sm text-neutral-500">陌生人的私信会先出现在这里，由你决定是否接受。</Text></View>}
+            renderItem={({ item }) => <MessageRequestRow item={item} direction={direction} busy={requestAction.isPending} onAction={(requestId, action) => requestAction.mutate({ requestId, action })} />}
+            ListFooterComponent={requests.isFetchingNextPage ? <View className="py-4"><ActivityIndicator color="#1d9bf0" /></View> : undefined}
+          />
+        )
       ) : conversations.isLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color="#1d9bf0" />

@@ -2,6 +2,8 @@
 import { listContentLikers } from './like-list-runtime.js'
 import { MessagingRuntimeError, createDirectConversation, listConversations, listMessages, listMessagesAfter, markConversationRead, sendMessage } from './messaging-runtime.js'
 import type { MessagingStore } from './messaging-store.js'
+import { MessageRequestRuntimeError, createMessageRequest, listMessageRequests, respondToMessageRequest } from './message-request-runtime.js'
+import type { MessageRequestStore } from './message-request-store.js'
 import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js'
 import { CommentRuntimeError, createComment, deleteComment, listComments, parseCommentLimit, parseCommentSort, updateComment } from './comment-runtime.js'
 import { listProfileLikedContents, listProfileReplies, ProfileChannelRuntimeError } from './profile-channel-runtime.js'
@@ -301,6 +303,8 @@ export type W05SocialWorkerDependencies = Readonly<{
   pushEndpointDatabase?: PushEndpointPostgresExecutor
   /** Authoritative W05 Neon Messaging Store; routes fail closed when absent. */
   messagingStore?: MessagingStore
+  /** W05-owned Neon Message Request lifecycle; routes fail closed when absent. */
+  messageRequestStore?: MessageRequestStore
   /** Required Neon PostgreSQL follower/following list reader; missing composition fails closed. */
   followListReadStore?: FollowListReadStore
   /** Required Neon PostgreSQL Follow/Unfollow writer; mutation routes fail closed when absent. */
@@ -835,6 +839,40 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         return new Response(null, { status: 405, headers: { Allow: 'PUT, DELETE' } })
       }
 
+
+      if (url.pathname === '/internal/messaging/requests') {
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        if (request.method === 'GET') {
+          const data = await listMessageRequests(dependencies.messageRequestStore, actorUserId,
+            url.searchParams.get('direction'), url.searchParams.get('cursor'), url.searchParams.get('limit'))
+          return json({ data, requestId: createRequestId() })
+        }
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'GET, POST' } })
+        await enforceRateLimit(request, env, 'write:messaging-request')
+        const key = request.headers.get('Idempotency-Key')?.trim() ?? ''
+        if (!key || key.length > 128) throw new MessagingRuntimeError(key ? 'VALIDATION_FAILED' : 'PRECONDITION_REQUIRED', key ? 422 : 428)
+        let body: unknown
+        try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
+        if (!body || typeof body !== 'object' || Array.isArray(body) ||
+          typeof (body as { recipientUserId?: unknown }).recipientUserId !== 'string') {
+          throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        }
+        const data = await createMessageRequest(dependencies.messageRequestStore, actorUserId,
+          (body as { recipientUserId: string }).recipientUserId, key, (body as { body?: unknown }).body)
+        return json({ data, requestId: createRequestId() }, 201)
+      }
+
+      const messageRequestAction = /^\/internal\/messaging\/requests\/([^/]+)\/(accept|decline|cancel)$/.exec(url.pathname)
+      if (messageRequestAction) {
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const requestId = decodePathPart(messageRequestAction[1] ?? '')
+        if (!requestId) throw new MessageRequestRuntimeError('VALIDATION_FAILED', 422)
+        const data = await respondToMessageRequest(dependencies.messageRequestStore, actorUserId, requestId, messageRequestAction[2] ?? '')
+        return json({ data, requestId: createRequestId() })
+      }
 
       if (url.pathname === '/internal/messaging/conversations') {
         const actorUserId = requirePrincipal(request)
@@ -1516,6 +1554,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
     } catch (error) {
       if (
         error instanceof MessagingRuntimeError ||
+        error instanceof MessageRequestRuntimeError ||
         error instanceof PushEndpointRuntimeError ||
         error instanceof CommentNotificationContextRuntimeError ||
         error instanceof SocialPollError ||
