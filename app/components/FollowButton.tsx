@@ -114,6 +114,24 @@ export default function FollowButton({ targetUserId, targetUsername }: FollowBut
       variant={loaded && following ? 'outline' : 'default'}
       size="default"
       accessibilityRole="button"
+      accessibilityLabel={
+        resolvingProfile || loading || retrying
+          ? "Loading follow status"
+          : pending
+            ? "Saving follow status"
+            : profileResolutionError || !loaded
+              ? "Retry follow status"
+              : following
+                ? "Unfollow"
+                : "Follow"
+      }
+      accessibilityHint={
+        profileResolutionError || !loaded
+          ? "Retries loading this profile’s follow status"
+          : following
+            ? "Stops following this profile"
+            : "Follows this profile"
+      }
       accessibilityState={{ disabled, selected: loaded && following }}
       disabled={disabled}
       onPress={() => void handlePress()}
