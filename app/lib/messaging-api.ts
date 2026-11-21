@@ -36,8 +36,8 @@ export async function fetchMessages(conversationId: string, beforeSequence: stri
     '/conversations/' + encodeURIComponent(conversationId) + '/messages?' + query.toString(), { method: 'GET', signal },
   ));
 }
-export async function sendDirectMessage(conversationId: string, body: string, idempotencyKey = createIdempotencyKey()) {
-  return unwrap(await apiRequest<Envelope<MessagingMessage>>(
+export async function sendDirectMessage(conversationId: string, body: string, idempotencyKey = createIdempotencyKey()): Promise<MessagingMessage> {
+  return unwrap<MessagingMessage>(await apiRequest<Envelope<MessagingMessage>>(
     '/conversations/' + encodeURIComponent(conversationId) + '/messages',
     { method: 'POST', body: JSON.stringify({ body }), idempotencyKey },
   ));
