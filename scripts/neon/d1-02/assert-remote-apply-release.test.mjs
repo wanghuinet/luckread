@@ -41,7 +41,7 @@ test('keeps D1-03 through D1-05 blocked and rejects missing review refs', () => 
 })
 
 
-test('holds D1-02 remote DDL closed while the forward-only Snowflake correction awaits a refreshed release review', () => {
+test('holds D1-02 remote DDL closed while the forward-only W03 schema corrections await a refreshed release review', () => {
   const corrective = {
     status:'CORRECTIVE_MIGRATION_LOCAL_READY_RELEASE_REVIEW_PENDING',
     domainId:'D1-02',
@@ -49,12 +49,13 @@ test('holds D1-02 remote DDL closed while the forward-only Snowflake correction 
     remoteApplyReady:false,
     businessDataImport:false,
     productionCutoverAuthorized:false,
-    expected:{ migrationLedgerRows:3 },
+    expected:{ migrationLedgerRows:4 },
     execution:{ runnerStatus:'IMPLEMENTED_LOCAL_ONLY_RELEASE_REVIEW_PENDING', remoteApplyReady:false, reviewEvidenceRef:null },
     entries:[
       { migrationId:'d1-02-w03-content-schema-v1', ownerWorker:'W03', kind:'GENERATED_POSTGRESQL_SQL' },
       { migrationId:'d1-02-w05-social-schema-v1', ownerWorker:'W05', kind:'GENERATED_POSTGRESQL_SQL' },
-      { migrationId:'d1-02-w03-content-snowflake-timestamp-bigint-v1', ownerWorker:'W03', kind:'POSTGRESQL_SQL', expectedTableCount:0 }
+      { migrationId:'d1-02-w03-content-snowflake-timestamp-bigint-v1', ownerWorker:'W03', kind:'POSTGRESQL_SQL', expectedTableCount:0 },
+      { migrationId:'d1-02-w03-content-quote-post-relationship-v1', ownerWorker:'W03', kind:'POSTGRESQL_SQL', expectedTableCount:0 }
     ]
   }
   assert.equal(validateD1_02BlockedReleaseState({ manifest:corrective }),true)
@@ -62,6 +63,6 @@ test('holds D1-02 remote DDL closed while the forward-only Snowflake correction 
   prematurelyReleased.remoteApplyReady = true
   assert.equal(validateD1_02BlockedReleaseState({ manifest:prematurelyReleased }),false)
   const badMigration = structuredClone(corrective)
-  badMigration.entries[2].expectedTableCount = 9
+  badMigration.entries[3].expectedTableCount = 9
   assert.equal(validateD1_02BlockedReleaseState({ manifest:badMigration }),false)
 })
