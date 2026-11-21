@@ -1,0 +1,74 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { Pool } from 'pg'
+
+const connectionString = process.env.MESSAGING_TEST_DATABASE_URL
+if (!connectionString) throw new Error('MESSAGING_TEST_DATABASE_URL is required')
+const pool = new Pool({ connectionString, max: 2 })
+try {
+  const migrationPaths = [
+    '0001_w05_d1_02_social_schema.sql',
+    '0002_w05_messaging_core.sql',
+    '0003_w05_message_requests.sql',
+    '0004_w05_messaging_attachments.sql',
+    '0005_w05_messaging_lifecycle.sql',
+  ]
+  for (const filename of migrationPaths) {
+    const sql = readFileSync(resolve('workers/W05-social/src/neon-postgres-migrations', filename), 'utf8')
+    await pool.query(sql)
+  }
+
+  const tables = await pool.query(
+    "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='public' ORDER BY tablename",
+  )
+  const tableNames = tables.rows.map(row => row.tablename)
+  const expected = [
+    'social_conversation_memberships',
+    'social_conversations',
+    'social_messages',
+    'social_message_requests',
+    'social_message_request_audit',
+  ]
+  if (tableNames.length !== 24 || expected.some(name => !tableNames.includes(name))) {
+    throw new Error('W05 baseline plus all messaging migrations must produce 24 tables including messaging and request tables')
+  }
+
+  const columns = await pool.query(
+    "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='social_messages'",
+  )
+  const columnNames = new Set(columns.rows.map(row => row.column_name))
+  for (const name of ['attachments', 'edited_at', 'recalled_at']) {
+    if (!columnNames.has(name)) throw new Error('Missing messaging lifecycle column: ' + name)
+  }
+
+  const constraints = await pool.query(
+    "SELECT pg_get_constraintdef(oid) AS definition FROM pg_catalog.pg_constraint WHERE conrelid='public.social_messages'::regclass AND conname='social_messages_body_or_attachments_check'",
+  )
+  const definition = String(constraints.rows[0]?.definition ?? '')
+  if (!definition.includes('recalled_at IS NOT NULL')) throw new Error('Recalled-message tombstones must satisfy the message body constraint')
+
+  const indexes = await pool.query(
+    "SELECT indexname FROM pg_catalog.pg_indexes WHERE schemaname='public' AND indexname IN ('ix_social_conversations_updated','ix_social_conversation_memberships_user','ix_social_messages_attachments_gin') ORDER BY indexname",
+  )
+  if (indexes.rows.length !== 3) throw new Error('Conversation, membership, or private attachment lookup index is missing')
+
+  const sequenceType = await pool.query(
+    "SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='social_messages' AND column_name='sequence'",
+  )
+  if (sequenceType.rows[0]?.data_type !== 'bigint') throw new Error('Message sequence must be BIGINT')
+
+  const rows = await pool.query(
+    'SELECT (SELECT count(*) FROM social_conversations) + (SELECT count(*) FROM social_conversation_memberships) + (SELECT count(*) FROM social_messages) + (SELECT count(*) FROM social_message_requests) + (SELECT count(*) FROM social_message_request_audit) AS count',
+  )
+  if (Number(rows.rows[0]?.count) !== 0) throw new Error('Schema rehearsal must not import business rows')
+
+  console.log('W05_MESSAGING_LIFECYCLE_POSTGRES18_REHEARSAL_PASS ' + JSON.stringify({
+    tables: tableNames.length,
+    messagingTables: expected.length,
+    lifecycleColumns: ['attachments', 'edited_at', 'recalled_at'],
+    recalledTombstoneConstraint: true,
+    businessRows: 0,
+  }))
+} finally {
+  await pool.end()
+}
