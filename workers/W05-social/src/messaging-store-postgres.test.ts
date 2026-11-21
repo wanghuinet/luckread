@@ -196,6 +196,24 @@ describe('W05 PostgreSQL messaging store', () => {
     expect(db.query).toHaveBeenCalledOnce()
   })
 
+  it('authorizes attachment reads only for an active unblocked conversation member and referenced media', async () => {
+    const { db } = executor([], [{ rows: [{ allowed: 1 }] }])
+    const store = createPostgresMessagingStore(db as never)
+    await expect(store.canReadAttachment('user-a', 'conversation-1', 'media-1')).resolves.toBe(true)
+    const sql = String(db.query.mock.calls[0]?.[0])
+    expect(sql).toContain('social_conversation_memberships')
+    expect(sql).toContain('message.attachments @>')
+    expect(sql).toContain('message.recalled_at IS NULL')
+    expect(sql).toContain('social_user_interactions')
+    expect(db.query.mock.calls[0]?.[1]).toEqual(['conversation-1', 'user-a', 'media-1'])
+  })
+
+  it('denies attachment reads when the media reference is absent from the conversation', async () => {
+    const { db } = executor([], [{ rows: [] }])
+    const store = createPostgresMessagingStore(db as never)
+    await expect(store.canReadAttachment('user-outsider', 'conversation-1', 'media-1')).resolves.toBe(false)
+  })
+
   it('filters blocked peers from inbox and calculates incoming unread counts', async () => {
     const { db } = executor([], [{ rows: [] }])
     const store = createPostgresMessagingStore(db as never)
