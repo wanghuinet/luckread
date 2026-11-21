@@ -9,6 +9,9 @@ import { fetchMessages, fetchMessagesAfter, markConversationRead, sendDirectMess
 import { createIdempotencyKey } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
 
+const compareSequence = (left: string, right: string) =>
+  left.length === right.length ? left.localeCompare(right) : left.length - right.length;
+
 export default function ConversationScreen() {
   const params = useLocalSearchParams<{ conversationId: string; participantName?: string }>();
   const conversationId = Array.isArray(params.conversationId) ? params.conversationId[0] : params.conversationId;
@@ -40,7 +43,7 @@ export default function ConversationScreen() {
   // The API returns newest-first pages; an inverted list keeps the newest message at the bottom.
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
   const latestSequence = messages.reduce((latest, message) =>
-    BigInt(message.sequence) > BigInt(latest) ? message.sequence : latest, '0');
+    compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const incrementalQuery = useQuery({
     queryKey: ['messaging', 'messages-after', conversationId, latestSequence],
     queryFn: ({ signal }) => fetchMessagesAfter(conversationId, latestSequence, signal),
@@ -65,7 +68,7 @@ export default function ConversationScreen() {
           pages[0] = {
             ...firstPage,
             items: [...firstPage.items, ...additions].sort((left, right) =>
-              BigInt(left.sequence) > BigInt(right.sequence) ? -1 : BigInt(left.sequence) < BigInt(right.sequence) ? 1 : 0),
+              compareSequence(right.sequence, left.sequence)),
           };
         }
         return { ...current, pages };
