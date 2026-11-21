@@ -56,8 +56,9 @@
     "path": "workers/W05-social/src/neon-postgres-migrations/0002_w05_messaging_core.sql",
     "database": "luckreadpro",
     "domain": "D1-02",
-    "applyStatus": "LOCAL_POSTGRESQL_18_REHEARSAL_REQUIRED",
+    "applyStatus": "LOCAL_POSTGRESQL_18_REHEARSAL_PASSED",
     "remoteApplyAuthorized": false,
-    "note": "Separate additive migration; do not alter the frozen D1-02 baseline manifest or execute against production from this PR."
+    "note": "Separate additive migration; do not alter the frozen D1-02 baseline manifest or execute against production from this PR.",
+    "rehearsalEvidence": ".github/workflows/w05-messaging-phase1-postgres18.yml"
   }
 }
