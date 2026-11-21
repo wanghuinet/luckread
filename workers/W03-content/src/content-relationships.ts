@@ -7,7 +7,7 @@ import {
 
 export type ContentRelationshipStatus = 'ACTIVE' | 'REVOKED' | 'SUPERSEDED'
 export type ContentRelationshipDirection = 'out' | 'in' | 'both'
-export type ContentRelationshipType = 'reference' | 'thread-next'
+export type ContentRelationshipType = 'reference' | 'quote-post' | 'thread-next'
 
 export interface ContentRelationship {
   relationshipId: string
@@ -58,7 +58,11 @@ export interface CreateRelationshipQueryRow {
   source_id: string
   owner_user_id: string
   source_version: number
+  source_content_type: 'article' | 'post' | 'video'
   target_id: string | null
+  target_content_type: 'article' | 'post' | 'video' | null
+  target_state: string | null
+  target_access_mode: string | null
   idem_id: string | null
   idem_owner_user_id: string | null
   idem_request_hash: string | null
@@ -200,7 +204,7 @@ const parseStoredRelationship = (value: string | null): ContentRelationship | nu
       parsed.targetType === 'content' &&
       typeof parsed.sourceId === 'string' &&
       typeof parsed.targetId === 'string' &&
-      (parsed.relationType === 'reference' || parsed.relationType === 'thread-next') &&
+      (parsed.relationType === 'reference' || parsed.relationType === 'quote-post' || parsed.relationType === 'thread-next') &&
       (parsed.status === 'ACTIVE' || parsed.status === 'REVOKED') &&
       typeof parsed.schemaVersion === 'number' &&
       typeof parsed.actorId === 'string'
@@ -258,7 +262,11 @@ SELECT
   s.id AS source_id,
   s.owner_user_id,
   s.version AS source_version,
+  s.content_type AS source_content_type,
   t.id AS target_id,
+  t.content_type AS target_content_type,
+  t.state AS target_state,
+  t.access_mode AS target_access_mode,
   i.id AS idem_id,
   i.owner_user_id AS idem_owner_user_id,
   i.request_hash AS idem_request_hash,
@@ -270,7 +278,6 @@ SELECT
       FROM content_relationships r
      WHERE r.source_id = s.id
        AND r.target_id = t.id
-       AND r.relation_type = 'reference'
        AND r.status = 'ACTIVE'
      LIMIT 1
   ) AS active_relationship_id
@@ -307,7 +314,7 @@ export async function createContentRelationship(
   const body = input as Record<string, unknown>
   const targetContentId = typeof body.targetContentId === 'string' ? body.targetContentId.trim() : ''
   const relationType = body.relationType === undefined ? 'reference' : body.relationType
-  if (relationType !== 'reference') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  if (relationType !== 'reference' && relationType !== 'quote-post') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   assertContentId(targetContentId)
   if (targetContentId === sourceContentId) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
 
@@ -342,6 +349,12 @@ export async function createContentRelationship(
 
   if (row.owner_user_id !== ownerUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   if (!row.target_id) throw new ContentRuntimeError('NOT_FOUND', 404)
+  if (relationType === 'quote-post') {
+    if (row.source_content_type !== 'post') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+    if (row.target_content_type !== 'post' || row.target_state !== 'PUBLISHED' || row.target_access_mode !== 'PUBLIC') {
+      throw new ContentRuntimeError('NOT_FOUND', 404)
+    }
+  }
   if (row.active_relationship_id) throw new ContentRuntimeError('CONFLICT', 409)
 
   const createdAt = now.toISOString()
@@ -351,7 +364,7 @@ export async function createContentRelationship(
     sourceId: row.source_id,
     targetType: 'content',
     targetId: row.target_id,
-    relationType: 'reference',
+    relationType,
     schemaVersion: 1,
     status: 'ACTIVE',
     actorId: ownerUserId,
@@ -387,11 +400,12 @@ export async function createContentRelationship(
         `INSERT INTO content_relationships
           (relationship_id, source_type, source_id, target_type, target_id, relation_type,
            schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at)
-         VALUES (?, 'content', ?, 'content', ?, 'reference', 1, 'ACTIVE', ?, ?, ?, ?, ?)`,
+         VALUES (?, 'content', ?, 'content', ?, ?, 1, 'ACTIVE', ?, ?, ?, ?, ?)`,
       ).bind(
         relationship.relationshipId,
         relationship.sourceId,
         relationship.targetId,
+        relationship.relationType,
         relationship.actorId,
         relationship.provenanceRef,
         relationship.authorizationRef,
@@ -450,7 +464,7 @@ export async function listContentRelationships(
     " WHERE r.status = 'ACTIVE'" +
     " AND s.state = 'PUBLISHED'" +
     " AND t.state = 'PUBLISHED'" +
-    " AND r.relation_type = 'reference'" +
+    " AND r.relation_type IN ('reference', 'quote-post')" +
     ' AND ' + predicate +
     ' ' + cursorClause +
     ' ORDER BY r.created_at DESC, r.relationship_id DESC' +

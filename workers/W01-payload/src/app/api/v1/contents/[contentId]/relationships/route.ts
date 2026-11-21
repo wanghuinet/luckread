@@ -9,6 +9,7 @@ import {
   resolveCookieContentPrincipal,
   W03ContentClientError,
 } from '../../../../../../content/w03-content-client.js'
+import { callW05Social, W05SocialClientError } from '../../../../../../social/w05-social-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -65,6 +66,7 @@ export async function GET(
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
+    if (error instanceof W05SocialClientError) return errorResponse(error.status, error.code, 'Social service unavailable')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
   }
 }
@@ -81,6 +83,23 @@ export async function POST(
     if (mutationError) return mutationError
 
     const body = await request.json()
+    if (
+      body && typeof body === 'object' && !Array.isArray(body) &&
+      (body as { relationType?: unknown }).relationType === 'quote-post'
+    ) {
+      const targetContentId = (body as { targetContentId?: unknown }).targetContentId
+      if (typeof targetContentId !== 'string' || !targetContentId.trim()) {
+        return errorResponse(422, 'VALIDATION_FAILED', 'Invalid quote target')
+      }
+      const blockPreflight = await callW05Social({
+        request,
+        pathname: '/internal/social/content/' + encodeURIComponent(targetContentId.trim()) + '/quote-post-preflight',
+        method: 'POST',
+        principal,
+        body: {},
+      })
+      if (!blockPreflight.ok) return blockPreflight
+    }
     const response = await callW03Content({
       request,
       pathname: relationshipPath(contentId),

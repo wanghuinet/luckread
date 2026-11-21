@@ -51,12 +51,16 @@ export function validateD1_02BlockedReleaseState({ manifest: manifestValue = man
     manifestValue?.execution?.runnerStatus === 'IMPLEMENTED_LOCAL_ONLY_RELEASE_REVIEW_PENDING' &&
     manifestValue?.execution?.remoteApplyReady === false &&
     manifestValue?.execution?.reviewEvidenceRef === null &&
-    manifestValue?.expected?.migrationLedgerRows === 3 &&
-    manifestValue?.entries?.length === 3 &&
+    manifestValue?.expected?.migrationLedgerRows === 4 &&
+    manifestValue?.entries?.length === 4 &&
     manifestValue?.entries?.[2]?.migrationId === 'd1-02-w03-content-snowflake-timestamp-bigint-v1' &&
     manifestValue?.entries?.[2]?.ownerWorker === 'W03' &&
     manifestValue?.entries?.[2]?.kind === 'POSTGRESQL_SQL' &&
-    manifestValue?.entries?.[2]?.expectedTableCount === 0
+    manifestValue?.entries?.[2]?.expectedTableCount === 0 &&
+    manifestValue?.entries?.[3]?.migrationId === 'd1-02-w03-content-quote-post-relationship-v1' &&
+    manifestValue?.entries?.[3]?.ownerWorker === 'W03' &&
+    manifestValue?.entries?.[3]?.kind === 'POSTGRESQL_SQL' &&
+    manifestValue?.entries?.[3]?.expectedTableCount === 0
 }
 
 export function assertD1_02RemoteApplyReady({ root: repositoryRoot = root, currentHead } = {}) {

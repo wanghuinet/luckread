@@ -110,4 +110,41 @@ describe('W05 Neon Repost route composition', () => {
     expect(h.store.remove).toHaveBeenCalledWith('repost-viewer-1', 'repost-content-1')
     expect(h.prepare).not.toHaveBeenCalled()
   })
+  it('preflights quote-post targets through W03 and bilateral Block state without writing a repost', async () => {
+    const h = createHarness()
+    const response = await h.worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/content/repost-content-1/quote-post-preflight', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'Idempotency-Key': 'quote-preflight-1' },
+      }),
+      h.env as never,
+      {} as never,
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ data: { allowed: true } })
+    expect(h.w03Content.fetch).toHaveBeenCalledTimes(1)
+    expect(h.store.isBlocked).toHaveBeenCalledWith('repost-viewer-1', 'repost-owner-1')
+    expect(h.store.insertIfAbsent).not.toHaveBeenCalled()
+    expect(h.prepare).not.toHaveBeenCalled()
+  })
+
+  it('hides quote-post targets when either side has blocked the viewer', async () => {
+    const h = createHarness()
+    vi.mocked(h.store.isBlocked).mockResolvedValue(true)
+    const response = await h.worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/content/repost-content-1/quote-post-preflight', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'Idempotency-Key': 'quote-preflight-blocked-1' },
+      }),
+      h.env as never,
+      {} as never,
+    )
+
+    expect(response.status).toBe(404)
+    expect(h.store.isBlocked).toHaveBeenCalledWith('repost-viewer-1', 'repost-owner-1')
+    expect(h.store.insertIfAbsent).not.toHaveBeenCalled()
+    expect(h.prepare).not.toHaveBeenCalled()
+  })
+
 })

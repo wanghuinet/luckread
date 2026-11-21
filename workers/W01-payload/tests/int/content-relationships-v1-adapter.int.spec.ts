@@ -31,6 +31,14 @@ describe('v1 content relationship adapters', () => {
     expect(route).toContain("value.length > 256")
   })
 
+  it('requires W05 bilateral Block preflight before creating a quote-post relationship', () => {
+    expect(route).toContain("callW05Social")
+    expect(route).toContain("/quote-post-preflight")
+    expect(route).toContain("relationType === 'quote-post'")
+    const postRoute = route.slice(route.indexOf('export async function POST'))
+    expect(postRoute.indexOf('await callW05Social')).toBeLessThan(postRoute.indexOf('await callW03Content'))
+  })
+
   it('exposes authenticated relationship revocation and invalidates public cache', () => {
     expect(deleteRoute).toContain("resolveCookieContentPrincipal")
     expect(deleteRoute).toContain("method: 'DELETE'")

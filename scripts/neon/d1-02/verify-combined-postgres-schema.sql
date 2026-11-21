@@ -75,6 +75,20 @@ BEGIN
     RAISE EXCEPTION 'Combined D1-02 rehearsal requires PostgreSQL 18';
   END IF;
 
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.content_relationships'::regclass
+      AND conname = 'content_relationships_relation_type_check'
+      AND pg_get_constraintdef(oid) LIKE '%quote-post%'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.content_relationships'::regclass
+      AND conname = 'content_relationships_check'
+      AND pg_get_constraintdef(oid) LIKE '%quote-post%'
+  ) THEN
+    RAISE EXCEPTION 'W03 quote-post relationship constraints were not applied by the append-only migration';
+  END IF;
+
   SELECT array_agg(table_name ORDER BY table_name) INTO actual
     FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name <> 'neon_schema_migration_ledger';
   SELECT count(*) INTO missing_count FROM unnest(expected_tables) AS expected(name)
