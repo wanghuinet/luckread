@@ -929,6 +929,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const messageId = decodePathPart(messagingMessageActionMatch[2] ?? '')
         if (!conversationId || !messageId) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
         if (request.method === 'PATCH') {
+          await enforceRateLimit(request, env, 'write:messaging-message-edit')
           let body: unknown
           try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
           if (!body || typeof body !== 'object' || Array.isArray(body) ||
@@ -939,6 +940,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           return json({ data, requestId: createRequestId() })
         }
         if (request.method === 'DELETE') {
+          await enforceRateLimit(request, env, 'write:messaging-message-recall')
           const data = await recallMessage(dependencies.messagingStore, actorUserId, conversationId, messageId)
           return json({ data, requestId: createRequestId() })
         }
