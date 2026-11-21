@@ -104,7 +104,8 @@
     "@posthog/react-native-plugin": "2.13.0",
     "posthog-react-native": "4.85.3",
     "expo-device": "~58.0.5",
-    "expo-localization": "~58.0.4"
+    "expo-localization": "~58.0.4",
+    "@kesha-antonov/react-native-chat": "7.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
