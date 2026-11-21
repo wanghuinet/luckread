@@ -890,7 +890,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         return json({ data, requestId: createRequestId() }, 201)
       }
 
-      const messagingGroupMembersMatch = /^\\/internal\\/messaging\\/conversations\\/([^/]+)\\/members(?:\\/([^/]+))?$/.exec(url.pathname)
+      const messagingGroupMembersMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/members(?:\/([^/]+))?$/.exec(url.pathname)
       if (messagingGroupMembersMatch) {
         const actorUserId = requirePrincipal(request)
         requireInteractionLayer(request)
@@ -917,7 +917,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         return json({ data, requestId: createRequestId() })
       }
 
-      const messagingGroupLeaveMatch = /^\\/internal\\/messaging\\/conversations\\/([^/]+)\\/leave$/.exec(url.pathname)
+      const messagingGroupLeaveMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/leave$/.exec(url.pathname)
       if (messagingGroupLeaveMatch) {
         if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
         const actorUserId = requirePrincipal(request)
