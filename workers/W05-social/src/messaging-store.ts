@@ -1,3 +1,11 @@
+export type MessagingAttachment = Readonly<{
+  mediaId: string
+  filename: string
+  mimeType: string
+  filesize: number
+  width: number | null
+  height: number | null
+}>
 export type MessagingConversationRow = Readonly<{
   conversation_id: string
   participant_user_id: string
@@ -16,6 +24,7 @@ export type MessagingMessageRow = Readonly<{
   sender_user_id: string
   sequence: string
   body: string
+  attachments?: MessagingAttachment[]
   created_at: string
 }>
 export interface MessagingStore {
@@ -29,7 +38,7 @@ export interface MessagingStore {
   listMessagesAfter(actorUserId: string, conversationId: string, afterSequence: string, limit: number): Promise<{
     items: MessagingMessageRow[]; nextCursor: string | null; hasMore: boolean
   }>
-  sendMessage(actorUserId: string, conversationId: string, clientMessageId: string, body: string): Promise<MessagingMessageRow>
+  sendMessage(actorUserId: string, conversationId: string, clientMessageId: string, body: string, attachments?: MessagingAttachment[]): Promise<MessagingMessageRow>
   markRead(actorUserId: string, conversationId: string, sequence: string): Promise<void>
 }
 export class MessagingStoreError extends Error {
