@@ -14,13 +14,14 @@ import { useRouter, useSegments } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
 import {
   BottomSheetModal,
-  BottomSheetView,
+  BottomSheetScrollView,
   BottomSheetBackdrop,
 } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWindowDimensions } from 'react-native';
 
 import { resolvePublicProfileById, type ApiPublicProfile } from '~/lib/content-adapter';
+import { MAX_STORED_ACCOUNTS } from '~/lib/secure-session';
 import { useAuthStore } from '~/store/auth-store';
 
 type DrawerMenuItemProps = {
@@ -54,12 +55,16 @@ function CustomDrawerContent(props: any) {
   const user = useAuthStore((state) => state.user);
   const authStatus = useAuthStore((state) => state.status);
   const logout = useAuthStore((state) => state.logout);
+  const accounts = useAuthStore((state) => state.accounts);
+  const switchAccount = useAuthStore((state) => state.switchAccount);
+  const removeAccount = useAuthStore((state) => state.removeAccount);
   const [profile, setProfile] = useState<ApiPublicProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [signOutBusy, setSignOutBusy] = useState(false);
+  const [accountActionId, setAccountActionId] = useState<string | null>(null);
   const accountSheetRef = useRef<BottomSheetModal>(null);
-  const accountSnapPoints = useMemo(() => ['32%'], []);
+  const accountSnapPoints = useMemo(() => ['82%'], []);
 
   useEffect(() => {
     let active = true;
@@ -114,6 +119,81 @@ function CustomDrawerContent(props: any) {
       setSignOutBusy(false);
     }
   }, [logout, router, signOutBusy]);
+
+  const handleSwitchAccount = useCallback(async (accountId: string) => {
+    if (accountActionId) return;
+    setAccountActionId(accountId);
+    try {
+      await switchAccount(accountId);
+      accountSheetRef.current?.dismiss();
+    } catch (cause) {
+      Alert.alert(
+        '切换账号失败',
+        cause instanceof Error ? cause.message : '账号切换暂时无法完成，请重试。',
+      );
+    } finally {
+      setAccountActionId(null);
+    }
+  }, [accountActionId, switchAccount]);
+
+  const handleAddAccount = useCallback(() => {
+    if (accounts.length >= MAX_STORED_ACCOUNTS) {
+      Alert.alert(
+        '账号数量已达上限',
+        '此设备最多保存 5 个 LuckRead 账号。请先移除一个账号，再添加新账号。',
+      );
+      return;
+    }
+    accountSheetRef.current?.dismiss();
+    router.push((authStatus === 'authenticated' ? '/login?addAccount=1' : '/login') as never);
+  }, [accounts.length, authStatus, router]);
+
+  const handleRemoveAccount = useCallback((accountId: string) => {
+    if (accountActionId) return;
+    const account = accounts.find((item) => item.id === accountId);
+    if (!account) return;
+
+    const isActiveAccount = authStatus === 'authenticated' && user?.id === accountId;
+    const nextAccount = isActiveAccount
+      ? accounts.find((item) => item.id !== accountId)
+      : undefined;
+
+    Alert.alert(
+      '从此设备移除账号',
+      isActiveAccount && nextAccount
+        ? '移除后将切换到最近使用的其他账号。此操作只移除此设备保存的凭证，不会撤销其他账号。'
+        : '这只会删除此设备保存的账号凭证，不会影响其他已保存账号。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '移除账号',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setAccountActionId(accountId);
+              try {
+                if (isActiveAccount && nextAccount) {
+                  await switchAccount(nextAccount.id);
+                }
+                await removeAccount(accountId);
+                if (isActiveAccount && !nextAccount) {
+                  accountSheetRef.current?.dismiss();
+                  router.replace('/login' as never);
+                }
+              } catch (cause) {
+                Alert.alert(
+                  '移除账号失败',
+                  cause instanceof Error ? cause.message : '移除账号暂时无法完成，请重试。',
+                );
+              } finally {
+                setAccountActionId(null);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [accountActionId, accounts, authStatus, removeAccount, router, switchAccount, user?.id]);
 
   const displayName = profile?.displayName?.trim() || user?.name?.trim() || 'LuckRead 用户';
   const username = profile?.username ? '@' + profile.username : user?.email || '';
@@ -278,37 +358,115 @@ function CustomDrawerContent(props: any) {
         handleIndicatorStyle={{ backgroundColor: isDark ? '#333333' : '#d1d5db', height: 5, width: 36 }}
         backgroundStyle={{ backgroundColor: drawerBackground, borderRadius: 24 }}
       >
-        <BottomSheetView className="flex-1 px-5 pt-2 bg-white dark:bg-black">
-          <Text className={'mb-1 text-center text-lg font-bold ' + sheetTextClass}>账户</Text>
-          <Text numberOfLines={1} className="mb-5 text-center text-sm text-neutral-500">
-            {user?.email || '尚未登录'}
+        <BottomSheetScrollView
+          className="flex-1 bg-white dark:bg-black"
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: Math.max(24, insets.bottom + 16) }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text className={'mb-1 text-center text-lg font-bold ' + sheetTextClass}>账号管理</Text>
+          <Text className="mb-5 text-center text-sm text-neutral-500">
+            最多保存 5 个账号。账号凭证独立保存在此设备的安全存储中。
           </Text>
+
+          {accounts.length > 0 ? (
+            <View className="mb-4 overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800">
+              {accounts.map((account, index) => {
+                const isActiveAccount = authStatus === 'authenticated' && user?.id === account.id;
+                const isBusy = accountActionId === account.id;
+                return (
+                  <View
+                    key={account.id}
+                    className={
+                      'flex-row items-center px-3 py-2 ' +
+                      (index > 0 ? 'border-t border-neutral-200 dark:border-neutral-800' : '')
+                    }
+                  >
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel={isActiveAccount ? '当前账号 ' + account.email : '切换到 ' + account.email}
+                      accessibilityState={{ selected: isActiveAccount, disabled: Boolean(accountActionId) || isActiveAccount }}
+                      disabled={Boolean(accountActionId) || isActiveAccount}
+                      onPress={() => void handleSwitchAccount(account.id)}
+                      className="min-h-[62px] flex-1 flex-row items-center"
+                      activeOpacity={0.72}
+                    >
+                      {account.image ? (
+                        <Image source={{ uri: account.image }} className="h-11 w-11 rounded-full bg-neutral-200 dark:bg-neutral-800" />
+                      ) : (
+                        <View className="h-11 w-11 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-900">
+                          <Feather name="user" size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
+                        </View>
+                      )}
+                      <View className="ml-3 mr-2 flex-1">
+                        <Text numberOfLines={1} className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
+                          {account.name?.trim() || account.email}
+                        </Text>
+                        <Text numberOfLines={1} className="mt-1 text-xs text-neutral-500">
+                          {account.email}
+                        </Text>
+                      </View>
+                      {isBusy ? (
+                        <Text className="text-xs font-semibold text-sky-600">处理中…</Text>
+                      ) : isActiveAccount ? (
+                        <View className="flex-row items-center gap-1">
+                          <Feather name="check-circle" size={17} color="#1d9bf0" />
+                          <Text className="text-xs font-semibold text-sky-600">当前</Text>
+                        </View>
+                      ) : (
+                        <Feather name="chevron-right" size={18} color={isDark ? '#737373' : '#9ca3af'} />
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel={'从设备移除 ' + account.email}
+                      accessibilityState={{ disabled: Boolean(accountActionId) }}
+                      disabled={Boolean(accountActionId)}
+                      onPress={() => handleRemoveAccount(account.id)}
+                      hitSlop={8}
+                      className="ml-2 h-10 w-10 items-center justify-center rounded-full"
+                    >
+                      <Feather name="trash-2" size={17} color={isDark ? '#a3a3a3' : '#737373'} />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View className="mb-4 rounded-2xl bg-neutral-100 px-4 py-5 dark:bg-neutral-900">
+              <Text className="text-center text-sm text-neutral-500 dark:text-neutral-400">此设备还没有保存账号。</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="添加其他账号"
+            onPress={handleAddAccount}
+            className="min-h-[52px] flex-row items-center justify-center gap-2 rounded-full bg-sky-500 px-5 py-3"
+          >
+            <Feather name="plus" size={19} color="#ffffff" />
+            <Text className="font-bold text-white">{authStatus === 'authenticated' ? '添加其他账号' : '添加账号'}</Text>
+            <Text className="text-xs font-semibold text-sky-100">{accounts.length}/{MAX_STORED_ACCOUNTS}</Text>
+          </TouchableOpacity>
+
           {authStatus === 'authenticated' ? (
             <TouchableOpacity
               accessibilityRole="button"
-              disabled={signOutBusy}
+              disabled={signOutBusy || Boolean(accountActionId)}
               onPress={() => void handleSignOut()}
-              className="flex-row items-center justify-center gap-2 rounded-full border border-neutral-300 px-5 py-3 dark:border-neutral-700"
+              className="mt-3 min-h-[48px] flex-row items-center justify-center gap-2 rounded-full border border-neutral-300 px-5 py-3 dark:border-neutral-700"
             >
               <Feather name="log-out" size={18} color="#dc2626" />
-              <Text className="font-bold text-red-600">{signOutBusy ? '正在退出…' : '退出登录'}</Text>
+              <Text className="font-bold text-red-600">{signOutBusy ? '正在退出…' : '退出当前账号'}</Text>
             </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={() => {
-                accountSheetRef.current?.dismiss();
-                router.push('/login' as never);
-              }}
-              className="items-center rounded-full bg-sky-500 px-5 py-3"
-            >
-              <Text className="font-bold text-white">登录或注册</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={() => accountSheetRef.current?.dismiss()} className="mt-2 items-center rounded-full px-5 py-3">
-            <Text className="font-semibold text-neutral-600 dark:text-neutral-300">取消</Text>
+          ) : null}
+
+          <TouchableOpacity
+            onPress={() => accountSheetRef.current?.dismiss()}
+            className="mt-2 min-h-[44px] items-center justify-center rounded-full px-5 py-3"
+          >
+            <Text className="font-semibold text-neutral-600 dark:text-neutral-300">关闭</Text>
           </TouchableOpacity>
-        </BottomSheetView>
+        </BottomSheetScrollView>
       </BottomSheetModal>
     </SafeAreaView>
   );
