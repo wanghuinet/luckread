@@ -191,7 +191,7 @@ describe('W03 native quote-post relationship authority', () => {
     const db = {
       prepare(sql: string) {
         return {
-          bind: (...values: unknown[]) {
+          bind(...values: unknown[]) {
             return {
               first: async () => ({
                 source_id: 'quote_post',
