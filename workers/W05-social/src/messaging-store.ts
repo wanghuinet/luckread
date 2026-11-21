@@ -8,6 +8,7 @@ export type MessagingConversationRow = Readonly<{
   last_message_sender_user_id: string | null
   last_message_created_at: string | null
   last_read_sequence: string
+  unread_count: number
 }>
 export type MessagingMessageRow = Readonly<{
   message_id: string
