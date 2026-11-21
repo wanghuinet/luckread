@@ -56,7 +56,9 @@
   ],
   "limits": {
     "pageSizeMax": 50,
-    "messageBodyMaxLength": 10000
+    "messageBodyMaxLength": 10000,
+    "idempotencyKeyMaxLength": 128,
+    "messageSequenceMaxDigits": 18
   },
   "responsePolicy": "no-store",
   "phase1NonGoals": [
