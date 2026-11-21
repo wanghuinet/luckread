@@ -43,7 +43,7 @@ async function validateOwnedMessageAttachments(request: Request, value: unknown)
       id: mediaId,
       depth: 0,
       overrideAccess: true,
-    }).catch(() => null) as unknown as {
+    }).catch((): null => null) as unknown as {
       id?: string | number
       ownerUserId?: string | number | null
       filename?: string | null
