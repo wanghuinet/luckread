@@ -57,6 +57,28 @@ describe('W05 PostgreSQL message request store', () => {
     expect(client.query.mock.calls.some(([sql]) => String(sql).includes('social_message_request_audit'))).toBe(true)
     expect(client.query.mock.calls.at(-1)?.[0]).toBe('COMMIT')
   })
+  it('allows only the recipient to decline and records the decision audit', async () => {
+    const { db, client } = executor([{ rows: [] }, { rows: [pending] }, { rows: [] }, { rows: [] }])
+    const store = createPostgresMessageRequestStore(db as never)
+    await expect(store.respondRequest('user-b', 'request-1', 'decline')).resolves.toEqual({ status: 'declined', conversationId: null })
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes("SET status = $2"))).toBe(true)
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes('social_message_request_audit'))).toBe(true)
+    expect(client.query.mock.calls.at(-1)?.[0]).toBe('COMMIT')
+  })
+  it('allows only the sender to cancel a pending request', async () => {
+    const { db, client } = executor([{ rows: [] }, { rows: [pending] }, { rows: [] }, { rows: [] }])
+    const store = createPostgresMessageRequestStore(db as never)
+    await expect(store.respondRequest('user-a', 'request-1', 'cancel')).resolves.toEqual({ status: 'cancelled', conversationId: null })
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes("SET status = $2"))).toBe(true)
+    expect(client.query.mock.calls.at(-1)?.[0]).toBe('COMMIT')
+  })
+  it('rechecks bilateral Block state before accepting a request', async () => {
+    const { db, client } = executor([{ rows: [] }, { rows: [pending] }, { rows: [{ blocked: 1 }] }, { rows: [] }])
+    const store = createPostgresMessageRequestStore(db as never)
+    await expect(store.respondRequest('user-b', 'request-1', 'accept')).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO social_conversations'))).toBe(false)
+    expect(client.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK')
+  })
   it('does not allow the sender to accept another user’s request', async () => {
     const { db, client } = executor([{ rows: [] }, { rows: [pending] }, { rows: [] }])
     const store = createPostgresMessageRequestStore(db as never)
