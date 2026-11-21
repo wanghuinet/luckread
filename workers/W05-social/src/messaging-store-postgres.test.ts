@@ -17,8 +17,9 @@ function executor(clientResponses: Array<{ rows: Row[]; rowCount?: number }> = [
 describe('W05 PostgreSQL messaging store', () => {
   it('creates a direct conversation and both memberships in one transaction', async () => {
     const { db, client } = executor([
-      { rows: [] },
-      { rows: [{ mutual: 1 }] },
+      { rows: [] }, // BEGIN
+      { rows: [] }, // no block
+      { rows: [{ mutual: 1 }] }, // mutual follow admission
       { rows: [{ conversation_id: 'conversation-1' }] },
       { rows: [] },
       { rows: [] },
