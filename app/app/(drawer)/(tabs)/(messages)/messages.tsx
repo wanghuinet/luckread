@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '~/store/auth-store';
 import { useColorScheme } from 'nativewind';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { fetchConversations, type MessagingConversation } from '~/lib/messaging-api';
 import { resolvePublicProfileById } from '~/lib/content-adapter';
 
