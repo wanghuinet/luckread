@@ -164,7 +164,7 @@ async function listNeonContentRelationships(
   try {
     const result = await database.query<{
       relationship_id: string
-      relation_type: 'reference'
+      relation_type: 'reference' | 'quote-post'
       created_at: Date | string
       related_id: string
       related_slug: string
@@ -174,7 +174,7 @@ async function listNeonContentRelationships(
     }>(
       'SELECT r.relationship_id, r.relation_type, r.created_at, ' + projection +
       ' FROM content_relationships r JOIN contents s ON s.id = r.source_id JOIN contents t ON t.id = r.target_id' +
-      " WHERE r.status = 'ACTIVE' AND s.state = 'PUBLISHED' AND t.state = 'PUBLISHED' AND r.relation_type = 'reference' AND " +
+      " WHERE r.status = 'ACTIVE' AND s.state = 'PUBLISHED' AND t.state = 'PUBLISHED' AND r.relation_type IN ('reference', 'quote-post') AND " +
       predicate + ' ' + cursorClause +
       ' ORDER BY r.created_at DESC, r.relationship_id DESC LIMIT $' + limitParameter,
       values,
@@ -214,11 +214,12 @@ export function createPostgresContentRelationshipMutationStore(
     async loadCreate(input) {
       try {
         const result = await database.query<PostgresCreateRelationshipRow>(
-          'SELECT s.id AS source_id, s.owner_user_id, s.version AS source_version, t.id AS target_id, ' +
+          'SELECT s.id AS source_id, s.owner_user_id, s.version AS source_version, s.content_type AS source_content_type, ' +
+          't.id AS target_id, t.content_type AS target_content_type, t.state AS target_state, t.access_mode AS target_access_mode, ' +
           'i.id AS idem_id, i.owner_user_id AS idem_owner_user_id, i.request_hash AS idem_request_hash, ' +
           'i.status AS idem_status, i.response_json AS idem_response_json, i.expires_at AS idem_expires_at, ' +
           '(SELECT relationship_id FROM content_relationships r ' +
-          "WHERE r.source_id = s.id AND r.target_id = t.id AND r.relation_type = 'reference' AND r.status = 'ACTIVE' LIMIT 1) " +
+          "WHERE r.source_id = s.id AND r.target_id = t.id AND r.status = 'ACTIVE' LIMIT 1) " +
           'AS active_relationship_id ' +
           'FROM contents s LEFT JOIN contents t ON t.id = $1 ' +
           'LEFT JOIN LATERAL (SELECT id, owner_user_id, request_hash, status, response_json, expires_at ' +
@@ -258,12 +259,13 @@ export function createPostgresContentRelationshipMutationStore(
           'INSERT INTO content_relationships ' +
           '(relationship_id, source_type, source_id, target_type, target_id, relation_type, ' +
           'schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at) ' +
-          "VALUES ($1, 'content', $2, 'content', $3, 'reference', 1, 'ACTIVE', $4, $5, $6, $7::timestamptz, $8::timestamptz) " +
+          "VALUES ($1, 'content', $2, 'content', $3, $4, 1, 'ACTIVE', $5, $6, $7, $8::timestamptz, $9::timestamptz) " +
           'RETURNING relationship_id',
           [
             relationship.relationshipId,
             relationship.sourceId,
             relationship.targetId,
+            relationship.relationType,
             relationship.actorId,
             relationship.provenanceRef,
             relationship.authorizationRef,
