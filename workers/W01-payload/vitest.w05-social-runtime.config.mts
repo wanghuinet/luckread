@@ -60,6 +60,8 @@ export default defineConfig({
       'src/social-targets-read-store-postgres.test.ts',
       'src/social-token-sync-store-postgres.test.ts',
       'src/social-closure-runtime.test.ts',
+      'src/messaging-runtime.test.ts',
+      'src/messaging-store-postgres.test.ts',
     ],
   },
 })
