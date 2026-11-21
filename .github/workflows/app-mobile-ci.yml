@@ -186,6 +186,8 @@ jobs:
         run: bun test tests/posthog-diagnostics.test.mjs
       - name: Test unified native API client rules
         run: bun run test:api-client
+      - name: Test five-account secure credential storage and switching
+        run: bun test tests/multi-account-secure-session.test.mjs tests/multi-account-auth-store.test.mjs
       - name: Test native media reference host and credential boundaries
         run: bun test tests/content-adapter-media-reference.test.mjs
       - name: Test native authenticated image gallery and multi-photo preview
