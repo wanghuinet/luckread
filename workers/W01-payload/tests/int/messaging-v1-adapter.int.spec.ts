@@ -55,6 +55,18 @@ describe('v1 messaging adapters', () => {
     expect(requestAction).toContain("['accept', 'decline', 'cancel']")
   })
 
+  it('streams message attachments only after W05 conversation authorization', () => {
+    const privateAttachment = route('src/app/api/v1/conversations/[conversationId]/attachments/[mediaId]/route.ts')
+    expect(privateAttachment).toContain('resolveCookieSocialPrincipal')
+    expect(privateAttachment).toContain('callW05Social')
+    expect(privateAttachment).toContain('/attachments/')
+    expect(privateAttachment).toContain('/authorize')
+    expect(privateAttachment).toContain('bucket.head(key)')
+    expect(privateAttachment).toContain('bucket.get(key')
+    expect(privateAttachment).toContain("headers.set('cache-control', 'private, no-store')")
+    expect(privateAttachment).not.toContain('searchParams.get(\'url\')')
+  })
+
   it('does not implement a second persistence path in W01', () => {
     for (const source of [conversations, messages, readCursor]) {
       expect(source).not.toMatch(/INSERT INTO|UPDATE social_|SELECT .* FROM social_/i)
