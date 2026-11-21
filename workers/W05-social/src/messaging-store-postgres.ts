@@ -200,8 +200,13 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
           const prior = await db.query<MessageRow>(
             `SELECT ${messageSelect} FROM social_messages WHERE sender_user_id = $1 AND client_message_id = $2 LIMIT 1`,
             [actorUserId, clientMessageId])
-          if (prior.rows[0]?.conversation_id === conversationId && prior.rows[0]?.body === body) return prior.rows[0]
-        } catch {}
+          if (prior.rows[0]) {
+            if (prior.rows[0].conversation_id === conversationId && prior.rows[0].body === body) return prior.rows[0]
+            throw new MessagingStoreError('CONFLICT', 409)
+          }
+        } catch (retryError) {
+          if (retryError instanceof MessagingStoreError) throw retryError
+        }
         throw new MessagingStoreError()
       }
     },
