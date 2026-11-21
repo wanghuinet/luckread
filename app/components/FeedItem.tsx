@@ -40,6 +40,7 @@ import { setProfilePin, useProfilePinSnapshot } from '~/lib/profile-pin-state';
 import ReportPostDialog from './ReportPostDialog';
 import SocialPoll from './SocialPoll';
 import QuotePostPreview from './QuotePostPreview';
+import PostThreadPreview from './PostThreadPreview';
 import { getXDesignColors, X_DESIGN_TOKENS } from '~/constants/x-design-tokens';
 
 
@@ -811,7 +812,10 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                         color: palette.text,
                     }}>{itemData.message}</Text>
                     {detailView && itemData.contentType === 'post' && itemData.contentId ? (
-                        <QuotePostPreview contentId={itemData.contentId} />
+                        <>
+                            <QuotePostPreview contentId={itemData.contentId} />
+                            <PostThreadPreview contentId={itemData.contentId} />
+                        </>
                     ) : null}
                     <FeedMediaGallery items={mediaItems} contentId={itemData.contentId} mediaWarning={itemData.accessGranted === false ? null : itemData.mediaWarning} />
                     {detailView && itemData.contentType === 'post' && itemData.contentId ? (
