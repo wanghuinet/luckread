@@ -62,6 +62,10 @@ export function createPostgresMessageRequestStore(db: MessageRequestPostgresExec
             VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING ${requestSelect}`,
             [crypto.randomUUID(), actor, recipient, clientRequestId, body])
           if (!inserted.rows[0]) throw new MessageRequestStoreError('SERVICE_UNAVAILABLE', 503)
+          await client.query(`INSERT INTO social_message_request_audit
+            (audit_id, request_id, actor_user_id, action, metadata)
+            VALUES ($1, $2, $3, 'created', '{}'::jsonb)`,
+            [crypto.randomUUID(), inserted.rows[0].request_id, actor])
           return inserted.rows[0]
         })
       } catch (error) {
@@ -120,6 +124,10 @@ export function createPostgresMessageRequestStore(db: MessageRequestPostgresExec
           if (action === 'cancel' || action === 'decline') {
             const status = action === 'cancel' ? 'cancelled' : 'declined'
             await client.query(`UPDATE social_message_requests SET status = $2, responded_at = CURRENT_TIMESTAMP WHERE request_id = $1`, [requestId, status])
+            await client.query(`INSERT INTO social_message_request_audit
+              (audit_id, request_id, actor_user_id, action, metadata)
+              VALUES ($1, $2, $3, $4, '{}'::jsonb)`,
+              [crypto.randomUUID(), requestId, actor, status])
             return { status, conversationId: null }
           }
           const blocked = await client.query(`SELECT 1 FROM social_user_interactions WHERE relation_type = 'block'
@@ -152,6 +160,10 @@ export function createPostgresMessageRequestStore(db: MessageRequestPostgresExec
           await client.query(`UPDATE social_conversations SET last_message_id = $2 WHERE conversation_id = $1`, [conversationId, messageId])
           await client.query(`UPDATE social_message_requests SET status = 'accepted', conversation_id = $2,
             responded_at = CURRENT_TIMESTAMP WHERE request_id = $1`, [requestId, conversationId])
+          await client.query(`INSERT INTO social_message_request_audit
+            (audit_id, request_id, actor_user_id, action, metadata)
+            VALUES ($1, $2, $3, 'accepted', '{}'::jsonb)`,
+            [crypto.randomUUID(), requestId, actor])
           return { status: 'accepted', conversationId }
         })
       } catch (error) {
