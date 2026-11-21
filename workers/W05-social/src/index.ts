@@ -865,7 +865,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
         if (!body || typeof body !== 'object' || Array.isArray(body)) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
         await markConversationRead(dependencies.messagingStore, actorUserId, conversationId, (body as { sequence?: unknown }).sequence)
-        return new Response(null, { status: 204 })
+        return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       }
 
       if (url.pathname === '/internal/social/notifications') {
