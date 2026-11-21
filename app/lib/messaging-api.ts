@@ -36,6 +36,12 @@ export async function fetchMessages(conversationId: string, beforeSequence: stri
     '/conversations/' + encodeURIComponent(conversationId) + '/messages?' + query.toString(), { method: 'GET', signal },
   ));
 }
+export async function fetchMessagesAfter(conversationId: string, afterSequence: string, signal?: AbortSignal): Promise<Page<MessagingMessage>> {
+  const query = new URLSearchParams({ afterSequence, limit: '50' });
+  return unwrap(await apiRequest<Envelope<Page<MessagingMessage>>>(
+    '/conversations/' + encodeURIComponent(conversationId) + '/messages?' + query.toString(), { method: 'GET', signal },
+  ));
+}
 export async function sendDirectMessage(conversationId: string, body: string, idempotencyKey = createIdempotencyKey()): Promise<MessagingMessage> {
   return unwrap<MessagingMessage>(await apiRequest<Envelope<MessagingMessage>>(
     '/conversations/' + encodeURIComponent(conversationId) + '/messages',
