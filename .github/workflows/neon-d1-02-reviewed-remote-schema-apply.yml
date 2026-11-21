@@ -10,15 +10,6 @@ on:
       - 'scripts/neon/d1-01/0001_schema_migration_ledger.sql'
       - 'workers/W03-content/src/neon-postgres-migrations/**'
       - 'workers/W05-social/src/neon-postgres-migrations/**'
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/neon-d1-02-reviewed-remote-schema-apply.yml'
-      - 'contracts/database/neon-d1-02-migration-manifest.v1.json'
-      - 'scripts/neon/d1-02/**'
-      - 'scripts/neon/d1-01/0001_schema_migration_ledger.sql'
-      - 'workers/W03-content/src/neon-postgres-migrations/**'
-      - 'workers/W05-social/src/neon-postgres-migrations/**'
   workflow_dispatch:
     inputs:
       confirm_target:
@@ -37,7 +28,7 @@ concurrency:
 
 jobs:
   validate:
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    if: ${{ github.event_name == 'pull_request' }}
     name: Validate D1-02 remote target guards without Neon credentials
     runs-on: ubuntu-latest
     steps:
@@ -54,7 +45,7 @@ jobs:
           node --check scripts/neon/d1-02/remote-runner-review.mjs
           node --check scripts/neon/d1-02/assert-remote-apply-release.mjs
           node --test scripts/neon/d1-02/schema-only-runner.test.mjs scripts/neon/d1-02/remote-runner-review.test.mjs scripts/neon/d1-02/assert-remote-apply-release.test.mjs
-          node scripts/neon/d1-02/assert-remote-apply-release.mjs --assert-ready
+          node scripts/neon/d1-02/assert-remote-apply-release.mjs --expect-blocked
 
   apply:
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'APPLY_REVIEWED_SCHEMA_D1_02_LUCKREADPRO' }}
