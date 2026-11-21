@@ -29,8 +29,10 @@
       "auth": "required",
       "query": [
         "beforeSequence",
+        "afterSequence",
         "limit"
-      ]
+      ],
+      "cursorPolicy": "beforeSequence_and_afterSequence_are_mutually_exclusive"
     },
     {
       "method": "POST",
