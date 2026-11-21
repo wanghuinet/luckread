@@ -442,4 +442,6 @@ test('native thread composer creates a bounded text-only thread through existing
   expect(composer).toContain("import PostThreadComposer from '~/components/PostThreadComposer';");
   expect(composer).toContain('setThreadComposerVisible(true)');
   expect(composer).toContain('<PostThreadComposer');
+  expect(composer).toContain('{threadComposerVisible ? (');
+  expect(composer).toContain('initialText={body}');
 });
