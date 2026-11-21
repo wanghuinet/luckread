@@ -2515,6 +2515,35 @@ describe('W05 social poll transport', () => {
     expect(query).not.toHaveBeenCalled()
   })
 
+  it('routes authenticated sender message edit and recall mutations through the messaging store', async () => {
+    const edited = {
+      message_id: 'message-1', conversation_id: 'conversation-1', sender_user_id: 'viewer-1',
+      sequence: '1', body: 'updated', attachments: [], created_at: '2026-11-21T00:00:00.000Z',
+      edited_at: '2026-11-21T00:01:00.000Z', recalled_at: null,
+    }
+    const recalled = { ...edited, body: '', attachments: [], edited_at: edited.edited_at, recalled_at: '2026-11-21T00:02:00.000Z' }
+    const messagingStore = {
+      editMessage: vi.fn(async () => edited),
+      recallMessage: vi.fn(async () => recalled),
+    }
+    const injected = createW05SocialWorker({ messagingStore: messagingStore as never })
+    const patch = await injected.fetch(new Request(
+      'https://luckread-w05.internal/internal/messaging/conversations/conversation-1/messages/message-1',
+      { method: 'PATCH', headers: { ...transportHeaders, 'content-type': 'application/json' }, body: JSON.stringify({ body: 'updated' }) },
+    ), {} as never)
+    expect(patch.status).toBe(200)
+    await expect(patch.json()).resolves.toMatchObject({ data: { body: 'updated', edited_at: edited.edited_at } })
+    expect(messagingStore.editMessage).toHaveBeenCalledWith('viewer-1', 'conversation-1', 'message-1', 'updated')
+
+    const deletion = await injected.fetch(new Request(
+      'https://luckread-w05.internal/internal/messaging/conversations/conversation-1/messages/message-1',
+      { method: 'DELETE', headers: transportHeaders },
+    ), {} as never)
+    expect(deletion.status).toBe(200)
+    await expect(deletion.json()).resolves.toMatchObject({ data: { body: '', recalled_at: recalled.recalled_at } })
+    expect(messagingStore.recallMessage).toHaveBeenCalledWith('viewer-1', 'conversation-1', 'message-1')
+  })
+
 })
 
 
