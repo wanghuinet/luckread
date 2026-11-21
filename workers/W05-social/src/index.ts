@@ -917,7 +917,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         let body: unknown
         try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
         if (!body || typeof body !== 'object' || Array.isArray(body)) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
-        const data = await sendMessage(dependencies.messagingStore, actorUserId, conversationId, idempotencyKey, (body as { body?: unknown }).body)
+        const data = await sendMessage(dependencies.messagingStore, actorUserId, conversationId, idempotencyKey, (body as { body?: unknown }).body, (body as { attachments?: unknown }).attachments)
         return json({ data, requestId: createRequestId() }, 201)
       }
 
