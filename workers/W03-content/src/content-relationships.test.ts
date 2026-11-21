@@ -185,6 +185,107 @@ describe('W03 content relationship foundation', () => {
 })
 
 
+describe('W03 native quote-post relationship authority', () => {
+  it('creates quote-post links only to public published posts', async () => {
+    const statements: Array<{ sql: string; values: unknown[] }> = [];
+    const db = {
+      prepare(sql: string) {
+        return {
+          bind: (...values: unknown[]) {
+            return {
+              first: async () => ({
+                source_id: 'quote_post',
+                owner_user_id: 'user_1',
+                source_version: 1,
+                source_content_type: 'post',
+                target_id: 'original_post',
+                target_content_type: 'post',
+                target_state: 'PUBLISHED',
+                target_access_mode: 'PUBLIC',
+                idem_id: null,
+                idem_owner_user_id: null,
+                idem_request_hash: null,
+                idem_status: null,
+                idem_response_json: null,
+                idem_expires_at: null,
+                active_relationship_id: null,
+              }),
+              all: async () => ({ results: [] }),
+              run: async () => ({ success: true }),
+              _statement: { sql, values },
+            };
+          },
+        };
+      },
+      batch: async (batch: Array<{ _statement?: { sql: string; values: unknown[] } }>) => {
+        for (const item of batch) {
+          if (item._statement) statements.push(item._statement);
+        }
+        return [];
+      },
+    } as never;
+
+    const relation = await createContentRelationship(
+      db,
+      'user_1',
+      'quote_post',
+      { targetContentId: 'original_post', relationType: 'quote-post' },
+      'quote-post-idem-1',
+    );
+
+    expect(relation).toMatchObject({
+      sourceId: 'quote_post',
+      targetId: 'original_post',
+      relationType: 'quote-post',
+      status: 'ACTIVE',
+    });
+    expect(statements.some((statement) =>
+      statement.sql.includes('INSERT INTO content_relationships') &&
+      statement.sql.includes('VALUES (?, \'content\', ?, \'content\', ?, ?, 1') &&
+      statement.values.includes('quote-post'),
+    )).toBe(true);
+  });
+
+  it('hides private or unpublished targets from quote-post creation', async () => {
+    const db = {
+      prepare() {
+        return {
+          bind() {
+            return {
+              first: async () => ({
+                source_id: 'quote_post',
+                owner_user_id: 'user_1',
+                source_version: 1,
+                source_content_type: 'post',
+                target_id: 'original_post',
+                target_content_type: 'post',
+                target_state: 'PUBLISHED',
+                target_access_mode: 'MEMBERS_ONLY',
+                idem_id: null,
+                idem_owner_user_id: null,
+                idem_request_hash: null,
+                idem_status: null,
+                idem_response_json: null,
+                idem_expires_at: null,
+                active_relationship_id: null,
+              }),
+            };
+          },
+        };
+      },
+      batch: async () => { throw new Error('quote link must not be persisted'); },
+    } as never;
+
+    await expect(createContentRelationship(
+      db,
+      'user_1',
+      'quote_post',
+      { targetContentId: 'original_post', relationType: 'quote-post' },
+      'quote-post-idem-2',
+    )).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+  });
+});
+
 describe('W03 native social post thread authority', () => {
   it('prevents the generic reference API from creating thread edges', async () => {
     const db = {
