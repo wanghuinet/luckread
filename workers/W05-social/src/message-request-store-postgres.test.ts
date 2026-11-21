@@ -21,6 +21,7 @@ describe('W05 PostgreSQL message request store', () => {
     expect(client.query.mock.calls.some(([sql]) => String(sql).includes("relation_type = 'block'"))).toBe(true)
     expect(client.query.mock.calls.some(([sql]) => String(sql).includes('social_follow_relationships'))).toBe(true)
     expect(client.query.mock.calls.some(([sql]) => String(sql).includes("INTERVAL '24 hours'"))).toBe(true)
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes('social_message_request_audit'))).toBe(true)
     expect(client.query.mock.calls.at(-1)?.[0]).toBe('COMMIT')
   })
   it('rejects blocked recipients without inserting a request', async () => {
@@ -53,6 +54,7 @@ describe('W05 PostgreSQL message request store', () => {
     expect(client.query.mock.calls.some(([sql]) => String(sql).includes('FOR UPDATE'))).toBe(true)
     expect(client.query.mock.calls.some(([sql]) => String(sql).includes('social_conversation_memberships'))).toBe(true)
     expect(client.query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO social_messages'))).toBe(true)
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes('social_message_request_audit'))).toBe(true)
     expect(client.query.mock.calls.at(-1)?.[0]).toBe('COMMIT')
   })
   it('does not allow the sender to accept another user’s request', async () => {
