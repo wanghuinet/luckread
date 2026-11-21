@@ -121,6 +121,10 @@ export default function ConversationScreen() {
       );
       await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
     },
+    onError: (_error, failedBody) => {
+      // Chat clears its composer after onSend; restore the draft so a network retry is lossless.
+      setDraft(failedBody);
+    },
   });
   const handleChatSend = useCallback((newMessages: IMessage[]) => {
     const body = newMessages[0]?.text?.trim();
