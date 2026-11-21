@@ -151,6 +151,40 @@ export default function ConversationScreen() {
     );
   }, [incrementalQuery.data, conversationId, queryClient]);
 
+  const latestMessagesRefresh = useQuery({
+    queryKey: ['messaging', 'latest-messages-refresh', conversationId],
+    queryFn: ({ signal }) => fetchMessages(conversationId, null, signal),
+    enabled: Boolean(conversationId) && messagesQuery.isSuccess && isFocused && appState === 'active',
+    refetchInterval: isFocused && appState === 'active' ? 15_000 : false,
+    refetchIntervalInBackground: false,
+    staleTime: 0,
+  });
+  useEffect(() => {
+    const refreshed = latestMessagesRefresh.data?.items ?? [];
+    if (!refreshed.length) return;
+    queryClient.setQueryData<typeof messagesQuery.data>(
+      ['messaging', 'messages', conversationId],
+      (current) => {
+        if (!current?.pages.length) return current;
+        const latestById = new Map(refreshed.map((message) => [message.message_id, message]));
+        const known = new Set(current.pages.flatMap((page) => page.items.map((message) => message.message_id)));
+        const pages = current.pages.map((page) => ({
+          ...page,
+          items: page.items.map((message) => latestById.get(message.message_id) ?? message),
+        }));
+        const additions = refreshed.filter((message) => !known.has(message.message_id));
+        if (pages[0] && additions.length) {
+          pages[0] = {
+            ...pages[0],
+            items: [...pages[0].items, ...additions].sort((left, right) =>
+              compareSequence(right.sequence, left.sequence)),
+          };
+        }
+        return { ...current, pages };
+      },
+    );
+  }, [latestMessagesRefresh.data, conversationId, queryClient]);
+
   const uploadOne = useCallback(async (localId: string, file: LocalMediaFile) => {
     setPendingAttachments((current) => current.map((item) => item.localId === localId
       ? { ...item, status: 'uploading', error: undefined } : item));
