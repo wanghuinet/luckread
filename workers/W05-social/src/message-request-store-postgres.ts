@@ -40,16 +40,16 @@ export function createPostgresMessageRequestStore(db: MessageRequestPostgresExec
           const blocked = await client.query(`SELECT 1 FROM social_user_interactions WHERE relation_type = 'block'
             AND ((actor_user_id = $1 AND target_user_id = $2) OR (actor_user_id = $2 AND target_user_id = $1)) LIMIT 1`, [actor, recipient])
           if (blocked.rows.length) throw new MessageRequestStoreError('PERMISSION_DENIED', 403)
-          const mutual = await client.query(`SELECT 1 FROM social_follow_relationships a
-            JOIN social_follow_relationships b ON b.follower_user_id = a.target_user_id AND b.target_user_id = a.follower_user_id
-            WHERE a.follower_user_id = $1 AND a.target_user_id = $2 LIMIT 1`, [actor, recipient])
-          if (mutual.rows.length) throw new MessageRequestStoreError('CONTACT_POLICY_ALREADY_OPEN', 409)
           const prior = await client.query<MessageRequestRow>(`SELECT ${requestSelect} FROM social_message_requests
             WHERE sender_user_id = $1 AND client_request_id = $2 LIMIT 1`, [actor, clientRequestId])
           if (prior.rows[0]) {
             if (prior.rows[0].recipient_user_id !== recipient || prior.rows[0].initial_message !== body) throw new MessageRequestStoreError('CONFLICT', 409)
             return prior.rows[0]
           }
+          const mutual = await client.query(`SELECT 1 FROM social_follow_relationships a
+            JOIN social_follow_relationships b ON b.follower_user_id = a.target_user_id AND b.target_user_id = a.follower_user_id
+            WHERE a.follower_user_id = $1 AND a.target_user_id = $2 LIMIT 1`, [actor, recipient])
+          if (mutual.rows.length) throw new MessageRequestStoreError('CONTACT_POLICY_ALREADY_OPEN', 409)
           const duplicatePending = await client.query(`SELECT 1 FROM social_message_requests
             WHERE status = 'pending' AND ((sender_user_id = $1 AND recipient_user_id = $2)
               OR (sender_user_id = $2 AND recipient_user_id = $1)) LIMIT 1`, [actor, recipient])
