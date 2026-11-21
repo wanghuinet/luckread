@@ -335,7 +335,9 @@
         "POST /v1/conversations/{conversationId}/messages",
         "POST /v1/conversations/{conversationId}/read",
         "POST /v1/message-requests",
-        "POST /v1/message-requests/{requestId}/{action}"
+        "POST /v1/message-requests/{requestId}/{action}",
+        "PATCH /v1/conversations/{conversationId}/messages/{messageId}",
+        "DELETE /v1/conversations/{conversationId}/messages/{messageId}"
       ]
     }
   },
