@@ -1702,6 +1702,12 @@ paths:
       tags: [Messaging]
       operationId: listMessagingConversations
       summary: List the current user's direct conversations
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50 }
       responses:
         '200': { description: Conversation page }
         '401': { $ref: '#/components/responses/Unauthorized' }
