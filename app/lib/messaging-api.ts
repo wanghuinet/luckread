@@ -24,7 +24,7 @@ export async function fetchConversations(signal?: AbortSignal): Promise<Page<Mes
 }
 export async function createDirectConversation(recipientUserId: string) {
   return unwrap(await apiRequest<Envelope<{ conversationId: string }>>('/conversations', {
-    method: 'POST', body: JSON.stringify({ recipientUserId }), idempotencyKey: createIdempotencyKey(),
+    method: 'POST', body: JSON.stringify({ recipientUserId }), idempotencyKey: false,
   }));
 }
 export async function fetchMessages(conversationId: string, signal?: AbortSignal): Promise<Page<MessagingMessage>> {

@@ -1709,8 +1709,6 @@ paths:
       tags: [Messaging]
       operationId: createMessagingConversation
       summary: Create or retrieve a direct conversation
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
