@@ -19,17 +19,21 @@ function unwrap<T>(result: ApiEnvelopeResult): T {
   }
   return envelope.data as T;
 }
-export async function fetchConversations(signal?: AbortSignal): Promise<Page<MessagingConversation>> {
-  return unwrap(await apiRequest<Envelope<Page<MessagingConversation>>>('/conversations?limit=30', { method: 'GET', signal }));
+export async function fetchConversations(cursor: string | null = null, signal?: AbortSignal): Promise<Page<MessagingConversation>> {
+  const query = new URLSearchParams({ limit: '30' });
+  if (cursor) query.set('cursor', cursor);
+  return unwrap(await apiRequest<Envelope<Page<MessagingConversation>>>('/conversations?' + query.toString(), { method: 'GET', signal }));
 }
 export async function createDirectConversation(recipientUserId: string) {
   return unwrap(await apiRequest<Envelope<{ conversationId: string }>>('/conversations', {
     method: 'POST', body: JSON.stringify({ recipientUserId }), idempotencyKey: false,
   }));
 }
-export async function fetchMessages(conversationId: string, signal?: AbortSignal): Promise<Page<MessagingMessage>> {
+export async function fetchMessages(conversationId: string, beforeSequence: string | null = null, signal?: AbortSignal): Promise<Page<MessagingMessage>> {
+  const query = new URLSearchParams({ limit: '50' });
+  if (beforeSequence) query.set('beforeSequence', beforeSequence);
   return unwrap(await apiRequest<Envelope<Page<MessagingMessage>>>(
-    '/conversations/' + encodeURIComponent(conversationId) + '/messages?limit=50', { method: 'GET', signal },
+    '/conversations/' + encodeURIComponent(conversationId) + '/messages?' + query.toString(), { method: 'GET', signal },
   ));
 }
 export async function sendDirectMessage(conversationId: string, body: string, idempotencyKey = createIdempotencyKey()) {

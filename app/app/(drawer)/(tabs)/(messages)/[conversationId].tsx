@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable,
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchMessages, markConversationRead, sendDirectMessage, type MessagingMessage } from '~/lib/messaging-api';
 import { createIdempotencyKey } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
@@ -18,12 +18,21 @@ export default function ConversationScreen() {
   const userId = useAuthStore((state) => state.user?.id);
   const [draft, setDraft] = useState('');
   const pendingSend = useRef<{ body: string; key: string } | null>(null);
-  const messagesQuery = useQuery({
+  const messagesQuery = useInfiniteQuery({
     queryKey: ['messaging', 'messages', conversationId],
-    queryFn: ({ signal }) => fetchMessages(conversationId, signal),
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam, signal }) => fetchMessages(conversationId, pageParam, signal),
+    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
     enabled: Boolean(conversationId),
+    staleTime: 15_000,
   });
-  const messages = useMemo(() => [...(messagesQuery.data?.items ?? [])].reverse(), [messagesQuery.data?.items]);
+  // The API returns newest-first pages; an inverted list keeps the newest message at the bottom.
+  const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
+  const loadOlder = () => {
+    if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage && !messagesQuery.isFetching) {
+      void messagesQuery.fetchNextPage();
+    }
+  };
   const sendMutation = useMutation({
     mutationFn: (body: string) => {
       if (!pendingSend.current || pendingSend.current.body !== body) {
@@ -41,9 +50,9 @@ export default function ConversationScreen() {
     },
   });
   useEffect(() => {
-    const latest = messagesQuery.data?.items?.[0];
+    const latest = messagesQuery.data?.pages?.[0]?.items?.[0];
     if (latest?.sequence) void markConversationRead(conversationId, latest.sequence).catch(() => undefined);
-  }, [conversationId, messagesQuery.data?.items]);
+  }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence]);
 
   const send = () => {
     const value = draft.trim();
@@ -73,8 +82,12 @@ export default function ConversationScreen() {
       ) : (
         <FlatList
           className="flex-1"
-          contentContainerStyle={{ paddingHorizontal: 14, paddingVertical: 16, flexGrow: 1, justifyContent: 'flex-end' }}
+          contentContainerStyle={{ paddingHorizontal: 14, paddingVertical: 16, flexGrow: 1 }}
           data={messages}
+          inverted
+          onEndReached={loadOlder}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={messagesQuery.isFetchingNextPage ? <View className="py-4"><ActivityIndicator color="#1d9bf0" /></View> : null}
           keyExtractor={(item) => item.message_id}
           renderItem={({ item }: { item: MessagingMessage }) => {
             const own = Boolean(userId && item.sender_user_id === userId);

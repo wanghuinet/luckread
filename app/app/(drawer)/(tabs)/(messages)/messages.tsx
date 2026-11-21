@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '~/store/auth-store';
 import { useColorScheme } from 'nativewind';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { fetchConversations, type MessagingConversation } from '~/lib/messaging-api';
 import { resolvePublicProfileById } from '~/lib/content-adapter';
 
@@ -39,11 +39,20 @@ export default function Messages() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
-  const conversations = useQuery({
+  const conversations = useInfiniteQuery({
     queryKey: ['messaging', 'conversations'],
-    queryFn: ({ signal }) => fetchConversations(signal),
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam, signal }) => fetchConversations(pageParam, signal),
+    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
     enabled: authStatus === 'authenticated',
+    staleTime: 30_000,
   });
+  const conversationItems = conversations.data?.pages.flatMap((page) => page.items) ?? [];
+  const loadMore = () => {
+    if (conversations.hasNextPage && !conversations.isFetchingNextPage && !conversations.isFetching) {
+      void conversations.fetchNextPage();
+    }
+  };
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
@@ -78,11 +87,14 @@ export default function Messages() {
         </View>
       ) : (
         <FlatList
-          data={conversations.data?.items ?? []}
+          data={conversationItems}
           keyExtractor={(item) => item.conversation_id}
           refreshing={conversations.isRefetching}
           onRefresh={() => conversations.refetch()}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
           contentContainerStyle={{ flexGrow: 1 }}
+          ListFooterComponent={conversations.isFetchingNextPage ? <View className="py-4"><ActivityIndicator color="#1d9bf0" /></View> : null}
           ListEmptyComponent={
             <View className="flex-1 items-center justify-center px-8 py-20">
               <View className="h-16 w-16 items-center justify-center rounded-full bg-sky-50 dark:bg-sky-950/40">
