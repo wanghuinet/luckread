@@ -69,5 +69,10 @@
     "recall",
     "per-message delete",
     "push fanout"
-  ]
+  ],
+  "contactPolicy": {
+    "newConversation": "MUTUAL_FOLLOWERS_ONLY",
+    "reopen": "REQUIRES_MUTUAL_FOLLOW_AND_NO_BLOCK",
+    "blockedConversationVisibility": "HIDDEN_FROM_INBOX_AND_HISTORY"
+  }
 }
