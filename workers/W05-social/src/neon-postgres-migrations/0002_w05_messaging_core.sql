@@ -1,6 +1,5 @@
--- GENERATED FILE. Do not hand-edit.
--- W05 / D1-02 additive migration: direct text messaging phase one.
--- Apply only after the three reviewed D1-02 baseline migrations.
+-- W05-owned PostgreSQL migration: direct text messaging phase one.
+-- Additive D1-02 schema extension; apply only through an approved migration release.
 BEGIN;
 CREATE TABLE social_conversations (
   conversation_id TEXT PRIMARY KEY NOT NULL,
