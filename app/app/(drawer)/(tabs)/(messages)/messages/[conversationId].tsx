@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, type AppStateStatus, Pressable, StatusBar, Text, View } from 'react-native';
+import { Alert, AppState, type AppStateStatus, ActivityIndicator, Pressable, StatusBar, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Chat, type IMessage } from '@kesha-antonov/react-native-chat';
 import { Feather } from '@expo/vector-icons';
@@ -159,7 +159,6 @@ export default function ConversationScreen() {
   }, [isPicking, pendingAttachments.length, uploadOne]);
 
   const sendMutationPendingRef = useRef(false);
-  sendMutationPendingRef.current = false;
   const sendMutation = useMutation({
     mutationFn: (variables: SendVariables) => {
       const fingerprint = JSON.stringify([variables.body, variables.attachments.map((item) => item.mediaId)]);
