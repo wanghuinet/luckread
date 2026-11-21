@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { listContentLikers } from './like-list-runtime.js'
-import { MessagingRuntimeError, createDirectConversation, listConversations, listMessages, markConversationRead, sendMessage } from './messaging-runtime.js'
+import { MessagingRuntimeError, createDirectConversation, listConversations, listMessages, listMessagesAfter, markConversationRead, sendMessage } from './messaging-runtime.js'
 import type { MessagingStore } from './messaging-store.js'
 import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js'
 import { CommentRuntimeError, createComment, deleteComment, listComments, parseCommentLimit, parseCommentSort, updateComment } from './comment-runtime.js'
@@ -862,10 +862,15 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const conversationId = decodePathPart(messagingMessagesMatch[1] ?? '')
         if (!conversationId) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
         if (request.method === 'GET') {
-          return json({
-            data: await listMessages(dependencies.messagingStore, actorUserId, conversationId, url.searchParams.get('beforeSequence'), url.searchParams.get('limit')),
-            requestId: createRequestId(),
-          })
+          const beforeSequence = url.searchParams.get('beforeSequence')
+          const afterSequence = url.searchParams.get('afterSequence')
+          if (beforeSequence !== null && afterSequence !== null) {
+            throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+          }
+          const data = afterSequence !== null
+            ? await listMessagesAfter(dependencies.messagingStore, actorUserId, conversationId, afterSequence, url.searchParams.get('limit'))
+            : await listMessages(dependencies.messagingStore, actorUserId, conversationId, beforeSequence, url.searchParams.get('limit'))
+          return json({ data, requestId: createRequestId() })
         }
         if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'GET, POST' } })
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
