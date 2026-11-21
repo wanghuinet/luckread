@@ -419,3 +419,27 @@ test('native composer persists warning metadata and hides media until the reader
   expect(feedItem).toContain('onPress={() => setRevealedMediaKey(mediaRevealKey)}');
   expect(feedItem).toContain('mediaWarning={itemData.accessGranted === false ? null : itemData.mediaWarning}');
 });
+
+
+const threadComposer = readFileSync(new URL('../components/PostThreadComposer.tsx', import.meta.url), 'utf8');
+
+test('native thread composer creates a bounded text-only thread through existing W01 APIs', () => {
+  expect(threadComposer).toContain('const MAX_ITEMS = 5');
+  expect(threadComposer).toContain('const MAX_TEXT = 500');
+  expect(threadComposer).toContain("'/contents'");
+  expect(threadComposer).toContain("'/contents/' + encodeURIComponent(item.contentId) + '/state'");
+  expect(threadComposer).toContain("'/contents/' + encodeURIComponent(item.contentId as string) + '/thread'");
+  expect(threadComposer).toContain('nextContentId: next.contentId');
+  expect(threadComposer).toContain("to: 'PUBLISHED'");
+  expect(threadComposer).toContain('uploadTextBody(body, item.key)');
+  expect(threadComposer).toContain('idempotencyKey: item.createKey');
+  expect(threadComposer).toContain('idempotencyKey: item.stateKey');
+  expect(threadComposer).toContain('idempotencyKey: item.linkKey');
+  expect(threadComposer).toContain('item.published');
+  expect(threadComposer).toContain('item.linked');
+  expect(threadComposer).toContain('startedRef.current = true');
+  expect(threadComposer).toContain('为防止重复发布');
+  expect(composer).toContain("import PostThreadComposer from '~/components/PostThreadComposer';");
+  expect(composer).toContain('setThreadComposerVisible(true)');
+  expect(composer).toContain('<PostThreadComposer');
+});
