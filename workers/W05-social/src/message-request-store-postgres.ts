@@ -66,6 +66,15 @@ export function createPostgresMessageRequestStore(db: MessageRequestPostgresExec
         })
       } catch (error) {
         if (error instanceof MessageRequestStoreError) throw error
+        if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
+          const prior = await db.query<MessageRequestRow>(`SELECT ${requestSelect} FROM social_message_requests
+            WHERE sender_user_id = $1 AND client_request_id = $2 LIMIT 1`, [actor, clientRequestId])
+          if (prior.rows[0]) {
+            if (prior.rows[0].recipient_user_id === recipient && prior.rows[0].initial_message === body) return prior.rows[0]
+            throw new MessageRequestStoreError('CONFLICT', 409)
+          }
+          throw new MessageRequestStoreError('REQUEST_ALREADY_PENDING', 409)
+        }
         throw new MessageRequestStoreError('SERVICE_UNAVAILABLE', 503)
       }
     },
