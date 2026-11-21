@@ -87,13 +87,27 @@ export default function ConversationScreen() {
       }
       return sendDirectMessage(conversationId, body, pendingSend.current.key);
     },
-    onSuccess: async (_message, sentBody) => {
+    onSuccess: async (sentMessage, sentBody) => {
       if (pendingSend.current?.body === sentBody) pendingSend.current = null;
       setDraft((current) => current.trim() === sentBody ? '' : current);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] }),
-        queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] }),
-      ]);
+      queryClient.setQueryData<typeof messagesQuery.data>(
+        ['messaging', 'messages', conversationId],
+        (current) => {
+          if (!current?.pages.length) return current;
+          const exists = current.pages.some((page) => page.items.some((item) => item.message_id === sentMessage.message_id));
+          if (exists) return current;
+          const pages = [...current.pages];
+          const firstPage = pages[0];
+          if (firstPage) {
+            pages[0] = {
+              ...firstPage,
+              items: [...firstPage.items, sentMessage].sort((left, right) => compareSequence(right.sequence, left.sequence)),
+            };
+          }
+          return { ...current, pages };
+        },
+      );
+      await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
     },
   });
   useEffect(() => {
