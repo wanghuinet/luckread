@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { apiRequest } from '~/lib/api-client';
-import { mapContentToFeedContent, unwrapApiData, type ApiContentRecord } from '~/lib/content-adapter';
+import { mapContentToFeedContent, readContentBody, unwrapApiData, type ApiContentRecord } from '~/lib/content-adapter';
 import type { FeedContent } from './FeedItem';
 
 type RelationshipPage = {
@@ -63,13 +63,13 @@ export default function QuotePostPreview({ contentId }: { contentId: string }) {
         return;
       }
 
-      if (active) {
-        setState({
-          status: 'ready',
-          contentId: target.id,
-          content: mapContentToFeedContent(target),
-        });
-      }
+      const bodyText = await readContentBody(target, controller.signal);
+      if (!active || controller.signal.aborted) return;
+      setState({
+        status: 'ready',
+        contentId: target.id,
+        content: mapContentToFeedContent(target, bodyText),
+      });
     })().catch(() => {
       if (active && !controller.signal.aborted) setState({ status: 'error' });
     });
