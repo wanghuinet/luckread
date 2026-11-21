@@ -47,11 +47,11 @@ export async function fetchMessagesAfter(conversationId: string, afterSequence: 
     '/conversations/' + encodeURIComponent(conversationId) + '/messages?' + query.toString(), { method: 'GET', signal },
   ));
 }
-export async function uploadMessageAttachment(file: LocalMediaFile) {
+export async function uploadMessageAttachment(file: LocalMediaFile, idempotencyKey = createIdempotencyKey()) {
   if (!file.size || file.size > 20 * 1024 * 1024) throw new Error('附件不能超过 20 MB。');
   const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
   if (!allowed.includes(file.mimeType.toLowerCase())) throw new Error('仅支持 JPG、PNG、WebP、GIF 和 PDF。');
-  const media = await uploadMediaFile(file);
+  const media = await uploadMediaFile(file, idempotencyKey);
   return {
     mediaId: media.id,
     filename: media.filename,
