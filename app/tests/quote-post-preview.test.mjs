@@ -15,7 +15,8 @@ test('quoted source is shown only while it remains a published public post', () 
   expect(preview).toContain("target.contentType !== 'post'");
   expect(preview).toContain("target.state !== 'PUBLISHED'");
   expect(preview).toContain("target.accessMode !== 'PUBLIC'");
-  expect(preview).toContain('mapContentToFeedContent(target)');
+  expect(preview).toContain('readContentBody(target, controller.signal)');
+  expect(preview).toContain('mapContentToFeedContent(target, bodyText)');
 });
 
 test('quoted source navigation uses the canonical relationship target ID, never push-supplied URLs', () => {
