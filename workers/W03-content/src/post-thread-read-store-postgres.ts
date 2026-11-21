@@ -27,7 +27,7 @@ function timestampString(value: unknown): string {
 /**
  * PostgreSQL equivalent of the native W03 thread read. The same-owner joins,
  * published-public rule, owner-only draft exception, cycle guard and 50-item
- * bound are retained. Thread writes remain on D1.
+ * bound are retained. Thread appends use the PostgreSQL relationship mutation store.
  */
 export function createPostgresPostThreadReadStore(
   database: PostThreadReadPostgresQueryExecutor,
