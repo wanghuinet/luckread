@@ -88,7 +88,12 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
                   latest.sender_user_id AS last_message_sender_user_id,
                   CASE WHEN latest.created_at IS NULL THEN NULL ELSE
                     to_char(latest.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS last_message_created_at,
-                  mine.last_read_sequence::text AS last_read_sequence
+                  mine.last_read_sequence::text AS last_read_sequence,
+                  (SELECT COUNT(*)::int FROM social_messages unread
+                    WHERE unread.conversation_id = c.conversation_id
+                      AND unread.sender_user_id <> $1
+                      AND unread.sequence > mine.last_read_sequence
+                      AND unread.recalled_at IS NULL) AS unread_count
              FROM social_conversation_memberships mine
              JOIN social_conversations c ON c.conversation_id = mine.conversation_id
              LEFT JOIN LATERAL (
