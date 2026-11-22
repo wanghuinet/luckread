@@ -3,10 +3,10 @@
 BEGIN;
 
 ALTER TABLE social_conversations
-  DROP CONSTRAINT social_conversations_conversation_type_check;
+  DROP CONSTRAINT conversation_type_check;
 
 ALTER TABLE social_conversations
-  ADD CONSTRAINT social_conversations_conversation_type_check
+  ADD CONSTRAINT conversation_type_check
   CHECK (conversation_type IN ('direct', 'group'));
 
 ALTER TABLE social_conversations
