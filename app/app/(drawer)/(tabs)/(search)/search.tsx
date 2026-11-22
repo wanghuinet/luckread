@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
 import {
   ActivityIndicator,
   Image,
@@ -17,7 +18,8 @@ import { useColorScheme } from 'nativewind';
 import { useTabBarScroll } from '~/components/TabBarScroll';
 
 import { getApiErrorMessage } from '~/lib/api-client';
-import { fetchContentSearchPage, fetchDiscoveryTopics, findPublicUserByUsername } from '~/lib/social-screen-api';
+import { fetchContentSearchPage, fetchDiscoveryTopics, fetchTrendingSearches, findPublicUserByUsername } from '~/lib/social-screen-api';
+import { addSearchHistoryEntry, clearSearchHistory, readSearchHistory, removeSearchHistoryEntry } from '~/lib/search-history';
 import { mapContentToFeedContent, readContentAuthor, readContentSocial, unwrapApiData, type ApiContentPage, type ApiContentRecord } from '~/lib/content-adapter';
 import { FeedItem, type FeedContent } from '~/components/FeedItem';
 import { readSessionToken } from '~/lib/secure-session';
@@ -35,6 +37,16 @@ type DiscoveryPage = {
   items: DiscoveryTopic[];
   hasMore: boolean;
   nextCursor: string | null;
+};
+
+type TrendingSearch = {
+  term: string;
+  count: number;
+  lastSeenAt: string;
+};
+
+type TrendingSearchPage = {
+  items: TrendingSearch[];
 };
 
 type PublicUser = {
@@ -55,11 +67,25 @@ export default function Search() {
   const userAbortRef = useRef<AbortController | null>(null);
   const topicsRequestIdRef = useRef(0);
   const topicsAbortRef = useRef<AbortController | null>(null);
+  const trendingRequestIdRef = useRef(0);
+  const trendingAbortRef = useRef<AbortController | null>(null);
+  const historyRequestIdRef = useRef(0);
   const tabBarScroll = useTabBarScroll();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
+  const historyScopeRef = useRef<string | null>(viewerId);
+  historyScopeRef.current = viewerId;
+  const [historyViewerId, setHistoryViewerId] = useState<string | null>(viewerId);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState('');
+  const [trendingSearches, setTrendingSearches] = useState<TrendingSearch[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
+  const [trendingError, setTrendingError] = useState('');
+  const visibleRecentSearches = historyViewerId === viewerId ? recentSearches : [];
   const [contentInput, setContentInput] = useState('');
   const [contentResults, setContentResults] = useState<FeedContent[]>([]);
   const [contentCursor, setContentCursor] = useState<string | null>(null);
@@ -75,6 +101,99 @@ export default function Search() {
   const [topics, setTopics] = useState<DiscoveryTopic[]>([]);
   const [topicsLoading, setTopicsLoading] = useState(true);
   const [topicsError, setTopicsError] = useState('');
+
+  useEffect(() => {
+    const scope = viewerId;
+    const requestId = ++historyRequestIdRef.current;
+    let active = true;
+    setHistoryViewerId(scope);
+    setRecentSearches([]);
+    setHistoryLoading(true);
+    setHistoryError('');
+    void readSearchHistory(SecureStore, scope).then((entries) => {
+      if (active && requestId === historyRequestIdRef.current && historyScopeRef.current === scope) {
+        setRecentSearches(entries);
+      }
+    }).finally(() => {
+      if (active && requestId === historyRequestIdRef.current && historyScopeRef.current === scope) {
+        setHistoryLoading(false);
+      }
+    });
+    return () => { active = false; };
+  }, [viewerId]);
+
+  const rememberSearch = useCallback((query: string) => {
+    const scope = viewerId;
+    historyRequestIdRef.current += 1;
+    void addSearchHistoryEntry(SecureStore, scope, query).then((entries) => {
+      if (historyScopeRef.current !== scope) return;
+      setHistoryViewerId(scope);
+      setRecentSearches(entries);
+      setHistoryError('');
+    }).catch(() => {
+      if (historyScopeRef.current === scope) setHistoryError('最近搜索保存失败，请检查设备存储空间后重试。');
+    });
+  }, [viewerId]);
+
+  const removeRecentSearch = useCallback(async (term: string) => {
+    const scope = viewerId;
+    historyRequestIdRef.current += 1;
+    try {
+      const entries = await removeSearchHistoryEntry(SecureStore, scope, term);
+      if (historyScopeRef.current !== scope) return;
+      setHistoryViewerId(scope);
+      setRecentSearches(entries);
+      setHistoryError('');
+    } catch {
+      if (historyScopeRef.current === scope) setHistoryError('无法删除这条搜索记录，请重试。');
+    }
+  }, [viewerId]);
+
+  const clearRecentSearches = useCallback(async () => {
+    const scope = viewerId;
+    historyRequestIdRef.current += 1;
+    try {
+      const entries = await clearSearchHistory(SecureStore, scope);
+      if (historyScopeRef.current !== scope) return;
+      setHistoryViewerId(scope);
+      setRecentSearches(entries);
+      setHistoryError('');
+    } catch {
+      if (historyScopeRef.current === scope) setHistoryError('无法清空搜索记录，请重试。');
+    }
+  }, [viewerId]);
+
+  const loadTrendingSearches = useCallback(async () => {
+    const requestId = ++trendingRequestIdRef.current;
+    trendingAbortRef.current?.abort();
+    const controller = new AbortController();
+    trendingAbortRef.current = controller;
+    const isCurrent = () => requestId === trendingRequestIdRef.current && !controller.signal.aborted;
+    setTrendingLoading(true);
+    setTrendingError('');
+    try {
+      const result = await fetchTrendingSearches({ limit: 10, signal: controller.signal });
+      if (!isCurrent()) return;
+      if (!result.response.ok) {
+        throw new Error(getApiErrorMessage(result.data, '热门搜索暂时无法加载。', result.response.status));
+      }
+      const page = unwrapApiData<TrendingSearchPage>(result.data);
+      if (!page || !Array.isArray(page.items)) throw new Error('热门搜索接口返回的数据格式无效。');
+      setTrendingSearches(page.items.filter((item): item is TrendingSearch =>
+        Boolean(item && typeof item.term === 'string' && item.term.trim() &&
+          typeof item.count === 'number' && Number.isSafeInteger(item.count) &&
+          typeof item.lastSeenAt === 'string'),
+      ).slice(0, 10));
+    } catch (cause) {
+      if (!isCurrent()) return;
+      setTrendingError(cause instanceof Error ? cause.message : '热门搜索暂时无法加载。');
+    } finally {
+      if (isCurrent()) {
+        setTrendingLoading(false);
+        if (trendingAbortRef.current === controller) trendingAbortRef.current = null;
+      }
+    }
+  }, []);
 
   const runContentSearch = useCallback(async (append = false, queryValue?: string) => {
     const query = (queryValue ?? contentInput).trim();
@@ -94,6 +213,8 @@ export default function Search() {
       setContentError('请输入要搜索的内容。');
       return;
     }
+
+    if (!append) rememberSearch(query);
 
     const controller = new AbortController();
     contentAbortRef.current = controller;
@@ -157,7 +278,7 @@ export default function Search() {
         if (contentAbortRef.current === controller) contentAbortRef.current = null;
       }
     }
-  }, [contentCursor, contentInput]);
+  }, [contentCursor, contentInput, rememberSearch]);
 
   const loadTopics = useCallback(async () => {
     const requestId = ++topicsRequestIdRef.current;
@@ -195,6 +316,10 @@ export default function Search() {
   }, [loadTopics]);
 
   useEffect(() => {
+    void loadTrendingSearches();
+  }, [loadTrendingSearches]);
+
+  useEffect(() => {
     return () => {
       contentRequestIdRef.current += 1;
       contentAbortRef.current?.abort();
@@ -202,6 +327,8 @@ export default function Search() {
       userAbortRef.current?.abort();
       topicsRequestIdRef.current += 1;
       topicsAbortRef.current?.abort();
+      trendingRequestIdRef.current += 1;
+      trendingAbortRef.current?.abort();
     };
   }, []);
 
@@ -297,29 +424,69 @@ export default function Search() {
               {contentBusy ? <ActivityIndicator size="small" color="#fff" /> : <Text className="font-bold text-white">搜索</Text>}
             </Pressable>
           </View>
-          {!topicsLoading && !topicsError && topics.length > 0 ? (
-            <View className="mt-4">
-              <Text className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">推荐搜索词</Text>
-              <Text className="mt-1 text-xs text-neutral-500">根据近期公开专题生成，不代表全站搜索量排名。</Text>
-              <View className="mt-3 flex-row flex-wrap">
-                {topics.slice(0, 8).map((topic) => {
-                  const term = (topic.displayName || topic.name).trim();
-                  if (!term) return null;
-                  return (
-                    <Pressable
-                      key={'recommended-search-' + topic.topicId}
-                      accessibilityRole="button"
-                      accessibilityLabel={'搜索 ' + term}
-                      onPress={() => {
-                        setContentInput(term);
-                        void runContentSearch(false, term);
-                      }}
-                      className="mb-2 mr-2 rounded-full bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
-                    >
-                      <Text className="text-sm text-neutral-800 dark:text-neutral-200">{term}</Text>
+          {!contentInput.trim() && !contentSearchSubmitted ? (
+            <View className="mt-5">
+              <View className="mb-5">
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">最近搜索</Text>
+                  {visibleRecentSearches.length > 0 ? (
+                    <Pressable accessibilityRole="button" accessibilityLabel="清空最近搜索" onPress={() => { void clearRecentSearches(); }}>
+                      <Text className="text-xs font-semibold text-sky-600">清空</Text>
                     </Pressable>
-                  );
-                })}
+                  ) : null}
+                </View>
+                {visibleRecentSearches.length > 0 ? (
+                  <View className="mt-3 flex-row flex-wrap">
+                    {visibleRecentSearches.map((term) => (
+                      <View key={'recent-search-' + term} className="mb-2 mr-2 flex-row items-center rounded-full bg-neutral-100 pl-3 pr-1 dark:bg-neutral-900">
+                        <Pressable accessibilityRole="button" accessibilityLabel={'重新搜索 ' + term} onPress={() => { setContentInput(term); void runContentSearch(false, term); }} className="py-2">
+                          <Text className="text-sm text-neutral-800 dark:text-neutral-200">{term}</Text>
+                        </Pressable>
+                        <Pressable accessibilityRole="button" accessibilityLabel={'删除最近搜索 ' + term} onPress={() => { void removeRecentSearch(term); }} className="ml-1 p-2">
+                          <Feather name="x" size={13} color="#6b7280" />
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text className="mt-2 text-xs text-neutral-500">{historyLoading ? '正在读取最近搜索…' : '你的搜索记录会保存在当前账号的本机空间。'}</Text>
+                )}
+                {historyError ? <Text accessibilityRole="alert" className="mt-2 text-xs text-red-600">{historyError}</Text> : null}
+              </View>
+
+              <View className="border-t border-neutral-100 pt-4 dark:border-neutral-800">
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">近期热门搜索</Text>
+                  <Pressable accessibilityRole="button" accessibilityLabel="刷新热门搜索" onPress={() => { void loadTrendingSearches(); }} disabled={trendingLoading} className="p-1">
+                    <Feather name="refresh-cw" size={16} color={PRIMARY} />
+                  </Pressable>
+                </View>
+                <Text className="mt-1 text-xs text-neutral-500">W04 聚合趋势，仅供搜索发现参考。</Text>
+                {trendingLoading ? <ActivityIndicator className="py-4" color={PRIMARY} /> : null}
+                {!trendingLoading && trendingError ? (
+                  <View className="mt-3 flex-row items-center justify-between">
+                    <Text className="flex-1 text-xs text-red-600">{trendingError}</Text>
+                    <Pressable accessibilityRole="button" onPress={() => { void loadTrendingSearches(); }}>
+                      <Text className="ml-3 text-xs font-semibold text-sky-600">重试</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+                {!trendingLoading && !trendingError && trendingSearches.length === 0 ? (
+                  <Text className="py-4 text-xs text-neutral-500">暂时没有达到展示条件的热门搜索。</Text>
+                ) : null}
+                {trendingSearches.map((item, index) => (
+                  <Pressable
+                    key={'trending-search-' + item.term}
+                    accessibilityRole="button"
+                    accessibilityLabel={'搜索热门词 ' + item.term}
+                    onPress={() => { setContentInput(item.term); void runContentSearch(false, item.term); }}
+                    className="flex-row items-center border-b border-neutral-100 py-3 dark:border-neutral-800"
+                  >
+                    <Text className="w-7 text-sm font-bold text-neutral-400">{index + 1}</Text>
+                    <Text className="flex-1 text-sm font-semibold text-neutral-800 dark:text-neutral-200">{item.term}</Text>
+                    <Feather name="trending-up" size={16} color={PRIMARY} />
+                  </Pressable>
+                ))}
               </View>
             </View>
           ) : null}
