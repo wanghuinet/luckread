@@ -7,6 +7,8 @@ import {
 import { NotificationPushWorkflow } from './notification-push-workflow.js'
 import { MessagingRealtimeHub } from './messaging-realtime-hub.js'
 import { dispatchMessagingOutboxBatch, pruneDeliveredMessagingOutbox } from './messaging-outbox.js'
+import { isMessagingMutationRequest } from './messaging-outbox-trigger.js'
+export { isMessagingMutationRequest } from './messaging-outbox-trigger.js'
 
 // Keep Cloudflare's virtual Workflow runtime module in the deploy entry only.
 export { NotificationPushWorkflow, MessagingRealtimeHub }
@@ -14,7 +16,6 @@ export { NotificationPushWorkflow, MessagingRealtimeHub }
 type W05Worker = ReturnType<typeof createW05SocialWorker>
 type W05Env = Parameters<W05Worker['fetch']>[1]
 type W05Context = Parameters<W05Worker['fetch']>[2]
-
 const workers = new WeakMap<object, W05Worker>()
 
 function getWorker(env: W05Env): W05Worker {
@@ -32,7 +33,13 @@ function getWorker(env: W05Env): W05Worker {
 
 export default {
   fetch(request: Request, env: W05Env, ctx: W05Context): Promise<Response> {
-    return getWorker(env).fetch(request, env, ctx)
+    const responsePromise = getWorker(env).fetch(request, env, ctx)
+    if (isMessagingMutationRequest(request)) ctx.waitUntil(responsePromise.then(response => {
+      if (!response.ok) return
+      return dispatchMessagingOutboxBatch(getW05MessagingOutboxDatabase(env), env.MESSAGING_REALTIME_HUB, 5)
+        .then(result => { if (result.retried) console.warn(JSON.stringify({ event: 'w05.messaging.outbox.immediate.retry', ...result })) })
+    }).catch(error => console.error(JSON.stringify({ event: 'w05.messaging.outbox.immediate.failed', errorType: error instanceof Error ? error.name : 'UNKNOWN' }))))
+    return responsePromise
   },
   scheduled(controller: ScheduledController, env: W05Env, ctx: W05Context): void {
     const task = (async () => {
