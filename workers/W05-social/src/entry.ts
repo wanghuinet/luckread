@@ -16,9 +16,7 @@ export { NotificationPushWorkflow, MessagingRealtimeHub }
 type W05Worker = ReturnType<typeof createW05SocialWorker>
 type W05Env = Parameters<W05Worker['fetch']>[1]
 type W05Context = Parameters<W05Worker['fetch']>[2]
-
-
-\nconst workers = new WeakMap<object, W05Worker>()
+const workers = new WeakMap<object, W05Worker>()
 
 function getWorker(env: W05Env): W05Worker {
   const key = env as object
