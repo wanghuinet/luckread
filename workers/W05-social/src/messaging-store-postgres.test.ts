@@ -163,15 +163,16 @@ describe('W05 PostgreSQL messaging store', () => {
       { message_id: 'message-7', conversation_id: 'conversation-1', sender_user_id: 'user-b', sequence: '7', body: 'seven', created_at: '2026-11-21T00:00:07.000Z' },
       { message_id: 'message-6', conversation_id: 'conversation-1', sender_user_id: 'user-a', sequence: '6', body: 'six', created_at: '2026-11-21T00:00:06.000Z' },
     ]
-    const { db } = executor([], [{ rows: [{ member: 1 }] }, { rows }])
+    const { db } = executor([], [{ rows: rows.map(row => ({ ...row, allowed: true, has_message: true })) }])
     const store = createPostgresMessagingStore(db as never)
     const page = await store.listMessages('user-a', 'conversation-1', '9', 2)
     expect(page.items.map(item => item.sequence)).toEqual(['8', '7'])
     expect(page).toMatchObject({ nextCursor: '7', hasMore: true })
+    expect(db.query).toHaveBeenCalledOnce()
     expect(db.query.mock.calls[0]?.[0]).toContain('social_user_interactions')
-    expect(db.query.mock.calls[1]?.[0]).toContain('sequence < $2::bigint')
-    expect(db.query.mock.calls[1]?.[0]).toContain('ORDER BY sequence DESC LIMIT $3')
-    expect(db.query.mock.calls[1]?.[1]).toEqual(['conversation-1', '9', 3])
+    expect(db.query.mock.calls[0]?.[0]).toContain('sequence < $3::bigint')
+    expect(db.query.mock.calls[0]?.[0]).toContain('ORDER BY sequence DESC LIMIT $4')
+    expect(db.query.mock.calls[0]?.[1]).toEqual(['conversation-1', 'user-a', '9', 3])
   })
 
   it('reads only messages after the cursor in ascending sequence order', async () => {
@@ -180,19 +181,28 @@ describe('W05 PostgreSQL messaging store', () => {
       { message_id: 'message-12', conversation_id: 'conversation-1', sender_user_id: 'user-a', sequence: '12', body: 'twelve', created_at: '2026-11-21T00:00:12.000Z' },
       { message_id: 'message-13', conversation_id: 'conversation-1', sender_user_id: 'user-b', sequence: '13', body: 'thirteen', created_at: '2026-11-21T00:00:13.000Z' },
     ]
-    const { db } = executor([], [{ rows: [{ member: 1 }] }, { rows }])
+    const { db } = executor([], [{ rows: rows.map(row => ({ ...row, allowed: true, has_message: true })) }])
     const store = createPostgresMessagingStore(db as never)
     const page = await store.listMessagesAfter('user-a', 'conversation-1', '10', 2)
     expect(page.items.map(item => item.sequence)).toEqual(['11', '12'])
     expect(page).toMatchObject({ nextCursor: '12', hasMore: true })
+    expect(db.query).toHaveBeenCalledOnce()
     expect(db.query.mock.calls[0]?.[0]).toContain('social_user_interactions')
-    expect(db.query.mock.calls[1]?.[0]).toContain('sequence > $2::bigint')
-    expect(db.query.mock.calls[1]?.[0]).toContain('ORDER BY sequence ASC LIMIT $3')
-    expect(db.query.mock.calls[1]?.[1]).toEqual(['conversation-1', '10', 3])
+    expect(db.query.mock.calls[0]?.[0]).toContain('sequence > $3::bigint')
+    expect(db.query.mock.calls[0]?.[0]).toContain('ORDER BY sequence ASC LIMIT $4')
+    expect(db.query.mock.calls[0]?.[1]).toEqual(['conversation-1', 'user-a', '10', 3])
+  })
+
+  it('returns an empty page for an authorized conversation with no messages', async () => {
+    const { db } = executor([], [{ rows: [{ allowed: true, has_message: false }] }])
+    const store = createPostgresMessagingStore(db as never)
+    await expect(store.listMessages('user-a', 'conversation-1', null, 30))
+      .resolves.toEqual({ items: [], nextCursor: null, hasMore: false })
+    expect(db.query).toHaveBeenCalledOnce()
   })
 
   it('denies incremental reads when the actor is not an active member or the peer is blocked', async () => {
-    const { db } = executor([], [{ rows: [] }])
+    const { db } = executor([], [{ rows: [{ allowed: false, has_message: false }] }])
     const store = createPostgresMessagingStore(db as never)
     await expect(store.listMessagesAfter('user-a', 'conversation-1', '0', 30))
       .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
@@ -201,7 +211,7 @@ describe('W05 PostgreSQL messaging store', () => {
   })
 
   it('hides message history when the actor is not an active conversation member', async () => {
-    const { db } = executor([], [{ rows: [] }])
+    const { db } = executor([], [{ rows: [{ allowed: false, has_message: false }] }])
     const store = createPostgresMessagingStore(db as never)
     await expect(store.listMessages('user-outsider', 'conversation-1', null, 30))
       .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
