@@ -32,10 +32,12 @@ interface W11AnalyticsDatabase {
  */
 export interface W11Env {
   D1_05: W11AnalyticsDatabase
+  W11_ANALYTICS_INGEST_ENABLED?: string
 }
 
 export interface W11PostgresEnv {
   W11_POSTGRES: AnalyticsPostgresPool
+  W11_ANALYTICS_INGEST_ENABLED?: string
 }
 
 type W11RuntimeEnv = W11Env | W11PostgresEnv
@@ -221,6 +223,14 @@ async function readBoundedBody(request: Request): Promise<string | null> {
 }
 
 async function ingestClientTelemetry(request: Request, env: W11RuntimeEnv): Promise<Response> {
+  if (env.W11_ANALYTICS_INGEST_ENABLED !== 'true') {
+    return errorResponse(
+      503,
+      'ANALYTICS_INGEST_NOT_ADMITTED',
+      'Analytics ingestion is not currently enabled',
+    )
+  }
+
   const correlationId = request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
   if (
     request.headers.get('X-LuckRead-Caller') !== 'W01' ||
