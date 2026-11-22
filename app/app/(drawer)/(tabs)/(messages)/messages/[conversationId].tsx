@@ -94,20 +94,50 @@ export default function ConversationScreen() {
     if (!conversationId || !isFocused || appState !== 'active') return;
     return connectMessagingRealtime({
       conversationId,
-      onEvent: () => {
+      onState: (state) => {
+        if (state !== 'connected') return;
+        void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+      },
+      onEvent: (event) => {
+        if (!event || typeof event !== 'object') return;
+        const realtimeEvent = event as { type?: unknown; payload?: { activeUserIds?: unknown } };
+        if (realtimeEvent.type === 'typing.changed' && Array.isArray(realtimeEvent.payload?.activeUserIds)) {
+          queryClient.setQueryData(['messaging', 'typing', conversationId], {
+            activeUserIds: realtimeEvent.payload.activeUserIds.filter((id): id is string => typeof id === 'string'),
+          });
+          return;
+        }
         void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
         void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
         void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
         void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
-        void queryClient.invalidateQueries({ queryKey: ['messaging', 'typing', conversationId] });
       },
     });
   }, [conversationId, isFocused, appState, queryClient]);
   const pendingSend = useRef<{ fingerprint: string; key: string } | null>(null);
   const sendMutationPendingRef = useRef(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stopTyping = useCallback(() => { if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = null; void setConversationTyping(conversationId, false).catch(() => undefined); }, [conversationId]);
-  const handleDraftChange = useCallback((value: string) => { setDraft(value); if (value.trim()) { void setConversationTyping(conversationId, true).catch(() => undefined); if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = setTimeout(stopTyping, 1800); } else stopTyping(); }, [conversationId, stopTyping]);
+  const typingActiveRef = useRef(false);
+  const stopTyping = useCallback(() => {
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = null;
+    if (!typingActiveRef.current) return;
+    typingActiveRef.current = false;
+    void setConversationTyping(conversationId, false).catch(() => undefined);
+  }, [conversationId]);
+  const handleDraftChange = useCallback((value: string) => {
+    setDraft(value);
+    if (!value.trim()) { stopTyping(); return; }
+    if (!typingActiveRef.current) {
+      typingActiveRef.current = true;
+      void setConversationTyping(conversationId, true).catch(() => undefined);
+    }
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(stopTyping, 1800);
+  }, [conversationId, stopTyping]);
   useEffect(() => () => stopTyping(), [stopTyping]);
   const messagesQuery = useInfiniteQuery({
     queryKey: ['messaging', 'messages', conversationId],
@@ -118,8 +148,8 @@ export default function ConversationScreen() {
     staleTime: 15_000,
   });
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
-  const membersQuery = useQuery({ queryKey: ['messaging', 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal), enabled: Boolean(conversationId) && params.conversationType !== 'group', refetchInterval: isFocused && appState === 'active' ? 8_000 : false });
-  const typingQuery = useQuery({ queryKey: ['messaging', 'typing', conversationId], queryFn: ({ signal }) => fetchConversationTyping(conversationId, signal), enabled: Boolean(conversationId) && isFocused && appState === 'active', refetchInterval: isFocused && appState === 'active' ? 4000 : false, refetchIntervalInBackground: false, staleTime: 1000 });
+  const membersQuery = useQuery({ queryKey: ['messaging', 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal), enabled: Boolean(conversationId) && params.conversationType !== 'group', staleTime: 60_000 });
+  const typingQuery = useQuery({ queryKey: ['messaging', 'typing', conversationId], queryFn: ({ signal }) => fetchConversationTyping(conversationId, signal), enabled: Boolean(conversationId) && isFocused && appState === 'active', staleTime: Infinity });
   const peerTyping = typingQuery.data?.activeUserIds.some(id => id !== userId) ?? false;
   const latestOwnMessage = messages.filter(message => message.sender_user_id === userId && !message.recalled_at).reduce((latest, message) => compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const peerReadSequence = membersQuery.data?.find(member => member.user_id !== userId)?.last_read_sequence ?? '0';
@@ -171,9 +201,7 @@ export default function ConversationScreen() {
     queryKey: ['messaging', 'messages-after', conversationId, latestSequence],
     queryFn: ({ signal }) => fetchMessagesAfter(conversationId, latestSequence, signal),
     enabled: Boolean(conversationId) && messagesQuery.isSuccess && isFocused && appState === 'active',
-    refetchInterval: isFocused && appState === 'active' ? 4_000 : false,
-    refetchIntervalInBackground: false,
-    staleTime: 0,
+    staleTime: Infinity,
   });
   useEffect(() => {
     const incoming = incrementalQuery.data?.items ?? [];
@@ -200,9 +228,7 @@ export default function ConversationScreen() {
     queryKey: ['messaging', 'latest-messages-refresh', conversationId],
     queryFn: ({ signal }) => fetchMessages(conversationId, null, signal),
     enabled: Boolean(conversationId) && messagesQuery.isSuccess && isFocused && appState === 'active',
-    refetchInterval: isFocused && appState === 'active' ? 15_000 : false,
-    refetchIntervalInBackground: false,
-    staleTime: 0,
+    staleTime: Infinity,
   });
   useEffect(() => {
     const refreshed = latestMessagesRefresh.data?.items ?? [];
