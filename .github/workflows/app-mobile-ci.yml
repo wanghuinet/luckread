@@ -214,6 +214,8 @@ jobs:
         run: bun run test:social-screen-api
       - name: Test native subscription management API
         run: bun run test:subscriptions-api
+      - name: Test native creator studio application and membership plan workflows
+        run: bun run test:creator-studio
       - name: Test native paid-content entitlement and paywall closure
         run: bun run test:paid-content
       - name: Test native billing history and refunds API

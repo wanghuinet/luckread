@@ -330,7 +330,7 @@ function CustomDrawerContent(props: any) {
         />
         <DrawerMenuItem icon="list" label="列表" onPress={() => showUnavailable('列表')} isDark={isDark} />
         <DrawerMenuItem icon="mic" label="空间" onPress={() => showUnavailable('空间')} isDark={isDark} />
-        <DrawerMenuItem icon="edit-3" label="创作者工作室" onPress={() => showUnavailable('创作者工作室')} isDark={isDark} />
+        <DrawerMenuItem icon="edit-3" label="创作者工作室" onPress={() => router.push('/creator-studio' as never)} isDark={isDark} />
       </DrawerContentScrollView>
 
       <View
