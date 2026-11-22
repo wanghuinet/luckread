@@ -55,23 +55,33 @@ export class MessagingRealtimeHub {
       });
       if (!reserved) return Response.json({ broadcast: false, duplicate: true });
 
-      // Membership mutations revoke the removed member's existing room socket, not just future API access.
-      if (input.type === 'group.member.removed') {
-        const payload = input.payload as { memberUserId?: unknown; membershipVersion?: unknown };
-        if (typeof payload.memberUserId !== 'string' || !USER_ID.test(payload.memberUserId) ||
-          !Number.isSafeInteger(payload.membershipVersion) || (payload.membershipVersion as number) < 1) {
-          return new Response('Invalid event payload', { status: 422 });
+      try {
+        // Membership mutations revoke the removed member's existing room socket, not just future API access.
+        if (input.type === 'group.member.removed') {
+          const payload = input.payload as { memberUserId?: unknown; membershipVersion?: unknown };
+          if (typeof payload.memberUserId !== 'string' || !USER_ID.test(payload.memberUserId) ||
+            !Number.isSafeInteger(payload.membershipVersion) || (payload.membershipVersion as number) < 1) {
+            // Release the reservation for malformed payloads; validation must not poison the event ID.
+            await this.releaseEventReceipt(input.eventId as string);
+            return new Response('Invalid event payload', { status: 422 });
+          }
+          await this.revokeUser(payload.memberUserId, payload.membershipVersion as number);
+        } else if (input.type === 'group.member.left') {
+          const payload = input.payload as { membershipVersion?: unknown };
+          if (!Number.isSafeInteger(payload.membershipVersion) || (payload.membershipVersion as number) < 1) {
+            await this.releaseEventReceipt(input.eventId as string);
+            return new Response('Invalid event payload', { status: 422 });
+          }
+          await this.revokeUser(actor, payload.membershipVersion as number);
         }
-        await this.revokeUser(payload.memberUserId, payload.membershipVersion as number);
-      } else if (input.type === 'group.member.left') {
-        const payload = input.payload as { membershipVersion?: unknown };
-        if (!Number.isSafeInteger(payload.membershipVersion) || (payload.membershipVersion as number) < 1) {
-          return new Response('Invalid event payload', { status: 422 });
-        }
-        await this.revokeUser(actor, payload.membershipVersion as number);
+        const failedSockets = this.broadcast(encoded);
+        if (failedSockets > 0) throw new Error(`Realtime broadcast failed for ${failedSockets} socket(s)`);
+        return Response.json({ broadcast: true });
+      } catch (error) {
+        // Failed side effects must not permanently suppress the Outbox retry.
+        await this.releaseEventReceipt(input.eventId as string);
+        return new Response('Realtime delivery failed', { status: 503 });
       }
-      this.broadcast(encoded);
-      return Response.json({ broadcast: true });
     }
     if (pathname.endsWith('/snapshot')) {
       if (request.method !== 'GET') return new Response('Method Not Allowed', { status: 405 });
@@ -197,12 +207,22 @@ export class MessagingRealtimeHub {
     }
   }
 
-  private broadcast(event: unknown): void {
+  private broadcast(event: unknown): number {
     const payload = typeof event === 'string' ? event : JSON.stringify(event);
+    let failures = 0;
     for (const socket of this.state.getWebSockets()) {
       try { socket.send(payload); }
-      catch { try { socket.close(1011, 'Realtime delivery failed'); } catch { /* already closed */ } }
+      catch { failures++; try { socket.close(1011, 'Realtime delivery failed'); } catch { /* already closed */ } }
     }
+    return failures;
+  }
+
+  private async releaseEventReceipt(eventId: string): Promise<void> {
+    await this.state.storage.transaction(async transaction => {
+      const receipts = (await transaction.get<Record<string, number>>(EVENT_DEDUPE_KEY)) ?? {};
+      delete receipts[eventId];
+      await transaction.put(EVENT_DEDUPE_KEY, receipts);
+    });
   }
 
   private async readTypingState(): Promise<TypingState> {
