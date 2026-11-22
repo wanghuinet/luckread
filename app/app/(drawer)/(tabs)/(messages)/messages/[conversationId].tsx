@@ -65,6 +65,9 @@ function PrivateMessageImages({ currentMessage }: { currentMessage: IMessage }) 
 const compareSequence = (left: string, right: string) =>
   left.length === right.length ? left.localeCompare(right) : left.length - right.length;
 
+// Keep realtime/incremental inserts from growing the newest history page indefinitely.
+const MAX_LIVE_CACHE_PAGE_ITEMS = 100;
+
 export default function ConversationScreen() {
   const params = useLocalSearchParams<{ conversationId: string; participantName?: string; conversationType?: string; groupName?: string }>();
   const conversationId = Array.isArray(params.conversationId) ? params.conversationId[0] : params.conversationId;
@@ -138,6 +141,14 @@ export default function ConversationScreen() {
               const knownMessages = cached.pages.flatMap((page) => page.items);
               const knownCursor = knownMessages.reduce((latest, item) => compareSequence(item.sequence, latest) > 0 ? item.sequence : latest, '0');
               const knownIds = new Set(knownMessages.map((item) => item.message_id));
+              if (!knownIds.has(message.message_id) &&
+                cached.pages[0] && cached.pages[0].items.length >= MAX_LIVE_CACHE_PAGE_ITEMS) {
+                // Let the persisted history query rebuild a bounded page instead of
+                // retaining every live event in the first infinite-query page.
+                void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
+                void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+                return;
+              }
               if (!knownIds.has(message.message_id) && /^\d+$/.test(message.sequence) && /^\d+$/.test(knownCursor) && knownCursor !== '0') {
                 const eventSequence = BigInt(message.sequence);
                 const cursorSequence = BigInt(knownCursor);
@@ -325,6 +336,7 @@ export default function ConversationScreen() {
       ...(continuationQuery.data?.items ?? []),
     ];
     if (!incoming.length) return;
+    let cachePageOverflow = false;
     queryClient.setQueryData<typeof messagesQuery.data>(
       ['messaging', 'messages', conversationId],
       (current) => {
@@ -334,6 +346,10 @@ export default function ConversationScreen() {
         if (!additions.length) return current;
         const pages = [...current.pages];
         const firstPage = pages[0];
+        if (firstPage && firstPage.items.length + additions.length > MAX_LIVE_CACHE_PAGE_ITEMS) {
+          cachePageOverflow = true;
+          return current;
+        }
         if (firstPage) {
           pages[0] = { ...firstPage, items: [...firstPage.items, ...additions].sort((left, right) =>
             compareSequence(right.sequence, left.sequence)) };
@@ -341,6 +357,12 @@ export default function ConversationScreen() {
         return { ...current, pages };
       },
     );
+    if (cachePageOverflow) {
+      // Neon is authoritative; rebuild bounded history pages rather than growing
+      // one cache page by thousands of messages after a long offline interval.
+      void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+    }
   }, [incrementalQuery.data, continuationQuery.data, conversationId, queryClient]);
 
 
