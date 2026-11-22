@@ -128,11 +128,22 @@ export default function ConversationScreen() {
               const cached = queryClient.getQueryData<typeof messagesQuery.data>(['messaging', 'messages', conversationId]);
               const knownMessages = cached?.pages.flatMap((page) => page.items) ?? [];
               const knownCursor = knownMessages.reduce((latest, item) => compareSequence(item.sequence, latest) > 0 ? item.sequence : latest, '0');
-              if (/^\\d+$/.test(message.sequence) && /^\\d+$/.test(knownCursor) && knownCursor !== '0' && BigInt(message.sequence) > BigInt(knownCursor) + 1n) {
-                // Do not advance the visible cache cursor past an unseen sequence. Fetch the missing prefix first.
-                void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
-                void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
-                return;
+              const knownIds = new Set(knownMessages.map((item) => item.message_id));
+              if (!knownIds.has(message.message_id) && /^\\d+$/.test(message.sequence) && /^\\d+$/.test(knownCursor) && knownCursor !== '0') {
+                const eventSequence = BigInt(message.sequence);
+                const cursorSequence = BigInt(knownCursor);
+                if (eventSequence > cursorSequence + 1n) {
+                  // A forward gap: recover from the existing cursor without prematurely inserting the event.
+                  void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
+                  void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+                  return;
+                }
+                if (eventSequence <= cursorSequence) {
+                  // Late delivery of a missing older event: refresh loaded history pages, not the advanced cursor.
+                  void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
+                  void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+                  return;
+                }
               }
             }
             queryClient.setQueryData<typeof messagesQuery.data>(
