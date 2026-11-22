@@ -1,4 +1,4 @@
-export interface MessagingOutboxRow {
+export interface MessagingOutboxRow extends Record<string, unknown> {
   event_id: string
   conversation_id: string
   actor_user_id: string
