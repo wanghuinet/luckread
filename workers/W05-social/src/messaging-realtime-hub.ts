@@ -125,9 +125,8 @@ export class MessagingRealtimeHub {
     if (!this.isMembershipVersionActive(membershipVersion, revokedVersion)) {
       return new Response('Conversation membership revoked', { status: 403 });
     }
-    if (revokedVersion !== undefined && membershipVersion > (revokedVersion as number)) {
-      await this.state.storage.delete(revocationKey);
-    }
+    // Keep the highest revoked version as a durable fence even after rejoin.
+    // Clearing it here could let an older socket become active again if close() failed.
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
