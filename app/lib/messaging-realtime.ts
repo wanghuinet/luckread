@@ -3,7 +3,7 @@ import { getApiAuthHeaders, getApiBaseUrl } from './api-client';
 type RealtimeOptions = {
   conversationId: string;
   onEvent?: (event: unknown) => void;
-  onState?: (state: 'connecting' | 'connected' | 'disconnected') => void;
+  onState?: (state: 'connecting' | 'connected' | 'disconnected' | 'revoked') => void;
 };
 
 const activeSockets = new Map<string, WebSocket>();
@@ -53,9 +53,15 @@ export function connectMessagingRealtime({ conversationId, onEvent, onState }: R
         try { onEvent?.(JSON.parse(message.data)); } catch { /* Ignore malformed frames. */ }
       };
       candidate.onerror = () => { /* onclose owns the single reconnect path */ };
-      candidate.onclose = () => {
+      candidate.onclose = (event) => {
         if (activeSockets.get(conversationId) === candidate) activeSockets.delete(conversationId);
         if (socket === candidate) socket = null;
+        if (event.code === 4003) {
+          stopped = true;
+          clearReconnect();
+          onState?.('revoked');
+          return;
+        }
         scheduleReconnect();
       };
     } catch { scheduleReconnect(); }
