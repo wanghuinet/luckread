@@ -74,20 +74,6 @@ export default function ConversationScreen() {
   const userId = user?.id;
   const [draft, setDraft] = useState('');
   const [senderProfiles, setSenderProfiles] = useState<Record<string, { displayName?: string | null; username?: string }>>({});
-  useEffect(() => {
-    if (params.conversationType !== 'group') return;
-    const senderIds = Array.from(new Set(messages.map(message => message.sender_user_id).filter(id => id && id !== userId)));
-    let active = true;
-    void Promise.all(senderIds.map(async id => [id, await resolvePublicProfileById(id)] as const)).then(results => {
-      if (!active) return;
-      setSenderProfiles(current => {
-        const next = { ...current };
-        for (const [id, profile] of results) if (profile) next[id] = profile;
-        return next;
-      });
-    });
-    return () => { active = false; };
-  }, [messages, params.conversationType, userId]);
   const [editTarget, setEditTarget] = useState<{ messageId: string; body: string } | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
@@ -113,6 +99,20 @@ export default function ConversationScreen() {
     staleTime: 15_000,
   });
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
+  useEffect(() => {
+    if (params.conversationType !== 'group') return;
+    const senderIds = Array.from(new Set(messages.map(message => message.sender_user_id).filter(id => id && id !== userId)));
+    let active = true;
+    void Promise.all(senderIds.map(async id => [id, await resolvePublicProfileById(id)] as const)).then(results => {
+      if (!active) return;
+      setSenderProfiles(current => {
+        const next = { ...current };
+        for (const [id, profile] of results) if (profile) next[id] = profile;
+        return next;
+      });
+    });
+    return () => { active = false; };
+  }, [messages, params.conversationType, userId]);
   const chatMessages = useMemo<IMessage[]>(() => messages.map((message) => {
     const attachments = message.attachments ?? [];
     const imageUrls = attachments
