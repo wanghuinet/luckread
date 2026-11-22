@@ -105,7 +105,9 @@ export default function ConversationScreen() {
   });
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
   const membersQuery = useQuery({ queryKey: ['messaging', 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal), enabled: Boolean(conversationId) && params.conversationType !== 'group', refetchInterval: isFocused && appState === 'active' ? 8_000 : false });
-  const typingQuery = useQuery({ queryKey: ['messaging', 'typing', conversationId], queryFn: ({ signal }) => fetchConversationTyping(conversationId, signal), enabled: Boolean(conversationId) && isFocused && appState === 'active', refetchInterval: isFocused && appState === 'active' ? 2500 : false, refetchIntervalInBackground: false });\n  const peerTyping = typingQuery.data?.activeUserIds.some(id => id !== userId) ?? false;\n  const latestOwnMessage = messages.filter(message => message.sender_user_id === userId && !message.recalled_at).reduce((latest, message) => compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
+  const typingQuery = useQuery({ queryKey: ['messaging', 'typing', conversationId], queryFn: ({ signal }) => fetchConversationTyping(conversationId, signal), enabled: Boolean(conversationId) && isFocused && appState === 'active', refetchInterval: isFocused && appState === 'active' ? 2500 : false, refetchIntervalInBackground: false });
+  const peerTyping = typingQuery.data?.activeUserIds.some(id => id !== userId) ?? false;
+  const latestOwnMessage = messages.filter(message => message.sender_user_id === userId && !message.recalled_at).reduce((latest, message) => compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const peerReadSequence = membersQuery.data?.find(member => member.user_id !== userId)?.last_read_sequence ?? '0';
   const lastOwnMessageIsRead = latestOwnMessage !== '0' && compareSequence(peerReadSequence, latestOwnMessage) >= 0;
   useEffect(() => {
@@ -139,7 +141,8 @@ export default function ConversationScreen() {
             message.body,
             ...attachments.filter((attachment) => !attachment.mimeType.startsWith('image/'))
               .map((attachment) => '📎 ' + attachment.filename),
-          ].filter(Boolean).join('\n') + (message.edited_at ? '  （已编辑）' : ''),
+          ].filter(Boolean).join('
+') + (message.edited_at ? '  （已编辑）' : ''),
       ...(!message.recalled_at && imageUrls.length ? { image: JSON.stringify(imageUrls) } : {}),
       createdAt: new Date(message.created_at),
       user: {
@@ -282,7 +285,8 @@ export default function ConversationScreen() {
     onSuccess: async (sentMessage, variables) => {
       sendMutationPendingRef.current = false;
       pendingSend.current = null;
-      setDraft((current) => current.trim() === variables.body ? '' : current);\n      stopTyping();
+      setDraft((current) => current.trim() === variables.body ? '' : current);
+      stopTyping();
       setPendingAttachments([]);
       queryClient.setQueryData<typeof messagesQuery.data>(
         ['messaging', 'messages', conversationId],
