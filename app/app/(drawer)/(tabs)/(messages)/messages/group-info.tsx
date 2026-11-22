@@ -122,7 +122,7 @@ export default function GroupInfoScreen() {
         <Pressable disabled={!selected.length || addMutation.isPending} onPress={() => addMutation.mutate()} className="mt-3 items-center rounded-full bg-sky-500 py-3 disabled:opacity-50">{addMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text className="font-semibold text-white">添加所选成员</Text>}</Pressable>
         <Text className="mt-2 text-xs text-neutral-500">从关注列表选择。仅群主可添加；服务器仍会校验私信联系关系、群屏蔽策略和人数上限。</Text>
       </View> : null}
-      {<Pressable disabled={leaveMutation.isPending} onPress={() => Alert.alert('退出群聊', owner ? '退出前必须先移交群主身份。确定退出？' : '退出后将不再接收群聊消息。确定退出？', [{text:'取消',style:'cancel'},{text:'退出',style:'destructive',onPress:()=>leaveMutation.mutate()}])} className="mt-8 items-center rounded-full border border-red-300 py-3"><Text className="font-semibold text-red-500">退出群聊</Text></Pressable>}
+      {owner ? <Text className="mt-6 text-sm text-neutral-500">请先移交群主身份，之后即可退出群聊。</Text> : <Pressable disabled={leaveMutation.isPending} onPress={() => Alert.alert('退出群聊', '退出后将不再接收群聊消息。确定退出？', [{text:'取消',style:'cancel'},{text:'退出',style:'destructive',onPress:()=>leaveMutation.mutate()}])} className="mt-8 items-center rounded-full border border-red-300 py-3"><Text className="font-semibold text-red-500">退出群聊</Text></Pressable>}
     </ScrollView>
   </View>;
 }
