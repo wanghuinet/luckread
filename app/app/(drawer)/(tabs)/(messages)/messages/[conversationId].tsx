@@ -105,7 +105,7 @@ export default function ConversationScreen() {
   });
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
   const membersQuery = useQuery({ queryKey: ['messaging', 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal), enabled: Boolean(conversationId) && params.conversationType !== 'group', refetchInterval: isFocused && appState === 'active' ? 8_000 : false });
-  const typingQuery = useQuery({ queryKey: ['messaging', 'typing', conversationId], queryFn: ({ signal }) => fetchConversationTyping(conversationId, signal), enabled: Boolean(conversationId) && isFocused && appState === 'active', refetchInterval: isFocused && appState === 'active' ? 2500 : false, refetchIntervalInBackground: false });
+  const typingQuery = useQuery({ queryKey: ['messaging', 'typing', conversationId], queryFn: ({ signal }) => fetchConversationTyping(conversationId, signal), enabled: Boolean(conversationId) && isFocused && appState === 'active', refetchInterval: isFocused && appState === 'active' ? 4000 : false, refetchIntervalInBackground: false, staleTime: 1000 });
   const peerTyping = typingQuery.data?.activeUserIds.some(id => id !== userId) ?? false;
   const latestOwnMessage = messages.filter(message => message.sender_user_id === userId && !message.recalled_at).reduce((latest, message) => compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const peerReadSequence = membersQuery.data?.find(member => member.user_id !== userId)?.last_read_sequence ?? '0';
@@ -387,7 +387,7 @@ export default function ConversationScreen() {
           <Feather name="refresh-cw" size={18} color="#1d9bf0" />
         </Pressable>
       </View>
-      {peerTyping ? <Text className="px-4 py-1 text-xs text-sky-500">对方正在输入…</Text> : null}
+      {peerTyping ? <Text className="px-4 py-1 text-xs text-sky-500">{params.conversationType === 'group' ? '有人正在输入…' : '对方正在输入…'}</Text> : null}
       {pendingAttachments.length > 0 ? (
         <View className="border-b border-neutral-100 px-3 py-2 dark:border-neutral-800">
           {pendingAttachments.map((item) => (
