@@ -127,7 +127,15 @@ export default function ConversationScreen() {
             typeof message.body === 'string' && typeof message.created_at === 'string') {
             if (realtimeEvent.type === 'message.created') {
               const cached = queryClient.getQueryData<typeof messagesQuery.data>(['messaging', 'messages', conversationId]);
-              const knownMessages = cached?.pages.flatMap((page) => page.items) ?? [];
+              if (!cached?.pages.length) {
+                // An event can race the first history request before its cache exists.
+                // Force a fresh read so the in-flight snapshot cannot hide this message.
+                void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
+                void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
+                void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+                return;
+              }
+              const knownMessages = cached.pages.flatMap((page) => page.items);
               const knownCursor = knownMessages.reduce((latest, item) => compareSequence(item.sequence, latest) > 0 ? item.sequence : latest, '0');
               const knownIds = new Set(knownMessages.map((item) => item.message_id));
               if (!knownIds.has(message.message_id) && /^\d+$/.test(message.sequence) && /^\d+$/.test(knownCursor) && knownCursor !== '0') {
