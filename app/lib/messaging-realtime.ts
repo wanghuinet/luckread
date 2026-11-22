@@ -37,8 +37,10 @@ export function connectMessagingRealtime({ conversationId, onEvent, onState }: R
       if (stopped) return;
       const base = getApiBaseUrl().replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
       const url = base + '/v1/conversations/' + encodeURIComponent(conversationId) + '/realtime';
-      // React Native's WebSocket implementation accepts custom headers in its third argument.
-      const candidate = new WebSocket(url, undefined, { headers } as never);
+      // React Native's WebSocket implementation accepts an options argument for headers;
+      // its DOM TypeScript declaration does not expose this native overload.
+      const NativeWebSocket = WebSocket as unknown as new (url: string, protocols?: string | string[], options?: { headers: Record<string, string> }) => WebSocket;
+      const candidate = new NativeWebSocket(url, undefined, { headers });
       socket = candidate;
       candidate.onopen = () => {
         if (stopped || socket !== candidate) return;
