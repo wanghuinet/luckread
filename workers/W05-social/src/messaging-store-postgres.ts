@@ -128,7 +128,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
           [conversationId, actorUserId])
         if (!allowed.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
         const result = await db.query<any>(
-          `SELECT user_id, member_role, last_read_sequence::text AS last_read_sequence,
+          `SELECT user_id, member_role, last_read_sequence::text AS last_read_sequence, membership_version::text AS membership_version,
                   to_char(joined_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS joined_at
              FROM social_conversation_memberships
             WHERE conversation_id = $1 AND left_at IS NULL
@@ -206,7 +206,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
     async removeGroupMember(actorUserId, conversationId, memberUserId) {
       if (!validId(conversationId) || !validId(memberUserId) || actorUserId === memberUserId) throw new MessagingStoreError('VALIDATION_FAILED', 422)
       try {
-        await withActorTransaction(db, actorUserId, async client => {
+        return await withActorTransaction(db, actorUserId, async client => {
           const group = await client.query(
             `SELECT c.conversation_id FROM social_conversations c
               JOIN social_conversation_memberships owner
@@ -216,13 +216,15 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
              FOR UPDATE OF c`,
             [conversationId, actorUserId])
           if (!group.rows.length) throw new MessagingStoreError('PERMISSION_DENIED', 403)
-          const removed = await client.query(
+          const removed = await client.query<{ membership_version: string }>(
             `UPDATE social_conversation_memberships
                 SET left_at = CURRENT_TIMESTAMP
-              WHERE conversation_id = $1 AND user_id = $2 AND member_role <> 'owner' AND left_at IS NULL`,
+              WHERE conversation_id = $1 AND user_id = $2 AND member_role <> 'owner' AND left_at IS NULL
+              RETURNING membership_version::text AS membership_version`,
             [conversationId, memberUserId])
-          if (!removed.rowCount) throw new MessagingStoreError('NOT_FOUND', 404)
+          if (!removed.rows[0]) throw new MessagingStoreError('NOT_FOUND', 404)
           await client.query('UPDATE social_conversations SET updated_at = CURRENT_TIMESTAMP WHERE conversation_id = $1', [conversationId])
+          return { membershipVersion: removed.rows[0].membership_version }
         })
       } catch (error) {
         if (error instanceof MessagingStoreError) throw error
@@ -261,7 +263,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
     async leaveGroupConversation(actorUserId, conversationId) {
       if (!validId(conversationId)) throw new MessagingStoreError('VALIDATION_FAILED', 422)
       try {
-        await withActorTransaction(db, actorUserId, async client => {
+        return await withActorTransaction(db, actorUserId, async client => {
           const member = await client.query<{ member_role: string }>(
             `SELECT m.member_role FROM social_conversation_memberships m
               JOIN social_conversations c ON c.conversation_id = m.conversation_id
@@ -271,11 +273,14 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
             [conversationId, actorUserId])
           if (!member.rows[0]) throw new MessagingStoreError('NOT_FOUND', 404)
           if (member.rows[0].member_role === 'owner') throw new MessagingStoreError('GROUP_OWNER_CANNOT_LEAVE', 409)
-          await client.query(
+          const left = await client.query<{ membership_version: string }>(
             `UPDATE social_conversation_memberships SET left_at = CURRENT_TIMESTAMP
-              WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL`,
+              WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL
+              RETURNING membership_version::text AS membership_version`,
             [conversationId, actorUserId])
+          if (!left.rows[0]) throw new MessagingStoreError('NOT_FOUND', 404)
           await client.query('UPDATE social_conversations SET updated_at = CURRENT_TIMESTAMP WHERE conversation_id = $1', [conversationId])
+          return { membershipVersion: left.rows[0].membership_version }
         })
       } catch (error) {
         if (error instanceof MessagingStoreError) throw error
