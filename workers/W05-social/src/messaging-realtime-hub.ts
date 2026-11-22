@@ -6,6 +6,9 @@ type SocketAttachment = { userId: string; membershipVersion: number };
 const USER_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const TYPING_TTL_MS = 5_000;
 const MAX_FRAME_BYTES = 1_024;
+const EVENT_DEDUPE_KEY = 'messaging-event-dedupe';
+const EVENT_DEDUPE_TTL_MS = 24 * 60 * 60 * 1_000;
+const EVENT_DEDUPE_MAX = 2_048;
 
 export class MessagingRealtimeHub {
   constructor(private readonly state: DurableObjectState) {}
@@ -34,6 +37,17 @@ export class MessagingRealtimeHub {
       const encoded = JSON.stringify(input);
       if (encoded.length > 64 * 1024) return new Response('Event too large', { status: 413 });
 
+      // Outbox delivery is at-least-once. Keep a bounded, durable receipt set so an
+      // immediate delivery and a later scheduled retry share one idempotency fence.
+      const now = Date.now();
+      const receipts = (await this.state.storage.get<Record<string, number>>(EVENT_DEDUPE_KEY)) ?? {};
+      for (const [eventId, expiresAt] of Object.entries(receipts)) {
+        if (!Number.isFinite(expiresAt) || expiresAt <= now) delete receipts[eventId];
+      }
+      if (Object.prototype.hasOwnProperty.call(receipts, input.eventId)) {
+        return Response.json({ broadcast: false, duplicate: true });
+      }
+
       // Membership mutations revoke the removed member's existing room socket, not just future API access.
       if (input.type === 'group.member.removed') {
         const payload = input.payload as { memberUserId?: unknown; membershipVersion?: unknown };
@@ -50,6 +64,11 @@ export class MessagingRealtimeHub {
         await this.revokeUser(actor, payload.membershipVersion as number);
       }
       this.broadcast(encoded);
+      receipts[input.eventId as string] = now + EVENT_DEDUPE_TTL_MS;
+      const entries = Object.entries(receipts)
+        .sort((left, right) => left[1] - right[1])
+        .slice(-EVENT_DEDUPE_MAX);
+      await this.state.storage.put(EVENT_DEDUPE_KEY, Object.fromEntries(entries));
       return Response.json({ broadcast: true });
     }
     if (pathname.endsWith('/snapshot')) {
