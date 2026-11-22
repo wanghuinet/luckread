@@ -68,7 +68,6 @@ try {
   const fixtureClient = await pool.connect()
   try {
     await fixtureClient.query('BEGIN')
-  try {
     await fixtureClient.query(
       "INSERT INTO social_conversations (conversation_id, conversation_type, direct_pair_key, created_by_user_id, last_sequence, created_at, updated_at) VALUES ('outbox-conversation', 'direct', 'outbox-a:outbox-b', 'outbox-a', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
     )
