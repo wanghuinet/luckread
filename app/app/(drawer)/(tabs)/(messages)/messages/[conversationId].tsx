@@ -387,6 +387,7 @@ export default function ConversationScreen() {
           <Feather name="refresh-cw" size={18} color="#1d9bf0" />
         </Pressable>
       </View>
+      {peerTyping ? <Text className="px-4 py-1 text-xs text-sky-500">对方正在输入…</Text> : null}
       {pendingAttachments.length > 0 ? (
         <View className="border-b border-neutral-100 px-3 py-2 dark:border-neutral-800">
           {pendingAttachments.map((item) => (
