@@ -4,6 +4,9 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-14",
   "workers_dev": false,
+  "vars": {
+    "W11_ANALYTICS_INGEST_ENABLED": "false"
+  },
   "observability": {
     "enabled": true,
     "logs": {
