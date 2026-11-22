@@ -164,3 +164,16 @@ P0 必须验证：通知列表、已读状态、偏好控制、1:1 消息、群�
 必须完成 Data/API/Event/Permission/Security/Privacy/Risk/Test/Recovery/Performance/Observability/CI/User Acceptance 全链路证据。
 
 当前：**IMPLEMENTATION PENDING**。
+
+
+---
+
+## 17. 当前私信实现状态与后续契约优先级（2026-11-22）
+
+**重要：本文早期架构段落包含 D1 作为消息权威存储、旧版实时能力边界及 IMPLEMENTATION PENDING 状态，属于历史设计基线，不再代表当前私信实现状态。**
+
+自 D1 → Neon 迁移及后续私信开发以来，当前消息权威存储以 Neon PostgreSQL 为准；Cloudflare Workers/DO 承担 API 与实时连接协调，R2 承担附件对象存储。本文与以下当前契约冲突时，以新契约为准：
+
+- `docs/208-MESSAGING-PRODUCTION-RELIABILITY-PERFORMANCE-COST-CONTRACT-v1.0.md`
+
+后续所有私信功能、性能、实时、成本、可靠性、安全、App 体验、测试与验收工作必须遵守该契约。不得根据本文旧版 D1 路线恢复 D1，不得把历史阶段的“IMPLEMENTATION PENDING”误认为当前功能状态，也不得仅凭 PR 创建宣称实现完成。具体已实现范围必须以当前 main 代码、CI 与测试证据为准。
