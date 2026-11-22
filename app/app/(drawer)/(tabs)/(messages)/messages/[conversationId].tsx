@@ -482,7 +482,15 @@ export default function ConversationScreen() {
           ...current,
           pages: current.pages.map((page) => ({
             ...page,
-            items: page.items.map((item) => item.message_id === updated.message_id ? updated : item),
+            items: page.items.map((item) => {
+              if (item.message_id !== updated.message_id) return item;
+              // Keep recalled state terminal and reject mutation responses older than cached edits.
+              if (item.recalled_at && !updated.recalled_at) return item;
+              const cachedEditedAt = item.edited_at ?? null;
+              const responseEditedAt = updated.edited_at ?? null;
+              if (cachedEditedAt && (!responseEditedAt || responseEditedAt < cachedEditedAt)) return item;
+              return { ...item, ...updated };
+            }),
           })),
         };
       },
