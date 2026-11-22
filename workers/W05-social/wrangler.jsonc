@@ -42,9 +42,21 @@
     "W05_PUSH_ENDPOINT_DATABASE_DRIVER": "neon"
   },
   "durable_objects": {
-    "bindings": [{ "name": "MESSAGING_REALTIME_HUB", "class_name": "MessagingRealtimeHub" }]
+    "bindings": [
+      {
+        "name": "MESSAGING_REALTIME_HUB",
+        "class_name": "MessagingRealtimeHub"
+      }
+    ]
   },
-  "migrations": [{ "tag": "messaging-realtime-hub-v1", "new_classes": ["MessagingRealtimeHub"] }],
+  "migrations": [
+    {
+      "tag": "messaging-realtime-hub-v1",
+      "new_classes": [
+        "MessagingRealtimeHub"
+      ]
+    }
+  ],
   "workflows": [
     {
       "name": "luckread-w05-notification-push",
@@ -67,5 +79,10 @@
       "binding": "HYPERDRIVE_D1_03",
       "id": "7c8831416c18494faee04b96aa551cb9"
     }
-  ]
+  ],
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  }
 }

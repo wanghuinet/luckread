@@ -362,3 +362,18 @@ export async function closeW05PostgresRuntimeForTest(
   await Promise.all([...closing].map((pool) => pool.end()))
 }
 
+
+/** Reuse W05's existing Hyperdrive-backed pool for the durable messaging outbox. */
+export function getW05MessagingOutboxDatabase(
+  env: W05SocialRuntimeEnv,
+  poolFactory: W05PoolFactory = (config) => new Pool(config),
+): {
+  query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string, values?: unknown[]): Promise<{ rows: Row[]; rowCount?: number | null }>
+  connect(): Promise<{ query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string, values?: unknown[]): Promise<{ rows: Row[]; rowCount?: number | null }>; release(): void }>
+} {
+  resolveW05SocialDatabaseDriver(env)
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') throw new Error('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  const connectionString = validateHyperdriveConnectionString(binding.connectionString)
+  return asExecutor(getPool(binding, connectionString, poolFactory))
+}

@@ -3,7 +3,7 @@
 BEGIN;
 
 ALTER TABLE social_conversations
-  DROP CONSTRAINT conversation_type_check;
+  DROP CONSTRAINT social_conversations_conversation_type_check;
 
 ALTER TABLE social_conversations
   ADD CONSTRAINT conversation_type_check
