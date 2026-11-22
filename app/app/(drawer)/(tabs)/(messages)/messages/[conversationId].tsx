@@ -471,14 +471,24 @@ export default function ConversationScreen() {
     sendCurrent(newMessages[0]?.text ?? draft);
   }, [draft, sendCurrent]);
 
+  const readAckSequenceRef = useRef('0');
+  const readAckInFlightRef = useRef(false);
   useEffect(() => {
     const latest = messagesQuery.data?.pages?.[0]?.items?.[0];
-    if (latest?.sequence) {
-      void markConversationRead(conversationId, latest.sequence)
-        .then(() => queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] }))
-        .catch(() => undefined);
-    }
-  }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence]);
+    if (!latest?.sequence || readAckInFlightRef.current ||
+      compareSequence(latest.sequence, readAckSequenceRef.current) <= 0) return;
+    readAckInFlightRef.current = true;
+    const targetSequence = latest.sequence;
+    void markConversationRead(conversationId, targetSequence)
+      .then(() => {
+        if (compareSequence(targetSequence, readAckSequenceRef.current) > 0) {
+          readAckSequenceRef.current = targetSequence;
+        }
+        return queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+      })
+      .catch(() => undefined)
+      .finally(() => { readAckInFlightRef.current = false; });
+  }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient]);
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
