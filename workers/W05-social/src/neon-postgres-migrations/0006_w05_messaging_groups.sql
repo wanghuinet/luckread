@@ -2,11 +2,13 @@
 -- Direct conversations retain their canonical pair key and existing access policy.
 BEGIN;
 
+-- PostgreSQL derives this name from the table and column for the inline CHECK
+-- in 0002_w05_messaging_core.sql. Keep the exact generated name here.
 ALTER TABLE social_conversations
-  DROP CONSTRAINT conversation_type_check;
+  DROP CONSTRAINT social_conversations_conversation_type_check;
 
 ALTER TABLE social_conversations
-  ADD CONSTRAINT conversation_type_check
+  ADD CONSTRAINT social_conversations_conversation_type_check
   CHECK (conversation_type IN ('direct', 'group'));
 
 ALTER TABLE social_conversations
