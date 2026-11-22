@@ -127,7 +127,15 @@ export default function ConversationScreen() {
             typeof message.body === 'string' && typeof message.created_at === 'string') {
             if (realtimeEvent.type === 'message.created') {
               const cached = queryClient.getQueryData<typeof messagesQuery.data>(['messaging', 'messages', conversationId]);
-              const knownMessages = cached?.pages.flatMap((page) => page.items) ?? [];
+              if (!cached?.pages.length) {
+                // An event can race the first history request before its cache exists.
+                // Force a fresh read so the in-flight snapshot cannot hide this message.
+                void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
+                void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
+                void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+                return;
+              }
+              const knownMessages = cached.pages.flatMap((page) => page.items);
               const knownCursor = knownMessages.reduce((latest, item) => compareSequence(item.sequence, latest) > 0 ? item.sequence : latest, '0');
               const knownIds = new Set(knownMessages.map((item) => item.message_id));
               if (!knownIds.has(message.message_id) && /^\d+$/.test(message.sequence) && /^\d+$/.test(knownCursor) && knownCursor !== '0') {
@@ -487,17 +495,23 @@ export default function ConversationScreen() {
   }, [draft, sendCurrent]);
 
   const [readAckCycle, setReadAckCycle] = useState(0);
-  const readAckStateRef = useRef({ conversationId, acknowledged: '0', inFlight: false });
+  const readAckStateRef = useRef({ conversationId, acknowledged: '0', inFlight: false, retryPending: false });
   // Route params can change without remounting this screen. Give each conversation
   // an isolated acknowledgement state so a stale request cannot affect the next chat.
   if (readAckStateRef.current.conversationId !== conversationId) {
-    readAckStateRef.current = { conversationId, acknowledged: '0', inFlight: false };
+    readAckStateRef.current = { conversationId, acknowledged: '0', inFlight: false, retryPending: false };
   }
   useEffect(() => {
+    if (!isFocused || appState !== 'active') return;
     const state = readAckStateRef.current;
     const latest = messagesQuery.data?.pages?.[0]?.items?.[0];
-    if (!latest?.sequence || state.inFlight ||
-      compareSequence(latest.sequence, state.acknowledged) <= 0) return;
+    if (!latest?.sequence || compareSequence(latest.sequence, state.acknowledged) <= 0) return;
+    // A focus/resume or newer-message update can arrive while the previous request
+    // is settling. Remember one retry so that event is not lost behind single-flight.
+    if (state.inFlight) {
+      state.retryPending = true;
+      return;
+    }
     state.inFlight = true;
     const targetSequence = latest.sequence;
     void markConversationRead(conversationId, targetSequence)
@@ -511,9 +525,14 @@ export default function ConversationScreen() {
       })
       .catch(() => undefined)
       .finally(() => {
-        if (readAckStateRef.current === state) state.inFlight = false;
+        if (readAckStateRef.current !== state) return;
+        state.inFlight = false;
+        if (state.retryPending) {
+          state.retryPending = false;
+          setReadAckCycle((cycle) => cycle + 1);
+        }
       });
-  }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient, readAckCycle]);
+  }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient, readAckCycle, isFocused, appState]);
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
