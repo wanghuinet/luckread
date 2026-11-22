@@ -124,6 +124,18 @@ describe('MessagingRealtimeHub membership revocation', () => {
     expect(storage.put).not.toHaveBeenCalledWith('typing', {})
   })
 
+  it('keeps stale websocket sessions fenced after a member rejoins at a newer version', async () => {
+    const staleSocket = makeSocket('member-user', 1);
+    const { state, storage } = makeState([staleSocket], {}, { 'member-user': 2 });
+    const hub = new MessagingRealtimeHub(state);
+
+    await hub.webSocketMessage(staleSocket, JSON.stringify({ type: 'typing.start' }));
+
+    expect(staleSocket.close).toHaveBeenCalledWith(4003, 'Conversation membership revoked');
+    expect(storage.put).not.toHaveBeenCalledWith('typing', expect.anything());
+    expect(storage.get).toHaveBeenCalledWith('membership-revoked:member-user');
+  });
+
   it('rejects typing writes from a stale membership version', async () => {
     const { state, storage } = makeState([], {}, { 'member-user': 2 })
     const hub = new MessagingRealtimeHub(state)
