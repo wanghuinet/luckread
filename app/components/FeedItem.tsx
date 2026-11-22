@@ -770,6 +770,9 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                 <View className="ml-2 flex-1">
                     <View className="flex-row items-start justify-between">
                         <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel={`查看作者 @${authorHandle}`}
+                            accessibilityHint="打开作者个人资料"
                             style={{ flex: 1, marginRight: 8 }}
                             onPress={() => router.push('/profile/' + encodeURIComponent(profileIdentifier))}
                         >
@@ -897,6 +900,9 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
                         is_organization={isOrganization}
                     />
                     <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel={`查看作者 @${authorHandle}`}
+                        accessibilityHint="打开作者个人资料"
                         onPress={() => router.push(`/profile/${encodeURIComponent(profileIdentifier)}`)}
                     >
                         <View className="flex-col">
