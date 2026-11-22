@@ -23,8 +23,8 @@ describe('native public content search', () => {
     expect(screen).toContain('runContentSearch(true)');
     expect(screen).toContain('加载更多搜索结果');
     expect(screen).toContain('没有找到匹配的公开内容');
-    expect(screen).toContain('推荐搜索词');
-    expect(screen).toContain('不代表全站搜索量排名');
+    expect(screen).toContain('近期热门搜索');
+    expect(screen).toContain('W04 聚合趋势');
     expect(screen).toContain('runContentSearch(false, term)');
   });
 
