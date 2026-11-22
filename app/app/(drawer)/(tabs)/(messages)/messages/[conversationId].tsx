@@ -74,6 +74,7 @@ export default function ConversationScreen() {
   const userId = user?.id;
   const [draft, setDraft] = useState('');
   const [senderProfiles, setSenderProfiles] = useState<Record<string, { displayName?: string | null; username?: string }>>({});
+  const senderProfileAttempted = useRef(new Set<string>());
   const [editTarget, setEditTarget] = useState<{ messageId: string; body: string } | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
@@ -101,9 +102,13 @@ export default function ConversationScreen() {
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
   useEffect(() => {
     if (params.conversationType !== 'group') return;
-    const senderIds = Array.from(new Set(messages.map(message => message.sender_user_id).filter(id => id && id !== userId)));
+    const senderIds = Array.from(new Set(messages.map(message => message.sender_user_id)
+      .filter(id => id && id !== userId && !senderProfileAttempted.current.has(id))));
+    if (!senderIds.length) return;
     let active = true;
-    void Promise.all(senderIds.map(async id => [id, await resolvePublicProfileById(id)] as const)).then(results => {
+    const controller = new AbortController();
+    senderIds.forEach(id => senderProfileAttempted.current.add(id));
+    void Promise.all(senderIds.map(async id => [id, await resolvePublicProfileById(id, controller.signal)] as const)).then(results => {
       if (!active) return;
       setSenderProfiles(current => {
         const next = { ...current };
@@ -111,7 +116,7 @@ export default function ConversationScreen() {
         return next;
       });
     });
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [messages, params.conversationType, userId]);
   const chatMessages = useMemo<IMessage[]>(() => messages.map((message) => {
     const attachments = message.attachments ?? [];
