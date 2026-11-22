@@ -445,6 +445,27 @@ export default function Search() {
               placeholderTextColor="#9ca3af"
               className="ml-3 min-h-12 flex-1 text-base text-neutral-900 dark:text-white"
             />
+            {contentInput.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="清空搜索输入"
+                onPress={() => {
+                  contentRequestIdRef.current += 1;
+                  contentAbortRef.current?.abort();
+                  setContentInput('');
+                  setContentSearchSubmitted(false);
+                  setContentBusy(false);
+                  setContentLoadingMore(false);
+                  setContentResults([]);
+                  setContentCursor(null);
+                  setContentHasMore(false);
+                  setContentError('');
+                }}
+                className="ml-1 p-2"
+              >
+                <Feather name="x-circle" size={18} color="#9ca3af" />
+              </Pressable>
+            ) : null}
             <Pressable accessibilityRole="button" disabled={contentBusy} onPress={() => void runContentSearch(false)} className="ml-2 rounded-full bg-sky-500 px-4 py-2">
               {contentBusy ? <ActivityIndicator size="small" color="#fff" /> : <Text className="font-bold text-white">搜索</Text>}
             </Pressable>
