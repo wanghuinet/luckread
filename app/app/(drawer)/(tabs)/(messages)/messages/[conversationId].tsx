@@ -297,7 +297,10 @@ export default function ConversationScreen() {
     staleTime: Infinity,
   });
   useEffect(() => {
-    const incoming = incrementalQuery.data?.items ?? [];
+    const incoming = [
+      ...(incrementalQuery.data?.items ?? []),
+      ...(continuationQuery.data?.items ?? []),
+    ];
     if (!incoming.length) return;
     queryClient.setQueryData<typeof messagesQuery.data>(
       ['messaging', 'messages', conversationId],
@@ -315,7 +318,7 @@ export default function ConversationScreen() {
         return { ...current, pages };
       },
     );
-  }, [incrementalQuery.data, conversationId, queryClient]);
+  }, [incrementalQuery.data, continuationQuery.data, conversationId, queryClient]);
 
 
 
