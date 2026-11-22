@@ -95,6 +95,12 @@ export default function ConversationScreen() {
     return connectMessagingRealtime({
       conversationId,
       onState: (state) => {
+        if (state === 'revoked') {
+          void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
+          void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+          router.back();
+          return;
+        }
         if (state !== 'connected') return;
         void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
         void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
@@ -160,7 +166,7 @@ export default function ConversationScreen() {
         void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
       },
     });
-  }, [conversationId, isFocused, appState, queryClient]);
+  }, [conversationId, isFocused, appState, queryClient, router]);
   const pendingSend = useRef<{ fingerprint: string; key: string } | null>(null);
   const sendMutationPendingRef = useRef(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
