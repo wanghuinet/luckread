@@ -368,6 +368,19 @@ export type W05SocialWorkerDependencies = Readonly<{
   likeMutationStore?: LikeMutationStore
 }>
 
+const broadcastMessagingEvent = async (env: Env, conversationId: string, actorUserId: string, type: string, payload: unknown): Promise<void> => {
+  if (!env.MESSAGING_REALTIME_HUB) return
+  try {
+    const id = env.MESSAGING_REALTIME_HUB.idFromName(conversationId)
+    const stub = env.MESSAGING_REALTIME_HUB.get(id)
+    await stub.fetch('https://messaging-realtime.internal/broadcast', {
+      method: 'POST',
+      headers: { 'X-LuckRead-Principal-User-Id': actorUserId, 'content-type': 'application/json' },
+      body: JSON.stringify({ type, conversationId, actorUserId, eventId: crypto.randomUUID(), occurredAt: Date.now(), payload }),
+    })
+  } catch { /* persisted mutation remains authoritative; clients recover through sync */ }
+}
+
 export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies = {}) {
   return {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
