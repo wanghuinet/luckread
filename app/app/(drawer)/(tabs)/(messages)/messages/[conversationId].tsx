@@ -103,11 +103,55 @@ export default function ConversationScreen() {
       },
       onEvent: (event) => {
         if (!event || typeof event !== 'object') return;
-        const realtimeEvent = event as { type?: unknown; payload?: { activeUserIds?: unknown } };
-        if (realtimeEvent.type === 'typing.changed' && Array.isArray(realtimeEvent.payload?.activeUserIds)) {
+        const realtimeEvent = event as { type?: unknown; payload?: unknown };
+        if (realtimeEvent.type === 'typing.changed' && realtimeEvent.payload &&
+          typeof realtimeEvent.payload === 'object' &&
+          Array.isArray((realtimeEvent.payload as { activeUserIds?: unknown }).activeUserIds)) {
           queryClient.setQueryData(['messaging', 'typing', conversationId], {
-            activeUserIds: realtimeEvent.payload.activeUserIds.filter((id): id is string => typeof id === 'string'),
+            activeUserIds: (realtimeEvent.payload as { activeUserIds: unknown[] }).activeUserIds.filter((id): id is string => typeof id === 'string'),
           });
+          return;
+        }
+        if (typeof realtimeEvent.type === 'string' && realtimeEvent.type.startsWith('message.') &&
+          realtimeEvent.payload && typeof realtimeEvent.payload === 'object') {
+          const message = realtimeEvent.payload as Record<string, unknown>;
+          if (typeof message.message_id === 'string' && typeof message.sequence === 'string' &&
+            typeof message.conversation_id === 'string' && typeof message.sender_user_id === 'string' &&
+            typeof message.body === 'string' && typeof message.created_at === 'string') {
+            queryClient.setQueryData<typeof messagesQuery.data>(
+              ['messaging', 'messages', conversationId],
+              (current) => {
+                if (!current?.pages.length) return current;
+                let found = false;
+                const pages = current.pages.map((page) => ({
+                  ...page,
+                  items: page.items.map((item) => {
+                    if (item.message_id !== message.message_id) return item;
+                    found = true;
+                    return { ...item, ...message } as typeof item;
+                  }),
+                }));
+                if (!found && realtimeEvent.type === 'message.created') {
+                  const firstPage = pages[0];
+                  if (firstPage) {
+                    pages[0] = {
+                      ...firstPage,
+                      items: [...firstPage.items, message as unknown as (typeof firstPage.items)[number]]
+                        .sort((left, right) => compareSequence(right.sequence, left.sequence)),
+                    };
+                  }
+                }
+                return { ...current, pages };
+              },
+            );
+            void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+            return;
+          }
+        }
+        if (realtimeEvent.type === 'conversation.read' ||
+          (typeof realtimeEvent.type === 'string' && realtimeEvent.type.startsWith('group.member.'))) {
+          void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
+          void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
           return;
         }
         void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
