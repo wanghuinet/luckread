@@ -60,12 +60,23 @@ export class MessagingRealtimeHub {
   }
 
   /** Hibernation API event handlers: no per-socket listener closures or isolate-local socket Map. */
-  webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): void {
+  async webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
     if (typeof message !== 'string' || message.length > MAX_FRAME_BYTES) return;
-    try {
-      const frame = JSON.parse(message) as { type?: unknown };
-      if (frame?.type === 'ping') socket.send(JSON.stringify({ type: 'pong', at: Date.now() }));
-    } catch { /* Ignore malformed control frames. */ }
+    let frame: { type?: unknown };
+    try { frame = JSON.parse(message) as { type?: unknown }; } catch { return; }
+    if (frame.type === 'ping') {
+      try { socket.send(JSON.stringify({ type: 'pong', at: Date.now() })); } catch { /* closed */ }
+      return;
+    }
+    if (frame.type !== 'typing.start' && frame.type !== 'typing.stop') return;
+    const attachment = socket.deserializeAttachment() as SocketAttachment | null;
+    const userId = attachment?.userId;
+    if (!userId || !USER_ID.test(userId)) return;
+    const state = await this.readTypingState();
+    if (frame.type === 'typing.start') state[userId] = Date.now() + TYPING_TTL_MS;
+    else delete state[userId];
+    await this.writeTypingState(state);
+    this.broadcast({ type: 'typing.changed', occurredAt: Date.now(), payload: { activeUserIds: Object.keys(state) } });
   }
   webSocketClose(_socket: WebSocket, _code: number, _reason: string, _wasClean: boolean): void {}
   webSocketError(_socket: WebSocket, _error: unknown): void {}
