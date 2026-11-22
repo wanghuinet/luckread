@@ -36,6 +36,14 @@ export default function GroupInfoScreen() {
     enabled: Boolean(conversationId),
   });
   const owner = members.data?.some(m => m.user_id === userId && m.member_role === 'owner') ?? false;
+  const memberProfiles = useQuery({
+    queryKey: ['messaging', 'member-profiles', members.data?.map(m => m.user_id)],
+    queryFn: async ({ signal }) => Promise.all((members.data ?? []).map(async member => ({
+      userId: member.user_id, profile: await resolvePublicProfileById(member.user_id, signal),
+    }))),
+    enabled: Boolean(members.data?.length),
+  });
+  const profileById = new Map((memberProfiles.data ?? []).map(item => [item.userId, item.profile]));
   const following = useQuery({
     queryKey: ['messaging', 'member-picker-following', userId],
     queryFn: async ({ signal }) => {
@@ -91,8 +99,8 @@ export default function GroupInfoScreen() {
       <Text className="mt-1 text-sm text-neutral-500">{members.data?.length ?? 0}/50 位成员</Text>
       <Text className="mt-5 mb-2 font-semibold text-neutral-900 dark:text-white">成员</Text>
       {members.isLoading ? <ActivityIndicator color="#1d9bf0" /> : members.data?.map(member => <View key={member.user_id} className="flex-row items-center border-b border-neutral-100 py-3 dark:border-neutral-800">
-        <View className="h-9 w-9 items-center justify-center rounded-full bg-sky-50 dark:bg-sky-950/40"><Feather name="user" size={18} color="#1d9bf0" /></View>
-        <View className="ml-3 flex-1"><Text className="text-neutral-900 dark:text-white" numberOfLines={1}>{member.user_id}</Text><Text className="text-xs text-neutral-500">{member.member_role === 'owner' ? '群主' : '成员'}</Text></View>
+        <View className="h-9 w-9 items-center justify-center rounded-full bg-sky-50 dark:bg-sky-950/40">{profileById.get(member.user_id)?.avatar ? <Image source={{ uri: profileById.get(member.user_id)?.avatar as string }} className="h-9 w-9 rounded-full" /> : <Feather name="user" size={18} color="#1d9bf0" />}</View>
+        <View className="ml-3 flex-1"><Text className="text-neutral-900 dark:text-white" numberOfLines={1}>{display(profileById.get(member.user_id), member.user_id)}</Text><Text className="text-xs text-neutral-500">{member.member_role === 'owner' ? '群主' : '成员'} · @{profileById.get(member.user_id)?.username || member.user_id}</Text></View>
         {owner && member.member_role !== 'owner' ? <Pressable disabled={removeMutation.isPending} onPress={() => Alert.alert('移除成员', '确定从群聊移除此成员？', [{text:'取消',style:'cancel'},{text:'移除',style:'destructive',onPress:()=>removeMutation.mutate(member.user_id)}])} className="p-2"><Feather name="user-minus" size={18} color="#dc2626" /></Pressable> : null}
       </View>)}
       {owner ? <View className="mt-5">
