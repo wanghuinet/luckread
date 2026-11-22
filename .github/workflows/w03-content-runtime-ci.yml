@@ -59,13 +59,8 @@ jobs:
           ]
           for (const path of workflows) {
             const source = fs.readFileSync(path, 'utf8')
-            for (const required of [
-              'businessDataImported',
-              'productionCutoverAuthorized',
-              'D1-02 business data import is not verified',
-              'explicit production cutover authorization is absent',
-            ]) {
-              if (!source.includes(required)) throw new Error(path + ' is missing deployment admission guard: ' + required)
+            if (!source.includes('scripts/neon/assert-production-cutover-authorized.mjs D1-02')) {
+              throw new Error(path + ' is missing the shared D1-02 data-import and cutover admission guard')
             }
           }
           console.log('W03_NEON_DEPLOYMENT_DATA_ADMISSION=PASS')
@@ -73,6 +68,9 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Test shared Neon production cutover admission guard
+        run: node --test scripts/neon/assert-production-cutover-authorized.test.mjs
 
       - name: Verify W03 migrations and nullable media warning constraints
         run: |
