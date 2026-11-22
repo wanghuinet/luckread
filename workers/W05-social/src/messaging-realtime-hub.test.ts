@@ -168,7 +168,7 @@ describe('MessagingRealtimeHub membership revocation', () => {
     expect(storage.put).toHaveBeenCalledWith('messaging-event-dedupe', {
       '123e4567-e89b-12d3-a456-426614174000': expect.any(Number),
     });
-    expect(storage.transaction).toHaveBeenCalledOnce();
+    expect(storage.transaction).toHaveBeenCalledTimes(2);
   });
 
   it('expires old event receipts and keeps the dedupe set bounded', async () => {
