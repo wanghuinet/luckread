@@ -487,18 +487,23 @@ export default function ConversationScreen() {
   }, [draft, sendCurrent]);
 
   const [readAckCycle, setReadAckCycle] = useState(0);
-  const readAckStateRef = useRef({ conversationId, acknowledged: '0', inFlight: false });
+  const readAckStateRef = useRef({ conversationId, acknowledged: '0', inFlight: false, retryPending: false });
   // Route params can change without remounting this screen. Give each conversation
   // an isolated acknowledgement state so a stale request cannot affect the next chat.
   if (readAckStateRef.current.conversationId !== conversationId) {
-    readAckStateRef.current = { conversationId, acknowledged: '0', inFlight: false };
+    readAckStateRef.current = { conversationId, acknowledged: '0', inFlight: false, retryPending: false };
   }
   useEffect(() => {
     if (!isFocused || appState !== 'active') return;
     const state = readAckStateRef.current;
     const latest = messagesQuery.data?.pages?.[0]?.items?.[0];
-    if (!latest?.sequence || state.inFlight ||
-      compareSequence(latest.sequence, state.acknowledged) <= 0) return;
+    if (!latest?.sequence || compareSequence(latest.sequence, state.acknowledged) <= 0) return;
+    // A focus/resume or newer-message update can arrive while the previous request
+    // is settling. Remember one retry so that event is not lost behind single-flight.
+    if (state.inFlight) {
+      state.retryPending = true;
+      return;
+    }
     state.inFlight = true;
     const targetSequence = latest.sequence;
     void markConversationRead(conversationId, targetSequence)
@@ -512,7 +517,12 @@ export default function ConversationScreen() {
       })
       .catch(() => undefined)
       .finally(() => {
-        if (readAckStateRef.current === state) state.inFlight = false;
+        if (readAckStateRef.current !== state) return;
+        state.inFlight = false;
+        if (state.retryPending) {
+          state.retryPending = false;
+          setReadAckCycle((cycle) => cycle + 1);
+        }
       });
   }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient, readAckCycle, isFocused, appState]);
 
