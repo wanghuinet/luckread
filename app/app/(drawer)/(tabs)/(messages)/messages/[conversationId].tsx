@@ -120,10 +120,13 @@ export default function ConversationScreen() {
   const pendingSend = useRef<{ fingerprint: string; key: string } | null>(null);
   const sendMutationPendingRef = useRef(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingRefreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const typingActiveRef = useRef(false);
   const stopTyping = useCallback(() => {
     if (typingTimer.current) clearTimeout(typingTimer.current);
+    if (typingRefreshTimer.current) clearInterval(typingRefreshTimer.current);
     typingTimer.current = null;
+    typingRefreshTimer.current = null;
     if (!typingActiveRef.current) return;
     typingActiveRef.current = false;
     setMessagingRealtimeTyping(conversationId, false);
@@ -134,6 +137,9 @@ export default function ConversationScreen() {
     if (!typingActiveRef.current) {
       typingActiveRef.current = true;
       setMessagingRealtimeTyping(conversationId, true);
+      typingRefreshTimer.current = setInterval(() => {
+        if (typingActiveRef.current) setMessagingRealtimeTyping(conversationId, true);
+      }, 3_000);
     }
     if (typingTimer.current) clearTimeout(typingTimer.current);
     typingTimer.current = setTimeout(stopTyping, 1800);
@@ -205,7 +211,7 @@ export default function ConversationScreen() {
   const latestSequence = messages.reduce((latest, message) =>
     compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const incrementalQuery = useQuery({
-    queryKey: ['messaging', 'messages-after', conversationId, latestSequence],
+    queryKey: ['messaging', 'messages-after', conversationId],
     queryFn: ({ signal }) => fetchMessagesAfter(conversationId, latestSequence, signal),
     enabled: Boolean(conversationId) && messagesQuery.isSuccess && isFocused && appState === 'active',
     staleTime: Infinity,
@@ -231,37 +237,7 @@ export default function ConversationScreen() {
     );
   }, [incrementalQuery.data, conversationId, queryClient]);
 
-  const latestMessagesRefresh = useQuery({
-    queryKey: ['messaging', 'latest-messages-refresh', conversationId],
-    queryFn: ({ signal }) => fetchMessages(conversationId, null, signal),
-    enabled: Boolean(conversationId) && messagesQuery.isSuccess && isFocused && appState === 'active',
-    staleTime: Infinity,
-  });
-  useEffect(() => {
-    const refreshed = latestMessagesRefresh.data?.items ?? [];
-    if (!refreshed.length) return;
-    queryClient.setQueryData<typeof messagesQuery.data>(
-      ['messaging', 'messages', conversationId],
-      (current) => {
-        if (!current?.pages.length) return current;
-        const latestById = new Map(refreshed.map((message) => [message.message_id, message]));
-        const known = new Set(current.pages.flatMap((page) => page.items.map((message) => message.message_id)));
-        const pages = current.pages.map((page) => ({
-          ...page,
-          items: page.items.map((message) => latestById.get(message.message_id) ?? message),
-        }));
-        const additions = refreshed.filter((message) => !known.has(message.message_id));
-        if (pages[0] && additions.length) {
-          pages[0] = {
-            ...pages[0],
-            items: [...pages[0].items, ...additions].sort((left, right) =>
-              compareSequence(right.sequence, left.sequence)),
-          };
-        }
-        return { ...current, pages };
-      },
-    );
-  }, [latestMessagesRefresh.data, conversationId, queryClient]);
+
 
   const uploadOne = useCallback(async (localId: string, file: LocalMediaFile) => {
     setPendingAttachments((current) => current.map((item) => item.localId === localId
