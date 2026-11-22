@@ -58,6 +58,11 @@ export async function removeGroupMember(conversationId: string, memberUserId: st
     method: 'DELETE',
   });
 }
+export async function transferGroupOwnership(conversationId: string, targetUserId: string): Promise<void> {
+  await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/transfer-owner', {
+    method: 'POST', body: JSON.stringify({ targetUserId }), idempotencyKey: false,
+  });
+}
 export async function leaveGroupConversation(conversationId: string): Promise<void> {
   await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/leave', {
     method: 'POST', body: JSON.stringify({ }), idempotencyKey: false,
