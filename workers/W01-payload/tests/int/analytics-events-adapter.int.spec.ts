@@ -146,7 +146,10 @@ describe('W01 analytics event route integration', () => {
         })),
       ),
     } as unknown as W11Env['D1_05']
-    const env: W11Env = { D1_05: database }
+    const env: W11Env = {
+      D1_05: database,
+      W11_ANALYTICS_INGEST_ENABLED: 'true',
+    }
 
     mocks.resolvePrincipal.mockResolvedValue({
       userId: 'user_test_01',
