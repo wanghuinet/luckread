@@ -58,6 +58,13 @@ jobs:
           workers/W04-feed-search/src/index.ts
           workers/W04-feed-search/src/search-trends.ts
 
+      - name: Verify serialized AUTH-013 projection consumer
+        run: >-
+          node --input-type=module -e "import fs from 'node:fs';
+          const config = JSON.parse(fs.readFileSync('workers/W04-feed-search/wrangler.jsonc', 'utf8'));
+          const consumer = config.queues?.consumers?.find((item) => item.queue === 'luckread-auth013-account-state-projection');
+          if (consumer?.max_concurrency !== 1) throw new Error('AUTH-013 KV projection writes must remain serialized until atomic per-user writes are implemented');"
+
       - name: Setup supported pnpm for W01 adapter checks
         uses: pnpm/action-setup@v4
         with:
