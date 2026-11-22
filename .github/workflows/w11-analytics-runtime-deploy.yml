@@ -61,8 +61,8 @@ jobs:
           if (c.name !== process.env.EXPECTED_WORKER) throw new Error('W11 identity mismatch');
           if (c.main !== 'src/worker.ts') throw new Error('W11 entrypoint mismatch');
           if (c.workers_dev !== false) throw new Error('Refusing to enable workers.dev');
-          if (c.vars?.W11_ANALYTICS_INGEST_ENABLED !== 'false') {
-            throw new Error('W11 D1 deployment must keep client analytics ingestion disabled until privacy and Neon admission gates pass');
+          if (c.vars?.W11_ANALYTICS_INGEST_ENABLED === 'true') {
+            throw new Error('W11 D1 deployment must not enable client analytics ingestion until privacy and Neon admission gates pass');
           }
           if ((c.routes || []).length !== 0) throw new Error('This workflow does not admit routes');
           if ((c.services || []).length !== 0) throw new Error('This workflow does not admit Service Bindings');
