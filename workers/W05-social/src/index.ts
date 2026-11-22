@@ -1033,6 +1033,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
         if (!body || typeof body !== 'object' || Array.isArray(body)) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
         const data = await sendMessage(dependencies.messagingStore, actorUserId, conversationId, idempotencyKey, (body as { body?: unknown }).body, (body as { attachments?: unknown }).attachments)
+        await broadcastMessagingEvent(env, conversationId, actorUserId, 'message.created', data)
         return json({ data, requestId: createRequestId() }, 201)
       }
 
@@ -1052,11 +1053,13 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
           }
           const data = await editMessage(dependencies.messagingStore, actorUserId, conversationId, messageId, (body as { body: string }).body)
+          await broadcastMessagingEvent(env, conversationId, actorUserId, 'message.edited', data)
           return json({ data, requestId: createRequestId() })
         }
         if (request.method === 'DELETE') {
           await enforceRateLimit(request, env, 'write:messaging-message-recall')
           const data = await recallMessage(dependencies.messagingStore, actorUserId, conversationId, messageId)
+          await broadcastMessagingEvent(env, conversationId, actorUserId, 'message.recalled', data)
           return json({ data, requestId: createRequestId() })
         }
         return new Response(null, { status: 405, headers: { Allow: 'PATCH, DELETE' } })
@@ -1086,7 +1089,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         let body: unknown
         try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
         if (!body || typeof body !== 'object' || Array.isArray(body)) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
-        await markConversationRead(dependencies.messagingStore, actorUserId, conversationId, (body as { sequence?: unknown }).sequence)
+        const data = await markConversationRead(dependencies.messagingStore, actorUserId, conversationId, (body as { sequence?: unknown }).sequence)
+        await broadcastMessagingEvent(env, conversationId, actorUserId, 'conversation.read', data ?? { sequence: (body as { sequence?: unknown }).sequence })
         return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       }
 
