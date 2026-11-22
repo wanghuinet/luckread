@@ -5,6 +5,9 @@ on:
     paths:
       - "workers/W03-content/**"
       - "workers/W03-content/package.json"
+      - "scripts/neon/assert-production-cutover-authorized.*"
+      - "contracts/database/neon-five-domain-schema-bootstrap.v1.json"
+      - "contracts/database/neon-five-database-remote-schema-evidence.v1.json"
       - ".github/workflows/w03-content-runtime-ci.yml"
       - ".github/workflows/neon-runtime-cutover-w03.yml"
       - ".github/workflows/w03-content-runtime-deploy.yml"
@@ -16,6 +19,9 @@ on:
     branches: ["main"]
     paths:
       - "workers/W03-content/**"
+      - "scripts/neon/assert-production-cutover-authorized.*"
+      - "contracts/database/neon-five-domain-schema-bootstrap.v1.json"
+      - "contracts/database/neon-five-database-remote-schema-evidence.v1.json"
 
 permissions:
   contents: read
