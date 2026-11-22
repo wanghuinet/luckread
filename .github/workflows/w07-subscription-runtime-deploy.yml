@@ -60,6 +60,9 @@ jobs:
         run: npm ci --prefix workers/W07-subscription-commerce --ignore-scripts --no-audit --fund=false
       - name: Install pinned W10 Expo SDK dependency
         run: npm ci --prefix workers/W10-async --ignore-scripts --no-audit --fund=false
+      - name: Require imported business data and explicit Neon production cutover approval
+        run: node scripts/neon/assert-production-cutover-authorized.mjs D1-04
+
       - name: Verify Neon-only W07 production config and preserved migration source records
         working-directory: workers/W07-subscription-commerce
         run: |
