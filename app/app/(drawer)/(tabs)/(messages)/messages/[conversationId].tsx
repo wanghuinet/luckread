@@ -12,6 +12,7 @@ import {
   type MessagingAttachment,
 } from '~/lib/messaging-api';
 import type { LocalMediaFile } from '~/lib/publish-api';
+import { connectMessagingRealtime } from '~/lib/messaging-realtime';
 import { createIdempotencyKey, getApiAuthHeaders } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
 import { resolvePublicProfileById } from '~/lib/content-adapter';
@@ -89,6 +90,19 @@ export default function ConversationScreen() {
     const subscription = AppState.addEventListener('change', setAppState);
     return () => subscription.remove();
   }, []);
+  useEffect(() => {
+    if (!conversationId || !isFocused || appState !== 'active') return;
+    return connectMessagingRealtime({
+      conversationId,
+      onEvent: () => {
+        void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', 'typing', conversationId] });
+      },
+    });
+  }, [conversationId, isFocused, appState, queryClient]);
   const pendingSend = useRef<{ fingerprint: string; key: string } | null>(null);
   const sendMutationPendingRef = useRef(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
