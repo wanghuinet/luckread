@@ -90,7 +90,11 @@ export default function ConversationScreen() {
     return () => subscription.remove();
   }, []);
   const pendingSend = useRef<{ fingerprint: string; key: string } | null>(null);
-  const sendMutationPendingRef = useRef(false);\n  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);\n  const stopTyping = useCallback(() => { if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = null; void setConversationTyping(conversationId, false).catch(() => undefined); }, [conversationId]);\n  const handleDraftChange = useCallback((value: string) => { setDraft(value); if (value.trim()) { void setConversationTyping(conversationId, true).catch(() => undefined); if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = setTimeout(stopTyping, 1800); } else stopTyping(); }, [conversationId, stopTyping]);\n  useEffect(() => () => stopTyping(), [stopTyping]);
+  const sendMutationPendingRef = useRef(false);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopTyping = useCallback(() => { if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = null; void setConversationTyping(conversationId, false).catch(() => undefined); }, [conversationId]);
+  const handleDraftChange = useCallback((value: string) => { setDraft(value); if (value.trim()) { void setConversationTyping(conversationId, true).catch(() => undefined); if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = setTimeout(stopTyping, 1800); } else stopTyping(); }, [conversationId, stopTyping]);
+  useEffect(() => () => stopTyping(), [stopTyping]);
   const messagesQuery = useInfiniteQuery({
     queryKey: ['messaging', 'messages', conversationId],
     initialPageParam: null as string | null,
