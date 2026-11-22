@@ -67,6 +67,7 @@ describe('native X-style search center', () => {
     const screen = read('../app/(drawer)/(tabs)/(search)/search.tsx');
     expect(screen).toContain('runContentSearch(false, term)');
     expect(screen).toContain('runContentSearch(false, item.term)');
+    expect(screen).toContain('accessibilityLabel="清空搜索输入"');
     expect(screen).toContain('fetchContentSearchPage(query');
     expect(screen).toContain('runContentSearch(true)');
   });
