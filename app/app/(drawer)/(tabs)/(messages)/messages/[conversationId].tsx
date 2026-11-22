@@ -438,17 +438,27 @@ export default function ConversationScreen() {
       setDraft((current) => current.trim() === variables.body ? '' : current);
       stopTyping();
       setPendingAttachments([]);
+      let cachePageOverflow = false;
       queryClient.setQueryData<typeof messagesQuery.data>(
         ['messaging', 'messages', conversationId],
         (current) => {
           if (!current?.pages.length || current.pages.some((page) => page.items.some((item) => item.message_id === sentMessage.message_id))) return current;
           const pages = [...current.pages];
           const firstPage = pages[0];
+          if (firstPage && firstPage.items.length >= MAX_LIVE_CACHE_PAGE_ITEMS) {
+            cachePageOverflow = true;
+            return current;
+          }
           if (firstPage) pages[0] = { ...firstPage, items: [...firstPage.items, sentMessage].sort((left, right) =>
             compareSequence(right.sequence, left.sequence)) };
           return { ...current, pages };
         },
       );
+      if (cachePageOverflow) {
+        // Local send success must obey the same bounded cache policy as WebSocket
+        // and incremental sync; the persisted history query will restore the page.
+        void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
+      }
       await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
     },
     onError: (_error, variables) => {
