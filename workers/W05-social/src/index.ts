@@ -891,7 +891,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         return json({ data, requestId: createRequestId() }, 201)
       }
 
-      const messagingTypingMatch = /^\\/internal\\/messaging\\/conversations\\/([^/]+)\\/typing$/.exec(url.pathname)
+      const messagingTypingMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/typing$/.exec(url.pathname)
       if (messagingTypingMatch) {
         const actorUserId = requirePrincipal(request)
         requireInteractionLayer(request)
