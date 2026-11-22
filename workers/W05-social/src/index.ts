@@ -934,7 +934,9 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         if (!hubBinding) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
         // listConversationMembers is membership-authorized by the Neon store; only current members may use typing state.
         const members = await listConversationMembers(dependencies.messagingStore, actorUserId, conversationId)
-        if (!members.some(member => member.user_id === actorUserId)) throw new MessagingRuntimeError('NOT_FOUND', 404)
+        const actorMember = members.find(member => member.user_id === actorUserId)
+        if (!actorMember) throw new MessagingRuntimeError('NOT_FOUND', 404)
+        if (!/^[1-9][0-9]{0,17}$/.test(actorMember.membership_version)) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
         const hub = hubBinding.get(hubBinding.idFromName(conversationId))
         if (request.method === 'GET') {
           const snapshot = await hub.fetch('https://messaging-hub.internal/snapshot', { method: 'GET' })
@@ -946,7 +948,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         let body: unknown
         try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
         if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => key !== 'typing') || typeof (body as {typing?:unknown}).typing !== 'boolean') throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
-        const result = await hub.fetch('https://messaging-hub.internal/update', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ userId: actorUserId, typing: (body as {typing:boolean}).typing }) })
+        const result = await hub.fetch('https://messaging-hub.internal/update', { method: 'POST', headers: { 'content-type': 'application/json', 'X-LuckRead-Principal-User-Id': actorUserId, 'X-LuckRead-Membership-Version': actorMember.membership_version }, body: JSON.stringify({ userId: actorUserId, typing: (body as {typing:boolean}).typing }) })
         if (!result.ok) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
         return json({ data: await result.json(), requestId: createRequestId() })
       }
