@@ -86,6 +86,9 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Require imported business data and explicit Neon production cutover approval
+        run: node scripts/neon/assert-production-cutover-authorized.mjs D1-01
+
       - name: Verify D1-free Neon production Worker config
         working-directory: workers/W01-payload
         run: |
