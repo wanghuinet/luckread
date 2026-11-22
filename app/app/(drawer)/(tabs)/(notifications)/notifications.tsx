@@ -398,7 +398,8 @@ export default function Notifications() {
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={displayName + messageFor(item)}
+        accessibilityLabel={displayName + '，' + (item.readAt ? '已读' : '未读') + '，' + messageFor(item)}
+        accessibilityHint="打开相关动态或用户个人资料"
         onPress={() => openNotification(item)}
         className={'flex-row gap-3 border-b border-neutral-100 px-4 py-4 dark:border-neutral-800 ' + (item.readAt ? 'bg-white dark:bg-black' : 'bg-sky-50 dark:bg-sky-950/30')}
       >
@@ -431,6 +432,9 @@ export default function Notifications() {
           {!item.readAt ? (
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="标记通知为已读"
+              accessibilityHint="仅将这条通知标记为已读"
+              accessibilityState={{ disabled: busyIds.has(item.id) }}
               className="mt-2 self-start rounded-full border border-neutral-300 px-3 py-1 dark:border-neutral-700"
               disabled={busyIds.has(item.id)}
               onPress={(event) => {
@@ -454,6 +458,9 @@ export default function Notifications() {
         <Text className="text-xl font-bold text-neutral-900 dark:text-white">通知</Text>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="全部标记已读"
+          accessibilityHint="将当前账号的所有未读通知标记为已读"
+          accessibilityState={{ disabled: currentUnreadCount === 0 || currentReadAllBusy }}
           disabled={currentUnreadCount === 0 || currentReadAllBusy}
           onPress={() => void markAllRead()}
           className="rounded-full px-3 py-2"
