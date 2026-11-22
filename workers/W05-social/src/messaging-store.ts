@@ -26,6 +26,7 @@ export type MessagingConversationMemberRow = Readonly<{
   member_role: 'owner' | 'member'
   joined_at: string
   last_read_sequence: string
+  membership_version: string
 }>
 export type MessagingMessageRow = Readonly<{
   message_id: string
@@ -43,9 +44,9 @@ export interface MessagingStore {
   createGroupConversation(actorUserId: string, memberUserIds: string[], groupName: string): Promise<{ conversationId: string }>
   listConversationMembers(actorUserId: string, conversationId: string): Promise<MessagingConversationMemberRow[]>
   addGroupMembers(actorUserId: string, conversationId: string, memberUserIds: string[]): Promise<{ addedCount: number }>
-  removeGroupMember(actorUserId: string, conversationId: string, memberUserId: string): Promise<void>
+  removeGroupMember(actorUserId: string, conversationId: string, memberUserId: string): Promise<{ membershipVersion: string }>
   transferGroupOwnership(actorUserId: string, conversationId: string, targetUserId: string): Promise<void>
-  leaveGroupConversation(actorUserId: string, conversationId: string): Promise<void>
+  leaveGroupConversation(actorUserId: string, conversationId: string): Promise<{ membershipVersion: string }>
   listConversations(actorUserId: string, cursor: string | null, limit: number): Promise<{
     items: MessagingConversationRow[]; nextCursor: string | null; hasMore: boolean
   }>
