@@ -8,7 +8,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  editDirectMessage, fetchMessages, fetchMessagesAfter, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
+  editDirectMessage, fetchConversationMembers, fetchMessages, fetchMessagesAfter, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
   type MessagingAttachment,
 } from '~/lib/messaging-api';
 import type { LocalMediaFile } from '~/lib/publish-api';
