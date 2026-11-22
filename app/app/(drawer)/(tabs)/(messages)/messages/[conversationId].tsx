@@ -63,7 +63,7 @@ const compareSequence = (left: string, right: string) =>
   left.length === right.length ? left.localeCompare(right) : left.length - right.length;
 
 export default function ConversationScreen() {
-  const params = useLocalSearchParams<{ conversationId: string; participantName?: string }>();
+  const params = useLocalSearchParams<{ conversationId: string; participantName?: string; conversationType?: string; groupName?: string }>();
   const conversationId = Array.isArray(params.conversationId) ? params.conversationId[0] : params.conversationId;
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -350,6 +350,7 @@ export default function ConversationScreen() {
           <Feather name="chevron-left" size={24} color={isDark ? '#fff' : '#111827'} />
         </Pressable>
         <Text className="ml-2 flex-1 text-lg font-bold text-neutral-900 dark:text-white" numberOfLines={1}>{params.participantName || '对话'}</Text>
+        {params.conversationType === 'group' ? <Pressable accessibilityRole="button" accessibilityLabel="群聊信息" onPress={() => router.push({ pathname: '/messages/group-info', params: { conversationId, groupName: params.groupName || params.participantName || '群聊' } } as never)} className="p-2"><Feather name="users" size={19} color="#1d9bf0" /></Pressable> : null}
         <Pressable accessibilityRole="button" accessibilityLabel="刷新消息" onPress={() => messagesQuery.refetch()} className="p-2">
           <Feather name="refresh-cw" size={18} color="#1d9bf0" />
         </Pressable>
