@@ -517,40 +517,81 @@ export default function ConversationScreen() {
   }, [draft, sendCurrent]);
 
   const [readAckCycle, setReadAckCycle] = useState(0);
-  const readAckStateRef = useRef({ conversationId, acknowledged: '0', inFlight: false, retryPending: false });
+  const readAckStateRef = useRef<{
+    conversationId: string;
+    acknowledged: string;
+    inFlight: boolean;
+    retryPending: boolean;
+    retryTarget: string;
+    retryAttempt: number;
+    retryTimer: ReturnType<typeof setTimeout> | null;
+  }>({ conversationId, acknowledged: '0', inFlight: false, retryPending: false, retryTarget: '0', retryAttempt: 0, retryTimer: null });
   // Route params can change without remounting this screen. Give each conversation
   // an isolated acknowledgement state so a stale request cannot affect the next chat.
   if (readAckStateRef.current.conversationId !== conversationId) {
-    readAckStateRef.current = { conversationId, acknowledged: '0', inFlight: false, retryPending: false };
+    if (readAckStateRef.current.retryTimer) clearTimeout(readAckStateRef.current.retryTimer);
+    readAckStateRef.current = { conversationId, acknowledged: '0', inFlight: false, retryPending: false, retryTarget: '0', retryAttempt: 0, retryTimer: null };
   }
+  useEffect(() => () => {
+    const state = readAckStateRef.current;
+    if (state.retryTimer) clearTimeout(state.retryTimer);
+    state.retryTimer = null;
+  }, []);
   useEffect(() => {
     if (!isFocused || appState !== 'active') return;
     const state = readAckStateRef.current;
     const latest = messagesQuery.data?.pages?.[0]?.items?.[0];
     if (!latest?.sequence || compareSequence(latest.sequence, state.acknowledged) <= 0) return;
-    // A focus/resume or newer-message update can arrive while the previous request
-    // is settling. Remember one retry so that event is not lost behind single-flight.
+    if (state.retryTarget !== latest.sequence) {
+      state.retryTarget = latest.sequence;
+      state.retryAttempt = 0;
+      if (state.retryTimer) clearTimeout(state.retryTimer);
+      state.retryTimer = null;
+    }
+    // Coalesce focus/resume and newer-message triggers while one request is active.
     if (state.inFlight) {
       state.retryPending = true;
       return;
     }
+    // A failed request gets at most three delayed retries for the same target.
+    if (state.retryTimer) return;
     state.inFlight = true;
     const targetSequence = latest.sequence;
     void markConversationRead(conversationId, targetSequence)
       .then(() => {
         if (readAckStateRef.current !== state) return;
-        if (compareSequence(targetSequence, state.acknowledged) > 0) {
-          state.acknowledged = targetSequence;
-        }
+        if (compareSequence(targetSequence, state.acknowledged) > 0) state.acknowledged = targetSequence;
+        state.retryAttempt = 0;
+        if (state.retryTimer) clearTimeout(state.retryTimer);
+        state.retryTimer = null;
         setReadAckCycle((cycle) => cycle + 1);
         return queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (readAckStateRef.current !== state) return;
+        // A newer target arrived while this request was in flight; retry that target
+        // immediately rather than charging the older failure against its retry budget.
+        if (state.retryTarget !== targetSequence) {
+          state.retryPending = true;
+          return;
+        }
+        state.retryAttempt += 1;
+        if (state.retryAttempt <= 3 && !state.retryTimer) {
+          const delay = [1_000, 3_000, 8_000][state.retryAttempt - 1];
+          state.retryTimer = setTimeout(() => {
+            if (readAckStateRef.current !== state) return;
+            state.retryTimer = null;
+            setReadAckCycle((cycle) => cycle + 1);
+          }, delay);
+        }
+      })
       .finally(() => {
         if (readAckStateRef.current !== state) return;
         state.inFlight = false;
         if (state.retryPending) {
           state.retryPending = false;
+          if (state.retryTimer) clearTimeout(state.retryTimer);
+          state.retryTimer = null;
           setReadAckCycle((cycle) => cycle + 1);
         }
       });
