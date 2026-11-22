@@ -13,6 +13,7 @@ try {
     '0004_w05_messaging_attachments.sql',
     '0005_w05_messaging_lifecycle.sql',
     '0006_w05_messaging_groups.sql',
+    '0007_w05_messaging_event_outbox.sql',
   ]
   for (const filename of migrationPaths) {
     const sql = readFileSync(resolve('workers/W05-social/src/neon-postgres-migrations', filename), 'utf8')
@@ -78,6 +79,18 @@ try {
     throw new Error('Direct-pair uniqueness must apply only to direct conversations')
   }
 
+  const outbox = await pool.query(
+    "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='social_messaging_event_outbox'",
+  )
+  const outboxColumns = new Set(outbox.rows.map(row => row.column_name))
+  for (const name of ['event_id', 'conversation_id', 'event_type', 'payload', 'attempt_count', 'next_attempt_at', 'lease_token', 'lease_expires_at', 'delivered_at', 'failed_at']) {
+    if (!outboxColumns.has(name)) throw new Error('Missing transactional messaging outbox column: ' + name)
+  }
+  const outboxIndexes = await pool.query(
+    "SELECT indexname FROM pg_catalog.pg_indexes WHERE schemaname='public' AND indexname IN ('ix_social_messaging_event_outbox_due','ix_social_messaging_event_outbox_retention')",
+  )
+  if (outboxIndexes.rows.length !== 2) throw new Error('Messaging outbox claim and retention indexes are required')
+
   const sequenceType = await pool.query(
     "SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='social_messages' AND column_name='sequence'",
   )
@@ -93,6 +106,7 @@ try {
     messagingTables: expected.length,
     migrations: migrationPaths,
     groupSchema: true,
+    transactionalOutbox: true,
     lifecycleColumns: ['attachments', 'edited_at', 'recalled_at'],
     recalledTombstoneConstraint: true,
     businessRows: 0,
