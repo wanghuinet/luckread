@@ -912,12 +912,15 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const conversationId = decodePathPart(messagingRealtimeMatch[1] ?? '')
         if (!conversationId) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
         const members = await listConversationMembers(dependencies.messagingStore, actorUserId, conversationId)
-        if (!members.some(member => member.user_id === actorUserId)) throw new MessagingRuntimeError('NOT_FOUND', 404)
+        const actorMember = members.find(member => member.user_id === actorUserId)
+        if (!actorMember) throw new MessagingRuntimeError('NOT_FOUND', 404)
+        if (!/^[1-9][0-9]{0,17}$/.test(actorMember.membership_version)) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
         const hubBinding = env.MESSAGING_REALTIME_HUB
         if (!hubBinding) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
         const hub = hubBinding.get(hubBinding.idFromName(conversationId))
         const forwarded = new Request('https://messaging-hub.internal/connect', request)
         forwarded.headers.set('X-LuckRead-Principal-User-Id', actorUserId)
+        forwarded.headers.set('X-LuckRead-Membership-Version', actorMember.membership_version)
         return hub.fetch(forwarded)
       }
 
@@ -958,8 +961,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         if (memberUserId) {
           if (request.method !== 'DELETE') return new Response(null, { status: 405, headers: { Allow: 'DELETE' } })
           await enforceRateLimit(request, env, 'write:messaging-group-member-remove')
-          await removeGroupMember(dependencies.messagingStore, actorUserId, conversationId, memberUserId)
-          await broadcastMessagingEvent(env, conversationId, actorUserId, 'group.member.removed', { memberUserId })
+          const removed = await removeGroupMember(dependencies.messagingStore, actorUserId, conversationId, memberUserId)
+          await broadcastMessagingEvent(env, conversationId, actorUserId, 'group.member.removed', { memberUserId, membershipVersion: Number(removed.membershipVersion) })
           return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
         }
         if (request.method === 'GET') {
@@ -1002,8 +1005,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         await enforceRateLimit(request, env, 'write:messaging-group-leave')
         const conversationId = decodePathPart(messagingGroupLeaveMatch[1] ?? '')
         if (!conversationId) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
-        await leaveGroupConversation(dependencies.messagingStore, actorUserId, conversationId)
-        await broadcastMessagingEvent(env, conversationId, actorUserId, 'group.member.left', { memberUserId: actorUserId })
+        const left = await leaveGroupConversation(dependencies.messagingStore, actorUserId, conversationId)
+        await broadcastMessagingEvent(env, conversationId, actorUserId, 'group.member.left', { memberUserId: actorUserId, membershipVersion: Number(left.membershipVersion) })
         return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       }
 
