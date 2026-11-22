@@ -15,6 +15,26 @@ function executor(clientResponses: Array<{ rows: Row[]; rowCount?: number }> = [
 }
 
 describe('W05 PostgreSQL messaging store', () => {
+  it('binds the authenticated owner to the same transaction before adding group members', async () => {
+    const { db, client } = executor([
+      { rows: [] }, // BEGIN
+      { rows: [{ set_config: 'user-a' }] }, // transaction-local trusted actor
+      { rows: [{ conversation_id: 'conversation-1' }] }, // owner authorization
+      { rows: [{ user_id: 'user-a' }] }, // current members
+      { rows: [{ user_id: 'user-b' }] }, // mutual contact admission
+      { rows: [] }, // no block
+      { rows: [] }, // insert member
+      { rows: [] }, // conversation timestamp
+      { rows: [] }, // COMMIT
+    ])
+    const store = createPostgresMessagingStore(db as never)
+    await expect(store.addGroupMembers('user-a', 'conversation-1', ['user-b']))
+      .resolves.toEqual({ addedCount: 1 })
+    expect(client.query.mock.calls[1]?.[0]).toContain("set_config('luckread.actor_user_id', $1, true)")
+    expect(client.query.mock.calls[1]?.[1]).toEqual(['user-a'])
+    expect(client.query.mock.calls.at(-1)?.[0]).toBe('COMMIT')
+  })
+
   it('creates a direct conversation and both memberships in one transaction', async () => {
     const { db, client } = executor([
       { rows: [] }, // BEGIN
