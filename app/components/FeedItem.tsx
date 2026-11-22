@@ -415,7 +415,8 @@ const FeedMediaGallery = ({
                         />
                         <TouchableOpacity
                             accessibilityRole="button"
-                            accessibilityLabel="Close image viewer"
+                            accessibilityLabel="关闭图片查看器"
+                            accessibilityHint="关闭图片查看器并返回动态"
                             onPress={() => setViewerStartIndex(null)}
                             style={{
                                 position: 'absolute',
