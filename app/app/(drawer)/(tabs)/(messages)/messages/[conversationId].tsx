@@ -494,6 +494,7 @@ export default function ConversationScreen() {
     readAckStateRef.current = { conversationId, acknowledged: '0', inFlight: false };
   }
   useEffect(() => {
+    if (!isFocused || appState !== 'active') return;
     const state = readAckStateRef.current;
     const latest = messagesQuery.data?.pages?.[0]?.items?.[0];
     if (!latest?.sequence || state.inFlight ||
@@ -513,7 +514,7 @@ export default function ConversationScreen() {
       .finally(() => {
         if (readAckStateRef.current === state) state.inFlight = false;
       });
-  }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient, readAckCycle]);
+  }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient, readAckCycle, isFocused, appState]);
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
