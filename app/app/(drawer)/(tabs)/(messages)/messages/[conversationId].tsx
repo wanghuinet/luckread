@@ -181,8 +181,7 @@ export default function ConversationScreen() {
                     if (item.recalled_at) return item;
                     const currentEditedAt = item.edited_at ?? null;
                     const incomingEditedAt = message.edited_at ?? null;
-                    if (currentEditedAt && incomingEditedAt && incomingEditedAt < currentEditedAt) return item;
-                    if (item.recalled_at && !message.recalled_at) return item;
+                    if (currentEditedAt && (!incomingEditedAt || incomingEditedAt < currentEditedAt)) return item;
                     return { ...item, ...message } as typeof item;
                   }),
                 }));
