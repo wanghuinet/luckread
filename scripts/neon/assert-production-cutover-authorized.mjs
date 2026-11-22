@@ -36,7 +36,7 @@ function main() {
   const bootstrap = JSON.parse(fs.readFileSync('contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
   const evidence = JSON.parse(fs.readFileSync('contracts/database/neon-five-database-remote-schema-evidence.v1.json', 'utf8'))
   const result = assertProductionCutoverAuthorized({ bootstrap, evidence, domainIds })
-  process.stdout.write(JSON.stringify({ productionCutover: 'AUTHORIZED', domains: result }) + '\\n')
+  process.stdout.write(JSON.stringify({ productionCutover: 'AUTHORIZED', domains: result }) + String.fromCharCode(10))
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
