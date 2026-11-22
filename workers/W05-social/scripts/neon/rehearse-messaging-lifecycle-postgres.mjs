@@ -15,6 +15,7 @@ try {
     '0006_w05_messaging_groups.sql',
     '0007_w05_messaging_transactional_outbox.sql',
     '0008_w05_messaging_group_outbox.sql',
+    '0009_w05_messaging_membership_fencing.sql',
   ]
   for (const filename of migrationPaths) {
     const sql = readFileSync(resolve('workers/W05-social/src/neon-postgres-migrations', filename), 'utf8')
@@ -64,7 +65,7 @@ try {
   const triggers = await pool.query(
     "SELECT tgname FROM pg_trigger WHERE tgrelid IN ('social_messages'::regclass, 'social_conversation_memberships'::regclass) AND NOT tgisinternal ORDER BY tgname",
   )
-  if (triggers.rows.length !== 3) throw new Error('Transactional message, read-receipt, or group-membership outbox triggers are missing')
+  if (triggers.rows.length !== 4) throw new Error('Transactional message, read-receipt, group-membership, or membership-version triggers are missing')
 
   const fixtureClient = await pool.connect()
   try {
@@ -100,6 +101,7 @@ try {
       "INSERT INTO social_conversation_memberships (conversation_id, user_id, member_role, joined_at, last_read_sequence) VALUES ('outbox-group', 'outbox-c', 'member', CURRENT_TIMESTAMP, 0)",
     )
     await fixtureClient.query("UPDATE social_conversation_memberships SET left_at = CURRENT_TIMESTAMP WHERE conversation_id = 'outbox-group' AND user_id = 'outbox-c'")
+    await fixtureClient.query("UPDATE social_conversation_memberships SET left_at = NULL, joined_at = CURRENT_TIMESTAMP WHERE conversation_id = 'outbox-group' AND user_id = 'outbox-c'")
     await fixtureClient.query("UPDATE social_conversation_memberships SET member_role = 'owner' WHERE conversation_id = 'outbox-group' AND user_id = 'outbox-b'")
     await fixtureClient.query("UPDATE social_conversation_memberships SET member_role = 'member' WHERE conversation_id = 'outbox-group' AND user_id = 'outbox-a'")
     await fixtureClient.query("SELECT set_config('luckread.actor_user_id', 'outbox-a', true)")
@@ -108,8 +110,25 @@ try {
       "SELECT event_type, count(*)::int AS count FROM social_messaging_outbox WHERE conversation_id = 'outbox-group' GROUP BY event_type",
     )
     const groupEventCounts = Object.fromEntries(groupEvents.rows.map(row => [row.event_type, Number(row.count)]))
-    for (const type of ['group.member.added', 'group.member.removed', 'group.member.left', 'group.owner.transferred']) {
+    for (const type of ['group.member.removed', 'group.member.left', 'group.owner.transferred']) {
       if (groupEventCounts[type] !== 1) throw new Error('Transactional group outbox event missing or duplicated: ' + type)
+    }
+    if (groupEventCounts['group.member.added'] !== 2) throw new Error('Group add and rejoin events must both be enqueued')
+    const fencedMembers = await fixtureClient.query(
+      "SELECT user_id, membership_version::text AS membership_version FROM social_conversation_memberships WHERE conversation_id = 'outbox-group'",
+    )
+    const fencedVersions = Object.fromEntries(fencedMembers.rows.map(row => [row.user_id, row.membership_version]))
+    if (fencedVersions['outbox-a'] !== '3' || fencedVersions['outbox-b'] !== '2' || fencedVersions['outbox-c'] !== '3') {
+      throw new Error('Membership fencing versions did not advance monotonically')
+    }
+    const removedEvent = await fixtureClient.query(
+      "SELECT payload->>'membershipVersion' AS version FROM social_messaging_outbox WHERE conversation_id = 'outbox-group' AND event_type = 'group.member.removed'",
+    )
+    const leftEvent = await fixtureClient.query(
+      "SELECT payload->>'membershipVersion' AS version FROM social_messaging_outbox WHERE conversation_id = 'outbox-group' AND event_type = 'group.member.left'",
+    )
+    if (removedEvent.rows[0]?.version !== '2' || leftEvent.rows[0]?.version !== '3') {
+      throw new Error('Group revocation events must carry their committed membership version')
     }
   } finally {
     try { await fixtureClient.query('ROLLBACK') } finally { fixtureClient.release() }
@@ -127,6 +146,7 @@ try {
     recalledTombstoneConstraint: true,
     transactionalOutboxTriggers: triggers.rows.length,
     groupMembershipEvents: ['group.member.added', 'group.member.removed', 'group.member.left', 'group.owner.transferred'],
+    membershipVersionFencing: true,
     businessRows: 0,
   }))
 } finally {

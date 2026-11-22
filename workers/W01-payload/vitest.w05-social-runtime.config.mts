@@ -63,6 +63,7 @@ export default defineConfig({
       'src/messaging-runtime.test.ts',
       'src/messaging-store-postgres.test.ts',
       'src/messaging-outbox.test.ts',
+      'src/messaging-realtime-hub.test.ts',
     ],
   },
 })
