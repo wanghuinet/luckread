@@ -14,6 +14,7 @@ import {
 import type { LocalMediaFile } from '~/lib/publish-api';
 import { createIdempotencyKey, getApiAuthHeaders } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
+import { resolvePublicProfileById } from '~/lib/content-adapter';
 
 type PendingAttachment = {
   localId: string;
@@ -72,6 +73,21 @@ export default function ConversationScreen() {
   const user = useAuthStore((state) => state.user);
   const userId = user?.id;
   const [draft, setDraft] = useState('');
+  const [senderProfiles, setSenderProfiles] = useState<Record<string, { displayName?: string | null; username?: string }>>({});
+  useEffect(() => {
+    if (params.conversationType !== 'group') return;
+    const senderIds = Array.from(new Set(messages.map(message => message.sender_user_id).filter(id => id && id !== userId)));
+    let active = true;
+    void Promise.all(senderIds.map(async id => [id, await resolvePublicProfileById(id)] as const)).then(results => {
+      if (!active) return;
+      setSenderProfiles(current => {
+        const next = { ...current };
+        for (const [id, profile] of results) if (profile) next[id] = profile;
+        return next;
+      });
+    });
+    return () => { active = false; };
+  }, [messages, params.conversationType, userId]);
   const [editTarget, setEditTarget] = useState<{ messageId: string; body: string } | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
@@ -115,11 +131,11 @@ export default function ConversationScreen() {
       createdAt: new Date(message.created_at),
       user: {
         _id: message.sender_user_id,
-        name: message.sender_user_id === userId ? (user?.name || '我') : (params.participantName || '对方'),
+        name: message.sender_user_id === userId ? (user?.name || '我') : (senderProfiles[message.sender_user_id]?.displayName?.trim() || (senderProfiles[message.sender_user_id]?.username ? '@' + senderProfiles[message.sender_user_id]?.username : params.participantName || '群成员')),
       },
       sent: message.sender_user_id === userId,
     };
-  }), [messages, params.participantName, user?.name, userId]);
+  }), [messages, params.participantName, senderProfiles, user?.name, userId]);
   const latestSequence = messages.reduce((latest, message) =>
     compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const incrementalQuery = useQuery({
