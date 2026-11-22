@@ -46,6 +46,25 @@ describe('messaging transactional outbox dispatcher', () => {
     expect(db.query.mock.calls.some(([sql]) => String(sql).includes('make_interval'))).toBe(true)
   })
 
+  it('flushes successful delivery receipts in one Neon query for a multi-event batch', async () => {
+    const second = { ...event, event_id: '9e0a4a7c-3d32-4d8e-a0d2-2b9b2a0bcb19', payload: { ...event.payload, message_id: 'message-2' } };
+    const db = database([event, second])
+    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ broadcast: true }), { status: 200 }))
+    const hub = { idFromName: vi.fn(() => 'room-id'), get: vi.fn(() => ({ fetch })) }
+
+    await expect(dispatchMessagingOutboxBatch(db as never, hub as never, 2))
+      .resolves.toEqual({ claimed: 2, delivered: 2, retried: 0 })
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+    const acknowledgementCalls = db.query.mock.calls.filter(([sql]) =>
+      String(sql).includes('WITH delivered AS'))
+    expect(acknowledgementCalls).toHaveLength(1)
+    expect(acknowledgementCalls[0]?.[1]).toEqual([
+      [event.event_id, second.event_id], [], [],
+    ])
+  })
+
   it('does not claim work when the realtime namespace is not configured', async () => {
     const db = database()
     await expect(dispatchMessagingOutboxBatch(db as never, undefined))

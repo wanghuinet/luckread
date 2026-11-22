@@ -56,34 +56,41 @@ async function claimBatch(db: MessagingOutboxDatabase, limit: number): Promise<C
   return result.rows
 }
 
-async function markDelivered(db: MessagingOutboxDatabase, eventId: string): Promise<void> {
+async function persistDeliveryResults(
+  db: MessagingOutboxDatabase,
+  deliveredIds: string[],
+  retries: Array<{ eventId: string; error: string }>,
+): Promise<void> {
+  if (!deliveredIds.length && !retries.length) return;
   await db.query(
-    `UPDATE social_messaging_outbox
-        SET delivered_at = CURRENT_TIMESTAMP, locked_until = NULL, last_error = NULL
-      WHERE event_id = $1 AND delivered_at IS NULL`,
-    [eventId],
-  )
-}
-
-async function scheduleRetry(db: MessagingOutboxDatabase, row: ClaimedOutboxRow, error: string): Promise<void> {
-  await db.query(
-    `UPDATE social_messaging_outbox
-        SET locked_until = NULL,
-            available_at = CURRENT_TIMESTAMP +
-              make_interval(secs => LEAST(3600, (POWER(2, LEAST(attempt_count, 12)))::integer)),
-            last_error = $2
-      WHERE event_id = $1 AND delivered_at IS NULL`,
-    [row.event_id, error.slice(0, 160)],
-  )
+    `WITH delivered AS (
+       UPDATE social_messaging_outbox
+          SET delivered_at = CURRENT_TIMESTAMP, locked_until = NULL, last_error = NULL
+        WHERE event_id::text = ANY($1::text[]) AND delivered_at IS NULL
+       RETURNING event_id
+     ),
+     retried AS (
+       UPDATE social_messaging_outbox outbox
+          SET locked_until = NULL,
+              available_at = CURRENT_TIMESTAMP +
+                make_interval(secs => LEAST(3600, (POWER(2, LEAST(outbox.attempt_count, 12)))::integer)),
+              last_error = retry.last_error
+         FROM unnest($2::text[], $3::text[]) AS retry(event_id, last_error)
+        WHERE outbox.event_id::text = retry.event_id AND outbox.delivered_at IS NULL
+       RETURNING outbox.event_id
+     )
+     SELECT (SELECT COUNT(*) FROM delivered) AS delivered_count,
+            (SELECT COUNT(*) FROM retried) AS retried_count`,
+    [deliveredIds, retries.map((item) => item.eventId), retries.map((item) => item.error.slice(0, 160))],
+  );
 }
 
 async function deliverOne(
-  db: MessagingOutboxDatabase,
   hub: MessagingRealtimeNamespace,
   row: ClaimedOutboxRow,
-): Promise<boolean> {
+): Promise<{ eventId: string; delivered: boolean; error?: string }> {
   try {
-    const room = hub.get(hub.idFromName(row.conversation_id))
+    const room = hub.get(hub.idFromName(row.conversation_id));
     const response = await room.fetch('https://messaging-hub.internal/broadcast', {
       method: 'POST',
       headers: {
@@ -98,33 +105,41 @@ async function deliverOne(
         occurredAt: row.occurred_at,
         payload: row.payload,
       }),
-    })
-    if (!response.ok) {
-      await scheduleRetry(db, row, 'hub_http_' + response.status)
-      return false
-    }
-    await markDelivered(db, row.event_id)
-    return true
+    });
+    return response.ok
+      ? { eventId: row.event_id, delivered: true }
+      : { eventId: row.event_id, delivered: false, error: 'hub_http_' + response.status };
   } catch (error) {
-    await scheduleRetry(db, row, error instanceof Error ? 'delivery_' + error.name : 'delivery_unknown')
-    return false
+    return {
+      eventId: row.event_id,
+      delivered: false,
+      error: error instanceof Error ? 'delivery_' + error.name : 'delivery_unknown',
+    };
   }
 }
 
-/** At-least-once delivery. A lease recovers abandoned claims; event consumers must be idempotent. */
+/** At-least-once delivery. Hub calls are bounded-concurrent; Neon results flush once per batch. */
 export async function dispatchMessagingOutboxBatch(
   db: MessagingOutboxDatabase,
   hub: MessagingRealtimeNamespace | undefined,
   limit = 25,
 ): Promise<{ claimed: number; delivered: number; retried: number }> {
-  if (!hub) return { claimed: 0, delivered: 0, retried: 0 }
-  const safeLimit = Number.isFinite(limit) ? Math.min(100, Math.max(1, Math.floor(limit))) : 25
-  const rows = await claimBatch(db, safeLimit)
-  let delivered = 0
-  for (const row of rows) {
-    if (await deliverOne(db, hub, row)) delivered += 1
+  if (!hub) return { claimed: 0, delivered: 0, retried: 0 };
+  const safeLimit = Number.isFinite(limit) ? Math.min(100, Math.max(1, Math.floor(limit))) : 25;
+  const rows = await claimBatch(db, safeLimit);
+  const results: Array<{ eventId: string; delivered: boolean; error?: string }> = [];
+  // Keep fan-out pressure bounded even when the caller requests the hard 100-row batch.
+  for (let offset = 0; offset < rows.length; offset += 5) {
+    const chunk = rows.slice(offset, offset + 5);
+    results.push(...await Promise.all(chunk.map((row) => deliverOne(hub, row))));
   }
-  return { claimed: rows.length, delivered, retried: rows.length - delivered }
+  const deliveredIds = results.filter((item) => item.delivered).map((item) => item.eventId);
+  const retries = results.filter((item) => !item.delivered).map((item) => ({
+    eventId: item.eventId,
+    error: item.error ?? 'delivery_unknown',
+  }));
+  await persistDeliveryResults(db, deliveredIds, retries);
+  return { claimed: rows.length, delivered: deliveredIds.length, retried: retries.length };
 }
 
 /** Bound cleanup work; delivered events are retained for seven days for incident inspection. */
