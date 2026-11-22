@@ -34,6 +34,18 @@ async function withTransaction<T>(db: MessagingPostgresExecutor, run: (client: P
     throw error
   } finally { client.release() }
 }
+
+/** Attach the trusted mutation actor to this transaction for membership outbox triggers. */
+async function withActorTransaction<T>(
+  db: MessagingPostgresExecutor,
+  actorUserId: string,
+  run: (client: PgClient) => Promise<T>,
+): Promise<T> {
+  return withTransaction(db, async client => {
+    await client.query("SELECT set_config('luckread.actor_user_id', $1, true)", [actorUserId])
+    return run(client)
+  })
+}
 const messageSelect = `message_id, conversation_id, sender_user_id, sequence::text AS sequence,
   body, COALESCE(attachments, '[]'::jsonb) AS attachments, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
   CASE WHEN edited_at IS NULL THEN NULL ELSE to_char(edited_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS edited_at,
@@ -49,7 +61,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
       }
       const participants = [actorUserId, ...members]
       try {
-        return await withTransaction(db, async client => {
+        return await withActorTransaction(db, actorUserId, async client => {
           const contacts = await client.query<{ user_id: string }>(
             `SELECT target.user_id
                FROM unnest($2::text[]) AS target(user_id)
@@ -133,7 +145,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
       if (!validId(conversationId) || members.length < 1 || members.length > 49 ||
         members.some(id => !validId(id) || id === actorUserId)) throw new MessagingStoreError('VALIDATION_FAILED', 422)
       try {
-        return await withTransaction(db, async client => {
+        return await withActorTransaction(db, actorUserId, async client => {
           const group = await client.query<{ conversation_id: string }>(
             `SELECT c.conversation_id FROM social_conversations c
               JOIN social_conversation_memberships mine
@@ -194,7 +206,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
     async removeGroupMember(actorUserId, conversationId, memberUserId) {
       if (!validId(conversationId) || !validId(memberUserId) || actorUserId === memberUserId) throw new MessagingStoreError('VALIDATION_FAILED', 422)
       try {
-        await withTransaction(db, async client => {
+        await withActorTransaction(db, actorUserId, async client => {
           const group = await client.query(
             `SELECT c.conversation_id FROM social_conversations c
               JOIN social_conversation_memberships owner
@@ -220,7 +232,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
     async transferGroupOwnership(actorUserId, conversationId, targetUserId) {
       if (!validId(conversationId) || !validId(targetUserId) || actorUserId === targetUserId) throw new MessagingStoreError('VALIDATION_FAILED', 422)
       try {
-        await withTransaction(db, async client => {
+        await withActorTransaction(db, actorUserId, async client => {
           const group = await client.query(
             `SELECT c.conversation_id FROM social_conversations c
               JOIN social_conversation_memberships owner
@@ -249,7 +261,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
     async leaveGroupConversation(actorUserId, conversationId) {
       if (!validId(conversationId)) throw new MessagingStoreError('VALIDATION_FAILED', 422)
       try {
-        await withTransaction(db, async client => {
+        await withActorTransaction(db, actorUserId, async client => {
           const member = await client.query<{ member_role: string }>(
             `SELECT m.member_role FROM social_conversation_memberships m
               JOIN social_conversations c ON c.conversation_id = m.conversation_id
