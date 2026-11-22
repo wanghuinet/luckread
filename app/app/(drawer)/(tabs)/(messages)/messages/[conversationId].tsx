@@ -8,11 +8,11 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  editDirectMessage, fetchConversationMembers, fetchConversationTyping, setConversationTyping, fetchMessages, fetchMessagesAfter, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
+  editDirectMessage, fetchConversationMembers, fetchConversationTyping, fetchMessages, fetchMessagesAfter, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
   type MessagingAttachment,
 } from '~/lib/messaging-api';
 import type { LocalMediaFile } from '~/lib/publish-api';
-import { connectMessagingRealtime } from '~/lib/messaging-realtime';
+import { connectMessagingRealtime, setMessagingRealtimeTyping } from '~/lib/messaging-realtime';
 import { createIdempotencyKey, getApiAuthHeaders } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
 import { resolvePublicProfileById } from '~/lib/content-adapter';
@@ -126,14 +126,14 @@ export default function ConversationScreen() {
     typingTimer.current = null;
     if (!typingActiveRef.current) return;
     typingActiveRef.current = false;
-    void setConversationTyping(conversationId, false).catch(() => undefined);
+    setMessagingRealtimeTyping(conversationId, false);
   }, [conversationId]);
   const handleDraftChange = useCallback((value: string) => {
     setDraft(value);
     if (!value.trim()) { stopTyping(); return; }
     if (!typingActiveRef.current) {
       typingActiveRef.current = true;
-      void setConversationTyping(conversationId, true).catch(() => undefined);
+      setMessagingRealtimeTyping(conversationId, true);
     }
     if (typingTimer.current) clearTimeout(typingTimer.current);
     typingTimer.current = setTimeout(stopTyping, 1800);
