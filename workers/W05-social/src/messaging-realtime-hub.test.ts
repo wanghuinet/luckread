@@ -2,16 +2,19 @@ import { describe, expect, it, vi } from 'vitest'
 import { MessagingRealtimeHub } from './messaging-realtime-hub.js'
 
 function makeSocket(userId: string, membershipVersion = 1) {
-  return {
+  const socket = {
     deserializeAttachment: () => ({ userId, membershipVersion }),
-    close: vi.fn(),
+    __closed: false,
+    close: vi.fn(() => { socket.__closed = true }),
     send: vi.fn(),
-  } as unknown as WebSocket & { close: ReturnType<typeof vi.fn>; send: ReturnType<typeof vi.fn> }
+  }
+  return socket as unknown as WebSocket & { close: ReturnType<typeof vi.fn>; send: ReturnType<typeof vi.fn>; __closed: boolean }
 }
 
-function makeState(sockets: WebSocket[], typing: Record<string, number> = {}) {
+function makeState(sockets: WebSocket[], typing: Record<string, number> = {}, revokedVersions: Record<string, number> = {}) {
   const values = new Map<string, unknown>()
   if (Object.keys(typing).length) values.set('typing', { ...typing })
+  for (const [userId, version] of Object.entries(revokedVersions)) values.set(`membership-revoked:${userId}`, version)
   const storage = {
     get: vi.fn(async (key: string) => values.get(key)),
     put: vi.fn(async (key: string, value: unknown) => { values.set(key, value) }),
@@ -20,7 +23,7 @@ function makeState(sockets: WebSocket[], typing: Record<string, number> = {}) {
     deleteAlarm: vi.fn(async () => undefined),
   }
   return {
-    state: { getWebSockets: () => sockets, storage } as unknown as DurableObjectState,
+    state: { getWebSockets: () => sockets.filter(socket => !(socket as WebSocket & { __closed?: boolean }).__closed), storage } as unknown as DurableObjectState,
     storage,
   }
 }
@@ -118,6 +121,22 @@ describe('MessagingRealtimeHub membership revocation', () => {
     expect(rejoinedSession.send).toHaveBeenCalledOnce()
     expect(storage.put).toHaveBeenCalledWith('membership-revoked:same-user', 2)
     expect(storage.put).not.toHaveBeenCalledWith('typing', {})
+  })
+
+  it('rejects typing writes from a stale membership version', async () => {
+    const { state, storage } = makeState([], {}, { 'member-user': 2 })
+    const hub = new MessagingRealtimeHub(state)
+    const response = await hub.fetch(new Request('https://messaging-hub.internal/update', {
+      method: 'POST',
+      headers: {
+        'X-LuckRead-Principal-User-Id': 'member-user',
+        'X-LuckRead-Membership-Version': '2',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ userId: 'member-user', typing: true }),
+    }))
+    expect(response.status).toBe(403)
+    expect(storage.put).not.toHaveBeenCalledWith('typing', expect.anything())
   })
 
   it('rejects oversized or unsupported events before broadcasting', async () => {
