@@ -75,6 +75,13 @@ export async function removeGroupMember(store: MessagingStore | undefined, actor
   if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
   return storeCall(() => store.removeGroupMember(requireId(actorValue, 'UNAUTHENTICATED'), requireId(conversationId), requireId(memberUserId)))
 }
+export async function transferGroupOwnership(store: MessagingStore | undefined, actorValue: string, conversationId: string, targetValue: string) {
+  if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
+  const actor = requireId(actorValue, 'UNAUTHENTICATED')
+  const target = requireId(targetValue)
+  if (actor === target) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+  return storeCall(() => store.transferGroupOwnership(actor, requireId(conversationId), target))
+}
 export async function leaveGroupConversation(store: MessagingStore | undefined, actorValue: string, conversationId: string) {
   if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
   return storeCall(() => store.leaveGroupConversation(requireId(actorValue, 'UNAUTHENTICATED'), requireId(conversationId)))
