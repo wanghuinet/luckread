@@ -235,9 +235,10 @@ test('hides and restores the X-style bottom navigation and publish action during
   expect(tabLayoutSource).toContain('TabBarScrollProvider');
   expect(bottomTabBarSource).toContain('transform: [{ translateY: tabBarTranslateY }]');
   expect(homeScreen).toContain('transform: [{ translateY: tabBarTranslateY }]');
-  expect(tabBarScrollSource).toContain('HIDE_SCROLL_THRESHOLD');
-  expect(tabBarScrollSource).toContain('SHOW_SCROLL_THRESHOLD');
-  expect(tabBarScrollSource).toContain('setTabBarVisible(direction < 0)');
+  const scrollStateSource = readFileSync(new URL('../lib/tab-bar-scroll-state.ts', import.meta.url), 'utf8');
+  expect(scrollStateSource).toContain('HIDE_SCROLL_THRESHOLD');
+  expect(scrollStateSource).toContain('SHOW_SCROLL_THRESHOLD');
+  expect(tabBarScrollSource).toContain('transition.visibility');
   expect(tabBarScrollSource).toContain('duration: 210');
   expect(tabBarScrollSource).toContain('useNativeDriver: true');
 });
