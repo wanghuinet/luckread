@@ -959,6 +959,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           if (request.method !== 'DELETE') return new Response(null, { status: 405, headers: { Allow: 'DELETE' } })
           await enforceRateLimit(request, env, 'write:messaging-group-member-remove')
           await removeGroupMember(dependencies.messagingStore, actorUserId, conversationId, memberUserId)
+          await broadcastMessagingEvent(env, conversationId, actorUserId, 'group.member.removed', { memberUserId })
           return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
         }
         if (request.method === 'GET') {
@@ -971,7 +972,9 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
         if (!body || typeof body !== 'object' || Array.isArray(body) ||
           Object.keys(body).some(key => key !== 'memberUserIds')) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
-        const data = await addGroupMembers(dependencies.messagingStore, actorUserId, conversationId, (body as { memberUserIds?: unknown }).memberUserIds)
+        const memberUserIds = (body as { memberUserIds?: unknown }).memberUserIds
+        const data = await addGroupMembers(dependencies.messagingStore, actorUserId, conversationId, memberUserIds)
+        await broadcastMessagingEvent(env, conversationId, actorUserId, 'group.member.added', { memberUserIds, data })
         return json({ data, requestId: createRequestId() })
       }
 
@@ -986,7 +989,9 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         let body: unknown
         try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
         if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => key !== 'targetUserId') || typeof (body as {targetUserId?:unknown}).targetUserId !== 'string') throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
-        await transferGroupOwnership(dependencies.messagingStore, actorUserId, conversationId, (body as {targetUserId:string}).targetUserId)
+        const targetUserId = (body as {targetUserId:string}).targetUserId
+        await transferGroupOwnership(dependencies.messagingStore, actorUserId, conversationId, targetUserId)
+        await broadcastMessagingEvent(env, conversationId, actorUserId, 'group.owner.transferred', { targetUserId })
         return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       }
 
@@ -999,6 +1004,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const conversationId = decodePathPart(messagingGroupLeaveMatch[1] ?? '')
         if (!conversationId) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
         await leaveGroupConversation(dependencies.messagingStore, actorUserId, conversationId)
+        await broadcastMessagingEvent(env, conversationId, actorUserId, 'group.member.left', { memberUserId: actorUserId })
         return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       }
 
