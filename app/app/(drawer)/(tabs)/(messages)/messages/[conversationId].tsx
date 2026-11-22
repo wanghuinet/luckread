@@ -10,6 +10,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   editDirectMessage, fetchConversationMembers, fetchMessages, fetchMessagesAfterBatch, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
   type MessagingAttachment,
+  type MessagingMessage,
 } from '~/lib/messaging-api';
 import type { LocalMediaFile } from '~/lib/publish-api';
 import { connectMessagingRealtime, setMessagingRealtimeTyping } from '~/lib/messaging-realtime';
@@ -295,7 +296,7 @@ export default function ConversationScreen() {
     queryFn: async ({ signal }) => {
       // Each batch is capped at 10 pages. Continue for at most four additional batches
       // (2,000 messages) in this query cycle to avoid an unbounded request burst.
-      const items = [];
+      const items: MessagingMessage[] = [];
       let cursor = continuationCursor!;
       let hasMore = true;
       for (let batch = 0; batch < 4 && hasMore; batch++) {
