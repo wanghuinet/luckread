@@ -22,7 +22,7 @@ export function searchHistoryStorageKey(viewerId: string | null | undefined): st
 
 export function normalizeSearchHistoryTerm(value: unknown): string | null {
   if (typeof value !== 'string') return null;
-  const normalized = value.normalize('NFKC').trim().replace(/\\s+/gu, ' ').slice(0, MAX_SEARCH_TERM_LENGTH);
+  const normalized = value.normalize('NFKC').trim().replace(/\s+/gu, ' ').slice(0, MAX_SEARCH_TERM_LENGTH);
   return normalized || null;
 }
 
