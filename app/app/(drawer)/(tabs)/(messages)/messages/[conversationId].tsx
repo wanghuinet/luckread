@@ -288,6 +288,14 @@ export default function ConversationScreen() {
     enabled: Boolean(conversationId) && messagesQuery.isSuccess && isFocused && appState === 'active',
     staleTime: Infinity,
   });
+  // Continue bounded drains from the returned cursor rather than silently stopping at the 500-message budget.
+  const continuationCursor = incrementalQuery.data?.hasMore ? incrementalQuery.data.nextCursor : null;
+  const continuationQuery = useQuery({
+    queryKey: ['messaging', 'messages-after-continuation', conversationId, continuationCursor],
+    queryFn: ({ signal }) => fetchMessagesAfterBatch(conversationId, continuationCursor!, signal),
+    enabled: Boolean(conversationId) && Boolean(continuationCursor) && isFocused && appState === 'active',
+    staleTime: Infinity,
+  });
   useEffect(() => {
     const incoming = incrementalQuery.data?.items ?? [];
     if (!incoming.length) return;
