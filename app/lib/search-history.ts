@@ -17,7 +17,7 @@ const pendingMutations = new Map<string, Promise<string[]>>();
 
 export function searchHistoryStorageKey(viewerId: string | null | undefined): string {
   const normalizedViewerId = typeof viewerId === 'string' ? viewerId.trim() : '';
-  return SEARCH_HISTORY_STORAGE_PREFIX + (normalizedViewerId ? encodeURIComponent(normalizedViewerId) : 'anonymous');
+  return SEARCH_HISTORY_STORAGE_PREFIX + (normalizedViewerId ? 'user:' + encodeURIComponent(normalizedViewerId) : 'anonymous');
 }
 
 export function normalizeSearchHistoryTerm(value: unknown): string | null {
