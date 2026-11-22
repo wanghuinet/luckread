@@ -8,7 +8,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  editDirectMessage, fetchConversationMembers, fetchMessages, fetchMessagesAfter, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
+  editDirectMessage, fetchConversationMembers, fetchMessages, fetchMessagesAfterBatch, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
   type MessagingAttachment,
 } from '~/lib/messaging-api';
 import type { LocalMediaFile } from '~/lib/publish-api';
@@ -261,8 +261,8 @@ export default function ConversationScreen() {
   const latestSequence = messages.reduce((latest, message) =>
     compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const incrementalQuery = useQuery({
-    queryKey: ['messaging', 'messages-after', conversationId],
-    queryFn: ({ signal }) => fetchMessagesAfter(conversationId, latestSequence, signal),
+    queryKey: ['messaging', 'messages-after', conversationId, latestSequence],
+    queryFn: ({ signal }) => fetchMessagesAfterBatch(conversationId, latestSequence, signal),
     enabled: Boolean(conversationId) && messagesQuery.isSuccess && isFocused && appState === 'active',
     staleTime: Infinity,
   });
