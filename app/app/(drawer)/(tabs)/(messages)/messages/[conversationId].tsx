@@ -471,25 +471,33 @@ export default function ConversationScreen() {
     sendCurrent(newMessages[0]?.text ?? draft);
   }, [draft, sendCurrent]);
 
-  const readAckSequenceRef = useRef('0');
   const [readAckCycle, setReadAckCycle] = useState(0);
-  const readAckInFlightRef = useRef(false);
+  const readAckStateRef = useRef({ conversationId, acknowledged: '0', inFlight: false });
+  // Route params can change without remounting this screen. Give each conversation
+  // an isolated acknowledgement state so a stale request cannot affect the next chat.
+  if (readAckStateRef.current.conversationId !== conversationId) {
+    readAckStateRef.current = { conversationId, acknowledged: '0', inFlight: false };
+  }
   useEffect(() => {
+    const state = readAckStateRef.current;
     const latest = messagesQuery.data?.pages?.[0]?.items?.[0];
-    if (!latest?.sequence || readAckInFlightRef.current ||
-      compareSequence(latest.sequence, readAckSequenceRef.current) <= 0) return;
-    readAckInFlightRef.current = true;
+    if (!latest?.sequence || state.inFlight ||
+      compareSequence(latest.sequence, state.acknowledged) <= 0) return;
+    state.inFlight = true;
     const targetSequence = latest.sequence;
     void markConversationRead(conversationId, targetSequence)
       .then(() => {
-        if (compareSequence(targetSequence, readAckSequenceRef.current) > 0) {
-          readAckSequenceRef.current = targetSequence;
+        if (readAckStateRef.current !== state) return;
+        if (compareSequence(targetSequence, state.acknowledged) > 0) {
+          state.acknowledged = targetSequence;
         }
         setReadAckCycle((cycle) => cycle + 1);
         return queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
       })
       .catch(() => undefined)
-      .finally(() => { readAckInFlightRef.current = false; });
+      .finally(() => {
+        if (readAckStateRef.current === state) state.inFlight = false;
+      });
   }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient, readAckCycle]);
 
   return (
