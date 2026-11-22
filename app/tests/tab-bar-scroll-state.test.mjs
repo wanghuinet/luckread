@@ -1,13 +1,13 @@
 import { expect, test } from 'bun:test';
-import { advanceTabBarScrollState, type TabBarScrollState } from '../lib/tab-bar-scroll-state';
+import { advanceTabBarScrollState } from '../lib/tab-bar-scroll-state';
 
-const initialState = (): TabBarScrollState => ({
+const initialState = () => ({
   lastOffset: null,
   direction: 0,
   accumulatedDistance: 0,
 });
 
-const advance = (state: TabBarScrollState, offset: number) =>
+const advance = (state, offset) =>
   advanceTabBarScrollState(state, offset);
 
 test('hides only after accumulated downward movement reaches the threshold', () => {
@@ -70,7 +70,7 @@ test('returning to the top restores the tab bar and resets direction history', (
 });
 
 test('ignores invalid offsets and sub-pixel jitter without corrupting scroll state', () => {
-  const state = { lastOffset: 100, direction: 1 as const, accumulatedDistance: 6 };
+  const state = { lastOffset: 100, direction: 1, accumulatedDistance: 6 };
   expect(advance(state, Number.NaN)).toEqual({ state, visibility: null });
 
   const jitter = advance(state, 100.05);
