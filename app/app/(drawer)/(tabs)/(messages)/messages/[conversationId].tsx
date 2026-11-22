@@ -100,6 +100,10 @@ export default function ConversationScreen() {
     staleTime: 15_000,
   });
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
+  const membersQuery = useQuery({ queryKey: ['messaging', 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal), enabled: Boolean(conversationId) && params.conversationType !== 'group', refetchInterval: isFocused && appState === 'active' ? 8_000 : false });
+  const latestOwnMessage = messages.filter(message => message.sender_user_id === userId && !message.recalled_at).reduce((latest, message) => compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
+  const peerReadSequence = membersQuery.data?.find(member => member.user_id !== userId)?.last_read_sequence ?? '0';
+  const lastOwnMessageIsRead = latestOwnMessage !== '0' && compareSequence(peerReadSequence, latestOwnMessage) >= 0;
   useEffect(() => {
     if (params.conversationType !== 'group') return;
     const senderIds = Array.from(new Set(messages.map(message => message.sender_user_id)
@@ -441,6 +445,7 @@ export default function ConversationScreen() {
               isSendButtonAlwaysVisible
             />
           </View>
+          {params.conversationType !== 'group' && latestOwnMessage !== '0' ? <Text className="px-4 pb-1 text-right text-xs text-neutral-500 dark:text-neutral-400">{lastOwnMessageIsRead ? '已读' : '已发送'}</Text> : null}
           <View className="flex-row items-center border-t border-neutral-100 px-4 py-2 dark:border-neutral-800">
             <Pressable accessibilityRole="button" accessibilityLabel="添加图片附件" disabled={isPicking || sendMutation.isPending || pendingAttachments.length >= 4} onPress={() => void pickAttachments()} className="mr-3 rounded-full p-2">
               {isPicking ? <ActivityIndicator size="small" color="#1d9bf0" /> : <Feather name="paperclip" size={21} color="#1d9bf0" />}
