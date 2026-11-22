@@ -306,6 +306,9 @@ const FeedMediaGallery = ({
                             <FeedVideoAttachment uri={media.src} headers={media.headers} />
                         ) : requiresAuthenticatedViewer ? (
                             <TouchableOpacity
+                                accessibilityRole="button"
+                                accessibilityLabel={`查看图片：${media.alt}`}
+                                accessibilityHint="打开图片查看器"
                                 activeOpacity={0.9}
                                 onPress={() => {
                                     setViewerStartIndex(currentImageIndex);
