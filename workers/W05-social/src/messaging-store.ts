@@ -25,6 +25,7 @@ export type MessagingConversationMemberRow = Readonly<{
   user_id: string
   member_role: 'owner' | 'member'
   joined_at: string
+  last_read_sequence: string
 }>
 export type MessagingMessageRow = Readonly<{
   message_id: string
