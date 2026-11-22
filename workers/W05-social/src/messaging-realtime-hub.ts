@@ -61,8 +61,14 @@ export class MessagingRealtimeHub {
       let body: unknown;
       try { body = await request.json(); } catch { return new Response('Invalid JSON', { status: 400 }); }
       if (!body || typeof body !== 'object' || Array.isArray(body)) return new Response('Invalid payload', { status: 400 });
+      const actor = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? '';
+      const rawMembershipVersion = request.headers.get('X-LuckRead-Membership-Version')?.trim() ?? '';
+      if (!USER_ID.test(actor) || !/^[1-9][0-9]{0,17}$/.test(rawMembershipVersion)) return new Response('Unauthorized', { status: 401 });
+      const membershipVersion = Number(rawMembershipVersion);
+      if (!Number.isSafeInteger(membershipVersion)) return new Response('Invalid membership version', { status: 422 });
       const input = body as { userId?: unknown; typing?: unknown };
-      if (typeof input.userId !== 'string' || !USER_ID.test(input.userId) || typeof input.typing !== 'boolean') return new Response('Invalid payload', { status: 422 });
+      if (input.userId !== actor || typeof input.typing !== 'boolean') return new Response('Invalid payload', { status: 422 });
+      if (!(await this.isMembershipActive(actor, membershipVersion))) return new Response('Conversation membership revoked', { status: 403 });
       const state = await this.readTypingState();
       if (input.typing) state[input.userId] = Date.now() + TYPING_TTL_MS;
       else delete state[input.userId];
@@ -85,7 +91,7 @@ export class MessagingRealtimeHub {
     if (!Number.isSafeInteger(membershipVersion)) return new Response('Invalid membership version', { status: 422 });
     const revocationKey = `membership-revoked:${userId}`;
     const revokedVersion = await this.state.storage.get<number>(revocationKey);
-    if (Number.isSafeInteger(revokedVersion) && membershipVersion <= (revokedVersion as number)) {
+    if (!this.isMembershipVersionActive(membershipVersion, revokedVersion)) {
       return new Response('Conversation membership revoked', { status: 403 });
     }
     if (revokedVersion !== undefined && membershipVersion > (revokedVersion as number)) {
@@ -98,7 +104,7 @@ export class MessagingRealtimeHub {
     this.state.acceptWebSocket(server, [`user:${userId}`]);
     // Recheck after accept: a revoke event may have been delivered while the initial storage read yielded.
     const latestRevokedVersion = await this.state.storage.get<number>(revocationKey);
-    if (Number.isSafeInteger(latestRevokedVersion) && membershipVersion <= (latestRevokedVersion as number)) {
+    if (!this.isMembershipVersionActive(membershipVersion, latestRevokedVersion)) {
       try { server.close(4003, 'Conversation membership revoked'); } catch { /* closed during handshake */ }
       return new Response('Conversation membership revoked', { status: 403 });
     }
@@ -119,7 +125,11 @@ export class MessagingRealtimeHub {
     if (frame.type !== 'typing.start' && frame.type !== 'typing.stop') return;
     const attachment = socket.deserializeAttachment() as SocketAttachment | null;
     const userId = attachment?.userId;
-    if (!userId || !USER_ID.test(userId)) return;
+    if (!userId || !USER_ID.test(userId) || !Number.isSafeInteger(attachment?.membershipVersion)) return;
+    if (!(await this.isMembershipActive(userId, attachment.membershipVersion))) {
+      try { socket.close(4003, 'Conversation membership revoked'); } catch { /* already closed */ }
+      return;
+    }
     const state = await this.readTypingState();
     if (frame.type === 'typing.start') state[userId] = Date.now() + TYPING_TTL_MS;
     else delete state[userId];
@@ -128,6 +138,16 @@ export class MessagingRealtimeHub {
   }
   webSocketClose(_socket: WebSocket, _code: number, _reason: string, _wasClean: boolean): void {}
   webSocketError(_socket: WebSocket, _error: unknown): void {}
+
+  private isMembershipVersionActive(membershipVersion: number, revokedVersion: number | undefined): boolean {
+    return Number.isSafeInteger(membershipVersion) && membershipVersion > 0 &&
+      (!Number.isSafeInteger(revokedVersion) || membershipVersion > (revokedVersion as number));
+  }
+
+  private async isMembershipActive(userId: string, membershipVersion: number): Promise<boolean> {
+    const revokedVersion = await this.state.storage.get<number>(`membership-revoked:${userId}`);
+    return this.isMembershipVersionActive(membershipVersion, revokedVersion);
+  }
 
   private async revokeUser(userId: string, membershipVersion: number): Promise<void> {
     const revocationKey = `membership-revoked:${userId}`;
