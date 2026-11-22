@@ -141,7 +141,7 @@ export default function ConversationScreen() {
             message.body,
             ...attachments.filter((attachment) => !attachment.mimeType.startsWith('image/'))
               .map((attachment) => '📎 ' + attachment.filename),
-          ].filter(Boolean).join('\\n') + (message.edited_at ? '  （已编辑）' : ''),
+          ].filter(Boolean).join(' ') + (message.edited_at ? '  （已编辑）' : ''),
       ...(!message.recalled_at && imageUrls.length ? { image: JSON.stringify(imageUrls) } : {}),
       createdAt: new Date(message.created_at),
       user: {
