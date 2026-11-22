@@ -314,6 +314,20 @@ export function fetchDiscoveryTopics(signal?: AbortSignal) {
 }
 
 
+/** Read W04's bounded public trending-search projection through the existing W01 boundary. */
+export function fetchTrendingSearches(options: { limit?: number; signal?: AbortSignal } = {}) {
+  const limit = options.limit ?? 10;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
+    throw new TypeError('Trending search limit must be an integer from 1 to 20.');
+  }
+  const params = new URLSearchParams({ limit: String(limit) });
+  return apiRequest<unknown>('/search/trending?' + params.toString(), {
+    method: 'GET',
+    auth: false,
+    signal: options.signal,
+  });
+}
+
 /** Search public LuckRead content through the canonical W01 -> W04 -> W03 route. */
 export function fetchContentSearchPage(queryValue: string, options: PageRequestOptions = {}) {
   const query = queryValue.trim()
