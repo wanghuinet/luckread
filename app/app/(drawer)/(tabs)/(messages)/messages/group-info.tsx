@@ -58,7 +58,7 @@ export default function GroupInfoScreen() {
   });
   const currentIds = new Set(members.data?.map(m => m.user_id) ?? []);
   const filteredCandidates = useMemo(() => (candidates.data ?? []).filter(p => {
-    if (!p.id || currentIds.has(p.id) || selected.includes(p.id)) return false;
+    if (!p.id || currentIds.has(p.id)) return false;
     const term = search.trim().replace(/^@/, '').toLowerCase();
     if (!term) return true;
     return (p.username ?? '').toLowerCase().includes(term) || (p.displayName ?? '').toLowerCase().includes(term);
@@ -103,9 +103,9 @@ export default function GroupInfoScreen() {
         {filteredCandidates.map(profile => <Pressable key={profile.id} onPress={() => toggle(profile.id)} className="flex-row items-center border-b border-neutral-100 py-3 dark:border-neutral-800">
           {profile.avatar ? <Image source={{ uri: profile.avatar }} className="h-10 w-10 rounded-full" /> : <View className="h-10 w-10 items-center justify-center rounded-full bg-neutral-200 dark:bg-neutral-700"><Feather name="user" size={18} color="#6b7280" /></View>}
           <View className="ml-3 flex-1"><Text className="font-semibold text-neutral-900 dark:text-white">{display(profile)}</Text><Text className="text-xs text-neutral-500">@{profile.username || profile.id}</Text></View>
-          <Feather name="circle" size={22} color="#9ca3af" />
+          <Feather name={selected.includes(profile.id) ? 'check-circle' : 'circle'} size={22} color={selected.includes(profile.id) ? '#1d9bf0' : '#9ca3af'} />
         </Pressable>)}
-        {selected.length > 0 ? <View className="mt-3 flex-row flex-wrap"><Text className="text-sm text-sky-600">已选 {selected.length} 人</Text><Pressable onPress={() => setSelected([])} className="ml-3"><Text className="text-sm text-neutral-500">清空</Text></Pressable></View> : null}
+        {selected.length > 0 ? <View className="mt-3 flex-row flex-wrap items-center"><Text className="text-sm text-sky-600">已选 {selected.length} 人</Text>{selected.map(id => { const profile = candidates.data?.find(p => p.id === id); return <Pressable key={id} onPress={() => toggle(id)} className="ml-2 mt-1 rounded-full border border-sky-200 px-3 py-1 dark:border-sky-900"><Text className="text-xs text-sky-600">{display(profile, id)} ×</Text></Pressable>; })}<Pressable onPress={() => setSelected([])} className="ml-3"><Text className="text-sm text-neutral-500">清空</Text></Pressable></View> : null}
         <Pressable disabled={!selected.length || addMutation.isPending} onPress={() => addMutation.mutate()} className="mt-3 items-center rounded-full bg-sky-500 py-3 disabled:opacity-50">{addMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text className="font-semibold text-white">添加所选成员</Text>}</Pressable>
         <Text className="mt-2 text-xs text-neutral-500">从关注列表选择。仅群主可添加；服务器仍会校验私信联系关系、群屏蔽策略和人数上限。</Text>
       </View> : null}
