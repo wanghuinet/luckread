@@ -110,7 +110,11 @@ export class MessagingRealtimeHub {
     }
   }
   async alarm(): Promise<void> {
+    const previous = await this.state.storage.get<TypingState>('typing') ?? {};
+    const expired = Object.values(previous).some((expiresAt) => !Number.isFinite(expiresAt) || expiresAt <= Date.now());
     const state = await this.readTypingState();
-    if (Object.keys(state).length) this.broadcast({ type: 'typing.changed', occurredAt: Date.now(), payload: { activeUserIds: Object.keys(state) } });
+    if (expired) {
+      this.broadcast({ type: 'typing.changed', occurredAt: Date.now(), payload: { activeUserIds: Object.keys(state) } });
+    }
   }
 }
