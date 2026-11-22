@@ -116,7 +116,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
           [conversationId, actorUserId])
         if (!allowed.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
         const result = await db.query<any>(
-          `SELECT user_id, member_role,
+          `SELECT user_id, member_role, last_read_sequence::text AS last_read_sequence,
                   to_char(joined_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS joined_at
              FROM social_conversation_memberships
             WHERE conversation_id = $1 AND left_at IS NULL
