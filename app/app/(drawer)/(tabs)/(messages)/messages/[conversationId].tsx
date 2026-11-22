@@ -63,7 +63,7 @@ const compareSequence = (left: string, right: string) =>
   left.length === right.length ? left.localeCompare(right) : left.length - right.length;
 
 export default function ConversationScreen() {
-  const params = useLocalSearchParams<{ conversationId: string; participantName?: string }>();
+  const params = useLocalSearchParams<{ conversationId: string; participantName?: string; conversationType?: string; groupName?: string }>();
   const conversationId = Array.isArray(params.conversationId) ? params.conversationId[0] : params.conversationId;
   const router = useRouter();
   const queryClient = useQueryClient();
