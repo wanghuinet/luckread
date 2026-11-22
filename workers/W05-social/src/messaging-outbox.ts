@@ -70,7 +70,7 @@ async function scheduleRetry(db: MessagingOutboxDatabase, row: ClaimedOutboxRow,
     `UPDATE social_messaging_outbox
         SET locked_until = NULL,
             available_at = CURRENT_TIMESTAMP +
-              make_interval(secs => LEAST(3600, (POWER(2, LEAST(attempt_count, 10)))::integer)),
+              make_interval(secs => LEAST(3600, (POWER(2, LEAST(attempt_count, 12)))::integer)),
             last_error = $2
       WHERE event_id = $1 AND delivered_at IS NULL`,
     [row.event_id, error.slice(0, 160)],
