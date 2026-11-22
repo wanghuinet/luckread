@@ -47,7 +47,7 @@ export class MessagingRealtimeHub {
         for (const [eventId, expiresAt] of Object.entries(receipts)) {
           if (!Number.isFinite(expiresAt) || expiresAt <= now) delete receipts[eventId];
         }
-        if (Object.prototype.hasOwnProperty.call(receipts, input.eventId)) return false;
+        if (Object.prototype.hasOwnProperty.call(receipts, input.eventId as string)) return false;
         receipts[input.eventId as string] = now + EVENT_DEDUPE_TTL_MS;
         const entries = Object.entries(receipts).sort((left, right) => left[1] - right[1]).slice(-EVENT_DEDUPE_MAX);
         await transaction.put(EVENT_DEDUPE_KEY, Object.fromEntries(entries));
