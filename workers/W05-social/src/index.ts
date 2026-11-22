@@ -891,6 +891,23 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         return json({ data, requestId: createRequestId() }, 201)
       }
 
+      const messagingRealtimeMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/realtime$/.exec(url.pathname)
+      if (messagingRealtimeMatch) {
+        if (request.method !== 'GET' || request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return new Response('WebSocket upgrade required', { status: 426 })
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const conversationId = decodePathPart(messagingRealtimeMatch[1] ?? '')
+        if (!conversationId) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        const members = await listConversationMembers(dependencies.messagingStore, actorUserId, conversationId)
+        if (!members.some(member => member.user_id === actorUserId)) throw new MessagingRuntimeError('NOT_FOUND', 404)
+        const hubBinding = env.MESSAGING_REALTIME_HUB
+        if (!hubBinding) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
+        const hub = hubBinding.get(hubBinding.idFromName(conversationId))
+        const forwarded = new Request('https://messaging-hub.internal/connect', request)
+        forwarded.headers.set('X-LuckRead-Principal-User-Id', actorUserId)
+        return hub.fetch(forwarded)
+      }
+
       const messagingTypingMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/typing$/.exec(url.pathname)
       if (messagingTypingMatch) {
         const actorUserId = requirePrincipal(request)
