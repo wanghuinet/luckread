@@ -43,6 +43,7 @@ export interface MessagingStore {
   listConversationMembers(actorUserId: string, conversationId: string): Promise<MessagingConversationMemberRow[]>
   addGroupMembers(actorUserId: string, conversationId: string, memberUserIds: string[]): Promise<{ addedCount: number }>
   removeGroupMember(actorUserId: string, conversationId: string, memberUserId: string): Promise<void>
+  transferGroupOwnership(actorUserId: string, conversationId: string, targetUserId: string): Promise<void>
   leaveGroupConversation(actorUserId: string, conversationId: string): Promise<void>
   listConversations(actorUserId: string, cursor: string | null, limit: number): Promise<{
     items: MessagingConversationRow[]; nextCursor: string | null; hasMore: boolean
