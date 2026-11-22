@@ -182,20 +182,26 @@ export class MessagingRealtimeHub {
 
   private async revokeUser(userId: string, membershipVersion: number): Promise<void> {
     const revocationKey = `membership-revoked:${userId}`;
-    const previousVersion = await this.state.storage.get<number>(revocationKey);
-    const effectiveVersion = Number.isSafeInteger(previousVersion)
-      ? Math.max(previousVersion as number, membershipVersion)
-      : membershipVersion;
-    await this.state.storage.put(revocationKey, effectiveVersion);
+    const effectiveVersion = await this.state.storage.transaction(async transaction => {
+      const previousVersion = await transaction.get<number>(revocationKey);
+      const nextVersion = Number.isSafeInteger(previousVersion)
+        ? Math.max(previousVersion as number, membershipVersion)
+        : membershipVersion;
+      await transaction.put(revocationKey, nextVersion);
+      return nextVersion;
+    });
 
+    // Use the persisted high-water mark, not this possibly delayed event's version.
+    // Otherwise an older retry can leave an already-revoked socket connected and
+    // eligible to receive the broadcast that follows this method.
     for (const socket of this.state.getWebSockets()) {
       const attachment = socket.deserializeAttachment() as SocketAttachment | null;
-      if (attachment?.userId !== userId || attachment.membershipVersion > membershipVersion) continue;
+      if (attachment?.userId !== userId || attachment.membershipVersion > effectiveVersion) continue;
       try { socket.close(4003, 'Conversation membership revoked'); } catch { /* already closed */ }
     }
     const hasNewerSocket = this.state.getWebSockets().some((socket) => {
       const attachment = socket.deserializeAttachment() as SocketAttachment | null;
-      return attachment?.userId === userId && attachment.membershipVersion > membershipVersion;
+      return attachment?.userId === userId && attachment.membershipVersion > effectiveVersion;
     });
     if (!hasNewerSocket) {
       const state = await this.readTypingState();
