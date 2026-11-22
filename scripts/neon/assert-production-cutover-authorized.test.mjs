@@ -94,4 +94,8 @@ test('every Neon production deployment workflow enforces the matching domain cut
       path + ' must gate deployment on ' + domains,
     )
   }
+  const legacyW03 = fs.readFileSync('.github/workflows/w03-content-runtime-deploy.yml', 'utf8')
+  assert.ok(legacyW03.includes("github.ref == 'refs/heads/main'"))
+  assert.ok(legacyW03.includes("github.ref_protected == true"))
+  assert.ok(legacyW03.includes('git merge-base --is-ancestor "$SOURCE_SHA" origin/main'))
 })
