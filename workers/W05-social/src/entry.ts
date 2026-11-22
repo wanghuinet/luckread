@@ -3,10 +3,10 @@ import {
   getW05PushEndpointPostgresDatabase,
   getW05SocialWorkerDependencies,
 } from './neon/runtime.js'
-import { NotificationPushWorkflow } from './notification-push-workflow.js'
+import { NotificationPushWorkflow } from './notification-push-workflow.js'\nimport { MessagingRealtimeHub } from './messaging-realtime-hub.js'
 
 // Keep Cloudflare's virtual Workflow runtime module in the deploy entry only.
-export { NotificationPushWorkflow }
+export { NotificationPushWorkflow, MessagingRealtimeHub }
 
 type W05Worker = ReturnType<typeof createW05SocialWorker>
 type W05Env = Parameters<W05Worker['fetch']>[1]
