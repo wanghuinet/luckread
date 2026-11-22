@@ -10,6 +10,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   editDirectMessage, fetchConversationMembers, fetchMessages, fetchMessagesAfterBatch, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
   type MessagingAttachment,
+  type MessagingMessage,
 } from '~/lib/messaging-api';
 import type { LocalMediaFile } from '~/lib/publish-api';
 import { connectMessagingRealtime, setMessagingRealtimeTyping } from '~/lib/messaging-realtime';
@@ -292,7 +293,21 @@ export default function ConversationScreen() {
   const continuationCursor = incrementalQuery.data?.hasMore ? incrementalQuery.data.nextCursor : null;
   const continuationQuery = useQuery({
     queryKey: ['messaging', 'messages-after-continuation', conversationId, continuationCursor],
-    queryFn: ({ signal }) => fetchMessagesAfterBatch(conversationId, continuationCursor!, signal),
+    queryFn: async ({ signal }) => {
+      // Each batch is capped at 10 pages. Continue for at most four additional batches
+      // (2,000 messages) in this query cycle to avoid an unbounded request burst.
+      const items: MessagingMessage[] = [];
+      let cursor = continuationCursor!;
+      let hasMore = true;
+      for (let batch = 0; batch < 4 && hasMore; batch++) {
+        const page = await fetchMessagesAfterBatch(conversationId, cursor, signal);
+        items.push(...page.items);
+        hasMore = page.hasMore;
+        if (page.nextCursor) cursor = page.nextCursor;
+        if (!page.items.length) break;
+      }
+      return { items, nextCursor: hasMore ? cursor : null, hasMore };
+    },
     enabled: Boolean(conversationId) && Boolean(continuationCursor) && isFocused && appState === 'active',
     staleTime: Infinity,
   });
