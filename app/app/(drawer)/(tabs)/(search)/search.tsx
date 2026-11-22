@@ -132,7 +132,10 @@ export default function Search() {
       setHistoryLoading(false);
       setHistoryError('');
     }).catch(() => {
-      if (historyScopeRef.current === scope) setHistoryError('最近搜索保存失败，请检查设备存储空间后重试。');
+      if (historyScopeRef.current === scope) {
+        setHistoryLoading(false);
+        setHistoryError('最近搜索保存失败，请检查设备存储空间后重试。');
+      }
     });
   }, [viewerId]);
 
@@ -147,7 +150,10 @@ export default function Search() {
       setHistoryLoading(false);
       setHistoryError('');
     } catch {
-      if (historyScopeRef.current === scope) setHistoryError('无法删除这条搜索记录，请重试。');
+      if (historyScopeRef.current === scope) {
+        setHistoryLoading(false);
+        setHistoryError('无法删除这条搜索记录，请重试。');
+      }
     }
   }, [viewerId]);
 
@@ -162,7 +168,10 @@ export default function Search() {
       setHistoryLoading(false);
       setHistoryError('');
     } catch {
-      if (historyScopeRef.current === scope) setHistoryError('无法清空搜索记录，请重试。');
+      if (historyScopeRef.current === scope) {
+        setHistoryLoading(false);
+        setHistoryError('无法清空搜索记录，请重试。');
+      }
     }
   }, [viewerId]);
 
