@@ -972,9 +972,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
         if (!body || typeof body !== 'object' || Array.isArray(body) ||
           Object.keys(body).some(key => key !== 'memberUserIds')) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
-        const memberUserIds = (body as { memberUserIds?: unknown }).memberUserIds
-        const data = await addGroupMembers(dependencies.messagingStore, actorUserId, conversationId, memberUserIds)
-        await broadcastMessagingEvent(env, conversationId, actorUserId, 'group.member.added', { memberUserIds, data })
+        const data = await addGroupMembers(dependencies.messagingStore, actorUserId, conversationId, (body as { memberUserIds?: unknown }).memberUserIds)
+        await broadcastMessagingEvent(env, conversationId, actorUserId, 'group.member.added', { memberUserIds: (body as { memberUserIds?: unknown }).memberUserIds, data })
         return json({ data, requestId: createRequestId() })
       }
 
