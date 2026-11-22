@@ -8,11 +8,11 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  editDirectMessage, fetchConversationMembers, fetchConversationTyping, setConversationTyping, fetchMessages, fetchMessagesAfter, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
+  editDirectMessage, fetchConversationMembers, fetchMessages, fetchMessagesAfter, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
   type MessagingAttachment,
 } from '~/lib/messaging-api';
 import type { LocalMediaFile } from '~/lib/publish-api';
-import { connectMessagingRealtime } from '~/lib/messaging-realtime';
+import { connectMessagingRealtime, setMessagingRealtimeTyping } from '~/lib/messaging-realtime';
 import { createIdempotencyKey, getApiAuthHeaders } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
 import { resolvePublicProfileById } from '~/lib/content-adapter';
@@ -94,20 +94,106 @@ export default function ConversationScreen() {
     if (!conversationId || !isFocused || appState !== 'active') return;
     return connectMessagingRealtime({
       conversationId,
-      onEvent: () => {
+      onState: (state) => {
+        if (state === 'revoked') {
+          void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
+          void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+          router.back();
+          return;
+        }
+        if (state !== 'connected') return;
+        void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+      },
+      onEvent: (event) => {
+        if (!event || typeof event !== 'object') return;
+        const realtimeEvent = event as { type?: unknown; payload?: unknown };
+        if (realtimeEvent.type === 'typing.changed' && realtimeEvent.payload &&
+          typeof realtimeEvent.payload === 'object' &&
+          Array.isArray((realtimeEvent.payload as { activeUserIds?: unknown }).activeUserIds)) {
+          queryClient.setQueryData(['messaging', 'typing', conversationId], {
+            activeUserIds: (realtimeEvent.payload as { activeUserIds: unknown[] }).activeUserIds.filter((id): id is string => typeof id === 'string'),
+          });
+          return;
+        }
+        if (typeof realtimeEvent.type === 'string' && realtimeEvent.type.startsWith('message.') &&
+          realtimeEvent.payload && typeof realtimeEvent.payload === 'object') {
+          const message = realtimeEvent.payload as Record<string, unknown>;
+          if (typeof message.message_id === 'string' && typeof message.sequence === 'string' &&
+            typeof message.conversation_id === 'string' && typeof message.sender_user_id === 'string' &&
+            typeof message.body === 'string' && typeof message.created_at === 'string') {
+            queryClient.setQueryData<typeof messagesQuery.data>(
+              ['messaging', 'messages', conversationId],
+              (current) => {
+                if (!current?.pages.length) return current;
+                let found = false;
+                const pages = current.pages.map((page) => ({
+                  ...page,
+                  items: page.items.map((item) => {
+                    if (item.message_id !== message.message_id) return item;
+                    found = true;
+                    return { ...item, ...message } as typeof item;
+                  }),
+                }));
+                if (!found && realtimeEvent.type === 'message.created') {
+                  const firstPage = pages[0];
+                  if (firstPage) {
+                    pages[0] = {
+                      ...firstPage,
+                      items: [...firstPage.items, message as unknown as (typeof firstPage.items)[number]]
+                        .sort((left, right) => compareSequence(right.sequence, left.sequence)),
+                    };
+                  }
+                }
+                return { ...current, pages };
+              },
+            );
+            void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+            return;
+          }
+        }
+        if (realtimeEvent.type === 'conversation.read' ||
+          (typeof realtimeEvent.type === 'string' && realtimeEvent.type.startsWith('group.member.'))) {
+          void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
+          void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+          return;
+        }
         void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
         void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
         void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
         void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
-        void queryClient.invalidateQueries({ queryKey: ['messaging', 'typing', conversationId] });
       },
     });
-  }, [conversationId, isFocused, appState, queryClient]);
+  }, [conversationId, isFocused, appState, queryClient, router]);
   const pendingSend = useRef<{ fingerprint: string; key: string } | null>(null);
   const sendMutationPendingRef = useRef(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stopTyping = useCallback(() => { if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = null; void setConversationTyping(conversationId, false).catch(() => undefined); }, [conversationId]);
-  const handleDraftChange = useCallback((value: string) => { setDraft(value); if (value.trim()) { void setConversationTyping(conversationId, true).catch(() => undefined); if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = setTimeout(stopTyping, 1800); } else stopTyping(); }, [conversationId, stopTyping]);
+  const typingRefreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const typingActiveRef = useRef(false);
+  const stopTyping = useCallback(() => {
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    if (typingRefreshTimer.current) clearInterval(typingRefreshTimer.current);
+    typingTimer.current = null;
+    typingRefreshTimer.current = null;
+    if (!typingActiveRef.current) return;
+    typingActiveRef.current = false;
+    setMessagingRealtimeTyping(conversationId, false);
+  }, [conversationId]);
+  const handleDraftChange = useCallback((value: string) => {
+    setDraft(value);
+    if (!value.trim()) { stopTyping(); return; }
+    if (!typingActiveRef.current) {
+      typingActiveRef.current = true;
+      setMessagingRealtimeTyping(conversationId, true);
+      typingRefreshTimer.current = setInterval(() => {
+        if (typingActiveRef.current) setMessagingRealtimeTyping(conversationId, true);
+      }, 3_000);
+    }
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(stopTyping, 1800);
+  }, [conversationId, stopTyping]);
   useEffect(() => () => stopTyping(), [stopTyping]);
   const messagesQuery = useInfiniteQuery({
     queryKey: ['messaging', 'messages', conversationId],
@@ -118,8 +204,15 @@ export default function ConversationScreen() {
     staleTime: 15_000,
   });
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
-  const membersQuery = useQuery({ queryKey: ['messaging', 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal), enabled: Boolean(conversationId) && params.conversationType !== 'group', refetchInterval: isFocused && appState === 'active' ? 8_000 : false });
-  const typingQuery = useQuery({ queryKey: ['messaging', 'typing', conversationId], queryFn: ({ signal }) => fetchConversationTyping(conversationId, signal), enabled: Boolean(conversationId) && isFocused && appState === 'active', refetchInterval: isFocused && appState === 'active' ? 4000 : false, refetchIntervalInBackground: false, staleTime: 1000 });
+  const membersQuery = useQuery({ queryKey: ['messaging', 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal), enabled: Boolean(conversationId) && params.conversationType !== 'group', staleTime: 60_000 });
+  // The authenticated WebSocket sends the initial typing snapshot and subsequent changes.
+  const typingQuery = useQuery({
+    queryKey: ['messaging', 'typing', conversationId],
+    queryFn: async () => ({ activeUserIds: [] as string[] }),
+    enabled: false,
+    initialData: { activeUserIds: [] as string[] },
+    staleTime: Infinity,
+  });
   const peerTyping = typingQuery.data?.activeUserIds.some(id => id !== userId) ?? false;
   const latestOwnMessage = messages.filter(message => message.sender_user_id === userId && !message.recalled_at).reduce((latest, message) => compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const peerReadSequence = membersQuery.data?.find(member => member.user_id !== userId)?.last_read_sequence ?? '0';
@@ -168,12 +261,10 @@ export default function ConversationScreen() {
   const latestSequence = messages.reduce((latest, message) =>
     compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const incrementalQuery = useQuery({
-    queryKey: ['messaging', 'messages-after', conversationId, latestSequence],
+    queryKey: ['messaging', 'messages-after', conversationId],
     queryFn: ({ signal }) => fetchMessagesAfter(conversationId, latestSequence, signal),
     enabled: Boolean(conversationId) && messagesQuery.isSuccess && isFocused && appState === 'active',
-    refetchInterval: isFocused && appState === 'active' ? 4_000 : false,
-    refetchIntervalInBackground: false,
-    staleTime: 0,
+    staleTime: Infinity,
   });
   useEffect(() => {
     const incoming = incrementalQuery.data?.items ?? [];
@@ -196,39 +287,7 @@ export default function ConversationScreen() {
     );
   }, [incrementalQuery.data, conversationId, queryClient]);
 
-  const latestMessagesRefresh = useQuery({
-    queryKey: ['messaging', 'latest-messages-refresh', conversationId],
-    queryFn: ({ signal }) => fetchMessages(conversationId, null, signal),
-    enabled: Boolean(conversationId) && messagesQuery.isSuccess && isFocused && appState === 'active',
-    refetchInterval: isFocused && appState === 'active' ? 15_000 : false,
-    refetchIntervalInBackground: false,
-    staleTime: 0,
-  });
-  useEffect(() => {
-    const refreshed = latestMessagesRefresh.data?.items ?? [];
-    if (!refreshed.length) return;
-    queryClient.setQueryData<typeof messagesQuery.data>(
-      ['messaging', 'messages', conversationId],
-      (current) => {
-        if (!current?.pages.length) return current;
-        const latestById = new Map(refreshed.map((message) => [message.message_id, message]));
-        const known = new Set(current.pages.flatMap((page) => page.items.map((message) => message.message_id)));
-        const pages = current.pages.map((page) => ({
-          ...page,
-          items: page.items.map((message) => latestById.get(message.message_id) ?? message),
-        }));
-        const additions = refreshed.filter((message) => !known.has(message.message_id));
-        if (pages[0] && additions.length) {
-          pages[0] = {
-            ...pages[0],
-            items: [...pages[0].items, ...additions].sort((left, right) =>
-              compareSequence(right.sequence, left.sequence)),
-          };
-        }
-        return { ...current, pages };
-      },
-    );
-  }, [latestMessagesRefresh.data, conversationId, queryClient]);
+
 
   const uploadOne = useCallback(async (localId: string, file: LocalMediaFile) => {
     setPendingAttachments((current) => current.map((item) => item.localId === localId

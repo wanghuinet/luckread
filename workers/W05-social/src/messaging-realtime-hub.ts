@@ -1,46 +1,155 @@
 /// <reference types="@cloudflare/workers-types" />
-/** Ephemeral typing-state coordinator. Caller MUST validate principal and membership before forwarding. */
-type TypingState=Record<string,number>
-type SessionData={userId:string}
+
+/** Conversation-scoped realtime hub. Formal message data remains authoritative in Neon. */
+type TypingState = Record<string, number>;
+type SocketAttachment = { userId: string };
+const USER_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+const TYPING_TTL_MS = 5_000;
+const MAX_FRAME_BYTES = 1_024;
+
 export class MessagingRealtimeHub {
- private sockets=new Map<WebSocket,SessionData>()
- constructor(private readonly state:DurableObjectState){}
- async fetch(request:Request):Promise<Response>{
-  const pathname=new URL(request.url).pathname;
-  if(pathname.endsWith('/connect'))return this.connect(request);
-  if(pathname.endsWith('/broadcast')){
-   if(request.method!=='POST')return new Response('Method Not Allowed',{status:405});
-   const actor=request.headers.get('X-LuckRead-Principal-User-Id')?.trim()||'';
-   if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(actor))return new Response('Unauthorized',{status:401});
-   let event:unknown;try{event=await request.json()}catch{return new Response('Invalid JSON',{status:400})}
-   if(!event||typeof event!=='object'||Array.isArray(event))return new Response('Invalid event',{status:422});
-   this.broadcast(event);return Response.json({broadcast:true});
+  constructor(private readonly state: DurableObjectState) {}
+
+  async fetch(request: Request): Promise<Response> {
+    const pathname = new URL(request.url).pathname;
+    if (pathname.endsWith('/connect')) return this.connect(request);
+    if (pathname.endsWith('/broadcast')) {
+      if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+      const actor = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? '';
+      if (!USER_ID.test(actor)) return new Response('Unauthorized', { status: 401 });
+      let event: unknown;
+      try { event = await request.json(); } catch { return new Response('Invalid JSON', { status: 400 }); }
+      if (!event || typeof event !== 'object' || Array.isArray(event)) return new Response('Invalid event', { status: 422 });
+      const input = event as Record<string, unknown>;
+      const allowedTypes = new Set([
+        'message.created', 'message.edited', 'message.recalled', 'conversation.read',
+        'group.member.added', 'group.member.removed', 'group.member.left', 'group.owner.transferred',
+      ]);
+      if (typeof input.type !== 'string' || !allowedTypes.has(input.type) ||
+        typeof input.conversationId !== 'string' || !USER_ID.test(input.conversationId) ||
+        input.actorUserId !== actor || typeof input.eventId !== 'string' ||
+        !USER_ID.test(input.eventId) || typeof input.occurredAt !== 'number' ||
+        !Number.isFinite(input.occurredAt) || !input.payload || typeof input.payload !== 'object' ||
+        Array.isArray(input.payload)) return new Response('Invalid event', { status: 422 });
+      const encoded = JSON.stringify(input);
+      if (encoded.length > 64 * 1024) return new Response('Event too large', { status: 413 });
+
+      // Membership mutations revoke the removed member's existing room socket, not just future API access.
+      if (input.type === 'group.member.removed') {
+        const memberUserId = (input.payload as { memberUserId?: unknown }).memberUserId;
+        if (typeof memberUserId !== 'string' || !USER_ID.test(memberUserId)) return new Response('Invalid event payload', { status: 422 });
+        await this.revokeUser(memberUserId);
+      } else if (input.type === 'group.member.left') {
+        await this.revokeUser(actor);
+      }
+      this.broadcast(encoded);
+      return Response.json({ broadcast: true });
+    }
+    if (pathname.endsWith('/snapshot')) {
+      if (request.method !== 'GET') return new Response('Method Not Allowed', { status: 405 });
+      return Response.json({ activeUserIds: await this.activeTypingUsers() }, { headers: { 'cache-control': 'no-store' } });
+    }
+    if (pathname.endsWith('/update')) {
+      if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+      let body: unknown;
+      try { body = await request.json(); } catch { return new Response('Invalid JSON', { status: 400 }); }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return new Response('Invalid payload', { status: 400 });
+      const input = body as { userId?: unknown; typing?: unknown };
+      if (typeof input.userId !== 'string' || !USER_ID.test(input.userId) || typeof input.typing !== 'boolean') return new Response('Invalid payload', { status: 422 });
+      const state = await this.readTypingState();
+      if (input.typing) state[input.userId] = Date.now() + TYPING_TTL_MS;
+      else delete state[input.userId];
+      await this.writeTypingState(state);
+      const activeUserIds = Object.keys(state);
+      this.broadcast({ type: 'typing.changed', occurredAt: Date.now(), payload: { activeUserIds } });
+      return Response.json({ activeUserIds }, { headers: { 'cache-control': 'no-store' } });
+    }
+    return new Response('Not Found', { status: 404 });
   }
-  const now=Date.now(),state=await this.state.storage.get<TypingState>('typing')??{}
-  for(const [id,expires] of Object.entries(state))if(expires<=now)delete state[id]
-  if(request.method==='GET'){await this.state.storage.put('typing',state);await this.schedule(state);return Response.json({activeUserIds:Object.keys(state)},{headers:{'cache-control':'no-store'}})}
-  if(request.method!=='POST')return new Response('Method Not Allowed',{status:405})
-  let body:unknown;try{body=await request.json()}catch{return new Response('Invalid JSON',{status:400})}
-  if(!body||typeof body!=='object'||Array.isArray(body))return new Response('Invalid payload',{status:400})
-  const p=body as {userId?:unknown;typing?:unknown}
-  if(typeof p.userId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(p.userId)||typeof p.typing!=='boolean')return new Response('Invalid payload',{status:422})
-  if(p.typing)state[p.userId]=now+5000;else delete state[p.userId]
-  await this.state.storage.put('typing',state)
-  await this.schedule(state)
-  return Response.json({activeUserIds:Object.keys(state)},{headers:{'cache-control':'no-store'}})
- }
- private connect(request:Request):Response {
-  if(request.method!=='GET'||request.headers.get('Upgrade')?.toLowerCase()!=='websocket')return new Response('WebSocket upgrade required',{status:426})
-  const userId=request.headers.get('X-LuckRead-Principal-User-Id')?.trim()||''
-  if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(userId))return new Response('Unauthorized',{status:401})
-  const pair=new WebSocketPair(),client=pair[0],server=pair[1]
-  server.accept()
-  this.sockets.set(server,{userId})
-  server.addEventListener('message',event=>{if(typeof event.data==='string'&&event.data.length<=1024){try{const msg=JSON.parse(event.data);if(msg?.type==='ping')server.send(JSON.stringify({type:'pong',at:Date.now()}))}catch{/* ignore malformed frames */}}})
-  server.addEventListener('close',()=>this.sockets.delete(server));server.addEventListener('error',()=>this.sockets.delete(server))
-  server.send(JSON.stringify({type:'connected'}));return new Response(null,{status:101,webSocket:client})
- }
- broadcast(event:unknown):void {const payload=JSON.stringify(event);for(const socket of this.sockets.keys())try{socket.send(payload)}catch{this.sockets.delete(socket)}}
- async alarm():Promise<void>{const state=await this.state.storage.get<TypingState>('typing')??{};for(const [id,expires] of Object.entries(state))if(expires<=Date.now())delete state[id];await this.state.storage.put('typing',state);await this.schedule(state)}
- private async schedule(state:TypingState):Promise<void>{const next=Math.min(...Object.values(state));if(Number.isFinite(next))await this.state.storage.setAlarm(next);else await this.state.storage.deleteAlarm()}
+
+  private async connect(request: Request): Promise<Response> {
+    if (request.method !== 'GET' || request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return new Response('WebSocket upgrade required', { status: 426 });
+    const userId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? '';
+    if (!USER_ID.test(userId)) return new Response('Unauthorized', { status: 401 });
+    const pair = new WebSocketPair();
+    const client = pair[0];
+    const server = pair[1];
+    server.serializeAttachment({ userId } satisfies SocketAttachment);
+    this.state.acceptWebSocket(server, [`user:${userId}`]);
+    server.send(JSON.stringify({ type: 'connected', occurredAt: Date.now() }));
+    server.send(JSON.stringify({ type: 'typing.changed', occurredAt: Date.now(), payload: { activeUserIds: await this.activeTypingUsers() } }));
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  /** Hibernation API event handlers: no per-socket listener closures or isolate-local socket Map. */
+  async webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    if (typeof message !== 'string' || message.length > MAX_FRAME_BYTES) return;
+    let frame: { type?: unknown };
+    try { frame = JSON.parse(message) as { type?: unknown }; } catch { return; }
+    if (frame.type === 'ping') {
+      try { socket.send(JSON.stringify({ type: 'pong', at: Date.now() })); } catch { /* closed */ }
+      return;
+    }
+    if (frame.type !== 'typing.start' && frame.type !== 'typing.stop') return;
+    const attachment = socket.deserializeAttachment() as SocketAttachment | null;
+    const userId = attachment?.userId;
+    if (!userId || !USER_ID.test(userId)) return;
+    const state = await this.readTypingState();
+    if (frame.type === 'typing.start') state[userId] = Date.now() + TYPING_TTL_MS;
+    else delete state[userId];
+    await this.writeTypingState(state);
+    this.broadcast({ type: 'typing.changed', occurredAt: Date.now(), payload: { activeUserIds: Object.keys(state) } });
+  }
+  webSocketClose(_socket: WebSocket, _code: number, _reason: string, _wasClean: boolean): void {}
+  webSocketError(_socket: WebSocket, _error: unknown): void {}
+
+  private async revokeUser(userId: string): Promise<void> {
+    for (const socket of this.state.getWebSockets()) {
+      const attachment = socket.deserializeAttachment() as SocketAttachment | null;
+      if (attachment?.userId !== userId) continue;
+      try { socket.close(4003, 'Conversation membership revoked'); } catch { /* already closed */ }
+    }
+    const state = await this.readTypingState();
+    if (Object.prototype.hasOwnProperty.call(state, userId)) {
+      delete state[userId];
+      await this.writeTypingState(state);
+    }
+  }
+
+  private broadcast(event: unknown): void {
+    const payload = typeof event === 'string' ? event : JSON.stringify(event);
+    for (const socket of this.state.getWebSockets()) {
+      try { socket.send(payload); }
+      catch { try { socket.close(1011, 'Realtime delivery failed'); } catch { /* already closed */ } }
+    }
+  }
+
+  private async readTypingState(): Promise<TypingState> {
+    const state = await this.state.storage.get<TypingState>('typing') ?? {};
+    const now = Date.now();
+    let changed = false;
+    for (const [userId, expiresAt] of Object.entries(state)) {
+      if (!Number.isFinite(expiresAt) || expiresAt <= now) { delete state[userId]; changed = true; }
+    }
+    if (changed) await this.writeTypingState(state);
+    return state;
+  }
+  private async activeTypingUsers(): Promise<string[]> { return Object.keys(await this.readTypingState()); }
+  private async writeTypingState(state: TypingState): Promise<void> {
+    if (Object.keys(state).length) {
+      await this.state.storage.put('typing', state);
+      await this.state.storage.setAlarm(Math.min(...Object.values(state)));
+    } else {
+      await this.state.storage.delete('typing');
+      await this.state.storage.deleteAlarm();
+    }
+  }
+  async alarm(): Promise<void> {
+    const previous = await this.state.storage.get<TypingState>('typing') ?? {};
+    const expired = Object.values(previous).some((expiresAt) => !Number.isFinite(expiresAt) || expiresAt <= Date.now());
+    const state = await this.readTypingState();
+    if (expired) {
+      this.broadcast({ type: 'typing.changed', occurredAt: Date.now(), payload: { activeUserIds: Object.keys(state) } });
+    }
+  }
 }
