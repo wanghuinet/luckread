@@ -62,6 +62,7 @@ export default defineConfig({
       'src/social-closure-runtime.test.ts',
       'src/messaging-runtime.test.ts',
       'src/messaging-store-postgres.test.ts',
+      'src/messaging-outbox.test.ts',
     ],
   },
 })
