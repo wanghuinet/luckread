@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { assertProductionCutoverAuthorized } from './assert-production-cutover-authorized.mjs'
@@ -72,4 +73,25 @@ test('accepts the explicitly recorded partial schema state only after data impor
   input.bootstrap.domains[0].remoteSchemaApplied = false
   input.bootstrap.domains[0].partialRemoteSchemaApplied = true
   assert.doesNotThrow(() => assertProductionCutoverAuthorized({ ...input, domainIds: ['D1-02'] }))
+})
+
+test('every Neon production deployment workflow enforces the matching domain cutover gate', () => {
+  const workflows = new Map([
+    ['.github/workflows/w01-payload-app-deploy.yml', 'D1-01'],
+    ['.github/workflows/w02-deploy.yml', 'D1-01'],
+    ['.github/workflows/w01-w02-binding-deploy.yml', 'D1-01'],
+    ['.github/workflows/neon-runtime-cutover-w03.yml', 'D1-02'],
+    ['.github/workflows/w03-content-runtime-deploy.yml', 'D1-02'],
+    ['.github/workflows/neon-runtime-cutover-deploy.yml', 'D1-02 D1-03'],
+    ['.github/workflows/w06-deploy.yml', 'D1-03'],
+    ['.github/workflows/w07-subscription-runtime-deploy.yml', 'D1-04'],
+    ['.github/workflows/neon-runtime-cutover-w07-d101.yml', 'D1-01 D1-04'],
+  ])
+  for (const [path, domains] of workflows) {
+    const source = fs.readFileSync(path, 'utf8')
+    assert.ok(
+      source.includes('node scripts/neon/assert-production-cutover-authorized.mjs ' + domains),
+      path + ' must gate deployment on ' + domains,
+    )
+  }
 })
