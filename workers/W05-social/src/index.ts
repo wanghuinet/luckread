@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { listContentLikers } from './like-list-runtime.js'
-import { MessagingRuntimeError, createDirectConversation, createGroupConversation, listConversationMembers, addGroupMembers, removeGroupMember, leaveGroupConversation, listConversations, listMessages, listMessagesAfter, markConversationRead, sendMessage, editMessage, recallMessage } from './messaging-runtime.js'
+import { MessagingRuntimeError, createDirectConversation, createGroupConversation, listConversationMembers, addGroupMembers, removeGroupMember, transferGroupOwnership, leaveGroupConversation, listConversations, listMessages, listMessagesAfter, markConversationRead, sendMessage, editMessage, recallMessage } from './messaging-runtime.js'
 import type { MessagingStore } from './messaging-store.js'
 import { MessageRequestRuntimeError, createMessageRequest, listMessageRequests, respondToMessageRequest } from './message-request-runtime.js'
 import type { MessageRequestStore } from './message-request-store.js'
@@ -915,6 +915,21 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           Object.keys(body).some(key => key !== 'memberUserIds')) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
         const data = await addGroupMembers(dependencies.messagingStore, actorUserId, conversationId, (body as { memberUserIds?: unknown }).memberUserIds)
         return json({ data, requestId: createRequestId() })
+      }
+
+      const messagingGroupTransferMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/transfer-owner$/.exec(url.pathname)
+      if (messagingGroupTransferMatch) {
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        await enforceRateLimit(request, env, 'write:messaging-group-owner-transfer')
+        const conversationId = decodePathPart(messagingGroupTransferMatch[1] ?? '')
+        if (!conversationId) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        let body: unknown
+        try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
+        if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => key !== 'targetUserId') || typeof (body as {targetUserId?:unknown}).targetUserId !== 'string') throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        await transferGroupOwnership(dependencies.messagingStore, actorUserId, conversationId, (body as {targetUserId:string}).targetUserId)
+        return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       }
 
       const messagingGroupLeaveMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/leave$/.exec(url.pathname)
