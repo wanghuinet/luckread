@@ -419,32 +419,42 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
         throw new MessagingStoreError('INVALID_CURSOR', 400)
       }
       try {
-        const membership = await db.query(
-          `SELECT 1 FROM social_conversation_memberships mine
-             WHERE mine.conversation_id = $1 AND mine.user_id = $2 AND mine.left_at IS NULL
-               AND EXISTS (
-                 SELECT 1 FROM social_conversation_memberships peer
-                  WHERE peer.conversation_id = mine.conversation_id AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
-               )
-               AND NOT EXISTS (
-                 SELECT 1 FROM social_conversation_memberships peer
-                 JOIN social_user_interactions blocked
-                   ON blocked.relation_type = 'block'
-                  AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
-                    OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
-                 WHERE peer.conversation_id = mine.conversation_id
-                   AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
-               ) LIMIT 1`,
-          [conversationId, actorUserId])
-        if (!membership.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
-        const result = await db.query<MessageRow>(
-          `SELECT ${messageSelect} FROM social_messages
-            WHERE conversation_id = $1
-              AND ($2::bigint IS NULL OR sequence < $2::bigint)
-            ORDER BY sequence DESC LIMIT $3`,
-          [conversationId, beforeSequence, limit + 1])
-        const hasMore = result.rows.length > limit
-        const items = result.rows.slice(0, limit)
+        const result = await db.query<MessageRow & { allowed: boolean; has_message: boolean }>(
+          `WITH access AS MATERIALIZED (
+             SELECT EXISTS (
+               SELECT 1 FROM social_conversation_memberships mine
+                WHERE mine.conversation_id = $1 AND mine.user_id = $2 AND mine.left_at IS NULL
+                  AND EXISTS (
+                    SELECT 1 FROM social_conversation_memberships peer
+                     WHERE peer.conversation_id = mine.conversation_id
+                       AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM social_conversation_memberships peer
+                    JOIN social_user_interactions blocked
+                      ON blocked.relation_type = 'block'
+                     AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                       OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                    WHERE peer.conversation_id = mine.conversation_id
+                      AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+                  )
+             ) AS allowed
+           )
+           SELECT access.allowed, (page.message_id IS NOT NULL) AS has_message, page.*
+             FROM access
+             LEFT JOIN LATERAL (
+               SELECT ${messageSelect} FROM social_messages
+                WHERE conversation_id = $1 AND access.allowed
+                  AND ($3::bigint IS NULL OR sequence < $3::bigint)
+                ORDER BY sequence DESC LIMIT $4
+             ) page ON TRUE`,
+          [conversationId, actorUserId, beforeSequence, limit + 1],
+        )
+        const first = result.rows[0]
+        if (!first?.allowed) throw new MessagingStoreError('NOT_FOUND', 404)
+        const pageRows = result.rows.filter(row => row.has_message)
+        const hasMore = pageRows.length > limit
+        const items = pageRows.slice(0, limit)
         return { items, nextCursor: hasMore && items.length ? items[items.length - 1]!.sequence : null, hasMore }
       } catch (error) {
         if (error instanceof MessagingStoreError) throw error
@@ -456,31 +466,41 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
         throw new MessagingStoreError('INVALID_CURSOR', 400)
       }
       try {
-        const membership = await db.query(
-          `SELECT 1 FROM social_conversation_memberships mine
-             WHERE mine.conversation_id = $1 AND mine.user_id = $2 AND mine.left_at IS NULL
-               AND EXISTS (
-                 SELECT 1 FROM social_conversation_memberships peer
-                  WHERE peer.conversation_id = mine.conversation_id AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
-               )
-               AND NOT EXISTS (
-                 SELECT 1 FROM social_conversation_memberships peer
-                 JOIN social_user_interactions blocked
-                   ON blocked.relation_type = 'block'
-                  AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
-                    OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
-                 WHERE peer.conversation_id = mine.conversation_id
-                   AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
-               ) LIMIT 1`,
-          [conversationId, actorUserId])
-        if (!membership.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
-        const result = await db.query<MessageRow>(
-          `SELECT ${messageSelect} FROM social_messages
-            WHERE conversation_id = $1 AND sequence > $2::bigint
-            ORDER BY sequence ASC LIMIT $3`,
-          [conversationId, afterSequence, limit + 1])
-        const hasMore = result.rows.length > limit
-        const items = result.rows.slice(0, limit)
+        const result = await db.query<MessageRow & { allowed: boolean; has_message: boolean }>(
+          `WITH access AS MATERIALIZED (
+             SELECT EXISTS (
+               SELECT 1 FROM social_conversation_memberships mine
+                WHERE mine.conversation_id = $1 AND mine.user_id = $2 AND mine.left_at IS NULL
+                  AND EXISTS (
+                    SELECT 1 FROM social_conversation_memberships peer
+                     WHERE peer.conversation_id = mine.conversation_id
+                       AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM social_conversation_memberships peer
+                    JOIN social_user_interactions blocked
+                      ON blocked.relation_type = 'block'
+                     AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                       OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                    WHERE peer.conversation_id = mine.conversation_id
+                      AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+                  )
+             ) AS allowed
+           )
+           SELECT access.allowed, (page.message_id IS NOT NULL) AS has_message, page.*
+             FROM access
+             LEFT JOIN LATERAL (
+               SELECT ${messageSelect} FROM social_messages
+                WHERE conversation_id = $1 AND access.allowed AND sequence > $3::bigint
+                ORDER BY sequence ASC LIMIT $4
+             ) page ON TRUE`,
+          [conversationId, actorUserId, afterSequence, limit + 1],
+        )
+        const first = result.rows[0]
+        if (!first?.allowed) throw new MessagingStoreError('NOT_FOUND', 404)
+        const pageRows = result.rows.filter(row => row.has_message)
+        const hasMore = pageRows.length > limit
+        const items = pageRows.slice(0, limit)
         return { items, nextCursor: hasMore && items.length ? items[items.length - 1]!.sequence : null, hasMore }
       } catch (error) {
         if (error instanceof MessagingStoreError) throw error
