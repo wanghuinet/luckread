@@ -89,19 +89,32 @@ export async function fetchMessagesAfterBatch(
   signal?: AbortSignal,
   maxPages = 10,
 ): Promise<Page<MessagingMessage>> {
-  const items: MessagingMessage[] = [];
+  const itemsById = new Map<string, MessagingMessage>();
   let cursor = afterSequence;
   let hasMore = false;
   const pageBudget = Math.max(1, Math.min(10, Math.floor(maxPages)));
   for (let pageIndex = 0; pageIndex < pageBudget; pageIndex++) {
     const page = await fetchMessagesAfter(conversationId, cursor, signal);
-    if (!page.items.length) { hasMore = false; break; }
-    items.push(...page.items);
-    cursor = page.items.reduce((latest, item) => compareMessagingSequence(item.sequence, latest) > 0 ? item.sequence : latest, cursor);
+    if (!page.items.length) {
+      if (page.hasMore) throw new Error('私信增量同步游标未推进，请重试。');
+      hasMore = false;
+      break;
+    }
+    let nextCursor = cursor;
+    for (const item of page.items) {
+      if (compareMessagingSequence(item.sequence, cursor) <= 0) continue;
+      if (compareMessagingSequence(item.sequence, nextCursor) > 0) nextCursor = item.sequence;
+      itemsById.set(item.message_id, item);
+    }
+    if (compareMessagingSequence(nextCursor, cursor) <= 0) {
+      throw new Error('私信增量同步游标未推进，请重试。');
+    }
+    cursor = nextCursor;
     hasMore = page.hasMore;
     if (!hasMore) break;
   }
-  return { items, nextCursor: hasMore ? cursor : null, hasMore };
+  return { items: [...itemsById.values()].sort((left, right) =>
+    compareMessagingSequence(left.sequence, right.sequence)), nextCursor: hasMore ? cursor : null, hasMore };
 }
 
 function compareMessagingSequence(left: string, right: string): number {
