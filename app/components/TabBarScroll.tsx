@@ -13,10 +13,9 @@ import {
   type SharedValue,
 } from 'react-native-reanimated';
 
+import { advanceTabBarScrollState } from '~/lib/tab-bar-scroll-state';
+
 const TAB_BAR_HIDE_DISTANCE = 128;
-const HIDE_SCROLL_THRESHOLD = 18;
-const SHOW_SCROLL_THRESHOLD = 12;
-const TOP_RESET_OFFSET = 16;
 
 type TabBarScrollContextValue = {
   tabBarTranslateY: Animated.Value;
@@ -55,35 +54,16 @@ export function TabBarScrollProvider({ children }: { children: React.ReactNode }
   }, [setTabBarVisible]);
 
   const reportScrollOffset = useCallback((offset: number) => {
-    if (!Number.isFinite(offset)) return;
+    const transition = advanceTabBarScrollState({
+      lastOffset: lastOffsetRef.current,
+      direction: lastDirectionRef.current,
+      accumulatedDistance: accumulatedDistanceRef.current,
+    }, offset);
 
-    if (offset <= TOP_RESET_OFFSET) {
-      lastOffsetRef.current = offset;
-      lastDirectionRef.current = 0;
-      accumulatedDistanceRef.current = 0;
-      setTabBarVisible(true);
-      return;
-    }
-
-    const previousOffset = lastOffsetRef.current;
-    lastOffsetRef.current = offset;
-    if (previousOffset === null) return;
-
-    const delta = offset - previousOffset;
-    if (Math.abs(delta) < 0.1) return;
-
-    const direction: 1 | -1 = delta > 0 ? 1 : -1;
-    if (direction !== lastDirectionRef.current) {
-      lastDirectionRef.current = direction;
-      accumulatedDistanceRef.current = 0;
-    }
-
-    accumulatedDistanceRef.current += Math.abs(delta);
-    const threshold = direction > 0 ? HIDE_SCROLL_THRESHOLD : SHOW_SCROLL_THRESHOLD;
-    if (accumulatedDistanceRef.current < threshold) return;
-
-    setTabBarVisible(direction < 0);
-    accumulatedDistanceRef.current = 0;
+    lastOffsetRef.current = transition.state.lastOffset;
+    lastDirectionRef.current = transition.state.direction;
+    accumulatedDistanceRef.current = transition.state.accumulatedDistance;
+    if (transition.visibility !== null) setTabBarVisible(transition.visibility);
   }, [setTabBarVisible]);
 
   const value = useMemo(() => ({
@@ -131,59 +111,39 @@ export function useTabBarScroll() {
 /** Observe a Reanimated scroll value without replacing the list's own scroll handler. */
 export function useTabBarVisibilityOnAnimatedScroll(scrollY: SharedValue<number>) {
   const { setTabBarVisible, resetTabBar } = useTabBarScrollState();
+  const lastOffset = useSharedValue<number | null>(null);
   const direction = useSharedValue<1 | -1 | 0>(0);
   const accumulatedDistance = useSharedValue(0);
-  const isHidden = useSharedValue(false);
 
   useFocusEffect(useCallback(() => {
+    lastOffset.value = null;
     direction.value = 0;
     accumulatedDistance.value = 0;
-    isHidden.value = false;
     resetTabBar();
     return () => {
+      lastOffset.value = null;
       direction.value = 0;
       accumulatedDistance.value = 0;
-      isHidden.value = false;
       resetTabBar();
     };
-  }, [accumulatedDistance, direction, isHidden, resetTabBar]));
+  }, [accumulatedDistance, direction, lastOffset, resetTabBar]));
 
   useAnimatedReaction(
     () => scrollY.value,
-    (current, previous) => {
-      if (current <= TOP_RESET_OFFSET) {
-        direction.value = 0;
-        accumulatedDistance.value = 0;
-        if (isHidden.value) {
-          isHidden.value = false;
-          runOnJS(setTabBarVisible)(true);
-        }
-        return;
-      }
+    (current) => {
+      const transition = advanceTabBarScrollState({
+        lastOffset: lastOffset.value,
+        direction: direction.value,
+        accumulatedDistance: accumulatedDistance.value,
+      }, current);
 
-      if (previous === null) return;
-      const delta = current - previous;
-      if (Math.abs(delta) < 0.1) return;
-
-      const nextDirection: 1 | -1 = delta > 0 ? 1 : -1;
-      if (nextDirection !== direction.value) {
-        direction.value = nextDirection;
-        accumulatedDistance.value = 0;
-      }
-      accumulatedDistance.value += Math.abs(delta);
-
-      const threshold = nextDirection > 0 ? HIDE_SCROLL_THRESHOLD : SHOW_SCROLL_THRESHOLD;
-      if (accumulatedDistance.value < threshold) return;
-
-      accumulatedDistance.value = 0;
-      if (nextDirection > 0 && !isHidden.value) {
-        isHidden.value = true;
-        runOnJS(setTabBarVisible)(false);
-      } else if (nextDirection < 0 && isHidden.value) {
-        isHidden.value = false;
-        runOnJS(setTabBarVisible)(true);
+      lastOffset.value = transition.state.lastOffset;
+      direction.value = transition.state.direction;
+      accumulatedDistance.value = transition.state.accumulatedDistance;
+      if (transition.visibility !== null) {
+        runOnJS(setTabBarVisible)(transition.visibility);
       }
     },
-    [accumulatedDistance, direction, isHidden, setTabBarVisible],
+    [accumulatedDistance, direction, lastOffset, setTabBarVisible],
   );
 }
