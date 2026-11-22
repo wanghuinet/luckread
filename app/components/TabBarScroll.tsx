@@ -13,7 +13,7 @@ import {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { advanceTabBarScrollState, HIDE_SCROLL_THRESHOLD, SHOW_SCROLL_THRESHOLD, TOP_RESET_OFFSET } from '~/lib/tab-bar-scroll-state';
+import { advanceTabBarScrollState } from '~/lib/tab-bar-scroll-state';
 
 const TAB_BAR_HIDE_DISTANCE = 128;
 
