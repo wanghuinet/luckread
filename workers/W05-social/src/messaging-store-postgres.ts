@@ -217,6 +217,35 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
         throw new MessagingStoreError()
       }
     },
+    async transferGroupOwnership(actorUserId, conversationId, targetUserId) {
+      if (!validId(conversationId) || !validId(targetUserId) || actorUserId === targetUserId) throw new MessagingStoreError('VALIDATION_FAILED', 422)
+      try {
+        await withTransaction(db, async client => {
+          const group = await client.query(
+            `SELECT c.conversation_id FROM social_conversations c
+              JOIN social_conversation_memberships owner
+                ON owner.conversation_id = c.conversation_id
+               AND owner.user_id = $2 AND owner.member_role = 'owner' AND owner.left_at IS NULL
+             WHERE c.conversation_id = $1 AND c.conversation_type = 'group'
+             FOR UPDATE OF c`,
+            [conversationId, actorUserId])
+          if (!group.rows.length) throw new MessagingStoreError('PERMISSION_DENIED', 403)
+          const target = await client.query(
+            `UPDATE social_conversation_memberships SET member_role = 'owner'
+              WHERE conversation_id = $1 AND user_id = $2 AND member_role = 'member' AND left_at IS NULL`,
+            [conversationId, targetUserId])
+          if (!target.rowCount) throw new MessagingStoreError('TARGET_NOT_ACTIVE_MEMBER', 409)
+          await client.query(
+            `UPDATE social_conversation_memberships SET member_role = 'member'
+              WHERE conversation_id = $1 AND user_id = $2 AND member_role = 'owner' AND left_at IS NULL`,
+            [conversationId, actorUserId])
+          await client.query('UPDATE social_conversations SET updated_at = CURRENT_TIMESTAMP WHERE conversation_id = $1', [conversationId])
+        })
+      } catch (error) {
+        if (error instanceof MessagingStoreError) throw error
+        throw new MessagingStoreError()
+      }
+    },
     async leaveGroupConversation(actorUserId, conversationId) {
       if (!validId(conversationId)) throw new MessagingStoreError('VALIDATION_FAILED', 422)
       try {
