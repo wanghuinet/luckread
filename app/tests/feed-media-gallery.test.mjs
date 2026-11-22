@@ -16,7 +16,8 @@ test('member-only image preview uses authenticated image sources in a paged nati
   expect(feedItem).toContain('source={{ uri: item.src, headers: item.headers }}');
   expect(feedItem).toContain('initialScrollIndex={viewerStartIndex}');
   expect(feedItem).toContain('pagingEnabled');
-  expect(feedItem).toContain('accessibilityLabel="Close image viewer"');
+  expect(feedItem).toContain('accessibilityLabel="关闭图片查看器"');
+  expect(feedItem).toContain('accessibilityHint="关闭图片查看器并返回动态"');
 });
 
 test('member-only images are not passed to Galeria as unauthenticated remote URLs', () => {
