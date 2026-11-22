@@ -11,23 +11,30 @@ import { resolvePublicProfileById } from '~/lib/content-adapter';
 
 function ConversationRow({ item }: { item: MessagingConversation }) {
   const router = useRouter();
+  const isGroup = item.conversation_type === 'group';
   const profile = useQuery({
     queryKey: ['public-profile', item.participant_user_id],
-    queryFn: ({ signal }) => resolvePublicProfileById(item.participant_user_id, signal),
+    queryFn: ({ signal }) => resolvePublicProfileById(item.participant_user_id!, signal),
+    enabled: !isGroup && Boolean(item.participant_user_id),
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
-  const displayName = profile.data?.displayName?.trim() ||
-    (profile.data?.username ? '@' + profile.data.username : 'LuckRead 用户');
+  const displayName = isGroup
+    ? (item.group_name || '群聊') + ' · ' + item.member_count + '人'
+    : profile.data?.displayName?.trim() ||
+      (profile.data?.username ? '@' + profile.data.username : 'LuckRead 用户');
 
   return (
-    <Pressable onPress={() => router.push({ pathname: '/messages/[conversationId]', params: { conversationId: item.conversation_id, participantName: displayName } } as never)} className="flex-row items-center border-b border-neutral-100 px-4 py-4 dark:border-neutral-800">
+    <Pressable onPress={() => router.push({ pathname: '/messages/[conversationId]', params: {
+      conversationId: item.conversation_id, participantName: displayName,
+      conversationType: item.conversation_type, groupName: item.group_name || '',
+    } } as never)} className="flex-row items-center border-b border-neutral-100 px-4 py-4 dark:border-neutral-800">
       <View className="h-12 w-12 items-center justify-center rounded-full bg-sky-50 dark:bg-sky-950/40">
-        <Feather name="user" size={22} color="#1d9bf0" />
+        <Feather name={isGroup ? 'users' : 'user'} size={22} color="#1d9bf0" />
       </View>
       <View className="ml-3 flex-1">
         <Text className="font-semibold text-neutral-900 dark:text-white" numberOfLines={1}>{displayName}</Text>
-        <Text className="mt-1 text-sm text-neutral-500" numberOfLines={1}>{item.last_message_body || '开始聊天'}</Text>
+        <Text className="mt-1 text-sm text-neutral-500" numberOfLines={1}>{item.last_message_body || (isGroup ? '群聊已创建，开始聊天' : '开始聊天')}</Text>
       </View>
       {item.unread_count > 0 ? (
         <View className="mr-2 min-w-5 items-center justify-center rounded-full bg-sky-500 px-1.5 py-0.5">
@@ -132,9 +139,14 @@ export default function Messages() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View className="flex-row items-center justify-between border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
         <Text className="text-xl font-bold text-neutral-900 dark:text-white">私信</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="刷新私信" onPress={() => conversations.refetch()} className="p-2">
-          <Feather name="refresh-cw" size={20} color="#1d9bf0" />
-        </Pressable>
+        <View className="flex-row items-center">
+          <Pressable accessibilityRole="button" accessibilityLabel="创建群聊" onPress={() => router.push('/messages/group-new' as never)} className="p-2">
+            <Feather name="users" size={20} color="#1d9bf0" />
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="刷新私信" onPress={() => conversations.refetch()} className="p-2">
+            <Feather name="refresh-cw" size={20} color="#1d9bf0" />
+          </Pressable>
+        </View>
       </View>
       {authStatus === 'authenticated' ? (
         <View className="flex-row border-b border-neutral-100 px-3 py-2 dark:border-neutral-800">

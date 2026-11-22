@@ -8,7 +8,10 @@ export type MessagingAttachment = Readonly<{
 }>
 export type MessagingConversationRow = Readonly<{
   conversation_id: string
-  participant_user_id: string
+  conversation_type: 'direct' | 'group'
+  group_name: string | null
+  member_count: number
+  participant_user_id: string | null
   updated_at: string
   last_sequence: string
   last_message_id: string | null
@@ -17,6 +20,11 @@ export type MessagingConversationRow = Readonly<{
   last_message_created_at: string | null
   last_read_sequence: string
   unread_count: number
+}>
+export type MessagingConversationMemberRow = Readonly<{
+  user_id: string
+  member_role: 'owner' | 'member'
+  joined_at: string
 }>
 export type MessagingMessageRow = Readonly<{
   message_id: string
@@ -31,6 +39,11 @@ export type MessagingMessageRow = Readonly<{
 }>
 export interface MessagingStore {
   createDirectConversation(actorUserId: string, recipientUserId: string): Promise<{ conversationId: string }>
+  createGroupConversation(actorUserId: string, memberUserIds: string[], groupName: string): Promise<{ conversationId: string }>
+  listConversationMembers(actorUserId: string, conversationId: string): Promise<MessagingConversationMemberRow[]>
+  addGroupMembers(actorUserId: string, conversationId: string, memberUserIds: string[]): Promise<{ addedCount: number }>
+  removeGroupMember(actorUserId: string, conversationId: string, memberUserId: string): Promise<void>
+  leaveGroupConversation(actorUserId: string, conversationId: string): Promise<void>
   listConversations(actorUserId: string, cursor: string | null, limit: number): Promise<{
     items: MessagingConversationRow[]; nextCursor: string | null; hasMore: boolean
   }>

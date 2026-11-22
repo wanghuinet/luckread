@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { listContentLikers } from './like-list-runtime.js'
-import { MessagingRuntimeError, createDirectConversation, listConversations, listMessages, listMessagesAfter, markConversationRead, sendMessage, editMessage, recallMessage } from './messaging-runtime.js'
+import { MessagingRuntimeError, createDirectConversation, createGroupConversation, listConversationMembers, addGroupMembers, removeGroupMember, leaveGroupConversation, listConversations, listMessages, listMessagesAfter, markConversationRead, sendMessage, editMessage, recallMessage } from './messaging-runtime.js'
 import type { MessagingStore } from './messaging-store.js'
 import { MessageRequestRuntimeError, createMessageRequest, listMessageRequests, respondToMessageRequest } from './message-request-runtime.js'
 import type { MessageRequestStore } from './message-request-store.js'
@@ -872,6 +872,61 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         if (!requestId) throw new MessageRequestRuntimeError('VALIDATION_FAILED', 422)
         const data = await respondToMessageRequest(dependencies.messageRequestStore, actorUserId, requestId, messageRequestAction[2] ?? '')
         return json({ data, requestId: createRequestId() })
+      }
+
+      if (url.pathname === '/internal/messaging/conversations/groups') {
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        await enforceRateLimit(request, env, 'write:messaging-group-create')
+        let body: unknown
+        try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
+        if (!body || typeof body !== 'object' || Array.isArray(body) ||
+          Object.keys(body).some(key => !['name', 'memberUserIds'].includes(key))) {
+          throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        }
+        const input = body as { name?: unknown; memberUserIds?: unknown }
+        const data = await createGroupConversation(dependencies.messagingStore, actorUserId, input.name, input.memberUserIds)
+        return json({ data, requestId: createRequestId() }, 201)
+      }
+
+      const messagingGroupMembersMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/members(?:\/([^/]+))?$/.exec(url.pathname)
+      if (messagingGroupMembersMatch) {
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const conversationId = decodePathPart(messagingGroupMembersMatch[1] ?? '')
+        const memberUserId = messagingGroupMembersMatch[2] ? decodePathPart(messagingGroupMembersMatch[2]) : null
+        if (!conversationId || (messagingGroupMembersMatch[2] && !memberUserId)) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        if (memberUserId) {
+          if (request.method !== 'DELETE') return new Response(null, { status: 405, headers: { Allow: 'DELETE' } })
+          await enforceRateLimit(request, env, 'write:messaging-group-member-remove')
+          await removeGroupMember(dependencies.messagingStore, actorUserId, conversationId, memberUserId)
+          return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
+        }
+        if (request.method === 'GET') {
+          const data = await listConversationMembers(dependencies.messagingStore, actorUserId, conversationId)
+          return json({ data, requestId: createRequestId() })
+        }
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'GET, POST' } })
+        await enforceRateLimit(request, env, 'write:messaging-group-member-add')
+        let body: unknown
+        try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
+        if (!body || typeof body !== 'object' || Array.isArray(body) ||
+          Object.keys(body).some(key => key !== 'memberUserIds')) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        const data = await addGroupMembers(dependencies.messagingStore, actorUserId, conversationId, (body as { memberUserIds?: unknown }).memberUserIds)
+        return json({ data, requestId: createRequestId() })
+      }
+
+      const messagingGroupLeaveMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/leave$/.exec(url.pathname)
+      if (messagingGroupLeaveMatch) {
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        await enforceRateLimit(request, env, 'write:messaging-group-leave')
+        const conversationId = decodePathPart(messagingGroupLeaveMatch[1] ?? '')
+        if (!conversationId) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        await leaveGroupConversation(dependencies.messagingStore, actorUserId, conversationId)
+        return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       }
 
       if (url.pathname === '/internal/messaging/conversations') {

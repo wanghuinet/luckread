@@ -139,7 +139,7 @@ export function createPostgresMessageRequestStore(db: MessageRequestPostgresExec
           const created = await client.query<{ conversation_id: string }>(`INSERT INTO social_conversations
             (conversation_id, conversation_type, direct_pair_key, created_by_user_id, last_sequence, created_at, updated_at)
             VALUES ($1, 'direct', $2, $3, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            ON CONFLICT (direct_pair_key) DO UPDATE SET updated_at = social_conversations.updated_at
+            ON CONFLICT (direct_pair_key) WHERE conversation_type = 'direct' AND direct_pair_key IS NOT NULL DO UPDATE SET updated_at = social_conversations.updated_at
             RETURNING conversation_id`, [crypto.randomUUID(), pairKey, request.sender_user_id])
           const conversationId = created.rows[0]?.conversation_id
           if (!conversationId) throw new MessageRequestStoreError('SERVICE_UNAVAILABLE', 503)

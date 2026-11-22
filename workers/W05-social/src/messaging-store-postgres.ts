@@ -40,6 +40,207 @@ const messageSelect = `message_id, conversation_id, sender_user_id, sequence::te
   CASE WHEN recalled_at IS NULL THEN NULL ELSE to_char(recalled_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS recalled_at`
 export function createPostgresMessagingStore(db: MessagingPostgresExecutor): MessagingStore {
   return {
+    async createGroupConversation(actorUserId, memberUserIds, groupName) {
+      const name = groupName.trim().normalize('NFC')
+      const members = [...new Set(memberUserIds.map(value => value.trim()))]
+      if (!validId(actorUserId) || name.length < 1 || name.length > 80 || members.length < 2 || members.length > 49 ||
+        members.some(id => !validId(id) || id === actorUserId)) {
+        throw new MessagingStoreError('VALIDATION_FAILED', 422)
+      }
+      const participants = [actorUserId, ...members]
+      try {
+        return await withTransaction(db, async client => {
+          const contacts = await client.query<{ user_id: string }>(
+            `SELECT target.user_id
+               FROM unnest($2::text[]) AS target(user_id)
+              WHERE EXISTS (
+                SELECT 1 FROM social_conversations direct
+                JOIN social_conversation_memberships mine
+                  ON mine.conversation_id = direct.conversation_id
+                 AND mine.user_id = $1 AND mine.left_at IS NULL
+                JOIN social_conversation_memberships peer
+                  ON peer.conversation_id = direct.conversation_id
+                 AND peer.user_id = target.user_id AND peer.left_at IS NULL
+                WHERE direct.conversation_type = 'direct'
+                  AND direct.direct_pair_key = LEAST($1::text, target.user_id) || ':' || GREATEST($1::text, target.user_id)
+              ) ORDER BY target.user_id`,
+            [actorUserId, members])
+          if (contacts.rows.length !== members.length) throw new MessagingStoreError('CONTACT_POLICY_DENIED', 403)
+          const blocked = await client.query(
+            `SELECT 1 FROM social_user_interactions
+              WHERE relation_type = 'block'
+                AND actor_user_id = ANY($1::text[])
+                AND target_user_id = ANY($1::text[])
+              LIMIT 1`, [participants])
+          if (blocked.rows.length) throw new MessagingStoreError('PERMISSION_DENIED', 403)
+          const conversationId = crypto.randomUUID()
+          await client.query(
+            `INSERT INTO social_conversations
+              (conversation_id, conversation_type, direct_pair_key, group_name, created_by_user_id, last_sequence, created_at, updated_at)
+             VALUES ($1, 'group', NULL, $2, $3, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            [conversationId, name, actorUserId])
+          await client.query(
+            `INSERT INTO social_conversation_memberships
+              (conversation_id, user_id, member_role, joined_at, last_read_sequence)
+             SELECT $1, member_id, CASE WHEN member_id = $2 THEN 'owner' ELSE 'member' END,
+                    CURRENT_TIMESTAMP, 0
+               FROM unnest($3::text[]) AS members(member_id)`,
+            [conversationId, actorUserId, participants])
+          return { conversationId }
+        })
+      } catch (error) {
+        if (error instanceof MessagingStoreError) throw error
+        throw new MessagingStoreError()
+      }
+    },
+    async listConversationMembers(actorUserId, conversationId) {
+      if (!validId(conversationId)) throw new MessagingStoreError('VALIDATION_FAILED', 422)
+      try {
+        const allowed = await db.query(
+          `SELECT 1 FROM social_conversation_memberships mine
+            WHERE mine.conversation_id = $1 AND mine.user_id = $2 AND mine.left_at IS NULL
+              AND EXISTS (
+                SELECT 1 FROM social_conversation_memberships peer
+                 WHERE peer.conversation_id = mine.conversation_id
+                   AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM social_conversation_memberships peer
+                JOIN social_user_interactions blocked
+                  ON blocked.relation_type = 'block'
+                 AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                   OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                WHERE peer.conversation_id = mine.conversation_id
+                  AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+              ) LIMIT 1`,
+          [conversationId, actorUserId])
+        if (!allowed.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
+        const result = await db.query<any>(
+          `SELECT user_id, member_role,
+                  to_char(joined_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS joined_at
+             FROM social_conversation_memberships
+            WHERE conversation_id = $1 AND left_at IS NULL
+            ORDER BY CASE WHEN member_role = 'owner' THEN 0 ELSE 1 END, joined_at ASC, user_id ASC`,
+          [conversationId])
+        return result.rows
+      } catch (error) {
+        if (error instanceof MessagingStoreError) throw error
+        throw new MessagingStoreError()
+      }
+    },
+    async addGroupMembers(actorUserId, conversationId, memberUserIds) {
+      const members = [...new Set(memberUserIds.map(value => value.trim()))]
+      if (!validId(conversationId) || members.length < 1 || members.length > 49 ||
+        members.some(id => !validId(id) || id === actorUserId)) throw new MessagingStoreError('VALIDATION_FAILED', 422)
+      try {
+        return await withTransaction(db, async client => {
+          const group = await client.query<{ conversation_id: string }>(
+            `SELECT c.conversation_id FROM social_conversations c
+              JOIN social_conversation_memberships mine
+                ON mine.conversation_id = c.conversation_id
+               AND mine.user_id = $2 AND mine.member_role = 'owner' AND mine.left_at IS NULL
+             WHERE c.conversation_id = $1 AND c.conversation_type = 'group'
+             FOR UPDATE OF c`,
+            [conversationId, actorUserId])
+          if (!group.rows.length) throw new MessagingStoreError('PERMISSION_DENIED', 403)
+          const current = await client.query<{ user_id: string }>(
+            `SELECT user_id FROM social_conversation_memberships
+              WHERE conversation_id = $1 AND left_at IS NULL`,
+            [conversationId])
+          const currentIds = current.rows.map(row => row.user_id)
+          const newMembers = members.filter(id => !currentIds.includes(id))
+          if (!newMembers.length) return { addedCount: 0 }
+          if (currentIds.length + newMembers.length > 50) throw new MessagingStoreError('GROUP_MEMBER_LIMIT_REACHED', 422)
+          const contacts = await client.query<{ user_id: string }>(
+            `SELECT target.user_id
+               FROM unnest($2::text[]) AS target(user_id)
+              WHERE EXISTS (
+                SELECT 1 FROM social_conversations direct
+                JOIN social_conversation_memberships mine
+                  ON mine.conversation_id = direct.conversation_id
+                 AND mine.user_id = $1 AND mine.left_at IS NULL
+                JOIN social_conversation_memberships peer
+                  ON peer.conversation_id = direct.conversation_id
+                 AND peer.user_id = target.user_id AND peer.left_at IS NULL
+                WHERE direct.conversation_type = 'direct'
+                  AND direct.direct_pair_key = LEAST($1, target.user_id) || ':' || GREATEST($1, target.user_id)
+              ) ORDER BY target.user_id`,
+            [actorUserId, newMembers])
+          if (contacts.rows.length !== newMembers.length) throw new MessagingStoreError('CONTACT_POLICY_DENIED', 403)
+          const allParticipants = [...currentIds, ...newMembers]
+          const blocked = await client.query(
+            `SELECT 1 FROM social_user_interactions
+              WHERE relation_type = 'block'
+                AND actor_user_id = ANY($1::text[])
+                AND target_user_id = ANY($1::text[])
+              LIMIT 1`, [allParticipants])
+          if (blocked.rows.length) throw new MessagingStoreError('PERMISSION_DENIED', 403)
+          await client.query(
+            `INSERT INTO social_conversation_memberships
+              (conversation_id, user_id, member_role, joined_at, last_read_sequence)
+             SELECT $1, member_id, 'member', CURRENT_TIMESTAMP, 0
+               FROM unnest($2::text[]) AS members(member_id)
+             ON CONFLICT (conversation_id, user_id) DO UPDATE
+               SET left_at = NULL, archived_at = NULL, joined_at = CURRENT_TIMESTAMP, last_read_sequence = 0`,
+            [conversationId, newMembers])
+          await client.query('UPDATE social_conversations SET updated_at = CURRENT_TIMESTAMP WHERE conversation_id = $1', [conversationId])
+          return { addedCount: newMembers.length }
+        })
+      } catch (error) {
+        if (error instanceof MessagingStoreError) throw error
+        throw new MessagingStoreError()
+      }
+    },
+    async removeGroupMember(actorUserId, conversationId, memberUserId) {
+      if (!validId(conversationId) || !validId(memberUserId) || actorUserId === memberUserId) throw new MessagingStoreError('VALIDATION_FAILED', 422)
+      try {
+        await withTransaction(db, async client => {
+          const group = await client.query(
+            `SELECT c.conversation_id FROM social_conversations c
+              JOIN social_conversation_memberships owner
+                ON owner.conversation_id = c.conversation_id
+               AND owner.user_id = $2 AND owner.member_role = 'owner' AND owner.left_at IS NULL
+             WHERE c.conversation_id = $1 AND c.conversation_type = 'group'
+             FOR UPDATE OF c`,
+            [conversationId, actorUserId])
+          if (!group.rows.length) throw new MessagingStoreError('PERMISSION_DENIED', 403)
+          const removed = await client.query(
+            `UPDATE social_conversation_memberships
+                SET left_at = CURRENT_TIMESTAMP
+              WHERE conversation_id = $1 AND user_id = $2 AND member_role <> 'owner' AND left_at IS NULL`,
+            [conversationId, memberUserId])
+          if (!removed.rowCount) throw new MessagingStoreError('NOT_FOUND', 404)
+          await client.query('UPDATE social_conversations SET updated_at = CURRENT_TIMESTAMP WHERE conversation_id = $1', [conversationId])
+        })
+      } catch (error) {
+        if (error instanceof MessagingStoreError) throw error
+        throw new MessagingStoreError()
+      }
+    },
+    async leaveGroupConversation(actorUserId, conversationId) {
+      if (!validId(conversationId)) throw new MessagingStoreError('VALIDATION_FAILED', 422)
+      try {
+        await withTransaction(db, async client => {
+          const member = await client.query<{ member_role: string }>(
+            `SELECT m.member_role FROM social_conversation_memberships m
+              JOIN social_conversations c ON c.conversation_id = m.conversation_id
+             WHERE m.conversation_id = $1 AND m.user_id = $2 AND m.left_at IS NULL
+               AND c.conversation_type = 'group'
+             FOR UPDATE OF c, m`,
+            [conversationId, actorUserId])
+          if (!member.rows[0]) throw new MessagingStoreError('NOT_FOUND', 404)
+          if (member.rows[0].member_role === 'owner') throw new MessagingStoreError('GROUP_OWNER_CANNOT_LEAVE', 409)
+          await client.query(
+            `UPDATE social_conversation_memberships SET left_at = CURRENT_TIMESTAMP
+              WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL`,
+            [conversationId, actorUserId])
+          await client.query('UPDATE social_conversations SET updated_at = CURRENT_TIMESTAMP WHERE conversation_id = $1', [conversationId])
+        })
+      } catch (error) {
+        if (error instanceof MessagingStoreError) throw error
+        throw new MessagingStoreError()
+      }
+    },
     async createDirectConversation(actorUserId, recipientUserId) {
       if (!validId(actorUserId) || !validId(recipientUserId) || actorUserId === recipientUserId) {
         throw new MessagingStoreError('VALIDATION_FAILED', 422)
@@ -87,7 +288,7 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
             `INSERT INTO social_conversations
               (conversation_id, conversation_type, direct_pair_key, created_by_user_id, last_sequence, created_at, updated_at)
              VALUES ($1, 'direct', $2, $3, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-             ON CONFLICT (direct_pair_key) DO UPDATE SET updated_at = social_conversations.updated_at
+             ON CONFLICT (direct_pair_key) WHERE conversation_type = 'direct' AND direct_pair_key IS NOT NULL DO UPDATE SET updated_at = social_conversations.updated_at
              RETURNING conversation_id`,
             [crypto.randomUUID(), directPairKey, actorUserId])
           const conversationId = created.rows[0]?.conversation_id
@@ -111,7 +312,10 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
       if (cursor && !decoded) throw new MessagingStoreError('INVALID_CURSOR', 400)
       try {
         const result = await db.query<any>(
-          `SELECT c.conversation_id, peer.user_id AS participant_user_id,
+          `SELECT c.conversation_id, c.conversation_type, c.group_name,
+                  CASE WHEN c.conversation_type = 'direct' THEN peer.user_id ELSE NULL END AS participant_user_id,
+                  (SELECT COUNT(*)::int FROM social_conversation_memberships members
+                    WHERE members.conversation_id = c.conversation_id AND members.left_at IS NULL) AS member_count,
                   to_char(c.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at,
                   c.last_sequence::text AS last_sequence,
                   latest.message_id AS last_message_id, latest.body AS last_message_body,
@@ -130,19 +334,22 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
                SELECT user_id FROM social_conversation_memberships
                 WHERE conversation_id = c.conversation_id AND user_id <> $1 AND left_at IS NULL
                 ORDER BY joined_at ASC LIMIT 1
-             ) peer ON TRUE
+             ) peer ON c.conversation_type = 'direct'
              LEFT JOIN LATERAL (
                SELECT message_id, body, sender_user_id, created_at FROM social_messages
                 WHERE conversation_id = c.conversation_id AND recalled_at IS NULL
                 ORDER BY sequence DESC LIMIT 1
              ) latest ON TRUE
             WHERE mine.user_id = $1 AND mine.left_at IS NULL
-              AND peer.user_id IS NOT NULL
+              AND (c.conversation_type = 'group' OR peer.user_id IS NOT NULL)
               AND NOT EXISTS (
-                SELECT 1 FROM social_user_interactions blocked
-                 WHERE blocked.relation_type = 'block'
-                   AND ((blocked.actor_user_id = $1 AND blocked.target_user_id = peer.user_id)
-                     OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = $1))
+                SELECT 1 FROM social_conversation_memberships other
+                JOIN social_user_interactions blocked
+                  ON blocked.relation_type = 'block'
+                 AND ((blocked.actor_user_id = $1 AND blocked.target_user_id = other.user_id)
+                   OR (blocked.actor_user_id = other.user_id AND blocked.target_user_id = $1))
+                WHERE other.conversation_id = c.conversation_id
+                  AND other.user_id <> $1 AND other.left_at IS NULL
               )
               AND ($2::timestamptz IS NULL OR (c.updated_at, c.conversation_id) < ($2::timestamptz, $3::text))
             ORDER BY c.updated_at DESC, c.conversation_id DESC
@@ -168,14 +375,19 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
       try {
         const membership = await db.query(
           `SELECT 1 FROM social_conversation_memberships mine
-             JOIN social_conversation_memberships peer
-               ON peer.conversation_id = mine.conversation_id AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
              WHERE mine.conversation_id = $1 AND mine.user_id = $2 AND mine.left_at IS NULL
+               AND EXISTS (
+                 SELECT 1 FROM social_conversation_memberships peer
+                  WHERE peer.conversation_id = mine.conversation_id AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+               )
                AND NOT EXISTS (
-                 SELECT 1 FROM social_user_interactions blocked
-                  WHERE blocked.relation_type = 'block'
-                    AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
-                      OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                 SELECT 1 FROM social_conversation_memberships peer
+                 JOIN social_user_interactions blocked
+                   ON blocked.relation_type = 'block'
+                  AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                    OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                 WHERE peer.conversation_id = mine.conversation_id
+                   AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
                ) LIMIT 1`,
           [conversationId, actorUserId])
         if (!membership.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
@@ -200,14 +412,19 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
       try {
         const membership = await db.query(
           `SELECT 1 FROM social_conversation_memberships mine
-             JOIN social_conversation_memberships peer
-               ON peer.conversation_id = mine.conversation_id AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
              WHERE mine.conversation_id = $1 AND mine.user_id = $2 AND mine.left_at IS NULL
+               AND EXISTS (
+                 SELECT 1 FROM social_conversation_memberships peer
+                  WHERE peer.conversation_id = mine.conversation_id AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+               )
                AND NOT EXISTS (
-                 SELECT 1 FROM social_user_interactions blocked
-                  WHERE blocked.relation_type = 'block'
-                    AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
-                      OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                 SELECT 1 FROM social_conversation_memberships peer
+                 JOIN social_user_interactions blocked
+                   ON blocked.relation_type = 'block'
+                  AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                    OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                 WHERE peer.conversation_id = mine.conversation_id
+                   AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
                ) LIMIT 1`,
           [conversationId, actorUserId])
         if (!membership.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
@@ -236,17 +453,19 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
              WHERE c.conversation_id = $1 AND m.user_id = $2 AND m.left_at IS NULL
              FOR UPDATE OF c`, [conversationId, actorUserId])
           if (!conversation.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
-          const peer = await client.query<{ user_id: string }>(
+          const peers = await client.query<{ user_id: string }>(
             `SELECT user_id FROM social_conversation_memberships
-              WHERE conversation_id = $1 AND user_id <> $2 AND left_at IS NULL LIMIT 1`,
+              WHERE conversation_id = $1 AND user_id <> $2 AND left_at IS NULL`,
             [conversationId, actorUserId])
-          if (!peer.rows[0]) throw new MessagingStoreError('NOT_FOUND', 404)
+          if (!peers.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
           const blocked = await client.query(
-            `SELECT 1 FROM social_user_interactions
-              WHERE relation_type = 'block'
-                AND ((actor_user_id = $1 AND target_user_id = $2)
-                  OR (actor_user_id = $2 AND target_user_id = $1))
-              LIMIT 1`, [actorUserId, peer.rows[0].user_id])
+            `SELECT 1 FROM social_conversation_memberships peer
+              JOIN social_user_interactions interaction
+                ON interaction.relation_type = 'block'
+               AND ((interaction.actor_user_id = $2 AND interaction.target_user_id = peer.user_id)
+                 OR (interaction.actor_user_id = peer.user_id AND interaction.target_user_id = $2))
+              WHERE peer.conversation_id = $1 AND peer.user_id <> $2 AND peer.left_at IS NULL
+              LIMIT 1`, [conversationId, actorUserId])
           if (blocked.rows.length) throw new MessagingStoreError('PERMISSION_DENIED', 403)
           // Check current access before returning an idempotent retry result.
           const prior = await client.query<MessageRow>(
@@ -285,14 +504,20 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
                FROM social_messages message
                JOIN social_conversation_memberships mine
                  ON mine.conversation_id = message.conversation_id AND mine.user_id = $1 AND mine.left_at IS NULL
-               JOIN social_conversation_memberships peer
-                 ON peer.conversation_id = message.conversation_id AND peer.user_id <> $1 AND peer.left_at IS NULL
               WHERE message.sender_user_id = $1 AND message.client_message_id = $2
+                AND EXISTS (
+                  SELECT 1 FROM social_conversation_memberships peer
+                   WHERE peer.conversation_id = message.conversation_id
+                     AND peer.user_id <> $1 AND peer.left_at IS NULL
+                )
                 AND NOT EXISTS (
-                  SELECT 1 FROM social_user_interactions blocked
-                   WHERE blocked.relation_type = 'block'
-                     AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
-                       OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                  SELECT 1 FROM social_conversation_memberships peer
+                  JOIN social_user_interactions blocked
+                    ON blocked.relation_type = 'block'
+                   AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                     OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                  WHERE peer.conversation_id = message.conversation_id
+                    AND peer.user_id <> $1 AND peer.left_at IS NULL
                 )
               LIMIT 1`, [actorUserId, clientMessageId])
           if (prior.rows[0]) {
@@ -311,10 +536,6 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
         const result = await db.query(
           `SELECT 1
              FROM social_conversation_memberships mine
-             JOIN social_conversation_memberships peer
-               ON peer.conversation_id = mine.conversation_id
-              AND peer.user_id <> mine.user_id
-              AND peer.left_at IS NULL
              JOIN social_messages message
                ON message.conversation_id = mine.conversation_id
               AND message.recalled_at IS NULL
@@ -322,11 +543,19 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
             WHERE mine.conversation_id = $1
               AND mine.user_id = $2
               AND mine.left_at IS NULL
+              AND EXISTS (
+                SELECT 1 FROM social_conversation_memberships peer
+                 WHERE peer.conversation_id = mine.conversation_id
+                   AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+              )
               AND NOT EXISTS (
-                SELECT 1 FROM social_user_interactions blocked
-                 WHERE blocked.relation_type = 'block'
-                   AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
-                     OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                SELECT 1 FROM social_conversation_memberships peer
+                JOIN social_user_interactions blocked
+                  ON blocked.relation_type = 'block'
+                 AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                   OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                WHERE peer.conversation_id = mine.conversation_id
+                  AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
               )
             LIMIT 1`,
           [conversationId, actorUserId, mediaId])
@@ -344,19 +573,25 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
           const authorized = await client.query(
             `SELECT 1
                FROM social_conversation_memberships mine
-               JOIN social_conversation_memberships peer
-                 ON peer.conversation_id = mine.conversation_id AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
                JOIN social_messages message
                  ON message.conversation_id = mine.conversation_id
                 AND message.message_id = $3
                 AND message.sender_user_id = mine.user_id
                 AND message.recalled_at IS NULL
               WHERE mine.conversation_id = $1 AND mine.user_id = $2 AND mine.left_at IS NULL
+                AND EXISTS (
+                  SELECT 1 FROM social_conversation_memberships peer
+                   WHERE peer.conversation_id = mine.conversation_id
+                     AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+                )
                 AND NOT EXISTS (
-                  SELECT 1 FROM social_user_interactions blocked
-                   WHERE blocked.relation_type = 'block'
-                     AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
-                       OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                  SELECT 1 FROM social_conversation_memberships peer
+                  JOIN social_user_interactions blocked
+                    ON blocked.relation_type = 'block'
+                   AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                     OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                  WHERE peer.conversation_id = mine.conversation_id
+                    AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
                 )
               FOR UPDATE OF message`,
             [conversationId, actorUserId, messageId])
@@ -382,19 +617,25 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
           const authorized = await client.query(
             `SELECT 1
                FROM social_conversation_memberships mine
-               JOIN social_conversation_memberships peer
-                 ON peer.conversation_id = mine.conversation_id AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
                JOIN social_messages message
                  ON message.conversation_id = mine.conversation_id
                 AND message.message_id = $3
                 AND message.sender_user_id = mine.user_id
                 AND message.recalled_at IS NULL
               WHERE mine.conversation_id = $1 AND mine.user_id = $2 AND mine.left_at IS NULL
+                AND EXISTS (
+                  SELECT 1 FROM social_conversation_memberships peer
+                   WHERE peer.conversation_id = mine.conversation_id
+                     AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
+                )
                 AND NOT EXISTS (
-                  SELECT 1 FROM social_user_interactions blocked
-                   WHERE blocked.relation_type = 'block'
-                     AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
-                       OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                  SELECT 1 FROM social_conversation_memberships peer
+                  JOIN social_user_interactions blocked
+                    ON blocked.relation_type = 'block'
+                   AND ((blocked.actor_user_id = mine.user_id AND blocked.target_user_id = peer.user_id)
+                     OR (blocked.actor_user_id = peer.user_id AND blocked.target_user_id = mine.user_id))
+                  WHERE peer.conversation_id = mine.conversation_id
+                    AND peer.user_id <> mine.user_id AND peer.left_at IS NULL
                 )
               FOR UPDATE OF message`,
             [conversationId, actorUserId, messageId])

@@ -46,6 +46,39 @@ function normalizeAttachments(value: unknown): MessagingAttachment[] {
     return { mediaId, filename, mimeType, filesize, width: width as number | null, height: height as number | null }
   })
 }
+export async function createGroupConversation(store: MessagingStore | undefined, actorValue: string, nameValue: unknown, memberValues: unknown) {
+  if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
+  if (typeof nameValue !== 'string' || !Array.isArray(memberValues) ||
+    memberValues.length < 2 || memberValues.length > 49 ||
+    memberValues.some(value => typeof value !== 'string')) {
+    throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+  }
+  const name = nameValue.normalize('NFC').trim()
+  if (!name || name.length > 80) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+  const actor = requireId(actorValue, 'UNAUTHENTICATED')
+  const members = memberValues.map(value => requireId(value as string))
+  return storeCall(() => store.createGroupConversation(actor, members, name))
+}
+export async function listConversationMembers(store: MessagingStore | undefined, actorValue: string, conversationId: string) {
+  if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return storeCall(() => store.listConversationMembers(requireId(actorValue, 'UNAUTHENTICATED'), requireId(conversationId)))
+}
+export async function addGroupMembers(store: MessagingStore | undefined, actorValue: string, conversationId: string, memberValues: unknown) {
+  if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
+  if (!Array.isArray(memberValues) || memberValues.length < 1 || memberValues.length > 49 ||
+    memberValues.some(value => typeof value !== 'string')) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+  const actor = requireId(actorValue, 'UNAUTHENTICATED')
+  const members = memberValues.map(value => requireId(value as string))
+  return storeCall(() => store.addGroupMembers(actor, requireId(conversationId), members))
+}
+export async function removeGroupMember(store: MessagingStore | undefined, actorValue: string, conversationId: string, memberUserId: string) {
+  if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return storeCall(() => store.removeGroupMember(requireId(actorValue, 'UNAUTHENTICATED'), requireId(conversationId), requireId(memberUserId)))
+}
+export async function leaveGroupConversation(store: MessagingStore | undefined, actorValue: string, conversationId: string) {
+  if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return storeCall(() => store.leaveGroupConversation(requireId(actorValue, 'UNAUTHENTICATED'), requireId(conversationId)))
+}
 export async function createDirectConversation(store: MessagingStore | undefined, actorValue: string, recipientValue: string) {
   if (!store) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
   const actor = requireId(actorValue, 'UNAUTHENTICATED')
