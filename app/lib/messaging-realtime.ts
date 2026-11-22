@@ -6,6 +6,18 @@ type RealtimeOptions = {
   onState?: (state: 'connecting' | 'connected' | 'disconnected') => void;
 };
 
+const activeSockets = new Map<string, WebSocket>();
+
+/** Send ephemeral typing control frames over the existing authenticated socket (no Worker API request). */
+export function setMessagingRealtimeTyping(conversationId: string, typing: boolean): boolean {
+  const socket = activeSockets.get(conversationId);
+  if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+  try {
+    socket.send(JSON.stringify({ type: typing ? 'typing.start' : 'typing.stop' }));
+    return true;
+  } catch { return false; }
+}
+
 /** Foreground WebSocket with bounded jittered reconnect; no periodic client heartbeat. */
 export function connectMessagingRealtime({ conversationId, onEvent, onState }: RealtimeOptions): () => void {
   let stopped = false;
@@ -32,6 +44,7 @@ export function connectMessagingRealtime({ conversationId, onEvent, onState }: R
       socket = candidate;
       candidate.onopen = () => {
         if (stopped || socket !== candidate) return;
+        activeSockets.set(conversationId, candidate);
         retry = 0;
         onState?.('connected');
       };
@@ -40,7 +53,11 @@ export function connectMessagingRealtime({ conversationId, onEvent, onState }: R
         try { onEvent?.(JSON.parse(message.data)); } catch { /* Ignore malformed frames. */ }
       };
       candidate.onerror = () => { /* onclose owns the single reconnect path */ };
-      candidate.onclose = () => { if (socket === candidate) socket = null; scheduleReconnect(); };
+      candidate.onclose = () => {
+        if (activeSockets.get(conversationId) === candidate) activeSockets.delete(conversationId);
+        if (socket === candidate) socket = null;
+        scheduleReconnect();
+      };
     } catch { scheduleReconnect(); }
   };
   void connect();
@@ -50,6 +67,7 @@ export function connectMessagingRealtime({ conversationId, onEvent, onState }: R
     const current = socket;
     socket = null;
     if (current) {
+      if (activeSockets.get(conversationId) === current) activeSockets.delete(conversationId);
       current.onopen = null; current.onmessage = null; current.onerror = null; current.onclose = null;
       try { current.close(); } catch { /* already closed */ }
     }
