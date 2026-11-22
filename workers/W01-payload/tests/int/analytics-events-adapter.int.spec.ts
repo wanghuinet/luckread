@@ -290,6 +290,8 @@ describe('W01 to W11 analytics event ingress contract', () => {
     expect(client).toContain("'X-LuckRead-Caller': 'W01'")
     expect(client).toContain("'X-LuckRead-Transport-Version': '1.0'")
     expect(client).toContain('W11_ANALYTICS')
+    expect(client).toContain('W11_ANALYTICS_INGEST_ENABLED')
+    expect(bindings).toContain('"W11_ANALYTICS_INGEST_ENABLED": "false"')
     expect(client).not.toContain("headers.set('Authorization'")
     expect(bindings).toContain('"binding": "W11_ANALYTICS"')
     expect(w11).toContain("url.pathname === '/internal/analytics/events'")
