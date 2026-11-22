@@ -19,7 +19,7 @@
     "test:social-screen-api": "bun test tests/social-screen-api.test.mjs tests/notifications-accessibility.test.mjs",
     "test:video-feed-api": "bun test tests/video-feed-api.test.mjs",
     "test:comment-navigation": "bun test tests/comment-navigation.test.mjs",
-    "test:content-search": "bun test tests/content-search.test.mjs",
+    "test:content-search": "bun test tests/content-search.test.mjs tests/search-history.test.mjs",
     "test:auth-flow": "bun test tests/auth-flow-api.test.mjs",
     "test:subscriptions-api": "bun test tests/subscriptions-api.test.mjs",
     "test:billing-api": "bun test tests/billing-api.test.mjs",
