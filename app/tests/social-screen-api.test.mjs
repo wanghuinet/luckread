@@ -47,6 +47,7 @@ const {
   fetchUserRepliesPage,
   fetchUserProfileContentPage,
   fetchContentSearchPage,
+  fetchTrendingSearches,
   findPublicUserByUsername,
   markAllNotificationsRead,
   markNotificationRead,
@@ -117,6 +118,23 @@ test('search screens cancel stale requests and ignore out-of-order responses', (
   expect(searchScreenSource).toContain('contentRequestIdRef.current += 1;');
   expect(searchScreenSource).toContain('userRequestIdRef.current += 1;');
   expect(searchScreenSource).toContain('topicsRequestIdRef.current += 1;');
+});
+
+test('loads bounded public trending search terms through W01 without viewer authentication', async () => {
+  const controller = new AbortController();
+  await fetchTrendingSearches({ signal: controller.signal });
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/search/trending?limit=10');
+  expect(calls[0].options.method).toBe('GET');
+  expect(calls[0].options.auth).toBe(false);
+  expect(calls[0].options.signal).toBe(controller.signal);
+});
+
+test('rejects unsupported trending search limits before making an API request', () => {
+  expect(() => fetchTrendingSearches({ limit: 0 })).toThrow(TypeError);
+  expect(() => fetchTrendingSearches({ limit: 21 })).toThrow(TypeError);
+  expect(calls).toHaveLength(0);
 });
 
 test('loads the first notification page through the shared client', async () => {
