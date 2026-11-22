@@ -799,7 +799,13 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                 onPressAction={({ nativeEvent }) => runMenuAction(nativeEvent.event)}
                                 style={{ width: 28, height: 28 }}
                             >
-                                <View className="p-1 -m-1 opacity-70">
+                                <View
+                                    accessible
+                                    accessibilityRole="button"
+                                    accessibilityLabel="更多动态操作"
+                                    accessibilityHint="打开动态操作菜单"
+                                    className="p-1 -m-1 opacity-70"
+                                >
                                     <Feather name="more-horizontal" size={18} color={colorScheme === 'dark' ? 'white' : 'black'} />
                                 </View>
                             </MenuView>
