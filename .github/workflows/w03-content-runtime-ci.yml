@@ -6,6 +6,8 @@ on:
       - "workers/W03-content/**"
       - "workers/W03-content/package.json"
       - ".github/workflows/w03-content-runtime-ci.yml"
+      - ".github/workflows/neon-runtime-cutover-w03.yml"
+      - ".github/workflows/w03-content-runtime-deploy.yml"
       - "contracts/persistence/CONTENT-ARTICLE-d1-02-persistence.v1.json"
       - "contracts/transport/W01-W03-content-http-binding.v1.json"
       - "contracts/transport/W05-W03-owned-post-context-http-binding.v1.json"
@@ -46,6 +48,28 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+
+      - name: Verify W03 Neon deployment is gated by data import and cutover approval
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+          const workflows = [
+            '.github/workflows/neon-runtime-cutover-w03.yml',
+            '.github/workflows/w03-content-runtime-deploy.yml',
+          ]
+          for (const path of workflows) {
+            const source = fs.readFileSync(path, 'utf8')
+            for (const required of [
+              'businessDataImported',
+              'productionCutoverAuthorized',
+              'D1-02 business data import is not verified',
+              'explicit production cutover authorization is absent',
+            ]) {
+              if (!source.includes(required)) throw new Error(path + ' is missing deployment admission guard: ' + required)
+            }
+          }
+          console.log('W03_NEON_DEPLOYMENT_DATA_ADMISSION=PASS')
+          NODE
 
       - name: Install locked dependencies
         run: npm ci
