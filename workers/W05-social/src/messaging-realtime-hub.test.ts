@@ -139,6 +139,64 @@ describe('MessagingRealtimeHub membership revocation', () => {
     expect(storage.put).not.toHaveBeenCalledWith('typing', expect.anything())
   })
 
+  it('delivers a repeated outbox event only once across direct and scheduled attempts', async () => {
+    const member = makeSocket('member-user');
+    const { state, storage } = makeState([member]);
+    const hub = new MessagingRealtimeHub(state);
+    const request = () => new Request('https://messaging-hub.internal/broadcast', {
+      method: 'POST',
+      headers: { 'X-LuckRead-Principal-User-Id': 'sender-user', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: 'message.created',
+        conversationId: 'conversation-1',
+        actorUserId: 'sender-user',
+        eventId: '123e4567-e89b-12d3-a456-426614174000',
+        occurredAt: Date.now(),
+        payload: { message_id: 'message-1' },
+      }),
+    });
+
+    const first = await hub.fetch(request());
+    const retry = await hub.fetch(request());
+
+    expect(first.status).toBe(200);
+    expect(await first.json()).toEqual({ broadcast: true });
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual({ broadcast: false, duplicate: true });
+    expect(member.send).toHaveBeenCalledOnce();
+    expect(storage.put).toHaveBeenCalledWith('messaging-event-dedupe', {
+      '123e4567-e89b-12d3-a456-426614174000': expect.any(Number),
+    });
+  });
+
+  it('expires old event receipts and keeps the dedupe set bounded', async () => {
+    const member = makeSocket('member-user');
+    const oldReceipts = Object.fromEntries(
+      Array.from({ length: 2_050 }, (_, index) => ['old-' + index, Date.now() - 1]),
+    );
+    const { state, storage } = makeState([member]);
+    storage.get.mockImplementation(async (key: string) =>
+      key === 'messaging-event-dedupe' ? oldReceipts : undefined,
+    );
+    const hub = new MessagingRealtimeHub(state);
+    const response = await hub.fetch(new Request('https://messaging-hub.internal/broadcast', {
+      method: 'POST',
+      headers: { 'X-LuckRead-Principal-User-Id': 'sender-user', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: 'message.created',
+        conversationId: 'conversation-1',
+        actorUserId: 'sender-user',
+        eventId: '123e4567-e89b-12d3-a456-426614174001',
+        occurredAt: Date.now(),
+        payload: { message_id: 'message-2' },
+      }),
+    }));
+    expect(response.status).toBe(200);
+    const stored = storage.put.mock.calls.find(([key]) => key === 'messaging-event-dedupe')?.[1] as Record<string, number>;
+    expect(Object.keys(stored)).toHaveLength(1);
+    expect(stored['123e4567-e89b-12d3-a456-426614174001']).toBeGreaterThan(Date.now());
+  });
+
   it('rejects oversized or unsupported events before broadcasting', async () => {
     const member = makeSocket('member-user')
     const { state } = makeState([member])
