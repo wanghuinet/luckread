@@ -80,10 +80,10 @@ export const EngagementActions = ({ detailView, itemData, onCommentPress, replyD
             <LikeButton contentId={itemData?.contentId} initialLiked={itemData?.liked} iconColor={iconColor} textColor={textColor} likes={itemData?.like_count} />
 
             {!detailView && (
-                <TouchableOpacity className="flex-row items-center gap-1.5">
+                <View className="flex-row items-center gap-1.5">
                     <Views width={18} height={18} fill={iconColor} />
                     <Text className={textColor}>{itemData?.view_count}</Text>
-                </TouchableOpacity>
+                </View>
             )}
 
             <BookmarkButton contentId={itemData?.contentId} iconColor={iconColor} />
