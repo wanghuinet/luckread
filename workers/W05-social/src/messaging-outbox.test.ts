@@ -26,7 +26,7 @@ function database(rows = [event], rowCount = 1) {
 describe('messaging transactional outbox dispatcher', () => {
   it('claims and delivers durable events to the conversation hub then marks them delivered', async () => {
     const db = database()
-    const fetch = vi.fn(async () => new Response(JSON.stringify({ broadcast: true }), { status: 200 }))
+    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ broadcast: true }), { status: 200 }))
     const hub = { idFromName: vi.fn(() => 'room-id'), get: vi.fn(() => ({ fetch })) }
     await expect(dispatchMessagingOutboxBatch(db as never, hub as never))
       .resolves.toEqual({ claimed: 1, delivered: 1, retried: 0 })
@@ -39,7 +39,7 @@ describe('messaging transactional outbox dispatcher', () => {
 
   it('releases failed deliveries with a bounded retry schedule', async () => {
     const db = database()
-    const fetch = vi.fn(async () => new Response('unavailable', { status: 503 }))
+    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response('unavailable', { status: 503 }))
     const hub = { idFromName: vi.fn(() => 'room-id'), get: vi.fn(() => ({ fetch })) }
     await expect(dispatchMessagingOutboxBatch(db as never, hub as never))
       .resolves.toEqual({ claimed: 1, delivered: 0, retried: 1 })
