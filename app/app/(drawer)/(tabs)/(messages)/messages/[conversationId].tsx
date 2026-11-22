@@ -486,14 +486,34 @@ export default function ConversationScreen() {
     sendCurrent(newMessages[0]?.text ?? draft);
   }, [draft, sendCurrent]);
 
+  const [readAckCycle, setReadAckCycle] = useState(0);
+  const readAckStateRef = useRef({ conversationId, acknowledged: '0', inFlight: false });
+  // Route params can change without remounting this screen. Give each conversation
+  // an isolated acknowledgement state so a stale request cannot affect the next chat.
+  if (readAckStateRef.current.conversationId !== conversationId) {
+    readAckStateRef.current = { conversationId, acknowledged: '0', inFlight: false };
+  }
   useEffect(() => {
+    const state = readAckStateRef.current;
     const latest = messagesQuery.data?.pages?.[0]?.items?.[0];
-    if (latest?.sequence) {
-      void markConversationRead(conversationId, latest.sequence)
-        .then(() => queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] }))
-        .catch(() => undefined);
-    }
-  }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence]);
+    if (!latest?.sequence || state.inFlight ||
+      compareSequence(latest.sequence, state.acknowledged) <= 0) return;
+    state.inFlight = true;
+    const targetSequence = latest.sequence;
+    void markConversationRead(conversationId, targetSequence)
+      .then(() => {
+        if (readAckStateRef.current !== state) return;
+        if (compareSequence(targetSequence, state.acknowledged) > 0) {
+          state.acknowledged = targetSequence;
+        }
+        setReadAckCycle((cycle) => cycle + 1);
+        return queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (readAckStateRef.current === state) state.inFlight = false;
+      });
+  }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient, readAckCycle]);
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
