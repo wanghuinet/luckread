@@ -125,8 +125,9 @@ export class MessagingRealtimeHub {
     if (frame.type !== 'typing.start' && frame.type !== 'typing.stop') return;
     const attachment = socket.deserializeAttachment() as SocketAttachment | null;
     const userId = attachment?.userId;
-    if (!userId || !USER_ID.test(userId) || !Number.isSafeInteger(attachment?.membershipVersion)) return;
-    if (!(await this.isMembershipActive(userId, attachment.membershipVersion))) {
+    const membershipVersion = attachment?.membershipVersion;
+    if (!userId || !USER_ID.test(userId) || typeof membershipVersion !== 'number' || !Number.isSafeInteger(membershipVersion)) return;
+    if (!(await this.isMembershipActive(userId, membershipVersion))) {
       try { socket.close(4003, 'Conversation membership revoked'); } catch { /* already closed */ }
       return;
     }
