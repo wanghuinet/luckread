@@ -6,7 +6,16 @@ export class MessagingRealtimeHub {
  private sockets=new Map<WebSocket,SessionData>()
  constructor(private readonly state:DurableObjectState){}
  async fetch(request:Request):Promise<Response>{
-  if(new URL(request.url).pathname.endsWith('/connect'))return this.connect(request)
+  const pathname=new URL(request.url).pathname;
+  if(pathname.endsWith('/connect'))return this.connect(request);
+  if(pathname.endsWith('/broadcast')){
+   if(request.method!=='POST')return new Response('Method Not Allowed',{status:405});
+   const actor=request.headers.get('X-LuckRead-Principal-User-Id')?.trim()||'';
+   if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(actor))return new Response('Unauthorized',{status:401});
+   let event:unknown;try{event=await request.json()}catch{return new Response('Invalid JSON',{status:400})}
+   if(!event||typeof event!=='object'||Array.isArray(event))return new Response('Invalid event',{status:422});
+   this.broadcast(event);return Response.json({broadcast:true});
+  }
   const now=Date.now(),state=await this.state.storage.get<TypingState>('typing')??{}
   for(const [id,expires] of Object.entries(state))if(expires<=now)delete state[id]
   if(request.method==='GET'){await this.state.storage.put('typing',state);await this.schedule(state);return Response.json({activeUserIds:Object.keys(state)},{headers:{'cache-control':'no-store'}})}

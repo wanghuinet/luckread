@@ -368,6 +368,19 @@ export type W05SocialWorkerDependencies = Readonly<{
   likeMutationStore?: LikeMutationStore
 }>
 
+const broadcastMessagingEvent = async (env: Env, conversationId: string, actorUserId: string, type: string, payload: unknown): Promise<void> => {
+  if (!env.MESSAGING_REALTIME_HUB) return
+  try {
+    const id = env.MESSAGING_REALTIME_HUB.idFromName(conversationId)
+    const stub = env.MESSAGING_REALTIME_HUB.get(id)
+    await stub.fetch('https://messaging-realtime.internal/broadcast', {
+      method: 'POST',
+      headers: { 'X-LuckRead-Principal-User-Id': actorUserId, 'content-type': 'application/json' },
+      body: JSON.stringify({ type, conversationId, actorUserId, eventId: crypto.randomUUID(), occurredAt: Date.now(), payload }),
+    })
+  } catch { /* persisted mutation remains authoritative; clients recover through sync */ }
+}
+
 export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies = {}) {
   return {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -1033,6 +1046,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
         if (!body || typeof body !== 'object' || Array.isArray(body)) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
         const data = await sendMessage(dependencies.messagingStore, actorUserId, conversationId, idempotencyKey, (body as { body?: unknown }).body, (body as { attachments?: unknown }).attachments)
+        await broadcastMessagingEvent(env, conversationId, actorUserId, 'message.created', data)
         return json({ data, requestId: createRequestId() }, 201)
       }
 
@@ -1052,11 +1066,13 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
           }
           const data = await editMessage(dependencies.messagingStore, actorUserId, conversationId, messageId, (body as { body: string }).body)
+          await broadcastMessagingEvent(env, conversationId, actorUserId, 'message.edited', data)
           return json({ data, requestId: createRequestId() })
         }
         if (request.method === 'DELETE') {
           await enforceRateLimit(request, env, 'write:messaging-message-recall')
           const data = await recallMessage(dependencies.messagingStore, actorUserId, conversationId, messageId)
+          await broadcastMessagingEvent(env, conversationId, actorUserId, 'message.recalled', data)
           return json({ data, requestId: createRequestId() })
         }
         return new Response(null, { status: 405, headers: { Allow: 'PATCH, DELETE' } })
@@ -1086,7 +1102,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         let body: unknown
         try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
         if (!body || typeof body !== 'object' || Array.isArray(body)) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
-        await markConversationRead(dependencies.messagingStore, actorUserId, conversationId, (body as { sequence?: unknown }).sequence)
+        const data = await markConversationRead(dependencies.messagingStore, actorUserId, conversationId, (body as { sequence?: unknown }).sequence)
+        await broadcastMessagingEvent(env, conversationId, actorUserId, 'conversation.read', data ?? { sequence: (body as { sequence?: unknown }).sequence })
         return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       }
 
