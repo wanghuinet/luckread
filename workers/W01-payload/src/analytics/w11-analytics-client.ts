@@ -24,7 +24,20 @@ export type ClientAnalyticsEvent = {
 
 async function getW11AnalyticsService(): Promise<W11AnalyticsService> {
   const context = await getCloudflareContext({ async: true })
-  const service = (context.env as unknown as { W11_ANALYTICS?: W11AnalyticsService }).W11_ANALYTICS
+  const env = context.env as unknown as {
+    W11_ANALYTICS?: W11AnalyticsService
+    W11_ANALYTICS_INGEST_ENABLED?: string
+  }
+  // W11 client telemetry remains closed until its Neon runtime, retention,
+  // deletion-propagation, and consent gates are explicitly admitted.
+  if (env.W11_ANALYTICS_INGEST_ENABLED !== 'true') {
+    throw new W11AnalyticsClientError(
+      503,
+      'ANALYTICS_INGEST_NOT_ADMITTED',
+      'Analytics ingestion is not currently enabled',
+    )
+  }
+  const service = env.W11_ANALYTICS
   if (!service) {
     throw new W11AnalyticsClientError(503, 'SERVICE_UNAVAILABLE', 'Analytics service unavailable')
   }
