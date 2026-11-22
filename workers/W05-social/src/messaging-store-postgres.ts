@@ -493,39 +493,62 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
       }
       try {
         return await withTransaction(db, async client => {
-          const conversation = await client.query<{ conversation_id: string }>(
-            `SELECT c.conversation_id FROM social_conversations c
-              JOIN social_conversation_memberships m ON m.conversation_id = c.conversation_id
-             WHERE c.conversation_id = $1 AND m.user_id = $2 AND m.left_at IS NULL
-             FOR UPDATE OF c`, [conversationId, actorUserId])
-          if (!conversation.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
-          const peers = await client.query<{ user_id: string }>(
-            `SELECT user_id FROM social_conversation_memberships
-              WHERE conversation_id = $1 AND user_id <> $2 AND left_at IS NULL`,
-            [conversationId, actorUserId])
-          if (!peers.rows.length) throw new MessagingStoreError('NOT_FOUND', 404)
-          const blocked = await client.query(
-            `SELECT 1 FROM social_conversation_memberships peer
-              JOIN social_user_interactions interaction
-                ON interaction.relation_type = 'block'
-               AND ((interaction.actor_user_id = $2 AND interaction.target_user_id = peer.user_id)
-                 OR (interaction.actor_user_id = peer.user_id AND interaction.target_user_id = $2))
-              WHERE peer.conversation_id = $1 AND peer.user_id <> $2 AND peer.left_at IS NULL
-              LIMIT 1`, [conversationId, actorUserId])
-          if (blocked.rows.length) throw new MessagingStoreError('PERMISSION_DENIED', 403)
+          // One locked conversation read performs membership, peer, and block checks.
+          // All group membership mutations lock the same conversation row.
+          const access = await client.query<{ conversation_id: string; has_peer: boolean; has_blocked: boolean }>(
+            `SELECT c.conversation_id,
+                    EXISTS (
+                      SELECT 1 FROM social_conversation_memberships peer
+                       WHERE peer.conversation_id = c.conversation_id
+                         AND peer.user_id <> $2 AND peer.left_at IS NULL
+                    ) AS has_peer,
+                    EXISTS (
+                      SELECT 1 FROM social_conversation_memberships peer
+                      JOIN social_user_interactions interaction
+                        ON interaction.relation_type = 'block'
+                       AND ((interaction.actor_user_id = $2 AND interaction.target_user_id = peer.user_id)
+                         OR (interaction.actor_user_id = peer.user_id AND interaction.target_user_id = $2))
+                       WHERE peer.conversation_id = c.conversation_id
+                         AND peer.user_id <> $2 AND peer.left_at IS NULL
+                    ) AS has_blocked
+               FROM social_conversations c
+               JOIN social_conversation_memberships mine
+                 ON mine.conversation_id = c.conversation_id
+                AND mine.user_id = $2 AND mine.left_at IS NULL
+              WHERE c.conversation_id = $1
+              FOR UPDATE OF c`,
+            [conversationId, actorUserId],
+          )
+          const current = access.rows[0]
+          if (!current) throw new MessagingStoreError('NOT_FOUND', 404)
+          if (!current.has_peer) throw new MessagingStoreError('NOT_FOUND', 404)
+          if (current.has_blocked) throw new MessagingStoreError('PERMISSION_DENIED', 403)
+
           // Check current access before returning an idempotent retry result.
           const prior = await client.query<MessageRow>(
             `SELECT ${messageSelect} FROM social_messages
               WHERE sender_user_id = $1 AND client_message_id = $2 LIMIT 1`,
-            [actorUserId, clientMessageId])
+            [actorUserId, clientMessageId],
+          )
           if (prior.rows[0]) {
-            if (prior.rows[0].conversation_id !== conversationId || prior.rows[0].body !== body || JSON.stringify(prior.rows[0].attachments ?? []) !== JSON.stringify(attachments)) throw new MessagingStoreError('CONFLICT', 409)
+            if (prior.rows[0].conversation_id !== conversationId || prior.rows[0].body !== body ||
+              JSON.stringify(prior.rows[0].attachments ?? []) !== JSON.stringify(attachments)) {
+              throw new MessagingStoreError('CONFLICT', 409)
+            }
             return prior.rows[0]
           }
+
+          const messageId = crypto.randomUUID()
+          // Allocate sequence and update the conversation preview in one write.
           const sequenceResult = await client.query<{ last_sequence: string }>(
-            `UPDATE social_conversations SET last_sequence = last_sequence + 1, updated_at = CURRENT_TIMESTAMP
-              WHERE conversation_id = $1 RETURNING last_sequence::text AS last_sequence`,
-            [conversationId])
+            `UPDATE social_conversations
+                SET last_sequence = last_sequence + 1,
+                    last_message_id = $2,
+                    updated_at = CURRENT_TIMESTAMP
+              WHERE conversation_id = $1
+              RETURNING last_sequence::text AS last_sequence`,
+            [conversationId, messageId],
+          )
           const sequence = sequenceResult.rows[0]?.last_sequence
           if (!sequence) throw new MessagingStoreError()
           const inserted = await client.query<MessageRow>(
@@ -533,12 +556,10 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
               (message_id, conversation_id, sender_user_id, sequence, client_message_id, body, attachments, created_at)
              VALUES ($1, $2, $3, $4::bigint, $5, $6, $7::jsonb, CURRENT_TIMESTAMP)
              RETURNING ${messageSelect}`,
-            [crypto.randomUUID(), conversationId, actorUserId, sequence, clientMessageId, body, JSON.stringify(attachments)])
+            [messageId, conversationId, actorUserId, sequence, clientMessageId, body, JSON.stringify(attachments)],
+          )
           const message = inserted.rows[0]
           if (!message) throw new MessagingStoreError()
-          await client.query(
-            `UPDATE social_conversations SET last_message_id = $2 WHERE conversation_id = $1`,
-            [conversationId, message.message_id])
           return message
         })
       } catch (error) {
@@ -567,7 +588,8 @@ export function createPostgresMessagingStore(db: MessagingPostgresExecutor): Mes
                 )
               LIMIT 1`, [actorUserId, clientMessageId])
           if (prior.rows[0]) {
-            if (prior.rows[0].conversation_id === conversationId && prior.rows[0].body === body && JSON.stringify(prior.rows[0].attachments ?? []) === JSON.stringify(attachments)) return prior.rows[0]
+            if (prior.rows[0].conversation_id === conversationId && prior.rows[0].body === body &&
+              JSON.stringify(prior.rows[0].attachments ?? []) === JSON.stringify(attachments)) return prior.rows[0]
             throw new MessagingStoreError('CONFLICT', 409)
           }
         } catch (retryError) {
