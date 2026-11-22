@@ -125,7 +125,8 @@ try {
     messagingTables: expected.length,
     lifecycleColumns: ['attachments', 'edited_at', 'recalled_at'],
     recalledTombstoneConstraint: true,
-    transactionalOutboxTriggers: triggers.rows.length,\n    groupMembershipEvents: ['group.member.added', 'group.member.removed', 'group.member.left', 'group.owner.transferred'],
+    transactionalOutboxTriggers: triggers.rows.length,
+    groupMembershipEvents: ['group.member.added', 'group.member.removed', 'group.member.left', 'group.owner.transferred'],
     businessRows: 0,
   }))
 } finally {
