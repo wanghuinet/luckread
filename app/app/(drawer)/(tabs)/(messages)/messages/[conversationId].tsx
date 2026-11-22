@@ -472,6 +472,7 @@ export default function ConversationScreen() {
   }, [draft, sendCurrent]);
 
   const readAckSequenceRef = useRef('0');
+  const [readAckCycle, setReadAckCycle] = useState(0);
   const readAckInFlightRef = useRef(false);
   useEffect(() => {
     const latest = messagesQuery.data?.pages?.[0]?.items?.[0];
@@ -487,8 +488,8 @@ export default function ConversationScreen() {
         return queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
       })
       .catch(() => undefined)
-      .finally(() => { readAckInFlightRef.current = false; });
-  }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient]);
+      .finally(() => { readAckInFlightRef.current = false; setReadAckCycle((cycle) => cycle + 1); });
+  }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient, readAckCycle]);
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
