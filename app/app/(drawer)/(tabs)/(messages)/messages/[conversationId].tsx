@@ -8,7 +8,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  editDirectMessage, fetchConversationMembers, fetchMessages, fetchMessagesAfter, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
+  editDirectMessage, fetchConversationMembers, fetchConversationTyping, setConversationTyping, fetchMessages, fetchMessagesAfter, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
   type MessagingAttachment,
 } from '~/lib/messaging-api';
 import type { LocalMediaFile } from '~/lib/publish-api';
@@ -91,6 +91,10 @@ export default function ConversationScreen() {
   }, []);
   const pendingSend = useRef<{ fingerprint: string; key: string } | null>(null);
   const sendMutationPendingRef = useRef(false);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopTyping = useCallback(() => { if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = null; void setConversationTyping(conversationId, false).catch(() => undefined); }, [conversationId]);
+  const handleDraftChange = useCallback((value: string) => { setDraft(value); if (value.trim()) { void setConversationTyping(conversationId, true).catch(() => undefined); if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = setTimeout(stopTyping, 1800); } else stopTyping(); }, [conversationId, stopTyping]);
+  useEffect(() => () => stopTyping(), [stopTyping]);
   const messagesQuery = useInfiniteQuery({
     queryKey: ['messaging', 'messages', conversationId],
     initialPageParam: null as string | null,
@@ -101,6 +105,8 @@ export default function ConversationScreen() {
   });
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
   const membersQuery = useQuery({ queryKey: ['messaging', 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal), enabled: Boolean(conversationId) && params.conversationType !== 'group', refetchInterval: isFocused && appState === 'active' ? 8_000 : false });
+  const typingQuery = useQuery({ queryKey: ['messaging', 'typing', conversationId], queryFn: ({ signal }) => fetchConversationTyping(conversationId, signal), enabled: Boolean(conversationId) && isFocused && appState === 'active', refetchInterval: isFocused && appState === 'active' ? 2500 : false, refetchIntervalInBackground: false });
+  const peerTyping = typingQuery.data?.activeUserIds.some(id => id !== userId) ?? false;
   const latestOwnMessage = messages.filter(message => message.sender_user_id === userId && !message.recalled_at).reduce((latest, message) => compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const peerReadSequence = membersQuery.data?.find(member => member.user_id !== userId)?.last_read_sequence ?? '0';
   const lastOwnMessageIsRead = latestOwnMessage !== '0' && compareSequence(peerReadSequence, latestOwnMessage) >= 0;
@@ -135,7 +141,7 @@ export default function ConversationScreen() {
             message.body,
             ...attachments.filter((attachment) => !attachment.mimeType.startsWith('image/'))
               .map((attachment) => '📎 ' + attachment.filename),
-          ].filter(Boolean).join('\n') + (message.edited_at ? '  （已编辑）' : ''),
+          ].filter(Boolean).join(' ') + (message.edited_at ? '  （已编辑）' : ''),
       ...(!message.recalled_at && imageUrls.length ? { image: JSON.stringify(imageUrls) } : {}),
       createdAt: new Date(message.created_at),
       user: {
@@ -279,6 +285,7 @@ export default function ConversationScreen() {
       sendMutationPendingRef.current = false;
       pendingSend.current = null;
       setDraft((current) => current.trim() === variables.body ? '' : current);
+      stopTyping();
       setPendingAttachments([]);
       queryClient.setQueryData<typeof messagesQuery.data>(
         ['messaging', 'messages', conversationId],
@@ -380,6 +387,7 @@ export default function ConversationScreen() {
           <Feather name="refresh-cw" size={18} color="#1d9bf0" />
         </Pressable>
       </View>
+      {peerTyping ? <Text className="px-4 py-1 text-xs text-sky-500">对方正在输入…</Text> : null}
       {pendingAttachments.length > 0 ? (
         <View className="border-b border-neutral-100 px-3 py-2 dark:border-neutral-800">
           {pendingAttachments.map((item) => (
@@ -413,7 +421,7 @@ export default function ConversationScreen() {
               user={{ _id: userId || 'anonymous', name: user?.name || '我' }}
               onSend={handleChatSend}
               text={draft}
-              onDraftChange={setDraft}
+              onDraftChange={handleDraftChange}
               isLoading={messagesQuery.isFetching && !messagesQuery.data}
               loadEarlierMessagesProps={{
                 isAvailable: Boolean(messagesQuery.hasNextPage),

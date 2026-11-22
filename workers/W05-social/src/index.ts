@@ -98,6 +98,7 @@ interface Env {
   SOCIAL_READ_LIMITER?: RateLimitBinding
   SOCIAL_WRITE_LIMITER?: RateLimitBinding
   SOCIAL_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
+  MESSAGING_REALTIME_HUB?: DurableObjectNamespace
 }
 
 const getRateKey = (request: Request): string => {
@@ -888,6 +889,33 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const input = body as { name?: unknown; memberUserIds?: unknown }
         const data = await createGroupConversation(dependencies.messagingStore, actorUserId, input.name, input.memberUserIds)
         return json({ data, requestId: createRequestId() }, 201)
+      }
+
+      const messagingTypingMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/typing$/.exec(url.pathname)
+      if (messagingTypingMatch) {
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const conversationId = decodePathPart(messagingTypingMatch[1] ?? '')
+        if (!conversationId) throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        const hubBinding = env.MESSAGING_REALTIME_HUB
+        if (!hubBinding) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
+        // listConversationMembers is membership-authorized by the Neon store; only current members may use typing state.
+        const members = await listConversationMembers(dependencies.messagingStore, actorUserId, conversationId)
+        if (!members.some(member => member.user_id === actorUserId)) throw new MessagingRuntimeError('NOT_FOUND', 404)
+        const hub = hubBinding.get(hubBinding.idFromName(conversationId))
+        if (request.method === 'GET') {
+          const snapshot = await hub.fetch('https://messaging-hub.internal/snapshot', { method: 'GET' })
+          if (!snapshot.ok) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
+          const data = await snapshot.json()
+          return json({ data, requestId: createRequestId() })
+        }
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'GET, POST' } })
+        let body: unknown
+        try { body = await request.json() } catch { throw new MessagingRuntimeError('VALIDATION_FAILED', 422) }
+        if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => key !== 'typing') || typeof (body as {typing?:unknown}).typing !== 'boolean') throw new MessagingRuntimeError('VALIDATION_FAILED', 422)
+        const result = await hub.fetch('https://messaging-hub.internal/update', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ userId: actorUserId, typing: (body as {typing:boolean}).typing }) })
+        if (!result.ok) throw new MessagingRuntimeError('SERVICE_UNAVAILABLE', 503)
+        return json({ data: await result.json(), requestId: createRequestId() })
       }
 
       const messagingGroupMembersMatch = /^\/internal\/messaging\/conversations\/([^/]+)\/members(?:\/([^/]+))?$/.exec(url.pathname)

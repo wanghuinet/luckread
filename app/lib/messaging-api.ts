@@ -149,3 +149,16 @@ export async function respondToMessageRequest(requestId: string, action: 'accept
     '/message-requests/' + encodeURIComponent(requestId) + '/' + action, { method: 'POST', body: JSON.stringify({}), idempotencyKey: false },
   ));
 }
+
+export type MessagingTypingSnapshot = { activeUserIds: string[] }
+export async function setConversationTyping(conversationId: string, typing: boolean): Promise<MessagingTypingSnapshot> {
+  return unwrap(await apiRequest<Envelope<MessagingTypingSnapshot>>(
+    '/conversations/' + encodeURIComponent(conversationId) + '/typing',
+    { method: 'POST', body: JSON.stringify({ typing }), idempotencyKey: false },
+  ))
+}
+export async function fetchConversationTyping(conversationId: string, signal?: AbortSignal): Promise<MessagingTypingSnapshot> {
+  return unwrap(await apiRequest<Envelope<MessagingTypingSnapshot>>(
+    '/conversations/' + encodeURIComponent(conversationId) + '/typing', { method: 'GET', signal },
+  ))
+}
