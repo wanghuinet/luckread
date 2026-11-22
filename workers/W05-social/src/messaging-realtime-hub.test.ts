@@ -124,6 +124,45 @@ describe('MessagingRealtimeHub membership revocation', () => {
     expect(storage.put).not.toHaveBeenCalledWith('typing', {})
   })
 
+  it('keeps stale websocket sessions fenced after a member rejoins at a newer version', async () => {
+    const staleSocket = makeSocket('member-user', 1);
+    const { state, storage } = makeState([staleSocket], {}, { 'member-user': 2 });
+    const hub = new MessagingRealtimeHub(state);
+
+    await hub.webSocketMessage(staleSocket, JSON.stringify({ type: 'typing.start' }));
+
+    expect(staleSocket.close).toHaveBeenCalledWith(4003, 'Conversation membership revoked');
+    expect(storage.put).not.toHaveBeenCalledWith('typing', expect.anything());
+    expect(storage.get).toHaveBeenCalledWith('membership-revoked:member-user');
+  });
+
+  it('uses the persisted revocation high-water mark when an older removal event arrives late', async () => {
+    const staleSession = makeSocket('same-user', 3);
+    const currentSession = makeSocket('same-user', 5);
+    const { state, storage } = makeState([staleSession, currentSession], {}, { 'same-user': 4 });
+    const hub = new MessagingRealtimeHub(state);
+    const response = await hub.fetch(new Request('https://messaging-hub.internal/broadcast', {
+      method: 'POST',
+      headers: { 'X-LuckRead-Principal-User-Id': 'owner-user', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: 'group.member.removed',
+        conversationId: 'conversation-1',
+        actorUserId: 'owner-user',
+        eventId: 'event-old-revocation',
+        occurredAt: Date.now(),
+        payload: { memberUserId: 'same-user', membershipVersion: 2 },
+      }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(staleSession.close).toHaveBeenCalledWith(4003, 'Conversation membership revoked');
+    expect(staleSession.send).not.toHaveBeenCalled();
+    expect(currentSession.close).not.toHaveBeenCalled();
+    expect(currentSession.send).toHaveBeenCalledOnce();
+    expect(storage.put).toHaveBeenCalledWith('membership-revoked:same-user', 4);
+    expect(storage.transaction).toHaveBeenCalled();
+  });
+
   it('rejects typing writes from a stale membership version', async () => {
     const { state, storage } = makeState([], {}, { 'member-user': 2 })
     const hub = new MessagingRealtimeHub(state)
