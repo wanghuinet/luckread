@@ -124,6 +124,17 @@ export default function ConversationScreen() {
           if (typeof message.message_id === 'string' && typeof message.sequence === 'string' &&
             typeof message.conversation_id === 'string' && typeof message.sender_user_id === 'string' &&
             typeof message.body === 'string' && typeof message.created_at === 'string') {
+            if (realtimeEvent.type === 'message.created') {
+              const cached = queryClient.getQueryData<typeof messagesQuery.data>(['messaging', 'messages', conversationId]);
+              const knownMessages = cached?.pages.flatMap((page) => page.items) ?? [];
+              const knownCursor = knownMessages.reduce((latest, item) => compareSequence(item.sequence, latest) > 0 ? item.sequence : latest, '0');
+              if (/^\\d+$/.test(message.sequence) && /^\\d+$/.test(knownCursor) && knownCursor !== '0' && BigInt(message.sequence) > BigInt(knownCursor) + 1n) {
+                // Do not advance the visible cache cursor past an unseen sequence. Fetch the missing prefix first.
+                void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
+                void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+                return;
+              }
+            }
             queryClient.setQueryData<typeof messagesQuery.data>(
               ['messaging', 'messages', conversationId],
               (current) => {
