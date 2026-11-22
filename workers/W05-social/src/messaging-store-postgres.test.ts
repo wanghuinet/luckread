@@ -79,20 +79,20 @@ describe('W05 PostgreSQL messaging store', () => {
       sequence: '1', body: 'hello', created_at: '2026-11-21T00:00:00.000Z',
     }
     const { db, client } = executor([
-      { rows: [] },
-      { rows: [{ conversation_id: 'conversation-1' }] },
-      { rows: [{ user_id: 'user-b' }] },
-      { rows: [] },
-      { rows: [] },
+      { rows: [] }, // BEGIN
+      { rows: [{ conversation_id: 'conversation-1', has_peer: true, has_blocked: false }] },
+      { rows: [] }, // no idempotent prior
       { rows: [{ last_sequence: '1' }] },
       { rows: [message] },
-      { rows: [] },
-      { rows: [] },
+      { rows: [] }, // COMMIT
     ])
     const store = createPostgresMessagingStore(db as never)
     await expect(store.sendMessage('user-a', 'conversation-1', 'client-1', 'hello')).resolves.toEqual(message)
     expect(client.query.mock.calls.some(([sql]) => String(sql).includes('FOR UPDATE OF c'))).toBe(true)
-    expect(client.query.mock.calls.some(([sql]) => String(sql).includes('UPDATE social_conversations SET last_sequence'))).toBe(true)
+    expect(client.query.mock.calls[1]?.[0]).toContain('has_peer')
+    expect(client.query.mock.calls[1]?.[0]).toContain('has_blocked')
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes('last_message_id = $2'))).toBe(true)
+    expect(client.query.mock.calls).toHaveLength(6)
     expect(client.query.mock.calls.at(-1)?.[0]).toBe('COMMIT')
   })
 
@@ -102,12 +102,10 @@ describe('W05 PostgreSQL messaging store', () => {
       sequence: '1', body: 'hello', created_at: '2026-11-21T00:00:00.000Z',
     }
     const { db, client } = executor([
-      { rows: [] },
-      { rows: [{ conversation_id: 'conversation-1' }] },
-      { rows: [{ user_id: 'user-b' }] },
-      { rows: [] },
+      { rows: [] }, // BEGIN
+      { rows: [{ conversation_id: 'conversation-1', has_peer: true, has_blocked: false }] },
       { rows: [message] },
-      { rows: [] },
+      { rows: [] }, // COMMIT
     ])
     const store = createPostgresMessagingStore(db as never)
     await expect(store.sendMessage('user-a', 'conversation-1', 'client-1', 'hello')).resolves.toEqual(message)
@@ -117,11 +115,9 @@ describe('W05 PostgreSQL messaging store', () => {
 
   it('rejects sends after a Block and never inserts a message', async () => {
     const { db, client } = executor([
-      { rows: [] },
-      { rows: [{ conversation_id: 'conversation-1' }] },
-      { rows: [{ user_id: 'user-b' }] },
-      { rows: [{ blocked: 1 }] },
-      { rows: [] },
+      { rows: [] }, // BEGIN
+      { rows: [{ conversation_id: 'conversation-1', has_peer: true, has_blocked: true }] },
+      { rows: [] }, // ROLLBACK
     ])
     const store = createPostgresMessagingStore(db as never)
     await expect(store.sendMessage('user-a', 'conversation-1', 'client-2', 'hello'))
@@ -132,11 +128,9 @@ describe('W05 PostgreSQL messaging store', () => {
 
   it('does not return an idempotent retry after a Block is created', async () => {
     const { db, client } = executor([
-      { rows: [] },
-      { rows: [{ conversation_id: 'conversation-1' }] },
-      { rows: [{ user_id: 'user-b' }] },
-      { rows: [{ blocked: 1 }] },
-      { rows: [] },
+      { rows: [] }, // BEGIN
+      { rows: [{ conversation_id: 'conversation-1', has_peer: true, has_blocked: true }] },
+      { rows: [] }, // ROLLBACK
     ])
     const store = createPostgresMessagingStore(db as never)
     await expect(store.sendMessage('user-a', 'conversation-1', 'client-1', 'hello'))
@@ -151,12 +145,10 @@ describe('W05 PostgreSQL messaging store', () => {
       sequence: '1', body: 'original', created_at: '2026-11-21T00:00:00.000Z',
     }
     const { db, client } = executor([
-      { rows: [] },
-      { rows: [{ conversation_id: 'conversation-1' }] },
-      { rows: [{ user_id: 'user-b' }] },
-      { rows: [] },
+      { rows: [] }, // BEGIN
+      { rows: [{ conversation_id: 'conversation-1', has_peer: true, has_blocked: false }] },
       { rows: [prior] },
-      { rows: [] },
+      { rows: [] }, // ROLLBACK
     ])
     const store = createPostgresMessagingStore(db as never)
     await expect(store.sendMessage('user-a', 'conversation-1', 'client-1', 'changed'))
