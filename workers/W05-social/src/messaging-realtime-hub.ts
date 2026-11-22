@@ -20,7 +20,29 @@ export class MessagingRealtimeHub {
       let event: unknown;
       try { event = await request.json(); } catch { return new Response('Invalid JSON', { status: 400 }); }
       if (!event || typeof event !== 'object' || Array.isArray(event)) return new Response('Invalid event', { status: 422 });
-      this.broadcast(event);
+      const input = event as Record<string, unknown>;
+      const allowedTypes = new Set([
+        'message.created', 'message.edited', 'message.recalled', 'conversation.read',
+        'group.member.added', 'group.member.removed', 'group.member.left', 'group.owner.transferred',
+      ]);
+      if (typeof input.type !== 'string' || !allowedTypes.has(input.type) ||
+        typeof input.conversationId !== 'string' || !USER_ID.test(input.conversationId) ||
+        input.actorUserId !== actor || typeof input.eventId !== 'string' ||
+        !USER_ID.test(input.eventId) || typeof input.occurredAt !== 'number' ||
+        !Number.isFinite(input.occurredAt) || !input.payload || typeof input.payload !== 'object' ||
+        Array.isArray(input.payload)) return new Response('Invalid event', { status: 422 });
+      const encoded = JSON.stringify(input);
+      if (encoded.length > 64 * 1024) return new Response('Event too large', { status: 413 });
+
+      // Membership mutations revoke the removed member's existing room socket, not just future API access.
+      if (input.type === 'group.member.removed') {
+        const memberUserId = (input.payload as { memberUserId?: unknown }).memberUserId;
+        if (typeof memberUserId !== 'string' || !USER_ID.test(memberUserId)) return new Response('Invalid event payload', { status: 422 });
+        await this.revokeUser(memberUserId);
+      } else if (input.type === 'group.member.left') {
+        await this.revokeUser(actor);
+      }
+      this.broadcast(encoded);
       return Response.json({ broadcast: true });
     }
     if (pathname.endsWith('/snapshot')) {
@@ -81,8 +103,21 @@ export class MessagingRealtimeHub {
   webSocketClose(_socket: WebSocket, _code: number, _reason: string, _wasClean: boolean): void {}
   webSocketError(_socket: WebSocket, _error: unknown): void {}
 
+  private async revokeUser(userId: string): Promise<void> {
+    for (const socket of this.state.getWebSockets()) {
+      const attachment = socket.deserializeAttachment() as SocketAttachment | null;
+      if (attachment?.userId !== userId) continue;
+      try { socket.close(4003, 'Conversation membership revoked'); } catch { /* already closed */ }
+    }
+    const state = await this.readTypingState();
+    if (Object.prototype.hasOwnProperty.call(state, userId)) {
+      delete state[userId];
+      await this.writeTypingState(state);
+    }
+  }
+
   private broadcast(event: unknown): void {
-    const payload = JSON.stringify(event);
+    const payload = typeof event === 'string' ? event : JSON.stringify(event);
     for (const socket of this.state.getWebSockets()) {
       try { socket.send(payload); }
       catch { try { socket.close(1011, 'Realtime delivery failed'); } catch { /* already closed */ } }
