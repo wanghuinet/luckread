@@ -22,6 +22,7 @@ function makeState(sockets: WebSocket[], typing: Record<string, number> = {}, re
     setAlarm: vi.fn(async () => undefined),
     deleteAlarm: vi.fn(async () => undefined),
   }
+  storage.transaction = vi.fn(async (run: (transaction: typeof storage) => Promise<unknown>) => run(storage)) as typeof storage.transaction;
   return {
     state: { getWebSockets: () => sockets.filter(socket => !(socket as WebSocket & { isClosed?: () => boolean }).isClosed?.()), storage } as unknown as DurableObjectState,
     storage,
