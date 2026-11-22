@@ -8,7 +8,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  editDirectMessage, fetchConversationMembers, fetchMessages, fetchMessagesAfter, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
+  editDirectMessage, fetchConversationMembers, fetchConversationTyping, setConversationTyping, fetchMessages, fetchMessagesAfter, getMessageAttachmentUrl, markConversationRead, recallDirectMessage, sendDirectMessage, uploadMessageAttachment,
   type MessagingAttachment,
 } from '~/lib/messaging-api';
 import type { LocalMediaFile } from '~/lib/publish-api';
@@ -90,7 +90,7 @@ export default function ConversationScreen() {
     return () => subscription.remove();
   }, []);
   const pendingSend = useRef<{ fingerprint: string; key: string } | null>(null);
-  const sendMutationPendingRef = useRef(false);
+  const sendMutationPendingRef = useRef(false);\n  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);\n  const stopTyping = useCallback(() => { if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = null; void setConversationTyping(conversationId, false).catch(() => undefined); }, [conversationId]);\n  const handleDraftChange = useCallback((value: string) => { setDraft(value); if (value.trim()) { void setConversationTyping(conversationId, true).catch(() => undefined); if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = setTimeout(stopTyping, 1800); } else stopTyping(); }, [conversationId, stopTyping]);\n  useEffect(() => () => stopTyping(), [stopTyping]);
   const messagesQuery = useInfiniteQuery({
     queryKey: ['messaging', 'messages', conversationId],
     initialPageParam: null as string | null,
@@ -101,7 +101,7 @@ export default function ConversationScreen() {
   });
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
   const membersQuery = useQuery({ queryKey: ['messaging', 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal), enabled: Boolean(conversationId) && params.conversationType !== 'group', refetchInterval: isFocused && appState === 'active' ? 8_000 : false });
-  const latestOwnMessage = messages.filter(message => message.sender_user_id === userId && !message.recalled_at).reduce((latest, message) => compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
+  const typingQuery = useQuery({ queryKey: ['messaging', 'typing', conversationId], queryFn: ({ signal }) => fetchConversationTyping(conversationId, signal), enabled: Boolean(conversationId) && isFocused && appState === 'active', refetchInterval: isFocused && appState === 'active' ? 2500 : false, refetchIntervalInBackground: false });\n  const peerTyping = typingQuery.data?.activeUserIds.some(id => id !== userId) ?? false;\n  const latestOwnMessage = messages.filter(message => message.sender_user_id === userId && !message.recalled_at).reduce((latest, message) => compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const peerReadSequence = membersQuery.data?.find(member => member.user_id !== userId)?.last_read_sequence ?? '0';
   const lastOwnMessageIsRead = latestOwnMessage !== '0' && compareSequence(peerReadSequence, latestOwnMessage) >= 0;
   useEffect(() => {
@@ -278,7 +278,7 @@ export default function ConversationScreen() {
     onSuccess: async (sentMessage, variables) => {
       sendMutationPendingRef.current = false;
       pendingSend.current = null;
-      setDraft((current) => current.trim() === variables.body ? '' : current);
+      setDraft((current) => current.trim() === variables.body ? '' : current);\n      stopTyping();
       setPendingAttachments([]);
       queryClient.setQueryData<typeof messagesQuery.data>(
         ['messaging', 'messages', conversationId],
@@ -413,7 +413,7 @@ export default function ConversationScreen() {
               user={{ _id: userId || 'anonymous', name: user?.name || '我' }}
               onSend={handleChatSend}
               text={draft}
-              onDraftChange={setDraft}
+              onDraftChange={handleDraftChange}
               isLoading={messagesQuery.isFetching && !messagesQuery.data}
               loadEarlierMessagesProps={{
                 isAvailable: Boolean(messagesQuery.hasNextPage),
