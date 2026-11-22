@@ -3,7 +3,8 @@ import {
   getW05PushEndpointPostgresDatabase,
   getW05SocialWorkerDependencies,
 } from './neon/runtime.js'
-import { NotificationPushWorkflow } from './notification-push-workflow.js'\nimport { MessagingRealtimeHub } from './messaging-realtime-hub.js'
+import { NotificationPushWorkflow } from './notification-push-workflow.js'
+import { MessagingRealtimeHub } from './messaging-realtime-hub.js'
 
 // Keep Cloudflare's virtual Workflow runtime module in the deploy entry only.
 export { NotificationPushWorkflow, MessagingRealtimeHub }
