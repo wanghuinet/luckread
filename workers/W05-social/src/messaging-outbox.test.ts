@@ -59,4 +59,18 @@ describe('messaging transactional outbox dispatcher', () => {
     expect(db.query.mock.calls[0]?.[1]).toEqual([500])
     expect(String(db.query.mock.calls[0]?.[0])).toContain("INTERVAL '7 days'")
   })
-})
+
+  it('clamps dispatcher batch sizes to a hard ceiling of 100 rows', async () => {
+    const db = database([])
+    await dispatchMessagingOutboxBatch(db as never, { idFromName: vi.fn(), get: vi.fn() } as never, 10000)
+    expect(db.query.mock.calls[0]?.[1]).toEqual([100])
+  })
+  it('normalizes invalid and fractional budgets safely', async () => {
+    const db = database([])
+    await dispatchMessagingOutboxBatch(db as never, { idFromName: vi.fn(), get: vi.fn() } as never, Number.NaN)
+    expect(db.query.mock.calls[0]?.[1]).toEqual([25])
+    const small = database([])
+    await dispatchMessagingOutboxBatch(small as never, { idFromName: vi.fn(), get: vi.fn() } as never, 0.8)
+    expect(small.query.mock.calls[0]?.[1]).toEqual([1])
+  })
+}
