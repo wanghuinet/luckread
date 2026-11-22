@@ -41,6 +41,10 @@
     "W05_DATABASE_DRIVER": "neon",
     "W05_PUSH_ENDPOINT_DATABASE_DRIVER": "neon"
   },
+  "durable_objects": {
+    "bindings": [{ "name": "MESSAGING_REALTIME_HUB", "class_name": "MessagingRealtimeHub" }]
+  },
+  "migrations": [{ "tag": "messaging-realtime-hub-v1", "new_classes": ["MessagingRealtimeHub"] }],
   "workflows": [
     {
       "name": "luckread-w05-notification-push",
