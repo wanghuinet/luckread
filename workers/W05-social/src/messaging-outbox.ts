@@ -2,7 +2,7 @@ export interface MessagingOutboxRow extends Record<string, unknown> {
   event_id: string
   conversation_id: string
   actor_user_id: string
-  event_type: 'message.created' | 'message.edited' | 'message.recalled' | 'conversation.read'
+  event_type: 'message.created' | 'message.edited' | 'message.recalled' | 'conversation.read' | 'group.member.added' | 'group.member.removed' | 'group.member.left' | 'group.owner.transferred'
   payload: Record<string, unknown>
   created_at: string
   occurred_at: number
