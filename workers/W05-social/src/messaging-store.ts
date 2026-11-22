@@ -38,7 +38,21 @@ export type MessagingMessageRow = Readonly<{
   edited_at?: string | null
   recalled_at?: string | null
 }>
+export type MessagingOutboxEvent = Readonly<{
+  event_id: string
+  conversation_id: string
+  actor_user_id: string
+  event_type: 'message.created' | 'message.edited' | 'message.recalled' | 'conversation.read' | 'group.member.added' | 'group.member.removed' | 'group.member.left' | 'group.owner.transferred'
+  payload: Record<string, unknown>
+  occurred_at: string
+  attempt_count: number
+  lease_token: string
+}>
 export interface MessagingStore {
+  claimMessagingOutboxEvents?(input: { now: string; leaseExpiresAt: string; leaseToken: string; limit: number }): Promise<MessagingOutboxEvent[]>
+  markMessagingOutboxEventDelivered?(input: { eventId: string; leaseToken: string; now: string }): Promise<boolean>
+  retryMessagingOutboxEvent?(input: { eventId: string; leaseToken: string; now: string; nextAttemptAt: string; errorCode: string; terminal: boolean }): Promise<boolean>
+  pruneMessagingOutboxEvents?(input: { deliveredBefore: string; failedBefore: string }): Promise<number>
   createDirectConversation(actorUserId: string, recipientUserId: string): Promise<{ conversationId: string }>
   createGroupConversation(actorUserId: string, memberUserIds: string[], groupName: string): Promise<{ conversationId: string }>
   listConversationMembers(actorUserId: string, conversationId: string): Promise<MessagingConversationMemberRow[]>
