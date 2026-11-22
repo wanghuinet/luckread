@@ -14,6 +14,7 @@ try {
     '0005_w05_messaging_lifecycle.sql',
     '0006_w05_messaging_groups.sql',
     '0007_w05_messaging_transactional_outbox.sql',
+    '0008_w05_messaging_group_outbox.sql',
   ]
   for (const filename of migrationPaths) {
     const sql = readFileSync(resolve('workers/W05-social/src/neon-postgres-migrations', filename), 'utf8')
@@ -63,7 +64,7 @@ try {
   const triggers = await pool.query(
     "SELECT tgname FROM pg_trigger WHERE tgrelid IN ('social_messages'::regclass, 'social_conversation_memberships'::regclass) AND NOT tgisinternal ORDER BY tgname",
   )
-  if (triggers.rows.length !== 2) throw new Error('Transactional message and read-receipt outbox triggers are missing')
+  if (triggers.rows.length !== 3) throw new Error('Transactional message, read-receipt, or group-membership outbox triggers are missing')
 
   const fixtureClient = await pool.connect()
   try {
@@ -87,6 +88,29 @@ try {
     for (const type of ['message.created', 'message.edited', 'message.recalled', 'conversation.read']) {
       if (eventCounts[type] !== 1) throw new Error('Transactional outbox event missing or duplicated: ' + type)
     }
+
+    await fixtureClient.query(
+      "INSERT INTO social_conversations (conversation_id, conversation_type, direct_pair_key, group_name, created_by_user_id, last_sequence, created_at, updated_at) VALUES ('outbox-group', 'group', NULL, 'Outbox Group', 'outbox-a', 0, CURRENT_TIMESTAMP - INTERVAL '1 day', CURRENT_TIMESTAMP - INTERVAL '1 day')",
+    )
+    await fixtureClient.query(
+      "INSERT INTO social_conversation_memberships (conversation_id, user_id, member_role, joined_at, last_read_sequence) VALUES ('outbox-group', 'outbox-a', 'owner', CURRENT_TIMESTAMP - INTERVAL '1 day', 0), ('outbox-group', 'outbox-b', 'member', CURRENT_TIMESTAMP - INTERVAL '1 day', 0)",
+    )
+    await fixtureClient.query("SELECT set_config('luckread.actor_user_id', 'outbox-a', true)")
+    await fixtureClient.query(
+      "INSERT INTO social_conversation_memberships (conversation_id, user_id, member_role, joined_at, last_read_sequence) VALUES ('outbox-group', 'outbox-c', 'member', CURRENT_TIMESTAMP, 0)",
+    )
+    await fixtureClient.query("UPDATE social_conversation_memberships SET left_at = CURRENT_TIMESTAMP WHERE conversation_id = 'outbox-group' AND user_id = 'outbox-c'")
+    await fixtureClient.query("UPDATE social_conversation_memberships SET member_role = 'owner' WHERE conversation_id = 'outbox-group' AND user_id = 'outbox-b'")
+    await fixtureClient.query("UPDATE social_conversation_memberships SET member_role = 'member' WHERE conversation_id = 'outbox-group' AND user_id = 'outbox-a'")
+    await fixtureClient.query("SELECT set_config('luckread.actor_user_id', 'outbox-a', true)")
+    await fixtureClient.query("UPDATE social_conversation_memberships SET left_at = CURRENT_TIMESTAMP WHERE conversation_id = 'outbox-group' AND user_id = 'outbox-a'")
+    const groupEvents = await fixtureClient.query(
+      "SELECT event_type, count(*)::int AS count FROM social_messaging_outbox WHERE conversation_id = 'outbox-group' GROUP BY event_type",
+    )
+    const groupEventCounts = Object.fromEntries(groupEvents.rows.map(row => [row.event_type, Number(row.count)]))
+    for (const type of ['group.member.added', 'group.member.removed', 'group.member.left', 'group.owner.transferred']) {
+      if (groupEventCounts[type] !== 1) throw new Error('Transactional group outbox event missing or duplicated: ' + type)
+    }
   } finally {
     try { await fixtureClient.query('ROLLBACK') } finally { fixtureClient.release() }
   }
@@ -101,7 +125,7 @@ try {
     messagingTables: expected.length,
     lifecycleColumns: ['attachments', 'edited_at', 'recalled_at'],
     recalledTombstoneConstraint: true,
-    transactionalOutboxTriggers: triggers.rows.length,
+    transactionalOutboxTriggers: triggers.rows.length,\n    groupMembershipEvents: ['group.member.added', 'group.member.removed', 'group.member.left', 'group.owner.transferred'],
     businessRows: 0,
   }))
 } finally {
