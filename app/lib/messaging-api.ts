@@ -35,7 +35,7 @@ export async function createDirectConversation(recipientUserId: string): Promise
   }));
 }
 export type MessagingConversationMember = {
-  user_id: string; member_role: 'owner' | 'member'; joined_at: string;
+  user_id: string; member_role: 'owner' | 'member'; joined_at: string; last_read_sequence: string;
 };
 export async function createGroupConversation(name: string, memberUserIds: string[]): Promise<{ conversationId: string }> {
   return unwrap(await apiRequest<Envelope<{ conversationId: string }>>('/conversations/groups', {
