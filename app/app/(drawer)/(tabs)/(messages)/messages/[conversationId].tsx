@@ -485,10 +485,11 @@ export default function ConversationScreen() {
         if (compareSequence(targetSequence, readAckSequenceRef.current) > 0) {
           readAckSequenceRef.current = targetSequence;
         }
+        setReadAckCycle((cycle) => cycle + 1);
         return queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
       })
       .catch(() => undefined)
-      .finally(() => { readAckInFlightRef.current = false; setReadAckCycle((cycle) => cycle + 1); });
+      .finally(() => { readAckInFlightRef.current = false; });
   }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient, readAckCycle]);
 
   return (
