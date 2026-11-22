@@ -58,6 +58,7 @@ postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
     }
     const env = {
       W11_DATABASE_DRIVER: 'neon',
+      W11_ANALYTICS_INGEST_ENABLED: 'true',
       HYPERDRIVE_ANALYTICS_PG: hyperdriveBinding,
       D1_05: legacyD1,
     } as never
@@ -138,6 +139,7 @@ postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
     }
     const env = {
       W11_DATABASE_DRIVER: 'neon',
+      W11_ANALYTICS_INGEST_ENABLED: 'true',
       HYPERDRIVE_ANALYTICS_PG: hyperdriveBinding,
       D1_05: legacyD1,
     } as never
