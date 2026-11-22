@@ -40,13 +40,20 @@ export class MessagingRealtimeHub {
       // Outbox delivery is at-least-once. Keep a bounded, durable receipt set so an
       // immediate delivery and a later scheduled retry share one idempotency fence.
       const now = Date.now();
-      const receipts = (await this.state.storage.get<Record<string, number>>(EVENT_DEDUPE_KEY)) ?? {};
-      for (const [eventId, expiresAt] of Object.entries(receipts)) {
-        if (!Number.isFinite(expiresAt) || expiresAt <= now) delete receipts[eventId];
-      }
-      if (Object.prototype.hasOwnProperty.call(receipts, input.eventId)) {
-        return Response.json({ broadcast: false, duplicate: true });
-      }
+      // Reserve the event ID atomically before side effects. Concurrent retry requests
+      // must not both pass the receipt check while revoke/broadcast awaits yield.
+      const reserved = await this.state.storage.transaction(async transaction => {
+        const receipts = (await transaction.get<Record<string, number>>(EVENT_DEDUPE_KEY)) ?? {};
+        for (const [eventId, expiresAt] of Object.entries(receipts)) {
+          if (!Number.isFinite(expiresAt) || expiresAt <= now) delete receipts[eventId];
+        }
+        if (Object.prototype.hasOwnProperty.call(receipts, input.eventId as string)) return false;
+        receipts[input.eventId as string] = now + EVENT_DEDUPE_TTL_MS;
+        const entries = Object.entries(receipts).sort((left, right) => left[1] - right[1]).slice(-EVENT_DEDUPE_MAX);
+        await transaction.put(EVENT_DEDUPE_KEY, Object.fromEntries(entries));
+        return true;
+      });
+      if (!reserved) return Response.json({ broadcast: false, duplicate: true });
 
       // Membership mutations revoke the removed member's existing room socket, not just future API access.
       if (input.type === 'group.member.removed') {
@@ -64,11 +71,6 @@ export class MessagingRealtimeHub {
         await this.revokeUser(actor, payload.membershipVersion as number);
       }
       this.broadcast(encoded);
-      receipts[input.eventId as string] = now + EVENT_DEDUPE_TTL_MS;
-      const entries = Object.entries(receipts)
-        .sort((left, right) => left[1] - right[1])
-        .slice(-EVENT_DEDUPE_MAX);
-      await this.state.storage.put(EVENT_DEDUPE_KEY, Object.fromEntries(entries));
       return Response.json({ broadcast: true });
     }
     if (pathname.endsWith('/snapshot')) {

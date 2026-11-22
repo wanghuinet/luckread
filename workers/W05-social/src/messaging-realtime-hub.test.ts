@@ -21,6 +21,7 @@ function makeState(sockets: WebSocket[], typing: Record<string, number> = {}, re
     delete: vi.fn(async (key: string) => { values.delete(key) }),
     setAlarm: vi.fn(async () => undefined),
     deleteAlarm: vi.fn(async () => undefined),
+    transaction: vi.fn(async (run: (transaction: any) => Promise<unknown>) => run(storage)),
   }
   return {
     state: { getWebSockets: () => sockets.filter(socket => !(socket as WebSocket & { isClosed?: () => boolean }).isClosed?.()), storage } as unknown as DurableObjectState,
@@ -167,6 +168,7 @@ describe('MessagingRealtimeHub membership revocation', () => {
     expect(storage.put).toHaveBeenCalledWith('messaging-event-dedupe', {
       '123e4567-e89b-12d3-a456-426614174000': expect.any(Number),
     });
+    expect(storage.transaction).toHaveBeenCalledTimes(2);
   });
 
   it('expires old event receipts and keeps the dedupe set bounded', async () => {
