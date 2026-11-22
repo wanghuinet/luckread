@@ -13,7 +13,6 @@ try {
     '0004_w05_messaging_attachments.sql',
     '0005_w05_messaging_lifecycle.sql',
     '0006_w05_messaging_groups.sql',
-    '0006_w05_messaging_groups.sql',
     '0007_w05_messaging_transactional_outbox.sql',
   ]
   for (const filename of migrationPaths) {
