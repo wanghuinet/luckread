@@ -1,4 +1,6 @@
 import fs from 'node:fs'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 export function assertProductionCutoverAuthorized({ bootstrap, evidence, domainIds }) {
   if (!Array.isArray(domainIds) || domainIds.length === 0) {
@@ -37,6 +39,6 @@ function main() {
   process.stdout.write(JSON.stringify({ productionCutover: 'AUTHORIZED', domains: result }) + '\\n')
 }
 
-if (process.argv[1] && new URL(import.meta.url).pathname === new URL('file://' + process.argv[1]).pathname) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main()
 }
