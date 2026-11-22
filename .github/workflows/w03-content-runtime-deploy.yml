@@ -26,6 +26,28 @@ jobs:
         with:
           ref: ${{ inputs.source_sha }}
 
+      - name: Require approved D1-02 business-data import and production cutover evidence
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs')
+          const bootstrap = JSON.parse(fs.readFileSync('contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
+          const evidence = JSON.parse(fs.readFileSync('contracts/database/neon-five-database-remote-schema-evidence.v1.json', 'utf8'))
+          const domain = (bootstrap.domains || []).find(x => x.domainId === 'D1-02')
+          const remote = evidence.domains?.['D1-02']
+          if (!domain || domain.remoteSchemaApplied !== true) {
+            throw new Error('D1-02 Neon schema is not remotely applied')
+          }
+          if (domain.businessDataImported !== true || remote?.businessDataImported !== true) {
+            throw new Error('W03 Neon deployment blocked: D1-02 business data import is not verified')
+          }
+          if (domain.productionCutoverAuthorized !== true || remote?.productionCutoverAuthorized !== true ||
+              evidence.productionCutoverAuthorized !== true) {
+            throw new Error('W03 Neon deployment blocked: explicit production cutover authorization is absent')
+          }
+          console.log('W03_DATA_IMPORT_AND_PRODUCTION_CUTOVER=AUTHORIZED')
+          NODE
+
       - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
