@@ -81,6 +81,32 @@ export async function fetchMessagesAfter(conversationId: string, afterSequence: 
     '/conversations/' + encodeURIComponent(conversationId) + '/messages?' + query.toString(), { method: 'GET', signal },
   ));
 }
+
+/** Drain bounded incremental-sync pages in one cycle to avoid silently stranding message gaps. */
+export async function fetchMessagesAfterBatch(
+  conversationId: string,
+  afterSequence: string,
+  signal?: AbortSignal,
+  maxPages = 10,
+): Promise<Page<MessagingMessage>> {
+  const items: MessagingMessage[] = [];
+  let cursor = afterSequence;
+  let hasMore = false;
+  const pageBudget = Math.max(1, Math.min(10, Math.floor(maxPages)));
+  for (let pageIndex = 0; pageIndex < pageBudget; pageIndex++) {
+    const page = await fetchMessagesAfter(conversationId, cursor, signal);
+    if (!page.items.length) { hasMore = false; break; }
+    items.push(...page.items);
+    cursor = page.items.reduce((latest, item) => compareMessagingSequence(item.sequence, latest) > 0 ? item.sequence : latest, cursor);
+    hasMore = page.hasMore;
+    if (!hasMore) break;
+  }
+  return { items, nextCursor: hasMore ? cursor : null, hasMore };
+}
+
+function compareMessagingSequence(left: string, right: string): number {
+  return left.length === right.length ? left.localeCompare(right) : left.length - right.length;
+}
 export async function uploadMessageAttachment(file: LocalMediaFile, idempotencyKey = createIdempotencyKey()) {
   if (!file.size || file.size > 20 * 1024 * 1024) throw new Error('附件不能超过 20 MB。');
   const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
