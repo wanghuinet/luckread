@@ -2,13 +2,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { MessagingRealtimeHub } from './messaging-realtime-hub.js'
 
 function makeSocket(userId: string, membershipVersion = 1) {
-  const socket = {
+  const lifecycle = { closed: false }
+  return {
     deserializeAttachment: () => ({ userId, membershipVersion }),
-    __closed: false,
-    close: vi.fn(() => { socket.__closed = true }),
+    isClosed: () => lifecycle.closed,
+    close: vi.fn(() => { lifecycle.closed = true }),
     send: vi.fn(),
-  }
-  return socket as unknown as WebSocket & { close: ReturnType<typeof vi.fn>; send: ReturnType<typeof vi.fn>; __closed: boolean }
+  } as unknown as WebSocket & { close: ReturnType<typeof vi.fn>; send: ReturnType<typeof vi.fn>; isClosed: () => boolean }
 }
 
 function makeState(sockets: WebSocket[], typing: Record<string, number> = {}, revokedVersions: Record<string, number> = {}) {
@@ -23,7 +23,7 @@ function makeState(sockets: WebSocket[], typing: Record<string, number> = {}, re
     deleteAlarm: vi.fn(async () => undefined),
   }
   return {
-    state: { getWebSockets: () => sockets.filter(socket => !(socket as WebSocket & { __closed?: boolean }).__closed), storage } as unknown as DurableObjectState,
+    state: { getWebSockets: () => sockets.filter(socket => !(socket as WebSocket & { isClosed?: () => boolean }).isClosed?.()), storage } as unknown as DurableObjectState,
     storage,
   }
 }
