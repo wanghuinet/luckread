@@ -33,7 +33,13 @@ function getWorker(env: W05Env): W05Worker {
 
 export default {
   fetch(request: Request, env: W05Env, ctx: W05Context): Promise<Response> {
-    return getWorker(env).fetch(request, env, ctx)
+    const responsePromise = getWorker(env).fetch(request, env, ctx)
+    if (isMessagingMutationRequest(request)) ctx.waitUntil(responsePromise.then(response => {
+      if (!response.ok) return
+      return dispatchMessagingOutboxBatch(getW05MessagingOutboxDatabase(env), env.MESSAGING_REALTIME_HUB, 5)
+        .then(result => { if (result.retried) console.warn(JSON.stringify({ event: 'w05.messaging.outbox.immediate.retry', ...result })) })
+    }).catch(error => console.error(JSON.stringify({ event: 'w05.messaging.outbox.immediate.failed', errorType: error instanceof Error ? error.name : 'UNKNOWN' }))))
+    return responsePromise
   },
   scheduled(controller: ScheduledController, env: W05Env, ctx: W05Context): void {
     const task = (async () => {
