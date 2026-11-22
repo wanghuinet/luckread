@@ -110,7 +110,7 @@ export default function Search() {
     setRecentSearches([]);
     setHistoryLoading(true);
     setHistoryError('');
-    void readSearchHistory(SecureStore, scope).then((entries) => {
+    void readSearchHistory(SecureStore, viewerId).then((entries) => {
       if (active && requestId === historyRequestIdRef.current && historyScopeRef.current === scope) {
         setRecentSearches(entries);
       }
