@@ -176,6 +176,12 @@ export default function ConversationScreen() {
                   items: page.items.map((item) => {
                     if (item.message_id !== message.message_id) return item;
                     found = true;
+                    // Realtime deliveries and in-flight history responses can arrive out of order.
+                    // Recall is terminal locally: never allow an older event to resurrect body/attachments.
+                    if (item.recalled_at) return item;
+                    const currentEditedAt = item.edited_at ?? null;
+                    const incomingEditedAt = message.edited_at ?? null;
+                    if (currentEditedAt && (!incomingEditedAt || incomingEditedAt < currentEditedAt)) return item;
                     return { ...item, ...message } as typeof item;
                   }),
                 }));
