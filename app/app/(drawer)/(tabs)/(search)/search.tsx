@@ -129,6 +129,7 @@ export default function Search() {
       if (historyScopeRef.current !== scope) return;
       setHistoryViewerId(scope);
       setRecentSearches(entries);
+      setHistoryLoading(false);
       setHistoryError('');
     }).catch(() => {
       if (historyScopeRef.current === scope) setHistoryError('最近搜索保存失败，请检查设备存储空间后重试。');
@@ -143,6 +144,7 @@ export default function Search() {
       if (historyScopeRef.current !== scope) return;
       setHistoryViewerId(scope);
       setRecentSearches(entries);
+      setHistoryLoading(false);
       setHistoryError('');
     } catch {
       if (historyScopeRef.current === scope) setHistoryError('无法删除这条搜索记录，请重试。');
@@ -157,6 +159,7 @@ export default function Search() {
       if (historyScopeRef.current !== scope) return;
       setHistoryViewerId(scope);
       setRecentSearches(entries);
+      setHistoryLoading(false);
       setHistoryError('');
     } catch {
       if (historyScopeRef.current === scope) setHistoryError('无法清空搜索记录，请重试。');
@@ -415,7 +418,20 @@ export default function Search() {
               returnKeyType="search"
               onSubmitEditing={() => void runContentSearch(false)}
               value={contentInput}
-              onChangeText={setContentInput}
+              onChangeText={(value) => {
+                setContentInput(value);
+                if (!value.trim()) {
+                  contentRequestIdRef.current += 1;
+                  contentAbortRef.current?.abort();
+                  setContentSearchSubmitted(false);
+                  setContentBusy(false);
+                  setContentLoadingMore(false);
+                  setContentResults([]);
+                  setContentCursor(null);
+                  setContentHasMore(false);
+                  setContentError('');
+                }
+              }}
               placeholder="搜索动态或文章标题"
               placeholderTextColor="#9ca3af"
               className="ml-3 min-h-12 flex-1 text-base text-neutral-900 dark:text-white"
@@ -449,7 +465,7 @@ export default function Search() {
                     ))}
                   </View>
                 ) : (
-                  <Text className="mt-2 text-xs text-neutral-500">{historyLoading ? '正在读取最近搜索…' : '你的搜索记录会保存在当前账号的本机空间。'}</Text>
+                  <Text className="mt-2 text-xs text-neutral-500">{historyLoading ? '正在读取最近搜索…' : viewerId ? '最近搜索仅保存在当前账号的本机空间。' : '最近搜索仅保存在本机，不会上传。'}</Text>
                 )}
                 {historyError ? <Text accessibilityRole="alert" className="mt-2 text-xs text-red-600">{historyError}</Text> : null}
               </View>
