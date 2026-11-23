@@ -457,27 +457,9 @@ export async function syncTerminalRenewalCycleToSubscription(
     }
   }
 
-  // A matching period proves another concurrent/replayed sync applied this cycle.
-  // Preserve any subsequent user lifecycle state; never reactivate canceled/paused subscriptions.
-  if (subscription.current_period_start === cycle.cycle_start && subscription.current_period_end === cycle.cycle_end) {
-    if (subscription.trial_started_at && subscription.trial_ends_at === cycle.cycle_start &&
-        subscription.trial_converted_at === cycle.cycle_start &&
-        !(await auditAppliedSubscriptionTrialConversion(env, cycle, subscription))) {
-      return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
-    }
-    if (scheduledChange?.status === 'APPLIED' &&
-        !(await auditAppliedSubscriptionPlanChange(env, cycle, scheduledChange))) {
-      return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
-    }
-    if (scheduledChange?.status === 'SCHEDULED') {
-      return reconcile(env, cycleStore, cycle, 'SCHEDULED_PLAN_CHANGE_NOT_MARKED_APPLIED', now);
-    }
-    const marked = await markCycleSyncState(cycleStore, cycle, 'APPLIED', null, now);
-    return {
-      cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id,
-      outcome: marked ? 'ALREADY_APPLIED' : 'PENDING_RETRY',
-    };
-  }
+  // Period timestamps alone are not durable proof that this particular finance cycle
+  // was applied. Without a cycle-specific application receipt, fail closed into
+  // reconciliation rather than marking Finance synchronization complete.
   if (subscription.current_period_end !== cycle.cycle_start ||
       subscription.current_period_start >= cycle.cycle_start) {
     return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_PERIOD_CAS_MISMATCH', now);
