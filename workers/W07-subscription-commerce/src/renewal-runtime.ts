@@ -863,7 +863,12 @@ async function transitionCycleToPaymentReady(
 ): Promise<RenewalCycleRow> {
   const updatedAt = strictlyAfter(now, cycle.updated_at);
   try {
-    return await transitionRenewalCycleToPaymentReadyPostgres(cycleStore, cycle, updatedAt);
+    const transitioned = await transitionRenewalCycleToPaymentReadyPostgres(cycleStore, cycle, updatedAt);
+    if (transitioned) return transitioned;
+    // Another worker advanced or changed this cycle after our snapshot. Re-read,
+    // but never treat our lost CAS as a successful transition of the stale row.
+    const latest = await readCycleById(cycleStore, cycle.cycle_id);
+    return latest;
   } catch {
     throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
