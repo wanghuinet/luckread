@@ -129,11 +129,11 @@ describe('native PostgreSQL renewal outcome synchronization', () => {
       expect.stringContaining("UPDATE membership_subscription_scheduled_plan_changes SET status = 'APPLIED'"),
       expect.stringContaining('INSERT INTO membership_subscription_renewal_cycle_applications'), 'COMMIT',
     ])
-    expect(f.transactionCalls[1]?.sql).toContain('version = $13')
-    expect(f.transactionCalls[1]?.sql).toContain("c.status = 'SCHEDULED'")
-    expect(f.transactionCalls[2]?.sql).toContain('applied_subscription_version = $2')
-    expect(f.transactionCalls[2]?.sql).toContain('s.version = $16')
-    expect(f.transactionCalls[2]?.values).toEqual(expect.arrayContaining([changeId, cycleStart, cycleEnd]))
+    expect(f.transactionCalls[2]?.sql).toContain('version = $13')
+    expect(f.transactionCalls[2]?.sql).toContain("c.status = 'SCHEDULED'")
+    expect(f.transactionCalls[3]?.sql).toContain('applied_subscription_version = $2')
+    expect(f.transactionCalls[3]?.sql).toContain('s.version = $16')
+    expect(f.transactionCalls[3]?.values).toEqual(expect.arrayContaining([changeId, cycleStart, cycleEnd]))
     expect(f.client.release).toHaveBeenCalledTimes(1)
   })
 
