@@ -56,6 +56,7 @@ if (JSON.stringify(persistence.table.columns.map((column) => column.name).sort()
 const expectedAdditionalTables = [
   'membership_subscription_plan_change_attempts',
   'membership_subscription_scheduled_plan_changes',
+  'membership_subscription_renewal_cycle_applications',
 ]
 if (JSON.stringify((persistence.additionalTables ?? []).map((table) => table.name).sort()) !==
     JSON.stringify(expectedAdditionalTables.sort())) {
@@ -123,6 +124,8 @@ const requiredSqlTokens = [
   'CREATE TABLE membership_revenuecat_product_bindings',
   'CREATE TABLE membership_subscription_plan_change_attempts',
   'CREATE TABLE membership_subscription_scheduled_plan_changes',
+  'CREATE TABLE membership_subscription_renewal_cycle_applications',
+  'ix_membership_renewal_cycle_applications_subscription',
   'CREATE UNIQUE INDEX ux_membership_subscriptions_trial_per_subscriber_creator',
   'CREATE UNIQUE INDEX ux_membership_plan_change_attempts_idempotency',
   'CREATE UNIQUE INDEX ux_membership_plan_change_attempts_pending_subscription',
