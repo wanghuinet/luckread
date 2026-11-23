@@ -53,8 +53,8 @@ DECLARE
     'membership_plans',
     'membership_revenuecat_product_bindings',
     'membership_subscription_plan_change_attempts',
-    'membership_subscription_scheduled_plan_changes',
     'membership_subscription_renewal_cycle_applications',
+    'membership_subscription_scheduled_plan_changes',
     'membership_subscriptions'
   ];
 BEGIN
@@ -72,7 +72,7 @@ BEGIN
       AND table_type = 'BASE TABLE'
       AND table_name = ANY(expected_tables);
   IF actual_columns IS DISTINCT FROM expected_tables THEN
-    RAISE EXCEPTION 'W07 expected six D1-01 membership tables; found %', actual_columns;
+    RAISE EXCEPTION 'W07 expected seven D1-01 membership tables; found %', actual_columns;
   END IF;
   SELECT COUNT(*)::INTEGER INTO actual_count
     FROM information_schema.tables
