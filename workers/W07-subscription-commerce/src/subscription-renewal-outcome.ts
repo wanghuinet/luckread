@@ -508,11 +508,6 @@ export async function syncTerminalRenewalCycleToSubscription(
     // Avoid treating status alone as proof; the cycle receipt is created via the
     // transactional application path when transitioning to PAST_DUE.
     return reconcile(env, cycleStore, cycle, 'PAST_DUE_WITHOUT_CYCLE_RECEIPT', now);
-    const marked = await markCycleSyncState(cycleStore, cycle, 'APPLIED', null, now);
-    return {
-      cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id,
-      outcome: marked ? 'ALREADY_APPLIED' : 'PENDING_RETRY',
-    };
   }
   if (subscription.status !== 'ACTIVE' && subscription.status !== 'TRIALING') {
     return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_STATE_FORBIDS_PAST_DUE_TRANSITION', now);
