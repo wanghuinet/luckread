@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,writeFileSync,mkdirSync,symlinkSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {resolve} from 'node:path';
+import {buildSnapshotManifest,verifySnapshot} from './data-transfer-snapshot.mjs';
+const dir=()=>mkdtempSync(resolve(tmpdir(),'luckread-transfer-'));
+test('snapshot manifest verifies inventory and bundle checksums',()=>{const d=dir();writeFileSync(resolve(d,'a.json'),'{}');mkdirSync(resolve(d,'sub'));writeFileSync(resolve(d,'sub','b.csv'),'id\n1\n');const m=buildSnapshotManifest(d,'D1-02','snapshot-test');assert.equal(verifySnapshot(d,m).valid,true);});
+test('verification detects altered bytes',()=>{const d=dir();writeFileSync(resolve(d,'a.txt'),'before');const m=buildSnapshotManifest(d,'D1-01','id');writeFileSync(resolve(d,'a.txt'),'after');assert.equal(verifySnapshot(d,m).valid,false);});
+test('verification detects unlisted file',()=>{const d=dir();writeFileSync(resolve(d,'a.txt'),'a');const m=buildSnapshotManifest(d,'D1-04','id');writeFileSync(resolve(d,'extra.txt'),'x');assert.equal(verifySnapshot(d,m).valid,false);});
+test('reject invalid domain and unsafe paths',()=>{const d=dir();writeFileSync(resolve(d,'a'),'x');assert.throws(()=>buildSnapshotManifest(d,'bad','id'));const m=buildSnapshotManifest(d,'D1-05','id');m.files[0].path='../escape';assert.equal(verifySnapshot(d,m).valid,false);m.files[0].path='C:/escape';assert.equal(verifySnapshot(d,m).valid,false);m.files[0].path='\\\\server\\share';assert.equal(verifySnapshot(d,m).valid,false);});
+test('safety flags cannot claim import or cutover',()=>{const d=dir();writeFileSync(resolve(d,'a'),'x');const m=buildSnapshotManifest(d,'D1-03','id');m.safety.importExecuted=true;assert.equal(verifySnapshot(d,m).valid,false);});
+test('reject symlinks and hidden files',()=>{const d=dir();writeFileSync(resolve(d,'target'),'x');symlinkSync(resolve(d,'target'),resolve(d,'link'));assert.throws(()=>buildSnapshotManifest(d,'D1-01','id'));});
+test('reject malformed manifest entries',()=>{const d=dir();writeFileSync(resolve(d,'a'),'x');const m=buildSnapshotManifest(d,'D1-01','id');m.files[0].sizeBytes=-1;assert.equal(verifySnapshot(d,m).valid,false);});
