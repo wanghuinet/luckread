@@ -17,7 +17,7 @@
       "worker": "W01",
       "role": "Payload/CMS schema authority and API boundary",
       "schemaMode": "Generate a fresh PostgreSQL baseline using the official Payload PostgreSQL adapter; do not translate or execute D1 adapter migrations on PostgreSQL.",
-      "currentAdapter": "@payloadcms/db-d1-sqlite@3.90.2",
+      "currentAdapter": "@payloadcms/db-postgres@3.90.2",
       "targetAdapter": "@payloadcms/db-postgres@3.90.2",
       "config": "workers/W01-payload/src/payload.config.ts",
       "wrangler": "workers/W01-payload/wrangler.jsonc",
@@ -55,7 +55,10 @@
         "payload_migrations",
         "redirects",
         "redirects_rels"
-      ]
+      ],
+      "legacyMigrationSourceAdapter": "@payloadcms/db-d1-sqlite@3.90.2",
+      "postgresAdapter": "workers/W01-payload/src/neon-postgres-adapter.ts",
+      "productionWrangler": "workers/W01-payload/wrangler.neon.jsonc"
     },
     {
       "worker": "W02",

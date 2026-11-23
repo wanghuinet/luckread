@@ -160,6 +160,8 @@ for (const module of expected.w01PayloadModules) {
 
 for (const file of [
   payload.config,
+  payload.postgresAdapter,
+  payload.productionWrangler,
   payload.wrangler,
   ...payload.collections,
   ...payload.sqliteSchemaSnapshots,
@@ -181,18 +183,17 @@ for (const file of [
     compareSets('W01 latest Payload SQLite table catalog', tables, payload.expectedCurrentTableNames)
   }
   if (file === payload.config) {
-    if (!content.includes('@payloadcms/db-d1-sqlite')) failures.push('W01 current Payload adapter no longer matches the source contract')
-    if (!/push\s*:\s*false/.test(content)) failures.push('W01 Payload push:false was not found; do not admit automatic production DDL')
+    if (!content.includes('createW01NeonPostgresAdapter')) failures.push('W01 active Payload config must use the Neon PostgreSQL adapter')
+    if (content.includes('sqliteD1Adapter')) failures.push('W01 active Payload config must not retain a D1/SQLite runtime adapter')
   }
+  if (file === payload.postgresAdapter && !/push\\s*:\\s*false/.test(content)) failures.push('W01 Neon PostgreSQL adapter must keep push:false; do not admit automatic production DDL')
   if (file === payload.wrangler) {
     let config
     try { config = JSON.parse(content) } catch {
       failures.push('W01 historical Wrangler source config is invalid JSON')
     }
-    const sourceBinding = (config?.d1_databases ?? []).find((binding) =>
-      binding.binding === 'D1' && binding.database_id === '2f80471e-3756-49f9-8db1-7707a433ad64')
-    if (!sourceBinding || boundaryContract.physicalD1Registry?.['D1-01'] !== '2f80471e-3756-49f9-8db1-7707a433ad64') {
-      failures.push('W01 historical D1-01 source identity must remain pinned to the canonical registry')
+    if ((config?.d1_databases ?? []).length !== 0) {
+      failures.push('W01 active Wrangler runtime config must not bind Cloudflare D1')
     }
   }
   addSource('W01', file.endsWith('.json') ? 'sqlite-schema-snapshot' : file.includes('/collections/') ? 'payload-collection' : 'payload-config-or-wrangler', file, content, extra)
@@ -216,10 +217,8 @@ for (const owner of contract.owners.slice(1)) {
       failures.push(`${owner.worker} historical Wrangler source config is invalid JSON`)
     }
     if (sourceConfig && owner.worker === 'W02') {
-      const sourceBinding = (sourceConfig.d1_databases ?? []).find((binding) =>
-        binding.binding === 'D1_01' && binding.database_id === '2f80471e-3756-49f9-8db1-7707a433ad64')
-      if (!sourceBinding || boundaryContract.physicalD1Registry?.['D1-01'] !== '2f80471e-3756-49f9-8db1-7707a433ad64') {
-        failures.push('W02 historical D1-01 source identity must remain pinned to the canonical registry')
+      if ((sourceConfig.d1_databases ?? []).length !== 0) {
+        failures.push('W02 active Wrangler runtime config must not bind Cloudflare D1')
       }
     }
     if (sourceConfig && owner.worker === 'W07') {
