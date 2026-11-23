@@ -32,7 +32,7 @@ export interface MfaAuditOperationReceiptStore {
   reconcile(now?: string): Promise<MfaAuditReceiptDrainSummary>
 }
 
-/** D1 remains the production-default durable MFA receipt implementation. */
+/** Legacy D1 adapter is restricted to explicit test/schema profiles; production injects Neon. */
 /**
  * @deprecated-next-version
  * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
