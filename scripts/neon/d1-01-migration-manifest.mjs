@@ -126,7 +126,7 @@ if (!d1Domain ||
   fail('five-domain bootstrap contract no longer authorizes this exact schema-only D1-01 scope')
 }
 if (w01Package.dependencies?.payload !== '3.90.2' ||
-    w01Package.devDependencies?.['@payloadcms/db-postgres'] !== '3.90.2') {
+    w01Package.dependencies?.['@payloadcms/db-postgres'] !== '3.90.2') {
   fail('W01 Payload and official PostgreSQL adapter must remain pinned to 3.90.2')
 }
 if (w02Package.dependencies?.['better-auth'] !== '1.7.8' ||
