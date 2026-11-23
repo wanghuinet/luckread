@@ -332,6 +332,8 @@ async function applySubscriptionUpdate(
         subscription_id: cycle.subscription_id,
         subscriber_id: cycle.subscriber_id,
         cycle_start: cycle.cycle_start,
+        cycle_id: cycle.cycle_id,
+        cycle_end: cycle.cycle_end,
       },
       subscription,
       nextStatus,
@@ -503,6 +505,9 @@ export async function syncTerminalRenewalCycleToSubscription(
   // A failed renewal moves only ACTIVE -> PAST_DUE. The paid-through period does
   // not advance, and duplicate failure delivery does not increment version twice.
   if (subscription.status === 'PAST_DUE') {
+    // Avoid treating status alone as proof; the cycle receipt is created via the
+    // transactional application path when transitioning to PAST_DUE.
+    return reconcile(env, cycleStore, cycle, 'PAST_DUE_WITHOUT_CYCLE_RECEIPT', now);
     const marked = await markCycleSyncState(cycleStore, cycle, 'APPLIED', null, now);
     return {
       cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id,
