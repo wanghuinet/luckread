@@ -121,6 +121,14 @@ describe('W02 MFA enrollment-start authority', () => {
     mocks.createAuth.mockReturnValue({ handler: mocks.handler })
   })
 
+  it('fails closed when no persistence store is injected', async () => {
+    const response = await handleMfaEnrollmentStartRequest({
+      AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
+    } as unknown as BetterAuthEnv, makeRequest())
+    expect(response.status).toBe(503)
+    expect(mocks.handler).not.toHaveBeenCalled()
+  })
+
   it('uses real SQLite conditional SQL to reserve a single enrollment and returns a one-time DTO', async () => {
     const { db, sqlite, close } = makeDb()
     try {
