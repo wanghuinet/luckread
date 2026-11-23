@@ -62,7 +62,7 @@ function scheduledChange(): ScheduledSubscriptionPlanDowngrade {
 
 function input(scheduled = true): ApplyRenewalSubscriptionUpdateInput {
   return {
-    cycle: { subscription_id: subscriptionId, subscriber_id: subscriberId, cycle_start: cycleStart },
+    cycle: { subscription_id: subscriptionId, subscriber_id: subscriberId, cycle_start: cycleStart, cycle_id: 'rcy_' + 'd'.repeat(26), cycle_end: cycleEnd },
     subscription: subscriptionRow(),
     nextStatus: 'ACTIVE',
     nextPeriodStart: cycleStart,
@@ -81,6 +81,8 @@ function postgresPool(
   const client = {
     query: vi.fn(async (sql: string, values: unknown[] = []) => {
       transactionCalls.push({ sql, values })
+      if (sql.includes('FROM membership_subscription_renewal_cycle_applications')) return { rows: [], rowCount: 0 }
+      if (sql.includes('INSERT INTO membership_subscription_renewal_cycle_applications')) return { rows: [{ cycle_id: 'rcy_' + 'd'.repeat(26) }], rowCount: 1 }
       return handler(sql, values)
     }),
     release: vi.fn(),
@@ -122,10 +124,10 @@ describe('native PostgreSQL renewal outcome synchronization', () => {
     await expect(applyRenewalSubscriptionUpdatePostgres(f.pool, input(true))).resolves.toBe('APPLIED')
 
     expect(f.transactionCalls.map(x => x.sql)).toEqual([
-      'BEGIN',
+      'BEGIN', expect.stringContaining('FROM membership_subscription_renewal_cycle_applications'),
       expect.stringContaining('UPDATE membership_subscriptions SET plan_id'),
       expect.stringContaining("UPDATE membership_subscription_scheduled_plan_changes SET status = 'APPLIED'"),
-      'COMMIT',
+      expect.stringContaining('INSERT INTO membership_subscription_renewal_cycle_applications'), 'COMMIT',
     ])
     expect(f.transactionCalls[1]?.sql).toContain('version = $13')
     expect(f.transactionCalls[1]?.sql).toContain("c.status = 'SCHEDULED'")
@@ -145,10 +147,9 @@ describe('native PostgreSQL renewal outcome synchronization', () => {
 
     await expect(applyRenewalSubscriptionUpdatePostgres(f.pool, input(true))).resolves.toBe('CAS_LOST')
     expect(f.transactionCalls.map(x => x.sql)).toEqual([
-      'BEGIN',
+      'BEGIN', expect.stringContaining('FROM membership_subscription_renewal_cycle_applications'),
       expect.stringContaining('UPDATE membership_subscriptions SET plan_id'),
-      expect.stringContaining("UPDATE membership_subscription_scheduled_plan_changes SET status = 'APPLIED'"),
-      'ROLLBACK',
+      expect.stringContaining("UPDATE membership_subscription_scheduled_plan_changes SET status = 'APPLIED'"), 'ROLLBACK',
     ])
     expect(f.transactionCalls.some(x => x.sql === 'COMMIT')).toBe(false)
   })
@@ -162,9 +163,9 @@ describe('native PostgreSQL renewal outcome synchronization', () => {
 
     await expect(applyRenewalSubscriptionUpdatePostgres(f.pool, input(false))).resolves.toBe('APPLIED')
     expect(f.transactionCalls.map(x => x.sql)).toEqual([
-      'BEGIN',
+      'BEGIN', expect.stringContaining('FROM membership_subscription_renewal_cycle_applications'),
       expect.stringContaining('UPDATE membership_subscriptions SET plan_id'),
-      'COMMIT',
+      expect.stringContaining('INSERT INTO membership_subscription_renewal_cycle_applications'), 'COMMIT',
     ])
   })
 
