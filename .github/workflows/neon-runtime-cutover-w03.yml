@@ -225,7 +225,7 @@ jobs:
           if (!relationships.includes('mutationStore.create({') ||
               !relationships.includes('mutationStore.revoke({') ||
               !relationships.includes('mutationStore.appendThread({') ||
-              !router.includes('dependencies.contentRelationshipMutationStoreProvider?.(env),')) {
+              !router.includes('requireStore(dependencies.contentRelationshipMutationStoreProvider?.(env))')) {
             throw new Error('W03 Neon content relationship and post-thread mutation wiring is incomplete')
           }
           if (!contentRuntime.includes('mutationStore.listDueScheduled(nowIso, limit)') ||
