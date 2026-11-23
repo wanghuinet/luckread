@@ -91,9 +91,10 @@ export async function GET(
     if (!access) return unavailable(503, 'SERVICE_UNAVAILABLE')
 
     let allowed = access.allowed && (access.isPublic || access.isMemberContent)
-    // Standalone private media remains available to its owner, but never as
-    // public playback. Payload's owner profile mapping is server-derived.
-    if (!allowed && principal) {
+    // Owner fallback applies only to unreferenced standalone media. It must not
+    // override a protected published reference denied by W03. Payload's owner
+    // profile mapping is server-derived.
+    if (!allowed && !access.isMemberContent && !access.isPublic && principal) {
       const payloadOwnerId = await resolvePayloadOwnerUserId(payload, principal.userId)
       allowed = Boolean(payloadOwnerId && String(media.ownerUserId ?? '') === payloadOwnerId)
     }
