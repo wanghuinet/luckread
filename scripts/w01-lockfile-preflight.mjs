@@ -25,6 +25,12 @@ function run(command, args) {
 if (!existsSync(pkgPath)) fail('workers/W01-payload/package.json is missing')
 
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+const rootPackage = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+const rootLockPath = join(root, 'package-lock.json')
+const rootLockText = existsSync(rootLockPath) ? readFileSync(rootLockPath, 'utf8') : ''
+if (rootPackage.dependencies?.['@payloadcms/db-d1-sqlite'] || rootLockText.includes('@payloadcms/db-d1-sqlite')) {
+  fail('Root package manifest/lockfile must not declare or resolve the Cloudflare D1 Payload adapter')
+}
 if (pkg.dependencies?.['@payloadcms/db-d1-sqlite']) fail('Cloudflare D1 Payload adapter must not be declared')
 const lockText = existsSync(lockPath) ? readFileSync(lockPath, 'utf8') : ''
 if (lockText.includes('@payloadcms/db-d1-sqlite')) fail('Cloudflare D1 Payload adapter must not remain in the W01 lockfile')
