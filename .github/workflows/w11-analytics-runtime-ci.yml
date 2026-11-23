@@ -88,6 +88,8 @@ jobs:
           workers/W11-growth-campaign-analytics-operations/src/analytics-ingest-postgres.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-ingest-postgres.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-postgres.integration.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-reconciliation-postgres.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-reconciliation-postgres.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-postgres-runtime.ts
           workers/W11-growth-campaign-analytics-operations/src/entry.ts
           workers/W11-growth-campaign-analytics-operations/src/entry.test.ts
