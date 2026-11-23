@@ -211,12 +211,6 @@ export async function readSessionToken(): Promise<string | null> {
   const snapshot = await readSessionCredentialSnapshot();
   return snapshot.token;
 }
-  const activeAccountId = await getActiveStoredAccountId();
-  if (activeAccountId) {
-    return SecureStore.getItemAsync(accountTokenKey(activeAccountId));
-  }
-  return SecureStore.getItemAsync(LEGACY_TOKEN_KEY);
-}
 
 export async function readCachedUser(): Promise<LuckReadUser | null> {
   const activeAccountId = await getActiveStoredAccountId();
