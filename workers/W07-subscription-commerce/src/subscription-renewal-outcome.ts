@@ -348,13 +348,8 @@ async function applySubscriptionUpdate(
 
   const latest = await readSubscription(membershipStore, cycle.subscription_id, cycle.subscriber_id);
   if (!latest) return 'CAS_LOST';
-  if (latest.plan_id === nextPlanId && latest.plan_version === nextPlanVersion &&
-      latest.current_period_start === nextPeriodStart && latest.current_period_end === nextPeriodEnd) {
-    return 'ALREADY_APPLIED';
-  }
-  if (nextStatus === 'PAST_DUE' && latest.status === 'PAST_DUE' &&
-      latest.plan_id === subscription.plan_id && latest.plan_version === subscription.plan_version &&
-      latest.current_period_end === cycle.cycle_start) return 'ALREADY_APPLIED';
+  // A post-CAS state read is not cycle-specific durable proof. Treat a lost
+  // compare-and-set as a conflict and let reconciliation resolve it.
   return 'CAS_LOST';
 }
 
@@ -457,27 +452,9 @@ export async function syncTerminalRenewalCycleToSubscription(
     }
   }
 
-  // A matching period proves another concurrent/replayed sync applied this cycle.
-  // Preserve any subsequent user lifecycle state; never reactivate canceled/paused subscriptions.
-  if (subscription.current_period_start === cycle.cycle_start && subscription.current_period_end === cycle.cycle_end) {
-    if (subscription.trial_started_at && subscription.trial_ends_at === cycle.cycle_start &&
-        subscription.trial_converted_at === cycle.cycle_start &&
-        !(await auditAppliedSubscriptionTrialConversion(env, cycle, subscription))) {
-      return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
-    }
-    if (scheduledChange?.status === 'APPLIED' &&
-        !(await auditAppliedSubscriptionPlanChange(env, cycle, scheduledChange))) {
-      return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
-    }
-    if (scheduledChange?.status === 'SCHEDULED') {
-      return reconcile(env, cycleStore, cycle, 'SCHEDULED_PLAN_CHANGE_NOT_MARKED_APPLIED', now);
-    }
-    const marked = await markCycleSyncState(cycleStore, cycle, 'APPLIED', null, now);
-    return {
-      cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id,
-      outcome: marked ? 'ALREADY_APPLIED' : 'PENDING_RETRY',
-    };
-  }
+  // Period timestamps alone are not durable proof that this particular finance cycle
+  // was applied. Without a cycle-specific application receipt, fail closed into
+  // reconciliation rather than marking Finance synchronization complete.
   if (subscription.current_period_end !== cycle.cycle_start ||
       subscription.current_period_start >= cycle.cycle_start) {
     return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_PERIOD_CAS_MISMATCH', now);
