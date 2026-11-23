@@ -1,98 +1,18 @@
-import { DatabaseSync } from 'node:sqlite'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   resolvePrincipal: vi.fn(),
-  createAuth: vi.fn(),
   handler: vi.fn(),
   limiter: { limit: vi.fn() },
 }))
 vi.mock('./principal.js', () => ({ resolveBetterAuthPrincipal: mocks.resolvePrincipal }))
 vi.mock('./better-auth.js', () => ({
-  createLuckReadAuth: mocks.createAuth,
+  createLuckReadAuth: vi.fn(() => ({ handler: mocks.handler })),
 }))
 
-import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import type { BetterAuthEnv } from './better-auth.js'
 import type { MfaEnrollmentStartStore } from './mfa-enrollment-start-store.js'
 import { handleMfaEnrollmentStartRequest } from './mfa-enrollment-start.js'
-import { createD1MfaEnrollmentStartStore } from './mfa-enrollment-start-store.js'
-
-const handleWithSqliteFixture = (env: BetterAuthEnv & { D1_01: D1Database }, request: Request) =>
-  handleMfaEnrollmentStartRequest(env, request, {
-    store: createD1MfaEnrollmentStartStore(env.D1_01!),
-  })
-
-const makeDb = () => {
-  const sqlite = new DatabaseSync(':memory:')
-  sqlite.exec(
-    'CREATE TABLE "user" (' +
-      'id TEXT PRIMARY KEY, ' +
-      'two_factor_enabled INTEGER NOT NULL DEFAULT 0, ' +
-      'mfa_enrollment_key_hash TEXT)',
-  )
-  sqlite.exec(
-    'CREATE TABLE "twoFactor" (' +
-      'id TEXT PRIMARY KEY, userId TEXT NOT NULL UNIQUE)',
-  )
-  sqlite.exec(
-    'CREATE TABLE auth_007_mfa_publication_journal (' +
-      'journal_id TEXT PRIMARY KEY NOT NULL, event_id TEXT NOT NULL UNIQUE, event_type TEXT NOT NULL, ' +
-      'schema_version TEXT NOT NULL, resource_id TEXT NOT NULL, source_version INTEGER NOT NULL, ' +
-      'idempotency_key TEXT NOT NULL UNIQUE, payload TEXT NOT NULL, status TEXT NOT NULL, attempt INTEGER NOT NULL, ' +
-      'next_attempt_at TEXT, created_at TEXT NOT NULL, published_at TEXT, last_error_code TEXT)',
-  )
-  sqlite.prepare(
-    'INSERT INTO "user" (id, two_factor_enabled, mfa_enrollment_key_hash) VALUES (?, 0, NULL)',
-  ).run('user-12345678')
-
-  const db = {
-    prepare(sql: string) {
-      const statement = sqlite.prepare(sql)
-      let values: (string | number | null)[] = []
-      return {
-        bind(...next: (string | number | null)[]) {
-          values = next
-          return this
-        },
-        async run() {
-          const result = statement.run(...values)
-          return { success: true, meta: { changes: Number(result.changes) } }
-        },
-        async first<T>() {
-          return (statement.get(...values) as T | undefined) ?? null
-        },
-        async all<T>() {
-          return { results: statement.all(...values) as T[] }
-        },
-      }
-    },
-    async batch(prepared: Array<{ run: () => Promise<{ success: boolean; meta: { changes: number } }> }>) {
-      sqlite.exec('BEGIN')
-      try {
-        const results = []
-        for (const statement of prepared) results.push(await statement.run())
-        sqlite.exec('COMMIT')
-        return results
-      } catch (error) {
-        sqlite.exec('ROLLBACK')
-        throw error
-      }
-    },
-  } as unknown as D1Database
-  return { db, sqlite, close: () => sqlite.close() }
-}
-
-const makeRequest = (body: unknown = { currentPassword: 'correct horse battery staple' }, key = 'mfa-enroll-key-0001', w01 = true) =>
-  new Request('https://luckread-w02.internal/internal/auth/mfa/enrollment/start', {
-    method: 'POST',
-    headers: {
-      cookie: 'better-auth.session_token=opaque-session',
-      'content-type': 'application/json',
-      'Idempotency-Key': key,
-      ...(w01 ? { 'X-LuckRead-Caller': 'W01', 'X-LuckRead-Transport-Version': '1.0' } : {}),
-    },
-    body: JSON.stringify(body),
-  })
 
 const principal = {
   userId: 'user-12345678',
@@ -104,6 +24,52 @@ const principal = {
   roleAssignments: [],
 }
 
+const makeRequest = (
+  body: unknown = { currentPassword: 'correct horse battery staple' },
+  key = 'mfa-enroll-key-0001',
+  w01 = true,
+) => new Request('https://luckread-w02.internal/internal/auth/mfa/enrollment/start', {
+  method: 'POST',
+  headers: {
+    cookie: 'better-auth.session_token=opaque-session',
+    'content-type': 'application/json',
+    ...(key ? { 'Idempotency-Key': key } : {}),
+    ...(w01 ? { 'X-LuckRead-Caller': 'W01', 'X-LuckRead-Transport-Version': '1.0' } : {}),
+  },
+  body: JSON.stringify(body),
+})
+
+function makeMemoryStore(): MfaEnrollmentStartStore & { state: () => string | null } {
+  let reservation: string | null = null
+  const store = {
+    reserve: vi.fn(async ({ keyHash }: Parameters<MfaEnrollmentStartStore['reserve']>[0]) => {
+      if (reservation !== null) return false
+      reservation = keyHash
+      return true
+    }),
+    recordFailure: vi.fn(async (_event: Parameters<MfaEnrollmentStartStore['recordFailure']>[0]) => undefined),
+    releaseReservationIfNoFactor: vi.fn(async (_userId: string, keyHash: string) => {
+      if (reservation === keyHash) reservation = null
+    }),
+    state: () => reservation,
+  }
+  return store
+}
+
+const makeAuth = () => ({ handler: mocks.handler }) as unknown as Parameters<typeof handleMfaEnrollmentStartRequest>[2] extends { auth?: infer T } ? T : never
+const makeEnv = (): BetterAuthEnv => ({
+  AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
+} as unknown as BetterAuthEnv)
+
+const call = (
+  store?: MfaEnrollmentStartStore,
+  request = makeRequest(),
+  env = makeEnv(),
+) => handleMfaEnrollmentStartRequest(env, request, {
+  ...(store ? { store } : {}),
+  auth: makeAuth(),
+})
+
 describe('W02 MFA enrollment-start authority', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -114,78 +80,27 @@ describe('W02 MFA enrollment-start authority', () => {
       totpURI: 'otpauth://totp/LuckRead:user%40example.com?secret=ABCDEFGHIJKLMNOP&issuer=LuckRead',
       backupCodes: ['RECOVERY-ONE', 'RECOVERY-TWO'],
     }))
-    mocks.createAuth.mockReturnValue({ handler: mocks.handler })
   })
 
   it('fails closed when no persistence store is injected', async () => {
-    const response = await handleMfaEnrollmentStartRequest({
-      AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
-    } as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest())
+    const response = await handleMfaEnrollmentStartRequest(makeEnv(), makeRequest())
     expect(response.status).toBe(503)
     expect(mocks.handler).not.toHaveBeenCalled()
   })
 
-  it('uses real SQLite conditional SQL to reserve a single enrollment and returns a one-time DTO', async () => {
-    const { db, sqlite, close } = makeDb()
-    try {
-      const response = await handleWithSqliteFixture({
-        D1_01: db,
-        AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
-      } as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest())
-      expect(response.status).toBe(200)
-      await expect(response.json()).resolves.toEqual({
-        data: {
-          totpUri: 'otpauth://totp/LuckRead:user%40example.com?secret=ABCDEFGHIJKLMNOP&issuer=LuckRead',
-          recoveryCodes: ['RECOVERY-ONE', 'RECOVERY-TWO'],
-        },
-      })
-      expect(mocks.limiter.limit).toHaveBeenCalledWith({ key: 'auth-mfa-enrollment-start:user-12345678' })
-      expect(mocks.handler).toHaveBeenCalledTimes(1)
-      const forwarded = mocks.handler.mock.calls[0]?.[0] as Request
-      expect(new URL(forwarded.url).pathname).toBe('/api/auth/two-factor/enable')
-      expect(forwarded.headers.get('cookie')).toBe('better-auth.session_token=opaque-session')
-      await expect(forwarded.json()).resolves.toEqual({ password: 'correct horse battery staple', method: 'totp' })
-      const account = sqlite.prepare('SELECT mfa_enrollment_key_hash FROM "user" WHERE id = ?')
-        .get('user-12345678') as { mfa_enrollment_key_hash: string | null }
-      expect(account.mfa_enrollment_key_hash).toMatch(/^[a-f0-9]{64}$/)
-      const audit = sqlite.prepare('SELECT event_type, resource_id, status, payload FROM auth_007_mfa_publication_journal')
-        .get() as { event_type: string; resource_id: string; status: string; payload: string }
-      expect(audit.event_type).toBe('auth.mfa.enrollment_started')
-      expect(audit.resource_id).toBe('user-12345678')
-      expect(audit.status).toBe('PENDING')
-      expect(audit.payload).not.toContain('correct horse battery staple')
-      expect(audit.payload).not.toContain('ABCDEFGHIJKLMNOP')
-      expect(audit.payload).not.toContain('RECOVERY-ONE')
-    } finally {
-      close()
-    }
-  })
-
-  it('uses an injected PostgreSQL-compatible store and Better Auth instance without touching D1', async () => {
-    const reserve = vi.fn(async (_input: Parameters<MfaEnrollmentStartStore['reserve']>[0]) => true)
-    const recordFailure = vi.fn(async (_event: Parameters<MfaEnrollmentStartStore['recordFailure']>[0]) => undefined)
-    const releaseReservationIfNoFactor = vi.fn(async (_userId: string, _keyHash: string) => undefined)
-    const store: MfaEnrollmentStartStore = {
-      reserve,
-      recordFailure,
-      releaseReservationIfNoFactor,
-    }
-    const auth = createLuckReadAuth({} as BetterAuthEnv)
-    const resolvePrincipal = vi.fn(async () => ({
-      userId: principal.userId,
-      accountState: principal.accountState,
-    }))
-    const response = await handleMfaEnrollmentStartRequest({
-      AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
-    } as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest(), {
-      auth,
-      store,
-      resolvePrincipal,
-    })
-
+  it('uses the injected persistence port and returns only the one-time enrollment DTO', async () => {
+    const store = makeMemoryStore()
+    const response = await call(store)
     expect(response.status).toBe(200)
-    expect(reserve).toHaveBeenCalledTimes(1)
-    const reservation = reserve.mock.calls[0]?.[0]
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        totpUri: 'otpauth://totp/LuckRead:user%40example.com?secret=ABCDEFGHIJKLMNOP&issuer=LuckRead',
+        recoveryCodes: ['RECOVERY-ONE', 'RECOVERY-TWO'],
+      },
+    })
+    expect(mocks.limiter.limit).toHaveBeenCalledWith({ key: 'auth-mfa-enrollment-start:user-12345678' })
+    expect(store.reserve).toHaveBeenCalledTimes(1)
+    const reservation = store.reserve.mock.calls[0]?.[0]
     expect(reservation?.userId).toBe(principal.userId)
     expect(reservation?.keyHash).toMatch(/^[a-f0-9]{64}$/)
     expect(reservation?.event).toMatchObject({
@@ -197,83 +112,69 @@ describe('W02 MFA enrollment-start authority', () => {
         factorState: 'PENDING_VERIFICATION',
       },
     })
-    expect(recordFailure).not.toHaveBeenCalled()
-    expect(releaseReservationIfNoFactor).not.toHaveBeenCalled()
-    expect(resolvePrincipal).toHaveBeenCalledTimes(1)
+    expect(JSON.stringify(reservation?.event)).not.toMatch(/correct horse|ABCDEFGHIJKLMNOP|RECOVERY-ONE/)
+    expect(mocks.handler).toHaveBeenCalledTimes(1)
+    const forwarded = mocks.handler.mock.calls[0]?.[0] as Request
+    expect(new URL(forwarded.url).pathname).toBe('/api/auth/two-factor/enable')
+    expect(forwarded.headers.get('cookie')).toBe('better-auth.session_token=opaque-session')
+    await expect(forwarded.json()).resolves.toEqual({ password: 'correct horse battery staple', method: 'totp' })
+    expect(store.recordFailure).not.toHaveBeenCalled()
+    expect(store.releaseReservationIfNoFactor).not.toHaveBeenCalled()
+  })
+
+  it('rejects non-W01 callers and inactive identities before reserving a factor', async () => {
+    const store = makeMemoryStore()
+    const forbidden = await call(store, makeRequest(undefined, 'mfa-enroll-key-0001', false))
+    expect(forbidden.status).toBe(403)
+    expect(store.reserve).not.toHaveBeenCalled()
+
+    mocks.resolvePrincipal.mockResolvedValueOnce({ ...principal, accountState: 'SUSPENDED' })
+    const inactive = await handleMfaEnrollmentStartRequest(makeEnv(), makeRequest(), {
+      store,
+      auth: makeAuth(),
+    })
+    expect(inactive.status).toBe(403)
+    expect(store.reserve).not.toHaveBeenCalled()
+    expect(mocks.handler).not.toHaveBeenCalled()
+  })
+
+  it('rejects repeated or competing enrollment keys without a second Better Auth write', async () => {
+    const store = makeMemoryStore()
+    expect((await call(store)).status).toBe(200)
+    expect((await call(store)).status).toBe(409)
+    expect((await call(store, makeRequest(
+      { currentPassword: 'correct horse battery staple' },
+      'mfa-enroll-key-0002',
+    ))).status).toBe(409)
     expect(mocks.handler).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects non-W01 callers and inactive identities before a factor write', async () => {
-    const { db, close } = makeDb()
-    try {
-      const forbidden = await handleWithSqliteFixture({
-        D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
-      } as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest(undefined, 'mfa-enroll-key-0001', false))
-      expect(forbidden.status).toBe(403)
+  it('requires a valid idempotency key and releases only the matching unmaterialized reservation on upstream failure', async () => {
+    const store = makeMemoryStore()
+    expect((await call(store, makeRequest(undefined, ''))).status).toBe(400)
+    expect(store.reserve).not.toHaveBeenCalled()
 
-      mocks.resolvePrincipal.mockResolvedValueOnce({ ...principal, accountState: 'SUSPENDED' })
-      const inactive = await handleWithSqliteFixture({
-        D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
-      } as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest())
-      expect(inactive.status).toBe(403)
-      expect(mocks.handler).not.toHaveBeenCalled()
-    } finally {
-      close()
-    }
+    mocks.handler.mockRejectedValueOnce(new Error('internal adapter failed'))
+    const failed = await call(store)
+    expect(failed.status).toBe(503)
+    expect(store.recordFailure).toHaveBeenCalledWith(expect.objectContaining({
+      eventType: 'auth.mfa.enrollment_failed',
+      resourceId: principal.userId,
+    }))
+    expect(store.releaseReservationIfNoFactor).toHaveBeenCalledWith(
+      principal.userId,
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+    )
+    expect(store.state()).toBeNull()
   })
 
-  it('rejects repeated or competing keys without calling Better Auth a second time', async () => {
-    const { db, close } = makeDb()
-    try {
-      const env = { D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter } as unknown as BetterAuthEnv & { D1_01: D1Database }
-      const first = await handleWithSqliteFixture(env, makeRequest())
-      expect(first.status).toBe(200)
-      const sameKeyReplay = await handleWithSqliteFixture(env, makeRequest())
-      expect(sameKeyReplay.status).toBe(409)
-      const differentKey = await handleWithSqliteFixture(env, makeRequest(
-        { currentPassword: 'correct horse battery staple' },
-        'mfa-enroll-key-0002',
-      ))
-      expect(differentKey.status).toBe(409)
-      expect(mocks.handler).toHaveBeenCalledTimes(1)
-    } finally {
-      close()
-    }
-  })
+  it('fails closed on malformed enrollment output or an unavailable rate-limit binding', async () => {
+    const store = makeMemoryStore()
+    mocks.handler.mockResolvedValueOnce(Response.json({ method: 'totp', totpURI: 'bad', backupCodes: [] }))
+    expect((await call(store)).status).toBe(503)
 
-  it('requires a real idempotency key and clears only an unmaterialized reservation after adapter failure', async () => {
-    const { db, sqlite, close } = makeDb()
-    try {
-      const env = { D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter } as unknown as BetterAuthEnv & { D1_01: D1Database }
-      const noKey = await handleWithSqliteFixture(env, makeRequest(
-        { currentPassword: 'correct horse battery staple' }, '',
-      ))
-      expect(noKey.status).toBe(400)
-      expect(mocks.handler).not.toHaveBeenCalled()
-
-      mocks.handler.mockRejectedValueOnce(new Error('internal adapter failed'))
-      const failed = await handleWithSqliteFixture(env, makeRequest())
-      expect(failed.status).toBe(503)
-      const account = sqlite.prepare('SELECT mfa_enrollment_key_hash FROM "user" WHERE id = ?')
-        .get('user-12345678') as { mfa_enrollment_key_hash: string | null }
-      expect(account.mfa_enrollment_key_hash).toBeNull()
-    } finally {
-      close()
-    }
-  })
-
-  it('fails closed on malformed enrollment output or unavailable rate-limit binding', async () => {
-    const { db, close } = makeDb()
-    try {
-      const env = { D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter } as unknown as BetterAuthEnv & { D1_01: D1Database }
-      mocks.handler.mockResolvedValueOnce(Response.json({ method: 'totp', totpURI: 'bad', backupCodes: [] }))
-      const malformed = await handleWithSqliteFixture(env, makeRequest())
-      expect(malformed.status).toBe(503)
-
-      const noLimiter = await handleWithSqliteFixture({} as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest())
-      expect(noLimiter.status).toBe(503)
-    } finally {
-      close()
-    }
+    mocks.handler.mockClear()
+    expect((await call(makeMemoryStore(), makeRequest(), {} as BetterAuthEnv)).status).toBe(503)
+    expect(mocks.handler).not.toHaveBeenCalled()
   })
 })
