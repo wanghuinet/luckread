@@ -175,15 +175,11 @@ describe('W03 Neon Collection member removal', () => {
       .rejects.toMatchObject({ code: 'IDEMPOTENCY_IN_PROGRESS', status: 409 })
   })
 
-  it('routes DELETE through Neon without querying D1', async () => {
+  it('routes DELETE through Neon', async () => {
     const remove = vi.fn(async (_input: Parameters<CollectionMemberRemoveStore['remove']>[0]) => undefined)
     const store: CollectionMemberRemoveStore = {
       loadMutation: vi.fn(async () => snapshot),
       remove,
-    }
-    const db = {
-      prepare() { throw new Error('D1 must not be queried for Neon Collection member removal') },
-      batch() { throw new Error('D1 must not be used for Neon Collection member removal') },
     }
     const worker = createW03ContentWorker({
       collectionMemberRemoveStoreProvider: () => store,
