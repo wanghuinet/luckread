@@ -101,16 +101,16 @@ describe('AUTH-007 MFA lifecycle contract', () => {
 
   it('keeps the TOTP replay guard, verified status, encrypted recovery codes and no-trust-device runtime bindings', () => {
     const betterAuth = readFileSync(new URL('./better-auth.ts', import.meta.url), 'utf8')
-    const replayGuard = readFileSync(new URL('./totp-replay-guard.ts', import.meta.url), 'utf8')
+    const replayGuard = readFileSync(new URL('../neon/mfa-factor-state-postgres.ts', import.meta.url), 'utf8')
     const enrollmentConfirm = readFileSync(new URL('./mfa-enrollment-confirm.ts', import.meta.url), 'utf8')
-    const roleAssignment = readFileSync(new URL('../authz/role-assignment.ts', import.meta.url), 'utf8')
+    const roleAssignment = readFileSync(new URL('../neon/role-assignment-postgres.ts', import.meta.url), 'utf8')
 
     expect(betterAuth).toContain('consumeTotpTimeStep')
     expect(betterAuth).toContain("trustDeviceMaxAge: 0")
     expect(betterAuth).toContain("storeBackupCodes: 'encrypted'")
-    expect(replayGuard).toContain('UPDATE "twoFactor" SET lastAcceptedTotpTimeStep')
+    expect(replayGuard).toContain('UPDATE "twoFactor" SET "lastAcceptedTotpTimeStep"')
     expect(enrollmentConfirm).toContain('statusStore.read')
-    expect(roleAssignment).toContain('requireMfaForPrivilegedAction')
+    expect(roleAssignment).toContain('requireMfaForPrivilegedActionPostgres')
     expect(roleAssignment).toContain('mfa_enrolled_at')
     expect(roleAssignment).toContain('mfaEnabled')
     expect(roleAssignment).toContain('mfaRequired ? mfaEnabled : true')
