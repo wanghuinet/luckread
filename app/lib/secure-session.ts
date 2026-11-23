@@ -196,6 +196,20 @@ export async function clearActiveAccountSelection(): Promise<void> {
   ]);
 }
 
+export type SessionCredentialSnapshot = {
+  accountId: string | null;
+  token: string | null;
+};
+
+/** Capture account identity and credential together so in-flight responses cannot cross account slots. */
+export async function readSessionCredentialSnapshot(): Promise<SessionCredentialSnapshot> {
+  const accountId = await getActiveStoredAccountId();
+  const token = accountId
+    ? await SecureStore.getItemAsync(accountTokenKey(accountId))
+    : await SecureStore.getItemAsync(LEGACY_TOKEN_KEY);
+  return { accountId, token };
+}
+
 export async function readSessionToken(): Promise<string | null> {
   const activeAccountId = await getActiveStoredAccountId();
   if (activeAccountId) {
@@ -218,6 +232,28 @@ export async function readCachedUser(): Promise<LuckReadUser | null> {
   } catch {
     return null;
   }
+}
+
+/** Persist a renewal to the account that initiated the request, never the newly active account. */
+export async function saveSessionTokenForSnapshot(
+  token: string,
+  snapshot: SessionCredentialSnapshot,
+): Promise<void> {
+  if (!token.trim()) throw new Error('The session response did not contain a usable credential.');
+  const currentActiveId = await getActiveStoredAccountId();
+  if (currentActiveId !== snapshot.accountId) return;
+
+  if (snapshot.accountId) {
+    const accounts = await readAccountIndex();
+    if (!accounts.some((account) => account.id === snapshot.accountId)) return;
+    await SecureStore.setItemAsync(accountTokenKey(snapshot.accountId), token, {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED,
+    });
+    return;
+  }
+  await SecureStore.setItemAsync(LEGACY_TOKEN_KEY, token, {
+    keychainAccessible: SecureStore.WHEN_UNLOCKED,
+  });
 }
 
 /** API session-renewal responses update only the currently active account. */

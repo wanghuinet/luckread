@@ -1,4 +1,4 @@
-import { readSessionToken, saveSessionToken } from './secure-session';
+import { readSessionToken, readSessionCredentialSnapshot, saveSessionTokenForSnapshot } from './secure-session';
 
 const DEFAULT_API_BASE_URL = 'https://api.luckread.com';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -530,9 +530,10 @@ export async function apiRequest<T>(
     headers.delete('Idempotency-Key');
   }
 
+  let credentialSnapshot: Awaited<ReturnType<typeof readSessionCredentialSnapshot>> | null = null;
   if (auth) {
-    const token = await readSessionToken();
-    if (token) headers.set('Authorization', 'Bearer ' + token);
+    credentialSnapshot = await readSessionCredentialSnapshot();
+    if (credentialSnapshot.token) headers.set('Authorization', 'Bearer ' + credentialSnapshot.token);
   }
 
   let response: Response;
@@ -559,7 +560,9 @@ export async function apiRequest<T>(
   let outcome: MutationOutcome = 'transient';
   try {
     const renewedCredential = response.headers.get('X-LuckRead-Session-Token');
-    if (renewedCredential && persistSessionCredential) await saveSessionToken(renewedCredential);
+    if (renewedCredential && persistSessionCredential && credentialSnapshot) {
+      await saveSessionTokenForSnapshot(renewedCredential, credentialSnapshot);
+    }
 
     let data: T | ApiErrorBody | null = null;
     try {
@@ -618,9 +621,10 @@ export async function fetchContentBodyReference(
   const trustedMediaDeliveryHost = target.protocol === 'https:' &&
     ['img.luckread.com', 'video.luckread.com'].includes(target.hostname);
   const maySendSession = target.origin === base.origin || trustedMediaDeliveryHost;
+  let credentialSnapshot: Awaited<ReturnType<typeof readSessionCredentialSnapshot>> | null = null;
   if (maySendSession) {
     const token = options.sessionToken === undefined
-      ? await readSessionToken().catch(() => null)
+      ? (credentialSnapshot = await readSessionCredentialSnapshot()).token
       : options.sessionToken;
     if (token) headers.set('Authorization', 'Bearer ' + token);
   }
@@ -638,9 +642,9 @@ export async function fetchContentBodyReference(
     throw new LuckReadNetworkError();
   }
 
-  if (target.origin === base.origin) {
+  if (target.origin === base.origin && credentialSnapshot) {
     const renewedCredential = response.headers.get('X-LuckRead-Session-Token');
-    if (renewedCredential) await saveSessionToken(renewedCredential);
+    if (renewedCredential) await saveSessionTokenForSnapshot(renewedCredential, credentialSnapshot);
   }
   return response;
 }
