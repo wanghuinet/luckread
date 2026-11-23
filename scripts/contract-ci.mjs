@@ -445,7 +445,7 @@ async function checkEvents() {
     ]
     const requiredTimestampSemanticTokens = [
       'const publishedAt = new Date().toISOString()',
-      'event.publishedAt,',
+      'new Date(event.publishedAt)',
       'const occurredAt = input.occurredAt ?? new Date().toISOString()',
       "SET status = 'PUBLISHED', published_at = $1",
     ]
@@ -462,11 +462,15 @@ async function checkEvents() {
         !requiredAuditEvidenceTokens.every((token) => mfaAuditEvidenceSource.includes(token)) ||
         !requiredAuditDeliveryE2ETokens.every((token) => mfaAuditDeliveryE2ESource.includes(token)) ||
         !requiredLiveMfaNegativeTestTokens.every((token) => mfaLiveSecurityE2ESource.includes(token)) ||
-        !requiredTimestampSemanticTokens.every((token) =>
-          token === "SET status = 'PUBLISHED', published_at = $1"
-            ? mfaPublicationSource.includes(token)
-            : mfaEventSource.includes(token)
-        ) ||
+        !requiredTimestampSemanticTokens.every((token) => {
+          if (token === "SET status = 'PUBLISHED', published_at = $1") {
+            return mfaPublicationSource.includes(token)
+          }
+          if (token === 'new Date(event.publishedAt)') {
+            return mfaAuditOutboxPostgresSource.includes(token)
+          }
+          return mfaEventSource.includes(token)
+        }) ||
         !(await fileExists('scripts/auth-007-mfa-audit-evidence.test.mjs')) ||
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-events.test.ts')) ||
         !(await fileExists('workers/W02-identity/src/neon/mfa-audit-publication-journal-publisher-postgres.ts')) ||
