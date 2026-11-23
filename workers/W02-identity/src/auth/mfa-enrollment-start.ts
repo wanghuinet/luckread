@@ -1,9 +1,6 @@
-import { createLuckReadAuth, requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
+import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
 import { buildMfaAuditEvent } from './mfa-audit-events.js'
-import {
-  createD1MfaEnrollmentStartStore,
-  type MfaEnrollmentStartStore,
-} from './mfa-enrollment-start-store.js'
+import type { MfaEnrollmentStartStore } from './mfa-enrollment-start-store.js'
 import { resolveBetterAuthPrincipal, type AuthenticatedPrincipal } from './principal.js'
 
 export type MfaEnrollmentStartHandlerDependencies = {
@@ -97,7 +94,8 @@ export async function handleMfaEnrollmentStartRequest(
     reasonCode: 'USER_INITIATED',
     factorState: 'PENDING_VERIFICATION',
   })
-  const store = dependencies.store ?? createD1MfaEnrollmentStartStore(requireLegacyW02D1Database(env))
+  const store = dependencies.store
+  if (!store) return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'MFA enrollment unavailable' } }, 503)
   let reserved = false
   try {
     reserved = await store.reserve({
