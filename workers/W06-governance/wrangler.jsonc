@@ -32,12 +32,10 @@
       }
     ]
   },
-  "d1_databases": [
+  "hyperdrive": [
     {
-      "binding": "D1_03",
-      "database_name": "secondary",
-      "database_id": "bda1d247-a371-4244-91ae-aef96034db7f",
-      "migrations_dir": "migrations"
+      "binding": "HYPERDRIVE_D1_03",
+      "id": "7c8831416c18494faee04b96aa551cb9"
     }
   ],
   "services": [
