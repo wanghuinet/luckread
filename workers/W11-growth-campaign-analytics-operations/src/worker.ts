@@ -28,61 +28,6 @@ const REQUIRED_SCHEMA_OBJECTS = [
   { type: 'index', name: 'analytics_creator_hourly_creator_time_idx' },
 ] as const
 
-mport { ingestAnalyticsBatchPostgres } from './analytics-ingest-postgres.js'
-import {
-  checkAnalyticsPostgresHealth,
-  readAnalyticsPostgresSchemaObjects,
-  type AnalyticsPostgresPool,
-} from './analytics-postgres-store.js'
-export interface W11PostgresEnv {
-  W11_POSTGRES: AnalyticsPostgresPool
-  W11_ANALYTICS_INGEST_ENABLED?: string
-}
-
-type W11RuntimeEnv = W11PostgresEnv
-
-const REQUIRED_SCHEMA_OBJECTS = [
-  { type: 'table', name: 'analytics_event_dedupe' },
-  { type: 'table', name: 'analytics_content_hourly' },
-  { type: 'table', name: 'analytics_creator_hourly' },
-  { type: 'table', name: 'analytics_rollup_watermark' },
-  { type: 'table', name: 'analytics_reconciliation_status' },
-  { type: 'table', name: 'analytics_projection_rebuild_state' },
-  { type: 'index', name: 'analytics_event_dedupe_ingested_at_idx' },
-  { type: 'index', name: 'analytics_event_dedupe_occurred_at_idx' },
-  { type: 'index', name: 'analytics_event_dedupe_hour_start_idx' },
-  { type: 'index', name: 'analytics_event_dedupe_pending_idx' },
-  { type: 'index', name: 'analytics_content_hourly_content_time_idx' },
-  { type: 'index', name: 'analytics_content_hourly_content_id_time_idx' },
-  { type: 'index', name: 'analytics_content_hourly_time_idx' },
-  { type: 'index', name: 'analytics_creator_hourly_creator_time_idx' },
-] as const
-
-const ANALYTICS_SCHEMA_PROBE = `
-  SELECT type, name, sql
-  FROM sqlite_master
-  WHERE
-    (type = 'table' AND name IN (
-      'analytics_event_dedupe',
-      'analytics_content_hourly',
-      'analytics_creator_hourly',
-      'analytics_rollup_watermark',
-      'analytics_reconciliation_status',
-      'analytics_projection_rebuild_state'
-    ))
-    OR
-    (type = 'index' AND name IN (
-      'analytics_event_dedupe_ingested_at_idx',
-      'analytics_event_dedupe_occurred_at_idx',
-      'analytics_event_dedupe_hour_start_idx',
-      'analytics_event_dedupe_pending_idx',
-      'analytics_content_hourly_content_time_idx',
-      'analytics_content_hourly_content_id_time_idx',
-      'analytics_content_hourly_time_idx',
-      'analytics_creator_hourly_creator_time_idx'
-    ))
-`
-
 const MAX_INGEST_BODY_BYTES = 64 * 1024
 const INTERNAL_CORRELATION_PATTERN = /^[A-Za-z0-9:_-]{8,255}$/
 const EVENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$/
