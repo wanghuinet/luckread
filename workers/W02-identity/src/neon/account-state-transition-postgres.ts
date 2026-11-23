@@ -278,10 +278,12 @@ async function authorizeSelfServiceAction(
   const layerCase = roleLayerPriority.map((_, index) => 'WHEN $' + (index * 2 + 3) + ' THEN $' + (index * 2 + 4)).join(' ')
   const roleLayerBindings = roleLayerPriority.flatMap(([roleId, layer]) => [roleId, layer])
   const assignments = await client.query<{ roleId: string }>(
-    `SELECT DISTINCT role_id AS "roleId" FROM role_assignments
-     WHERE subject_id = $1 AND status = 'ACTIVE' AND valid_from <= $2
-       AND (valid_until IS NULL OR $2 < valid_until)
-       AND scope_type = 'global' AND scope_id IS NULL
+    `SELECT role_id AS "roleId" FROM (
+       SELECT DISTINCT role_id FROM role_assignments
+       WHERE subject_id = $1 AND status = 'ACTIVE' AND valid_from <= $2
+         AND (valid_until IS NULL OR $2 < valid_until)
+         AND scope_type = 'global' AND scope_id IS NULL
+     ) AS effective_global_roles
      ORDER BY CASE role_id ${layerCase} ELSE -1 END DESC, role_id ASC
      LIMIT 62`,
     [subjectId, now, ...roleLayerBindings],
