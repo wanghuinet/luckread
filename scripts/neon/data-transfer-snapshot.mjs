@@ -5,7 +5,7 @@ import { resolve, relative, sep } from 'node:path';
 
 const sha = (b) => createHash('sha256').update(b).digest('hex');
 const domains = ['D1-01','D1-02','D1-03','D1-04','D1-05'];
-const safeRel = (p) => typeof p === 'string' && p.length > 0 && !p.startsWith('/') && !p.includes('\\\\') && !/^[A-Za-z]:/.test(p) && p.split('/').every(part => part && part !== '.' && part !== '..');
+const safeRel = (p) => typeof p === 'string' && p.length > 0 && !p.startsWith('/') && !p.includes(String.fromCharCode(92)) && !/^[A-Za-z]:/.test(p) && p.split('/').every(part => part && part !== '.' && part !== '..');
 function walk(root, dir=root, out=[]) {
   for (const name of readdirSync(dir).sort()) {
     if (name.startsWith('.')) throw new Error('hidden files/directories are not admitted: '+relative(root,resolve(dir,name)));
