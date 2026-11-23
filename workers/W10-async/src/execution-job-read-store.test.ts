@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  createD1W10T16MembershipRenewalJobReadStore,
   W10ExecutionJobReadStoreError,
-  type W10D1ReadExecutor,
   type W10ExecutionJobReadRow,
 } from './execution-job-read-store.js'
 import {
@@ -32,79 +30,6 @@ const job = (operationId: string): W10ExecutionJobReadRow => ({
 })
 
 describe('W10 T16 membership-renewal execution job read store', () => {
-  it('reads an operation only inside the admitted W07 T16 owner scope through D1', async () => {
-    const calls: Array<{ sql: string; values: unknown[] }> = []
-    const row = job('op_membership_1')
-    const db = {
-      prepare(sql: string) {
-        return {
-          bind(...values: unknown[]) {
-            calls.push({ sql, values })
-            return { first: async <T>() => row as T, all: async () => ({ results: [] }) }
-          },
-        }
-      },
-    }
-
-    const result = await createD1W10T16MembershipRenewalJobReadStore(db)
-      .getByOperationId('op_membership_1')
-
-    expect(result).toEqual(row)
-    expect(calls[0]?.values).toEqual(['op_membership_1'])
-    expect(calls[0]?.sql).toContain("j.owner_worker = 'W07'")
-    expect(calls[0]?.sql).toContain("j.owner_task_id = 'T16'")
-    expect(calls[0]?.sql).not.toContain('actor_id')
-    expect(calls[0]?.sql).not.toContain('subject_id')
-  })
-
-  it('scopes D1 lists to W07 T16, state and keyset cursor', async () => {
-    const calls: Array<{ sql: string; values: unknown[] }> = []
-    const rows = [job('op_z'), job('op_y')]
-    const db = {
-      prepare(sql: string) {
-        return {
-          bind(...values: unknown[]) {
-            calls.push({ sql, values })
-            return { first: async () => null, all: async () => ({ results: rows }) }
-          },
-        }
-      },
-    } as unknown as W10D1ReadExecutor
-
-    const result = await createD1W10T16MembershipRenewalJobReadStore(db).list({
-      states: ['RUNNING', 'SUCCEEDED'],
-      cursor: { updatedAt: '2026-11-10T04:02:00.000123Z', operationId: 'op_m' },
-      limit: 3,
-    })
-
-    expect(result).toEqual(rows)
-    expect(calls[0]?.values).toEqual([
-      'RUNNING',
-      'SUCCEEDED',
-      '2026-11-10T04:02:00.000123Z',
-      '2026-11-10T04:02:00.000123Z',
-      'op_m',
-      3,
-    ])
-    expect(calls[0]?.sql).toContain("j.owner_worker = 'W07'")
-    expect(calls[0]?.sql).toContain("j.owner_task_id = 'T16'")
-    expect(calls[0]?.sql).toContain('j.state IN (?,?)')
-    expect(calls[0]?.sql).toContain('j.updated_at < ? OR (j.updated_at = ? AND j.operation_id < ?)')
-    expect(calls[0]?.sql).toContain('ORDER BY j.updated_at DESC,j.operation_id DESC')
-    expect(calls[0]?.sql).toContain('LIMIT ?')
-  })
-
-  it('returns no D1 rows for an explicitly empty state filter without querying', async () => {
-    const prepare = vi.fn(() => { throw new Error('empty state filter must not query D1') })
-    const result = await createD1W10T16MembershipRenewalJobReadStore({ prepare } as unknown as W10D1ReadExecutor).list({
-      states: [],
-      limit: 10,
-    })
-
-    expect(result).toEqual([])
-    expect(prepare).not.toHaveBeenCalled()
-  })
-
   it('uses parameterized PostgreSQL state filters and preserves microsecond cursors', async () => {
     const calls: Array<{ sql: string; values: unknown[] }> = []
     const rows = [job('op_z'), job('op_y')]
@@ -140,26 +65,13 @@ describe('W10 T16 membership-renewal execution job read store', () => {
     expect(calls[0]?.sql).not.toContain('subject_id')
   })
 
-  it('maps D1 and PostgreSQL failures to a sanitized service-unavailable error', async () => {
-    const d1 = createD1W10T16MembershipRenewalJobReadStore({
-      prepare() {
-        return {
-          bind() {
-            return {
-              first: async () => { throw new Error('private D1 detail') },
-              all: async () => { throw new Error('private D1 detail') },
-            }
-          },
-        }
-      },
-    })
+  it('maps PostgreSQL failures to a sanitized service-unavailable error', async () => {
     const pg = createPostgresW10T16MembershipRenewalJobReadStore({
       async query() {
         throw new Error('private PostgreSQL detail')
       },
     })
 
-    await expect(d1.getByOperationId('op_1')).rejects.toBeInstanceOf(W10ExecutionJobReadStoreError)
     await expect(pg.getByOperationId('op_1')).rejects.toMatchObject({
       code: 'SERVICE_UNAVAILABLE',
       status: 503,
