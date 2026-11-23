@@ -337,7 +337,7 @@ const w02Package = JSON.parse(read('workers/W02-identity/package.json'))
 const packageState = {
   payloadVersion: w01Package.dependencies?.payload ?? null,
   payloadD1AdapterInstalled: Boolean(w01Package.dependencies?.['@payloadcms/db-d1-sqlite']),
-  payloadPostgresAdapterInstalled: Boolean(w01Package.dependencies?.['@payloadcms/db-postgres']),
+  payloadPostgresAdapterInstalled: Boolean(w01Package.dependencies?.['@payloadcms/db-postgres'] ?? w01Package.devDependencies?.['@payloadcms/db-postgres']),
   betterAuthVersion: w02Package.dependencies?.['better-auth'] ?? null,
   betterAuthPgDriverInstalled: Boolean(w02Package.dependencies?.pg),
 }
