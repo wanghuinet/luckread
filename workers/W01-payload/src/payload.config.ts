@@ -1,10 +1,8 @@
 import fs from 'fs'
 import path from 'path'
-import { sqliteD1Adapter } from '@payloadcms/db-d1-sqlite'
 import { lexicalEditor, UploadFeature } from '@payloadcms/richtext-lexical'
 import { redirectsPlugin } from '@payloadcms/plugin-redirects'
 import { buildConfig } from 'payload'
-import type { Payload } from 'payload'
 import { fileURLToPath } from 'url'
 import { CloudflareContext, getCloudflareContext } from '@opennextjs/cloudflare'
 import { GetPlatformProxyOptions } from 'wrangler'
@@ -15,10 +13,7 @@ import { Media } from './collections/Media'
 import { payloadAdminOnly } from './auth/payload-admin-access'
 import { createPublicMediaUrl } from './media/public-media-url'
 import { createW01NeonPostgresAdapter } from './neon-postgres-adapter'
-import {
-  resolveW01PayloadDatabaseDriver,
-  type W01PayloadDatabaseEnvironment,
-} from './payload-database-driver'
+import { resolveW01PayloadDatabaseDriver } from './payload-database-driver'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -57,19 +52,12 @@ const cloudflare = isWorkerRuntime
   ? await getCloudflareContext({ async: true })
   : await getCloudflareContextFromWrangler()
 
-// The Neon-only production Wrangler config explicitly selects PostgreSQL.
-// The legacy D1 adapter is available only when a local/test config provides
-// an actual D1 binding; a D1-free config cannot silently fall back to SQLite.
+// W01 uses Neon PostgreSQL in every environment. A missing or invalid
+// Hyperdrive binding fails closed; there is no D1/SQLite fallback.
 const databaseSelection = resolveW01PayloadDatabaseDriver(
-  cloudflare.env as unknown as W01PayloadDatabaseEnvironment,
+  cloudflare.env as Parameters<typeof resolveW01PayloadDatabaseDriver>[0],
 )
-const databaseAdapter = databaseSelection.kind === 'neon'
-  ? createW01NeonPostgresAdapter(databaseSelection.connectionString)
-  : sqliteD1Adapter({
-      binding: cloudflare.env.D1,
-      push: false,
-      migrationDir: path.resolve(dirname, 'migrations'),
-    })
+const databaseAdapter = createW01NeonPostgresAdapter(databaseSelection.connectionString)
 
 export default buildConfig({
   admin: {
@@ -91,18 +79,6 @@ export default buildConfig({
   },
   db: databaseAdapter,
   logger: isProduction ? cloudflareLogger : undefined,
-  onInit: async (payload: Payload) => {
-    if (
-      databaseSelection.kind !== 'd1' ||
-      payload.db.packageName !== '@payloadcms/db-d1-sqlite'
-    ) return
-    const updateOne = payload.db.updateOne.bind(payload.db)
-    payload.db.upsert = (args) =>
-      updateOne({
-        ...args,
-        options: { upsert: true },
-      })
-  },
   plugins: [
     redirectsPlugin({
       collections: ['users'],

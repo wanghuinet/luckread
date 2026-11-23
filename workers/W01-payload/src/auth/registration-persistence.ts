@@ -42,22 +42,6 @@ export interface RegistrationPersistenceStore {
   completeRegistration(input: RegistrationCompletion): Promise<string | null>
 }
 
-type D1PreparedStatement = {
-  bind(...values: unknown[]): D1PreparedStatement
-  first<T = Record<string, unknown>>(): Promise<T | null>
-  run(): Promise<D1Result>
-}
-type D1Session = {
-  prepare(query: string): D1PreparedStatement
-}
-type D1Binding = {
-  prepare(query: string): D1PreparedStatement
-  batch(statements: D1PreparedStatement[]): Promise<D1Result[]>
-  withSession(consistency: 'first-primary'): D1Session
-}
-type D1Result = { meta?: { changes?: number }; results?: Array<Record<string, unknown>> }
-type D1Statement = ReturnType<D1Binding['prepare']>
-
 const REGISTRATION_SCOPE = 'ACCOUNT_REGISTRATION'
 const REGISTRATION_ENDPOINT = 'authRegister'
 
@@ -101,124 +85,6 @@ function getPool(binding: object, connectionString: string): Pool {
   })
   pools.set(binding, pool)
   return pool
-}
-
-const d1ExistingEnvelope = async (
-  db: D1Binding,
-  idempotencyKey: string,
-): Promise<RegistrationEnvelope | null> => db
-  .prepare(
-    `SELECT
-       id,
-       payload_hash AS payloadHash,
-       state,
-       committed_response AS committedResponse,
-       expires_at AS expiresAt
-     FROM auth_registration_envelopes
-     WHERE idempotency_key = ?
-       AND scope = ?
-       AND endpoint = ?
-     ORDER BY created_at DESC
-     LIMIT 1`,
-  )
-  .bind(idempotencyKey, REGISTRATION_SCOPE, REGISTRATION_ENDPOINT)
-  .first<RegistrationEnvelope>()
-
-function createD1RegistrationPersistenceStore(db: D1Binding): RegistrationPersistenceStore {
-  return {
-    getExistingEnvelope: (key) => d1ExistingEnvelope(db, key),
-
-    async reserveEnvelope(input) {
-      const statements: D1Statement[] = []
-      if (input.existing && Date.parse(input.existing.expiresAt) <= Date.parse(input.now)) {
-        statements.push(
-          db.prepare(
-            `DELETE FROM auth_registration_envelopes
-             WHERE id = ? AND active_key = ? AND expires_at <= ?`,
-          ).bind(input.existing.id, input.idempotencyKey, input.now),
-        )
-      }
-      statements.push(
-        db.prepare(
-          `INSERT INTO auth_registration_envelopes (
-            id, idempotency_key, active_key, scope, endpoint, payload_hash,
-            state, response_digest, committed_response, expires_at,
-            consent_record_id, updated_at, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, 'IN_PROGRESS', ?, NULL, ?, ?, ?, ?)`,
-        ).bind(
-          input.reservationId,
-          input.idempotencyKey,
-          input.idempotencyKey,
-          REGISTRATION_SCOPE,
-          REGISTRATION_ENDPOINT,
-          input.payloadHash,
-          input.responseDigest,
-          input.expiresAt,
-          input.consentRecordId,
-          input.now,
-          input.now,
-        ),
-      )
-      const results = await db.batch(statements) as D1Result[]
-      const insertIndex = statements.length - 1
-      if (
-        results.length !== statements.length ||
-        (input.existing &&
-          Date.parse(input.existing.expiresAt) <= Date.parse(input.now) &&
-          results[0]?.meta?.changes !== 1) ||
-        results[insertIndex]?.meta?.changes !== 1
-      ) {
-        throw new Error('AUTH001_IDEMPOTENCY_RESERVATION_INCOMPLETE')
-      }
-    },
-
-    async releaseReservation(reservationId) {
-      await db.prepare(
-        `DELETE FROM auth_registration_envelopes
-         WHERE id = ? AND state = 'IN_PROGRESS'`,
-      ).bind(reservationId).run()
-    },
-
-    async completeRegistration(input) {
-      const statements = [
-        db.prepare(
-          `INSERT INTO consents (
-            id, actor_subject_id, owner_subject_id, resource_id, resource_type,
-            purpose, state, policy_version, legal_basis, retention_class,
-            retention_until, source_authority
-          ) VALUES (?, ?, ?, ?, 'User', 'ACCOUNT_REGISTRATION', 'GRANTED',
-            ?, 'CONSENT', 'LEGAL_AUDIT', ?, ?)`,
-        ).bind(
-          input.consentRecordId,
-          input.userId,
-          input.userId,
-          input.userId,
-          input.policyVersion,
-          input.retentionUntil,
-          input.sourceAuthority,
-        ),
-        db.prepare(
-          `UPDATE auth_registration_envelopes
-           SET state = 'COMPLETED', committed_response = ?, updated_at = ?
-           WHERE id = ? AND state = 'IN_PROGRESS'`,
-        ).bind(input.committedResponse, input.now, input.reservationId),
-        db.prepare(
-          `SELECT committed_response FROM auth_registration_envelopes
-           WHERE id = ? LIMIT 1`,
-        ).bind(input.reservationId),
-      ]
-      const results = await db.batch(statements) as D1Result[]
-      if (
-        results.length !== statements.length ||
-        results[0]?.meta?.changes !== 1 ||
-        results[1]?.meta?.changes !== 1
-      ) {
-        throw new Error('AUTH001_COMMIT_BATCH_INCOMPLETE')
-      }
-      const row = results[2]?.results?.[0] as { committed_response?: unknown } | undefined
-      return typeof row?.committed_response === 'string' ? row.committed_response : null
-    },
-  }
 }
 
 async function inTransaction<T>(client: PoolClient, operation: () => Promise<T>): Promise<T> {
@@ -345,14 +211,9 @@ function createPostgresRegistrationPersistenceStore(pool: Pool): RegistrationPer
 }
 
 export function getW01RegistrationPersistenceStore(
-  env: W01PayloadDatabaseEnvironment & { D1?: D1Binding },
+  env: W01PayloadDatabaseEnvironment,
 ): RegistrationPersistenceStore {
   const selection = resolveW01PayloadDatabaseDriver(env)
-  if (selection.kind === 'd1') {
-    if (!env.D1) throw new Error('W01_D1_BINDING_REQUIRED')
-    return createD1RegistrationPersistenceStore(env.D1)
-  }
-
   const binding = env.HYPERDRIVE
   if (!binding || typeof binding !== 'object') {
     throw new Error('W01_NEON_HYPERDRIVE_BINDING_MISSING')
