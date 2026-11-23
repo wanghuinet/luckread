@@ -202,14 +202,15 @@ export async function transitionRenewalCycleToPaymentReadyPostgres(
   pool: W07WebhookPostgresPool,
   cycle: RenewalCycleRow,
   updatedAt: string,
-): Promise<RenewalCycleRow> {
+): Promise<RenewalCycleRow | null> {
   try {
-    await pool.query(
+    const result = await pool.query<{ cycle_id: string } & Record<string, unknown>>(
       "UPDATE subscription_renewal_cycles SET state = 'PAYMENT_READY', outcome_code = NULL, " +
       'version = version + 1, updated_at = $1::timestamptz WHERE cycle_id = $2 AND version = $3 AND state = $4 ' +
       'AND order_id IS NOT NULL AND payment_id IS NOT NULL RETURNING cycle_id',
       [updatedAt, cycle.cycle_id, cycle.version, cycle.state],
     )
+    if (result.rows.length !== 1) return null
     const latest = await readRenewalCycleByIdPostgres(pool, cycle.cycle_id)
     if (!latest) return failUnavailable()
     return latest
