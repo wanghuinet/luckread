@@ -1126,8 +1126,13 @@ export async function processSubscriptionRenewalCycle(
 
   if (cycle.state === 'PAYMENT_READY' || cycle.state === 'SUBMITTING') {
     if (!(await isExactMandateActiveFromStore(cycleStore, cycle))) {
-      cycle = await writeCycleReconciliation(cycleStore, cycle, 'MANDATE_NOT_ACTIVE_AT_SUBMISSION', now);
-      return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
+      await finishRenewalSubmissionLeasePostgres(cycleStore, cycleId, cycle.lease_token!, now,
+        strictlyAfter(now, cycle.updated_at), {
+          state: 'RECONCILIATION_REQUIRED', providerResponseStatus: null,
+          outcomeCode: 'MANDATE_NOT_ACTIVE_AT_SUBMISSION',
+        });
+      const latest = await readCycleById(cycleStore, cycleId);
+      return { cycleId, state: latest.state, action: 'RECONCILIATION_REQUIRED' };
     }
     let leased: RenewalCycleRow | null;
     try {
@@ -1153,26 +1158,43 @@ export async function processSubscriptionRenewalCycle(
     if (!payment || payment.merchant_id !== cycle.merchant_id || payment.provider !== PROVIDER ||
         payment.order_id !== cycle.order_id || payment.amount_minor !== cycle.amount_minor ||
         payment.currency !== cycle.currency) {
-      cycle = await writeCycleReconciliation(cycleStore, cycle, 'PAYMENT_ATTEMPT_BINDING_MISMATCH', now);
-      return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
+      await finishRenewalSubmissionLeasePostgres(cycleStore, cycleId, cycle.lease_token!, now,
+        strictlyAfter(now, cycle.updated_at), {
+          state: 'RECONCILIATION_REQUIRED', providerResponseStatus: null,
+          outcomeCode: 'PAYMENT_ATTEMPT_BINDING_MISMATCH',
+        });
+      const latest = await readCycleById(cycleStore, cycleId);
+      return { cycleId, state: latest.state, action: 'RECONCILIATION_REQUIRED' };
     }
 
     if (payment.status !== 'INITIATING') {
       if (['failed', 'cancelled', 'expired', 'cancelled_post_capture'].includes(payment.status)) {
-        cycle = await writeCycleReconciliation(cycleStore, cycle, 'PAYMENT_ALREADY_TERMINAL_WITHOUT_CYCLE_RESULT', now);
-        return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
+        await finishRenewalSubmissionLeasePostgres(cycleStore, cycleId, cycle.lease_token!, now,
+          strictlyAfter(now, cycle.updated_at), {
+            state: 'RECONCILIATION_REQUIRED', providerResponseStatus: null,
+            outcomeCode: 'PAYMENT_ALREADY_TERMINAL_WITHOUT_CYCLE_RESULT',
+          });
+        const latest = await readCycleById(cycleStore, cycleId);
+        return { cycleId, state: latest.state, action: 'RECONCILIATION_REQUIRED' };
       }
       now = nowIso(nowFn);
-      cycle = await updateCycle(cycleStore, cycle, now,
-        "state = 'SUBMITTED', provider_response_status = 'processing', outcome_code = 'RECOVERED_SUBMISSION_RESPONSE_UNKNOWN', lease_token = NULL, lease_expires_at = NULL",
-        [],
-      );
-      return { cycleId, state: cycle.state, action: 'SUBMITTED', ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
+      const finished = await finishRenewalSubmissionLeasePostgres(cycleStore, cycleId, cycle.lease_token!, now,
+        strictlyAfter(now, cycle.updated_at), {
+          state: 'SUBMITTED', providerResponseStatus: 'processing',
+          outcomeCode: 'RECOVERED_SUBMISSION_RESPONSE_UNKNOWN',
+        });
+      const latest = await readCycleById(cycleStore, cycleId);
+      return { cycleId, state: latest.state, action: finished ? 'SUBMITTED' : 'SUBMISSION_IN_PROGRESS', ...(latest.payment_id ? { paymentId: latest.payment_id } : {}) };
     }
 
     if (!(await isSubscriptionChargeableForCycle(membershipStore, cycle))) {
-      cycle = await writeCycleReconciliation(cycleStore, cycle, 'SUBSCRIPTION_NOT_CHARGEABLE_AT_SUBMISSION', now);
-      return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
+      await finishRenewalSubmissionLeasePostgres(cycleStore, cycleId, cycle.lease_token!, now,
+        strictlyAfter(now, cycle.updated_at), {
+          state: 'RECONCILIATION_REQUIRED', providerResponseStatus: null,
+          outcomeCode: 'SUBSCRIPTION_NOT_CHARGEABLE_AT_SUBMISSION',
+        });
+      const latest = await readCycleById(cycleStore, cycleId);
+      return { cycleId, state: latest.state, action: 'RECONCILIATION_REQUIRED' };
     }
 
     // Revalidate ownership immediately before the external side effect. A worker
