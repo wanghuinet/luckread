@@ -158,12 +158,6 @@ describe('W02 MFA enrollment confirmation authority', () => {
     const h = makeHarness()
     h.store.persistConfirmation = vi.fn(async () => {
       // The database committed, but the adapter did not receive its commit response.
-      Object.assign(h.state(), {
-        userEnabled: true,
-        confirmationKeyHash: keyHash,
-        confirmationRequestHash: requestHash,
-        factorVerified: true,
-      })
       throw new Error('commit response lost')
     })
     // Model the committed row through the Store read-back contract.
