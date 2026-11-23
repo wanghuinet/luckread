@@ -6,6 +6,7 @@ import {
 
 interface W11NeonEnv {
   W11_DATABASE_DRIVER?: string
+  W11_ANALYTICS_INGEST_ENABLED?: string
   HYPERDRIVE_ANALYTICS_PG?: W11AnalyticsHyperdriveBinding
 }
 
@@ -33,7 +34,10 @@ const entry = {
       const pool = getW11AnalyticsPostgresPool(
         env.HYPERDRIVE_ANALYTICS_PG as W11AnalyticsHyperdriveBinding,
       )
-      return worker.fetch(request, { W11_POSTGRES: pool } satisfies W11PostgresEnv)
+      return worker.fetch(request, {
+        W11_POSTGRES: pool,
+        W11_ANALYTICS_INGEST_ENABLED: env.W11_ANALYTICS_INGEST_ENABLED,
+      } satisfies W11PostgresEnv)
     } catch {
       return new Response(JSON.stringify({
         worker: 'W11',

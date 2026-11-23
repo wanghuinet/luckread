@@ -35,6 +35,7 @@ function environment(
     })),
 ): W11Env {
   return {
+    W11_ANALYTICS_INGEST_ENABLED: 'true',
     D1_05: {
       prepare: vi.fn((query: string) => {
         const statement: HealthStatement = {
@@ -129,6 +130,26 @@ describe('W11 runtime boundary', () => {
     const env = environment(async () => ({ ok: 1 }), async () => ({ results: legacySchemaRows }))
     const response = await worker.fetch(new Request('https://w11.internal/readyz'), env)
     expect(response.status).toBe(503)
+  })
+
+  it('blocks telemetry persistence until W11 ingestion is explicitly admitted', async () => {
+    const env = environment(async () => ({ ok: 1 }))
+    env.W11_ANALYTICS_INGEST_ENABLED = 'false'
+    const response = await worker.fetch(
+      new Request('https://w11.internal/internal/analytics/events', {
+        method: 'POST',
+        headers: trustedHeaders,
+        body: JSON.stringify({ events: [event()] }),
+      }),
+      env,
+    )
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'ANALYTICS_INGEST_NOT_ADMITTED' },
+    })
+    expect(env.D1_05.prepare).not.toHaveBeenCalled()
+    expect(env.D1_05.batch).not.toHaveBeenCalled()
   })
 
   it('accepts a bounded W01 content telemetry batch, derives actor fields, and persists aggregate counts only', async () => {

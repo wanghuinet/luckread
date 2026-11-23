@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
       { status: 200, headers: { 'content-type': 'application/json' } },
     ),
   ),
+  analyticsIngestEnabled: 'true' as string,
   enforceLimit: vi.fn(async (_request: Request) => undefined),
   resolvePrincipal: vi.fn(async (_request: Request) =>
     null as null | { userId: string; layer: string | null; verified?: boolean } | Response,
@@ -22,7 +23,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@opennextjs/cloudflare', () => ({
   getCloudflareContext: vi.fn(async () => ({
-    env: { W11_ANALYTICS: { fetch: mocks.w11Fetch } },
+    env: {
+      W11_ANALYTICS: { fetch: mocks.w11Fetch },
+      W11_ANALYTICS_INGEST_ENABLED: mocks.analyticsIngestEnabled,
+    },
   })),
 }))
 
@@ -68,6 +72,7 @@ const requestFor = (events: unknown[], extraHeaders: Record<string, string> = {}
   })
 
 beforeEach(() => {
+  mocks.analyticsIngestEnabled = 'true'
   mocks.w11Fetch.mockClear()
   mocks.enforceLimit.mockReset()
   mocks.enforceLimit.mockResolvedValue(undefined)
@@ -109,6 +114,19 @@ describe('W01 analytics event route integration', () => {
     expect(await forwarded.clone().json()).toEqual({ events: [validEvent()] })
   })
 
+  it('fails closed without forwarding telemetry until W11 ingestion is explicitly admitted', async () => {
+    mocks.analyticsIngestEnabled = 'false'
+    const response = await POST(requestFor([validEvent()]))
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'ANALYTICS_INGEST_NOT_ADMITTED' },
+    })
+    expect(mocks.enforceLimit).toHaveBeenCalledTimes(1)
+    expect(mocks.resolvePrincipal).toHaveBeenCalledTimes(1)
+    expect(mocks.w11Fetch).not.toHaveBeenCalled()
+  })
+
   it('runs the allowed route through the real W11 handler without persisting user or session identity', async () => {
     const persistedBindings: (string | number | null)[][] = []
     const database = {
@@ -128,7 +146,10 @@ describe('W01 analytics event route integration', () => {
         })),
       ),
     } as unknown as W11Env['D1_05']
-    const env: W11Env = { D1_05: database }
+    const env: W11Env = {
+      D1_05: database,
+      W11_ANALYTICS_INGEST_ENABLED: 'true',
+    }
 
     mocks.resolvePrincipal.mockResolvedValue({
       userId: 'user_test_01',
@@ -261,6 +282,7 @@ describe('W01 to W11 analytics event ingress contract', () => {
     const route = read('src/app/api/v1/analytics/events/route.ts')
     const client = read('src/analytics/w11-analytics-client.ts')
     const bindings = read('wrangler.jsonc')
+    const productionBindings = read('wrangler.neon.jsonc')
     const w11 = read('../W11-growth-campaign-analytics-operations/src/worker.ts')
     const w11Config = read('../W11-growth-campaign-analytics-operations/wrangler.jsonc')
     const transport = JSON.parse(read('../../contracts/transport/W01-W11-analytics-event-ingress.v1.json'))
@@ -272,6 +294,9 @@ describe('W01 to W11 analytics event ingress contract', () => {
     expect(client).toContain("'X-LuckRead-Caller': 'W01'")
     expect(client).toContain("'X-LuckRead-Transport-Version': '1.0'")
     expect(client).toContain('W11_ANALYTICS')
+    expect(client).toContain('W11_ANALYTICS_INGEST_ENABLED')
+    expect(bindings).toContain('"W11_ANALYTICS_INGEST_ENABLED": "false"')
+    expect(productionBindings).toContain('"W11_ANALYTICS_INGEST_ENABLED": "false"')
     expect(client).not.toContain("headers.set('Authorization'")
     expect(bindings).toContain('"binding": "W11_ANALYTICS"')
     expect(w11).toContain("url.pathname === '/internal/analytics/events'")

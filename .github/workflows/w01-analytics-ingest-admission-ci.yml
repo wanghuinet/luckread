@@ -1,0 +1,41 @@
+name: W01 Analytics Ingress Admission CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'workers/W01-payload/src/analytics/w11-analytics-client.ts'
+      - 'workers/W01-payload/tests/int/analytics-events-adapter.int.spec.ts'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/W01-payload/wrangler.neon.jsonc'
+      - '.github/workflows/w01-analytics-ingest-admission-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  analytics-ingress-admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
+      - name: Install locked W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Run W01 analytics ingress admission regression tests
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run --config ./vitest.config.mts tests/int/analytics-events-adapter.int.spec.ts
