@@ -54,6 +54,7 @@ const users = {
   stale: 'auth013-stale-' + suffix,
   approval: 'auth013-approval-' + suffix,
   self: 'auth013-self-' + suffix,
+  selfReactivation: 'auth013-self-reactivation-' + suffix,
   concurrent: 'auth013-concurrent-' + suffix,
   rollback: 'auth013-rollback-' + suffix,
   deniedInactiveActor: 'auth013-denied-inactive-' + suffix,
@@ -78,6 +79,8 @@ const checks: Record<string, boolean> = {
   moderatorCanRestoreLimitedRestriction: false,
   inactiveModeratorIsDenied: false,
   selfModerationIsDenied: false,
+  selfServiceDeletionRequestIsOwnedAndJournaled: false,
+  selfReactivationPreconditionFailsClosed: false,
   missingRoleAndMissingMfaFailClosed: false,
   invalidTransitionAndStaleVersionDoNotWrite: false,
   approvalRequiredBanFailsClosed: false,
@@ -142,7 +145,7 @@ const expectCode = async (
 const transition = (
   subjectId: string,
   targetUserId: string,
-  to: 'ACTIVE' | 'RESTRICTED' | 'FROZEN' | 'SUSPENDED' | 'BANNED',
+  to: 'ACTIVE' | 'RESTRICTED' | 'FROZEN' | 'SUSPENDED' | 'BANNED' | 'DELETION_REQUESTED' | 'REACTIVATED',
   expectedVersion = 1,
 ) => accountStateStore.transition({
   subjectId,
@@ -195,6 +198,7 @@ try {
   await insertUser(users.stale, { version: 2 })
   await insertUser(users.approval)
   await insertUser(users.self)
+  await insertUser(users.selfReactivation, { state: 'DELETED' })
   await insertUser(users.concurrent)
   await insertUser(users.rollback)
   await insertUser(users.deniedInactiveActor)
@@ -287,6 +291,40 @@ try {
   await expectCode('FORBIDDEN', () => transition(users.admin, users.admin, 'RESTRICTED'))
   checks.selfModerationIsDenied = true
 
+  // A user may request deletion for their own ACTIVE account. The state change
+  // and AUTH-013 journal intent are committed together and attributed to the user.
+  const selfDeletion = await transition(users.self, users.self, 'DELETION_REQUESTED')
+  assert.equal(selfDeletion.from, 'ACTIVE')
+  assert.equal(selfDeletion.to, 'DELETION_REQUESTED')
+  assert.equal(selfDeletion.accountStateVersion, 2)
+  const selfJournal = await pool.query<{ payload: Record<string, unknown> | string }>(
+    'SELECT payload FROM auth_013_publication_journal WHERE resource_id = $1 ' +
+      "AND event_type = 'identity.account_state_changed' ORDER BY created_at DESC LIMIT 1",
+    [users.self],
+  )
+  const selfPayload = selfJournal.rows[0]?.payload
+  const selfEvent = typeof selfPayload === 'string'
+    ? JSON.parse(selfPayload) as Record<string, unknown>
+    : selfPayload
+  assert.deepEqual(selfEvent?.actor, { actorId: users.self, actorType: 'user' })
+  assert.equal(await countJournal(users.self), 1)
+
+  // The same user cannot submit a self-service command against another account.
+  await expectCode('FORBIDDEN', () => transition(users.self, users.restricted, 'DELETION_REQUESTED', 3))
+  assert.deepEqual(await readAccount(users.restricted), { accountState: 'ACTIVE', accountStateVersion: 3 })
+  assert.equal(await countJournal(users.restricted), 2)
+  checks.selfServiceDeletionRequestIsOwnedAndJournaled = true
+
+  // A state-machine lifecycle precondition is not trusted from an internal
+  // caller. Reactivation remains on its dedicated W02 path until its window is
+  // authoritatively proven from persisted lifecycle facts.
+  await expectCode('PRECONDITION_FAILED', () =>
+    transition(users.selfReactivation, users.selfReactivation, 'REACTIVATED'),
+  )
+  assert.deepEqual(await readAccount(users.selfReactivation), { accountState: 'DELETED', accountStateVersion: 1 })
+  assert.equal(await countJournal(users.selfReactivation), 0)
+  checks.selfReactivationPreconditionFailsClosed = true
+
   // The contract requires external L7 approval for BANNED. A permission grant
   // alone is deliberately insufficient; this adapter does not forge approval.
   await expectCode('FORBIDDEN', () => transition(users.admin, users.approval, 'BANNED'))
@@ -378,7 +416,7 @@ const report = {
   status: failure
     ? 'W02_ACCOUNT_STATE_TRANSITION_POSTGRES_RUNTIME_REHEARSAL_FAILED'
     : 'W02_ACCOUNT_STATE_TRANSITION_POSTGRES_RUNTIME_REHEARSAL_PASS',
-  scope: 'Test-only W02 moderator/admin account-state PostgreSQL adapter on disposable PostgreSQL 18; production Worker and D1 authority are unchanged.',
+  scope: 'Test-only W02 self-service and moderator/admin account-state PostgreSQL adapter on disposable PostgreSQL 18; production Worker and D1 authority are unchanged.',
   postgresMajor: 18,
   database: 'luckread_schema',
   checks,
