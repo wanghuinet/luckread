@@ -1,0 +1,45 @@
+name: Repository SBOM
+
+on:
+  pull_request:
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/pnpm-lock.yaml'
+      - '**/yarn.lock'
+      - 'contracts/dependencies/**'
+      - '.github/workflows/repository-sbom.yml'
+  push:
+    branches: [main]
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/pnpm-lock.yaml'
+      - '**/yarn.lock'
+      - 'contracts/dependencies/**'
+      - '.github/workflows/repository-sbom.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  sbom:
+    name: Generate repository SPDX SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Generate SPDX JSON SBOM with Syft
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: spdx-json
+          output-file: artifacts/sbom/luckread.spdx.json
+          artifact-name: luckread-sbom-${{ github.sha }}
+          upload-artifact: true
+          upload-release-assets: false
+          dependency-snapshot: false
