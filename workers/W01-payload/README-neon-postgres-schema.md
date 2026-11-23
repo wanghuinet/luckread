@@ -4,7 +4,7 @@ W01's active Payload runtime uses the official `@payloadcms/db-postgres@3.90.2` 
 
 - `src/payload.config.ts` selects the Neon PostgreSQL adapter in the Worker runtime.
 - `src/neon-postgres-adapter.ts` uses the official Payload PostgreSQL adapter, `push: false`, and `src/neon-postgres-migrations`.
-- `@payloadcms/db-postgres` is a runtime dependency, not a development-only dependency.
+- The official `@payloadcms/db-postgres` adapter remains in the W01 dependency graph; this cleanup leaves its existing dependency classification unchanged.
 - R2 remains the media/object store through Payload's official R2 storage integration.
 - The existing `Users` and `Media` Collections and supported Payload plugin extension points remain unchanged.
 
