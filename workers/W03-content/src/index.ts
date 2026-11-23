@@ -7,11 +7,6 @@ import {
   createRequestId,
   deleteContent,
   getContent,
-  getPublishedContentAuthorContext,
-  getOwnedPostContext,
-  getPublishedOwnerPostContext,
-  getPublishedContentSocialContext,
-  getPublishedContentSocialContexts,
   resolvePublishedMediaReferenceAccess,
   listContents,
   searchPublishedContents,
@@ -36,7 +31,6 @@ import {
   publishAuthorizedScheduledContents,
   updateContent,
   type ContentState,
-  type ContentD1,
   type PublicContentListReadStore,
 } from './content-runtime.js'
 import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
@@ -106,18 +100,6 @@ interface Env extends W03PublishedMediaReferenceRuntimeEnv {
   CONTENT_PUBLIC_READ_LIMITER?: RateLimitBinding
   CONTENT_MUTATION_LIMITER?: RateLimitBinding
   CONTENT_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
-}
-
-// Compatibility helpers still accept the old ContentD1 interface internally,
-// but production never has a D1 binding. Fail closed with a typed service error
-// rather than allowing undefined.prepare() to turn a missing Neon store into a 500.
-const NO_LEGACY_DATABASE_HANDLE: ContentD1 = {
-  prepare(_query: string) {
-    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
-  },
-  batch(_statements: D1PreparedStatement[]) {
-    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
-  },
 }
 
 const getRateKey = (request: Request): string => {
@@ -491,6 +473,11 @@ export type W03ContentWorkerDependencies = Readonly<{
   ) => ContentContextReadStore | undefined
 }>
 
+const requireStore = <T>(store: T | undefined): T => {
+  if (!store) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return store
+}
+
 export function createW03ContentWorker(dependencies: W03ContentWorkerDependencies = {}) {
   return {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -525,9 +512,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         }
         const contentIds = (body as { contentIds: string[] }).contentIds
         const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
-        const items = contextReadStore
-          ? await contextReadStore.getPublishedContentSocialContexts(contentIds)
-          : await getPublishedContentSocialContexts(NO_LEGACY_DATABASE_HANDLE, contentIds)
+        const items = await requireStore(contextReadStore).getPublishedContentSocialContexts(contentIds)
         return json({ data: { items }, requestId: createRequestId() })
       }
 
@@ -548,9 +533,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         if (url.search !== '') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         const contentId = decodePathSegment(publishedSocialContextMatch[1] ?? '')
         const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
-        const context = contextReadStore
-          ? await contextReadStore.getPublishedContentSocialContext(contentId)
-          : await getPublishedContentSocialContext(NO_LEGACY_DATABASE_HANDLE, contentId)
+        const context = await requireStore(contextReadStore).getPublishedContentSocialContext(contentId)
         return json({ data: context, requestId: createRequestId() })
       }
 
@@ -572,9 +555,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const contentId = decodePathSegment(publicPostContextMatch[1] ?? '')
         const ownerUserId = decodePathSegment(publicPostContextMatch[2] ?? '')
         const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
-        const context = contextReadStore
-          ? await contextReadStore.getPublishedOwnerPostContext(contentId, ownerUserId)
-          : await getPublishedOwnerPostContext(NO_LEGACY_DATABASE_HANDLE, contentId, ownerUserId)
+        const context = await requireStore(contextReadStore).getPublishedOwnerPostContext(contentId, ownerUserId)
         return json({ data: context, requestId: createRequestId() })
       }
 
@@ -599,9 +580,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         }
         const contentId = decodePathSegment(ownedPostContextMatch[1] ?? '')
         const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
-        const context = contextReadStore
-          ? await contextReadStore.getOwnedPostContext(contentId, principal.userId)
-          : await getOwnedPostContext(NO_LEGACY_DATABASE_HANDLE, contentId, principal.userId)
+        const context = await requireStore(contextReadStore).getOwnedPostContext(contentId, principal.userId)
         return json({ data: context, requestId: createRequestId() })
       }
 
@@ -653,14 +632,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         if (body.limit !== undefined && typeof body.limit !== 'number' && typeof body.limit !== 'string') {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
-        const page = await listFollowingOwnerContents(
-          NO_LEGACY_DATABASE_HANDLE,
-          viewerUserId,
-          ownerUserIds as string[],
-          cursor,
-          parseListLimit(body.limit === undefined ? null : String(body.limit)),
-          dependencies.followingOwnerContentsReadStoreProvider?.(env),
-        )
+        const page = await listFollowingOwnerContents(requireStore(dependencies.followingOwnerContentsReadStoreProvider?.(env)), viewerUserId, ownerUserIds as string[], cursor, parseListLimit(body.limit === undefined ? null : String(body.limit)))
         return json({
           data: {
             items: page.items.map((item) => ({
@@ -722,13 +694,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
 
-        const page = await searchPublishedContents(
-          NO_LEGACY_DATABASE_HANDLE,
-          query,
-          cursor,
-          parseListLimit(body.limit === undefined ? null : String(body.limit)),
-          dependencies.publicContentListReadStoreProvider?.(env),
-        )
+        const page = await searchPublishedContents(requireStore(dependencies.publicContentListReadStoreProvider?.(env)), query, cursor, parseListLimit(body.limit === undefined ? null : String(body.limit)))
         return json({
           data: {
             items: page.items.map((item) => ({
@@ -896,11 +862,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         ) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
-        const items = await listPublishedContentsByIds(
-          NO_LEGACY_DATABASE_HANDLE,
-          ids,
-          dependencies.publishedContentsByIdsReadStoreProvider?.(env),
-        )
+        const items = await listPublishedContentsByIds(requireStore(dependencies.publishedContentsByIdsReadStoreProvider?.(env)), ids)
         return json({
           data: {
             items: items.map(item => {
@@ -945,9 +907,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         if (url.search !== '') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         const contentId = decodePathSegment(publicAuthorContextMatch[1] ?? '')
         const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
-        const context = contextReadStore
-          ? await contextReadStore.getPublishedContentAuthorContext(contentId)
-          : await getPublishedContentAuthorContext(NO_LEGACY_DATABASE_HANDLE, contentId)
+        const context = await requireStore(contextReadStore).getPublishedContentAuthorContext(contentId)
         return json({ data: context, requestId: createRequestId() })
       }
 
@@ -957,30 +917,14 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
-        const page = await listCollectionMembers(
-          NO_LEGACY_DATABASE_HANDLE,
-          principal.userId,
-          path.id,
-          cursor,
-          parseListLimit(url.searchParams.get('limit')),
-          dependencies.membersReadStoreProvider?.(env)?.collections,
-        )
+        const page = await listCollectionMembers(requireStore(dependencies.membersReadStoreProvider?.(env)?.collections), principal.userId, path.id, cursor, parseListLimit(url.searchParams.get('limit')))
         return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.collectionMembers && path.id && request.method === 'POST' && !path.collectionMemberContentId) {
         const principal = requiredCreatorPrincipal(request)
         return json({
-          data: await attachCollectionMember(
-            NO_LEGACY_DATABASE_HANDLE,
-            principal.userId,
-            path.id,
-            await parseBody(request),
-            requireIfMatch(request),
-            requireIdempotency(request),
-            new Date(),
-            dependencies.collectionMemberAttachStoreProvider?.(env),
-          ),
+          data: await attachCollectionMember(requireStore(dependencies.collectionMemberAttachStoreProvider?.(env)), principal.userId, path.id, await parseBody(request), requireIfMatch(request), requireIdempotency(request), new Date()),
           schemaVersion: '1.0',
           requestId: createRequestId(),
         }, 201)
@@ -989,16 +933,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
       if (path && path.collectionMembers && path.id && path.collectionMemberContentId && request.method === 'DELETE') {
         const principal = requiredCreatorPrincipal(request)
         return json({
-          data: await removeCollectionMember(
-            NO_LEGACY_DATABASE_HANDLE,
-            principal.userId,
-            path.id,
-            path.collectionMemberContentId,
-            requireIfMatch(request),
-            requireIdempotency(request),
-            new Date(),
-            dependencies.collectionMemberRemoveStoreProvider?.(env),
-          ),
+          data: await removeCollectionMember(requireStore(dependencies.collectionMemberRemoveStoreProvider?.(env)), principal.userId, path.id, path.collectionMemberContentId, requireIfMatch(request), requireIdempotency(request), new Date()),
           schemaVersion: '1.0',
           requestId: createRequestId(),
         })
@@ -1009,17 +944,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const body = await parseBody(request)
         if (!Number.isSafeInteger(body.position)) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         return json({
-          data: await reorderCollectionMember(
-            NO_LEGACY_DATABASE_HANDLE,
-            principal.userId,
-            path.id,
-            path.collectionMemberContentId,
-            Number(body.position),
-            requireIfMatch(request),
-            requireIdempotency(request),
-            new Date(),
-            dependencies.collectionMemberReorderStoreProvider?.(env),
-          ),
+          data: await reorderCollectionMember(requireStore(dependencies.collectionMemberReorderStoreProvider?.(env)), principal.userId, path.id, path.collectionMemberContentId, Number(body.position), requireIfMatch(request), requireIdempotency(request), new Date()),
           schemaVersion: '1.0',
           requestId: createRequestId(),
         })
@@ -1027,14 +952,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
 
       if (path && path.collections && request.method === 'POST' && path.id === undefined) {
         const principal = requiredCreatorPrincipal(request)
-        const collection = await createCollection(
-          NO_LEGACY_DATABASE_HANDLE,
-          principal.userId,
-          await parseBody(request),
-          requireIdempotency(request),
-          new Date(),
-          dependencies.collectionCreateStoreProvider?.(env),
-        )
+        const collection = await createCollection(requireStore(dependencies.collectionCreateStoreProvider?.(env)), principal.userId, await parseBody(request), requireIdempotency(request), new Date())
         return json({ data: collection, schemaVersion: '1.0', requestId: createRequestId() }, 201)
       }
 
@@ -1042,34 +960,19 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
-        const page = await listCreatorCollections(
-          NO_LEGACY_DATABASE_HANDLE,
-          principal.userId,
-          cursor,
-          parseListLimit(url.searchParams.get('limit')),
-          dependencies.collectionListReadStoreProvider?.(env),
-        )
+        const page = await listCreatorCollections(requireStore(dependencies.collectionListReadStoreProvider?.(env)), principal.userId, cursor, parseListLimit(url.searchParams.get('limit')))
         return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.collections && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
-        return json({ data: await getCollection(NO_LEGACY_DATABASE_HANDLE, principal.userId, path.id, dependencies.collectionListReadStoreProvider?.(env)), schemaVersion: '1.0', requestId: createRequestId() })
+        return json({ data: await getCollection(requireStore(dependencies.collectionListReadStoreProvider?.(env)), principal.userId, path.id), schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.collections && path.id && request.method === 'PATCH') {
         const principal = requiredCreatorPrincipal(request)
         return json({
-          data: await updateCollection(
-            NO_LEGACY_DATABASE_HANDLE,
-            principal.userId,
-            path.id,
-            await parseBody(request),
-            requireIfMatch(request),
-            requireIdempotency(request),
-            new Date(),
-            dependencies.collectionUpdateStoreProvider?.(env),
-          ),
+          data: await updateCollection(requireStore(dependencies.collectionUpdateStoreProvider?.(env)), principal.userId, path.id, await parseBody(request), requireIfMatch(request), requireIdempotency(request), new Date()),
           schemaVersion: '1.0',
           requestId: createRequestId(),
         })
@@ -1077,28 +980,13 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
 
       if (path && path.collections && path.id && request.method === 'DELETE') {
         const principal = requiredCreatorPrincipal(request)
-        await deleteCollection(
-          NO_LEGACY_DATABASE_HANDLE,
-          principal.userId,
-          path.id,
-          requireIfMatch(request),
-          requireIdempotency(request),
-          new Date(),
-          dependencies.collectionDeleteStoreProvider?.(env),
-        )
+        await deleteCollection(requireStore(dependencies.collectionDeleteStoreProvider?.(env)), principal.userId, path.id, requireIfMatch(request), requireIdempotency(request), new Date())
         return new Response(null, { status: 204 })
       }
 
       if (path && path.series && request.method === 'POST' && path.id === undefined) {
         const principal = requiredCreatorPrincipal(request)
-        const series = await createSeries(
-          NO_LEGACY_DATABASE_HANDLE,
-          principal.userId,
-          await parseBody(request),
-          requireIdempotency(request),
-          new Date(),
-          dependencies.seriesCreateStoreProvider?.(env),
-        )
+        const series = await createSeries(requireStore(dependencies.seriesCreateStoreProvider?.(env)), principal.userId, await parseBody(request), requireIdempotency(request), new Date())
         return json({ data: series, schemaVersion: '1.0', requestId: createRequestId() }, 201)
       }
 
@@ -1106,30 +994,14 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
-        const page = await listSeriesMembers(
-          NO_LEGACY_DATABASE_HANDLE,
-          principal.userId,
-          path.id,
-          cursor,
-          parseListLimit(url.searchParams.get('limit')),
-          dependencies.membersReadStoreProvider?.(env)?.series,
-        )
+        const page = await listSeriesMembers(requireStore(dependencies.membersReadStoreProvider?.(env)?.series), principal.userId, path.id, cursor, parseListLimit(url.searchParams.get('limit')))
         return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.seriesMembers && path.id && request.method === 'POST' && !path.seriesMemberContentId) {
         const principal = requiredCreatorPrincipal(request)
         return json({
-          data: await attachSeriesMember(
-            NO_LEGACY_DATABASE_HANDLE,
-            principal.userId,
-            path.id,
-            await parseBody(request),
-            requireIfMatch(request),
-            requireIdempotency(request),
-            new Date(),
-            dependencies.seriesMemberAttachStoreProvider?.(env),
-          ),
+          data: await attachSeriesMember(requireStore(dependencies.seriesMemberAttachStoreProvider?.(env)), principal.userId, path.id, await parseBody(request), requireIfMatch(request), requireIdempotency(request), new Date()),
           schemaVersion: '1.0',
           requestId: createRequestId(),
         }, 201)
@@ -1138,16 +1010,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
       if (path && path.seriesMembers && path.id && path.seriesMemberContentId && request.method === 'DELETE') {
         const principal = requiredCreatorPrincipal(request)
         return json({
-          data: await removeSeriesMember(
-            NO_LEGACY_DATABASE_HANDLE,
-            principal.userId,
-            path.id,
-            path.seriesMemberContentId,
-            requireIfMatch(request),
-            requireIdempotency(request),
-            new Date(),
-            dependencies.seriesMemberRemoveStoreProvider?.(env),
-          ),
+          data: await removeSeriesMember(requireStore(dependencies.seriesMemberRemoveStoreProvider?.(env)), principal.userId, path.id, path.seriesMemberContentId, requireIfMatch(request), requireIdempotency(request), new Date()),
           schemaVersion: '1.0',
           requestId: createRequestId(),
         })
@@ -1160,17 +1023,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         return json({
-          data: await reorderSeriesMember(
-            NO_LEGACY_DATABASE_HANDLE,
-            principal.userId,
-            path.id,
-            path.seriesMemberContentId,
-            Number(body.position),
-            requireIfMatch(request),
-            requireIdempotency(request),
-            new Date(),
-            dependencies.seriesMemberReorderStoreProvider?.(env),
-          ),
+          data: await reorderSeriesMember(requireStore(dependencies.seriesMemberReorderStoreProvider?.(env)), principal.userId, path.id, path.seriesMemberContentId, Number(body.position), requireIfMatch(request), requireIdempotency(request), new Date()),
           schemaVersion: '1.0',
           requestId: createRequestId(),
         })
@@ -1180,34 +1033,19 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
-        const page = await listCreatorSeries(
-          NO_LEGACY_DATABASE_HANDLE,
-          principal.userId,
-          cursor,
-          parseListLimit(url.searchParams.get('limit')),
-          dependencies.seriesReadStoreProvider?.(env),
-        )
+        const page = await listCreatorSeries(requireStore(dependencies.seriesReadStoreProvider?.(env)), principal.userId, cursor, parseListLimit(url.searchParams.get('limit')))
         return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.series && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
-        return json({ data: await getSeries(NO_LEGACY_DATABASE_HANDLE, principal.userId, path.id, dependencies.seriesReadStoreProvider?.(env)), schemaVersion: '1.0', requestId: createRequestId() })
+        return json({ data: await getSeries(requireStore(dependencies.seriesReadStoreProvider?.(env)), principal.userId, path.id), schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.series && path.id && request.method === 'PATCH') {
         const principal = requiredCreatorPrincipal(request)
         return json({
-          data: await updateSeries(
-            NO_LEGACY_DATABASE_HANDLE,
-            principal.userId,
-            path.id,
-            await parseBody(request),
-            requireIfMatch(request),
-            requireIdempotency(request),
-            new Date(),
-            dependencies.seriesUpdateStoreProvider?.(env),
-          ),
+          data: await updateSeries(requireStore(dependencies.seriesUpdateStoreProvider?.(env)), principal.userId, path.id, await parseBody(request), requireIfMatch(request), requireIdempotency(request), new Date()),
           schemaVersion: '1.0',
           requestId: createRequestId(),
         })
@@ -1215,15 +1053,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
 
       if (path && path.series && path.id && request.method === 'DELETE') {
         const principal = requiredCreatorPrincipal(request)
-        await deleteSeries(
-          NO_LEGACY_DATABASE_HANDLE,
-          principal.userId,
-          path.id,
-          requireIfMatch(request),
-          requireIdempotency(request),
-          new Date(),
-          dependencies.seriesDeleteStoreProvider?.(env),
-        )
+        await deleteSeries(requireStore(dependencies.seriesDeleteStoreProvider?.(env)), principal.userId, path.id, requireIfMatch(request), requireIdempotency(request), new Date())
         return new Response(null, { status: 204 })
       }
 
@@ -1235,12 +1065,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           // receives the owner-scoped draft visibility mode.
           if (hasSocialPostPermission(principal.layer)) viewerUserId = principal.userId
         }
-        const thread = await listPostThread(
-          NO_LEGACY_DATABASE_HANDLE,
-          path.id,
-          viewerUserId,
-          dependencies.postThreadReadStoreProvider?.(env),
-        )
+        const thread = await listPostThread(requireStore(dependencies.postThreadReadStoreProvider?.(env)), path.id, viewerUserId)
         return json({ data: thread, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
@@ -1248,15 +1073,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const principal = requiredSocialPostPrincipal(request)
         const body = await parseBody(request)
         const nextContentId = typeof body.nextContentId === 'string' ? body.nextContentId.trim() : ''
-        const relationship = await appendPostThreadNext(
-          NO_LEGACY_DATABASE_HANDLE,
-          principal.userId,
-          path.id,
-          nextContentId,
-          requireIdempotency(request),
-          new Date(),
-          dependencies.contentRelationshipMutationStoreProvider?.(env),
-        )
+        const relationship = await appendPostThreadNext(requireStore(dependencies.contentRelationshipMutationStoreProvider?.(env)), principal.userId, path.id, nextContentId, requireIdempotency(request), new Date())
         return json({ data: relationship, schemaVersion: '1.0', requestId: createRequestId() }, 201)
       }
 
@@ -1267,11 +1084,15 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         }
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
-        const relationshipStore = dependencies.contentRelationshipMutationStoreProvider?.(env)
-        if (!relationshipStore?.list) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
         const direction = directionParam as ContentRelationshipDirection
         const limit = parseListLimit(url.searchParams.get('limit'))
-        const page = await relationshipStore.list({ contentId: path.id, direction, cursor, limit })
+        const page = await listContentRelationships(
+          requireStore(dependencies.contentRelationshipMutationStoreProvider?.(env)),
+          path.id,
+          direction,
+          cursor,
+          limit,
+        )
         return json({
           data: {
             items: page.items,
@@ -1285,30 +1106,14 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
       if (path && path.relationships && path.id && request.method === 'POST' && !path.relationshipId) {
         const principal = requiredCreatorPrincipal(request)
         const body = await parseBody(request)
-        const relationship = await createContentRelationship(
-          NO_LEGACY_DATABASE_HANDLE,
-          principal.userId,
-          path.id,
-          body,
-          requireIdempotency(request),
-          new Date(),
-          dependencies.contentRelationshipMutationStoreProvider?.(env),
-        )
+        const relationship = await createContentRelationship(requireStore(dependencies.contentRelationshipMutationStoreProvider?.(env)), principal.userId, path.id, body, requireIdempotency(request), new Date())
         return json({ data: relationship, requestId: createRequestId() }, 201)
       }
 
       if (path && path.relationships && path.id && path.relationshipId && request.method === 'DELETE') {
         const principal = requiredCreatorPrincipal(request)
         const relationshipId = path.relationshipId
-        const relationship = await revokeContentRelationship(
-          NO_LEGACY_DATABASE_HANDLE,
-          principal.userId,
-          path.id,
-          relationshipId,
-          requireIdempotency(request),
-          new Date(),
-          dependencies.contentRelationshipMutationStoreProvider?.(env),
-        )
+        const relationship = await revokeContentRelationship(requireStore(dependencies.contentRelationshipMutationStoreProvider?.(env)), principal.userId, path.id, relationshipId, requireIdempotency(request), new Date())
         return json({ data: relationship, requestId: createRequestId() })
       }
 
@@ -1400,14 +1205,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const limit = parseListLimit(limitParam)
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const filters = validateListFilters(url.searchParams.get('status'), url.searchParams.get('type'))
-        const page = await listCreatorContents(
-          NO_LEGACY_DATABASE_HANDLE,
-          principal.userId,
-          cursor,
-          limit,
-          filters,
-          dependencies.creatorContentsReadStoreProvider?.(env),
-        )
+        const page = await listCreatorContents(requireStore(dependencies.creatorContentsReadStoreProvider?.(env)), principal.userId, cursor, limit, filters)
         return json({
           data: {
             items: page.items.map(item => ({
@@ -1451,14 +1249,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           if (status === 'DRAFT') {
             // L2+ authors may read only their own social post drafts.
             const principal = requiredSocialPostPrincipal(request)
-            const page = await listCreatorContents(
-              NO_LEGACY_DATABASE_HANDLE,
-              principal.userId,
-              cursor,
-              limit,
-              { status: 'DRAFT', contentType: 'post' },
-              dependencies.creatorContentsReadStoreProvider?.(env),
-            )
+            const page = await listCreatorContents(requireStore(dependencies.creatorContentsReadStoreProvider?.(env)), principal.userId, cursor, limit, { status: 'DRAFT', contentType: 'post' })
             return json({
               data: {
                 items: page.items.map(item => ({
@@ -1486,14 +1277,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
             // Scheduled publication is a Creator-only capability. W03 applies
             // L3/L4 and owner scope before returning any edit/cancel preconditions.
             const principal = requiredCreatorPrincipal(request)
-            const page = await listCreatorContents(
-              NO_LEGACY_DATABASE_HANDLE,
-              principal.userId,
-              cursor,
-              limit,
-              { status: 'SCHEDULED', contentType: 'post' },
-              dependencies.creatorContentsReadStoreProvider?.(env),
-            )
+            const page = await listCreatorContents(requireStore(dependencies.creatorContentsReadStoreProvider?.(env)), principal.userId, cursor, limit, { status: 'SCHEDULED', contentType: 'post' })
             return json({
               data: {
                 items: page.items.map(item => ({
@@ -1526,15 +1310,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         if (contentType && !['article', 'post', 'video'].includes(contentType)) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
-        const page = await listContents(
-          NO_LEGACY_DATABASE_HANDLE,
-          cursor,
-          limit,
-          creatorId,
-          contentType as 'article' | 'post' | 'video' | null,
-          null,
-          dependencies.publicContentListReadStoreProvider?.(env),
-        )
+        const page = await listContents(requireStore(dependencies.publicContentListReadStoreProvider?.(env)), cursor, limit, creatorId, contentType as 'article' | 'post' | 'video' | null, null)
         return json({
           data: {
             items: page.items.map(item => {
