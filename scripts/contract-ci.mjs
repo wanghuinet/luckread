@@ -470,7 +470,7 @@ async function checkEvents() {
         !(await fileExists('scripts/auth-007-mfa-audit-evidence.test.mjs')) ||
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-events.test.ts')) ||
         !(await fileExists('workers/W02-identity/src/neon/mfa-audit-publication-journal-publisher-postgres.ts')) ||
-        !mfaEventSource.includes('auth_007_mfa_publication_journal') ||
+        !mfaAuditOutboxPostgresSource.includes('auth_007_mfa_publication_journal') ||
         !["auth.mfa.challenge_succeeded", "auth.mfa.challenge_failed",
           "auth.mfa.factor_disabled", "auth.mfa.recovery_codes_rotated",
           "auth.mfa.recovery_code_consumed"].every((token) => mfaHookSource.includes(token))) {
