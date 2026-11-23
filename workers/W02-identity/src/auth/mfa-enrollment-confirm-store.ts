@@ -61,7 +61,7 @@ function mapState(row: {
 }
 
 /**
- * D1 remains the production-default enrollment-confirm state store.
+ * Legacy D1 adapter retained only for explicit SQLite unit fixtures; production W02 injects the Neon PostgreSQL store.
  * The read is a secret-free projection; the final marker update is conditional
  * on the authoritative Better Auth factor already being verified.
  */
