@@ -128,6 +128,76 @@ describe('W04 Following feed serving route', () => {
     expect(socialFetch).toHaveBeenCalledTimes(1)
   })
 
+  it('returns a retryable projection error instead of silently omitting a followed author with unknown state', async () => {
+    const socialFetch = vi.fn(async () => Response.json({
+      data: { items: [{ userId: 'creator-1' }, { userId: 'creator-2' }], candidateWindowTruncated: false },
+    }))
+    const contentFetch = vi.fn(async () => Response.json({
+      data: { items: [], nextCursor: null, hasMore: false },
+    }))
+    const env = {
+      AUTH013_W04_DERIVED_PROJECTION: projection,
+      W05_SOCIAL: { fetch: socialFetch },
+      W03_CONTENT: { fetch: contentFetch },
+    }
+
+    seedProjection('viewer-1', 'creator-1')
+    const missing = await worker.fetch(
+      new Request('https://luckread-w04.internal/internal/feed/following?limit=6', { headers }),
+      env,
+    )
+    expect(missing.status).toBe(503)
+    await expect(missing.json()).resolves.toMatchObject({
+      error: { code: 'ACCOUNT_STATE_PROJECTION_UNAVAILABLE' },
+    })
+    expect(contentFetch).not.toHaveBeenCalled()
+
+    seedProjection('viewer-1', 'creator-1', 'creator-2')
+    projectionRows.set('auth013:projection:User:creator-2', {
+      ...projectionRecord('creator-2'),
+      staleAfter: '2020-01-01T00:00:00.000Z',
+    })
+    const expired = await worker.fetch(
+      new Request('https://luckread-w04.internal/internal/feed/following?limit=6', { headers }),
+      env,
+    )
+    expect(expired.status).toBe(503)
+    await expect(expired.json()).resolves.toMatchObject({
+      error: { code: 'ACCOUNT_STATE_PROJECTION_UNAVAILABLE' },
+    })
+    expect(contentFetch).not.toHaveBeenCalled()
+  })
+
+  it('returns a retryable projection error when a followed-author KV read fails', async () => {
+    seedProjection('viewer-1', 'creator-1')
+    const failingProjection = {
+      get: async (key: string, type: 'json'): Promise<unknown> => {
+        if (key.endsWith(':creator-2')) throw new Error('KV temporarily unavailable')
+        return projection.get(key, type)
+      },
+      put: projection.put,
+    }
+    const socialFetch = vi.fn(async () => Response.json({
+      data: { items: [{ userId: 'creator-1' }, { userId: 'creator-2' }], candidateWindowTruncated: false },
+    }))
+    const contentFetch = vi.fn(async () => Response.json({
+      data: { items: [], nextCursor: null, hasMore: false },
+    }))
+    const response = await worker.fetch(
+      new Request('https://luckread-w04.internal/internal/feed/following?limit=6', { headers }),
+      {
+        AUTH013_W04_DERIVED_PROJECTION: failingProjection,
+        W05_SOCIAL: { fetch: socialFetch },
+        W03_CONTENT: { fetch: contentFetch },
+      },
+    )
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'ACCOUNT_STATE_PROJECTION_UNAVAILABLE' },
+    })
+    expect(contentFetch).not.toHaveBeenCalled()
+  })
+
   it('rejects untrusted transport, duplicate parameters, and out-of-range page sizes before service calls', async () => {
     const socialFetch = vi.fn(async () => Response.json({ data: { items: [] } }))
     const contentFetch = vi.fn(async () => Response.json({ data: { items: [] } }))

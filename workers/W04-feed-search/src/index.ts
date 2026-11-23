@@ -285,7 +285,13 @@ export default {
         try {
           const eligibility = await Promise.all(candidateIds.map(async (userId) => {
             const projection = await env.AUTH013_W04_DERIVED_PROJECTION!.get(projectionKey(userId), 'json')
-            if (!projectionIsCurrent(projection, userId, now)) return null
+            // A missing or expired projection is an unknown account state, not
+            // evidence that the followed author has no eligible content.
+            // Fail the page so the caller can retry instead of returning a
+            // misleading partial feed.
+            if (!projectionIsCurrent(projection, userId, now)) {
+              throw new Error('ACCOUNT_STATE_PROJECTION_UNAVAILABLE')
+            }
             return projectionAllowsFeed(projection) ? userId : null
           }))
           eligibleOwnerIds = [...new Set(eligibility.filter((userId): userId is string => typeof userId === 'string'))]

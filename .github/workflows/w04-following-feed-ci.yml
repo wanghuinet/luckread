@@ -58,6 +58,14 @@ jobs:
           workers/W04-feed-search/src/index.ts
           workers/W04-feed-search/src/search-trends.ts
 
+      - name: Verify serialized AUTH-013 projection consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONFIG=workers/W04-feed-search/wrangler.jsonc
+          grep -Fq '"queue": "luckread-auth013-account-state-projection"' "$CONFIG"
+          grep -Fq '"max_concurrency": 1' "$CONFIG"
+
       - name: Setup supported pnpm for W01 adapter checks
         uses: pnpm/action-setup@v4
         with:

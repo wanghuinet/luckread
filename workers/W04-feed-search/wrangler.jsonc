@@ -27,6 +27,9 @@
         "max_batch_size": 10,
         "max_batch_timeout": 5,
         "max_retries": 5,
+        // Projection writes currently use KV get/compare/put, not atomic CAS.
+        // Serialize consumer batches until writes gain per-user atomic ordering.
+        "max_concurrency": 1,
         "dead_letter_queue": "luckread-auth013-account-state-projection-dlq"
       }
     ]
