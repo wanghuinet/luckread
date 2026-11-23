@@ -17,6 +17,22 @@
 
 BEGIN;
 
+CREATE TABLE membership_subscription_renewal_cycle_applications (
+  cycle_id TEXT PRIMARY KEY NOT NULL,
+  subscription_id TEXT NOT NULL,
+  subscriber_id TEXT NOT NULL,
+  cycle_start TIMESTAMPTZ NOT NULL,
+  cycle_end TIMESTAMPTZ NOT NULL,
+  outcome TEXT NOT NULL CHECK (outcome IN ('ACTIVE', 'PAST_DUE')),
+  applied_subscription_version INTEGER NOT NULL CHECK (applied_subscription_version > 0),
+  plan_id TEXT NOT NULL,
+  plan_version INTEGER NOT NULL CHECK (plan_version > 0),
+  applied_at TIMESTAMPTZ NOT NULL,
+  CHECK (cycle_end > cycle_start)
+);
+CREATE INDEX ix_membership_renewal_cycle_applications_subscription
+  ON membership_subscription_renewal_cycle_applications (subscription_id, cycle_start);
+
 CREATE TABLE membership_subscriptions (
   subscription_id TEXT PRIMARY KEY NOT NULL,
   subscriber_id TEXT NOT NULL,

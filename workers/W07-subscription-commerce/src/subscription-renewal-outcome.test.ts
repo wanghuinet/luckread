@@ -55,6 +55,7 @@ const makeSubscription = (overrides: Partial<Subscription> = {}): Subscription =
 class MemoryStore {
   pendingScanLimit: number | null = null;
   failPendingScan = false;
+  failSubscriptionCas = false;
 
   constructor(
     public cycle: Cycle | null,
@@ -91,6 +92,7 @@ class MemoryStore {
 
   async run<T>(sql: string, values: unknown[]): Promise<{ meta: { changes: number } }> {
     if (sql.includes('UPDATE membership_subscriptions SET')) {
+      if (this.failSubscriptionCas) return { meta: { changes: 0 } };
       if (!this.subscription) return { meta: { changes: 0 } };
       const [planId, planVersion, status, periodStart, periodEnd, convertedAt, updatedAt, subscriptionId, subscriberId,
         expectedPlanId, expectedPlanVersion, expectedStatus, version, expectedStart, expectedEnd, cancelBoundary] = values;
@@ -142,6 +144,12 @@ function membershipPoolFor(store: MemoryStore): W07WebhookPostgresPool {
   ) => {
     if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
       return { rows: [] as Row[], rowCount: 0 };
+    }
+    if (sql.includes('FROM membership_subscription_renewal_cycle_applications')) {
+      return { rows: [] as Row[], rowCount: 0 };
+    }
+    if (sql.includes('INSERT INTO membership_subscription_renewal_cycle_applications')) {
+      return { rows: [{ cycle_id: values[0] } as Row], rowCount: 1 };
     }
     if (sql.includes('FROM membership_subscription_scheduled_plan_changes')) {
       return { rows: [] as Row[], rowCount: 0 };
@@ -274,6 +282,19 @@ describe('Neon finance renewal outcome to Neon membership Subscription synchroni
     const replay = await syncTerminalRenewalCycleToSubscription(e.value, CYCLE_ID, syncDependencies(e));
     expect(replay.outcome).toBe('ALREADY_APPLIED');
     expect(e.membershipStore.subscription?.version).toBe(4);
+  });
+
+  it('keeps Finance pending when the membership subscription CAS loses a concurrent update', async () => {
+    const e = env();
+    e.membershipStore.failSubscriptionCas = true;
+
+    const result = await syncTerminalRenewalCycleToSubscription(e.value, CYCLE_ID, syncDependencies(e));
+
+    expect(result).toMatchObject({ outcome: 'PENDING_RETRY', cycleId: CYCLE_ID });
+    expect(e.membershipStore.subscription).toMatchObject({
+      status: 'ACTIVE', current_period_start: START, current_period_end: CYCLE_START, version: 3,
+    });
+    expect(e.financeStore.cycle?.subscription_sync_state).toBe('PENDING');
   });
 
   it('moves ACTIVE to PAST_DUE on terminal payment failure without advancing paid-through dates', async () => {

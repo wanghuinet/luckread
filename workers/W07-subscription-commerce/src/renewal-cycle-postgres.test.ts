@@ -277,6 +277,27 @@ describe('native PostgreSQL D1-04 renewal cycle persistence', () => {
     expect(f.calls[0]?.values).toEqual(['APPLIED', later, null, later, cycleId, 3, 'SUCCEEDED'])
   })
 
+  it('does not treat a concurrent reconciliation with a different reason as this request succeeding', async () => {
+    const latest = cycleRow({
+      state: 'SUCCEEDED',
+      subscription_sync_state: 'RECONCILIATION_REQUIRED',
+      subscription_sync_error_code: 'OTHER_WORKER_REASON',
+      version: 4,
+      updated_at: later,
+    })
+    const f = poolWith(async (sql) => sql.startsWith('UPDATE')
+      ? { rows: [], rowCount: 0 }
+      : { rows: [latest as unknown as Record<string, unknown>], rowCount: 1 })
+
+    await expect(markRenewalCycleSyncStatePostgres(
+      f.pool, cycleRow({ state: 'SUCCEEDED' }), 'RECONCILIATION_REQUIRED',
+      'THIS_WORKER_REASON', later, later,
+    )).resolves.toBe(false)
+
+    expect(f.calls).toHaveLength(2)
+    expect(f.calls[1]?.sql).toContain('SELECT')
+  })
+
   it('lists pending terminal outcomes with a bounded stable order and reads payment mapping', async () => {
     const f = poolWith(async (sql) => sql.includes('WHERE provider')
       ? { rows: [{ cycle_id: cycleId }], rowCount: 1 }

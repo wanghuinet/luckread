@@ -6,7 +6,7 @@ DECLARE
   actual_columns TEXT[];
   expected_columns TEXT[];
   actual_count INTEGER;
-  -- The verifier still checks W07's exact six-table owner slice, while allowing
+  -- The verifier checks W07's exact seven-table owner slice, while allowing
   -- only the registered W01/W02/W07/W08 owner tables in the integrated D1-01 rehearsal.
   known_d1_01_tables TEXT[] := ARRAY[
     'users_sessions',
@@ -41,6 +41,7 @@ DECLARE
     'membership_revenuecat_product_bindings',
     'membership_subscription_plan_change_attempts',
     'membership_subscription_scheduled_plan_changes',
+    'membership_subscription_renewal_cycle_applications',
     'membership_subscriptions',
     'creator_applications',
     'creators',
@@ -52,6 +53,7 @@ DECLARE
     'membership_plans',
     'membership_revenuecat_product_bindings',
     'membership_subscription_plan_change_attempts',
+    'membership_subscription_renewal_cycle_applications',
     'membership_subscription_scheduled_plan_changes',
     'membership_subscriptions'
   ];
@@ -70,7 +72,7 @@ BEGIN
       AND table_type = 'BASE TABLE'
       AND table_name = ANY(expected_tables);
   IF actual_columns IS DISTINCT FROM expected_tables THEN
-    RAISE EXCEPTION 'W07 expected six D1-01 membership tables; found %', actual_columns;
+    RAISE EXCEPTION 'W07 expected seven D1-01 membership tables; found %', actual_columns;
   END IF;
   SELECT COUNT(*)::INTEGER INTO actual_count
     FROM information_schema.tables
@@ -120,6 +122,9 @@ BEGIN
         (table_name = 'membership_subscription_scheduled_plan_changes'
           AND column_name IN ('effective_at', 'applied_at', 'created_at', 'updated_at')
           AND data_type <> 'timestamp with time zone')
+        OR
+        (table_name = 'membership_subscription_renewal_cycle_applications'
+          AND column_name IN ('cycle_start', 'cycle_end', 'applied_at') AND data_type <> 'timestamp with time zone')
       )
   ) THEN
     RAISE EXCEPTION 'D1 ISO-8601 timestamp fields must map to PostgreSQL TIMESTAMPTZ';
@@ -129,7 +134,8 @@ BEGIN
      OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_plan_versions') <> 10
      OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_revenuecat_product_bindings') <> 8
      OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscription_plan_change_attempts') <> 19
-     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscription_scheduled_plan_changes') <> 17 THEN
+     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscription_scheduled_plan_changes') <> 17
+     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscription_renewal_cycle_applications') <> 10 THEN
     RAISE EXCEPTION 'W07 plan, RevenueCat, upgrade-attempt or scheduled-change column counts drifted';
   END IF;
 
@@ -170,8 +176,9 @@ BEGIN
           'ix_membership_plan_change_attempts_expiry',
           'ux_membership_scheduled_plan_changes_idempotency',
           'ux_membership_scheduled_plan_changes_pending_subscription',
-          'ix_membership_scheduled_plan_changes_effective'
-        )) <> 17 THEN
+          'ix_membership_scheduled_plan_changes_effective',
+          'ix_membership_renewal_cycle_applications_subscription'
+        )) <> 18 THEN
     RAISE EXCEPTION 'W07 secondary index set is incomplete';
   END IF;
 
@@ -555,8 +562,8 @@ ROLLBACK;
 SELECT jsonb_build_object(
   'status', 'W07_D1_01_MEMBERSHIP_POSTGRES_SCHEMA_PASS',
   'postgresMajor', 18,
-  'tablesVerified', 6,
-  'secondaryIndexesVerified', 17,
+  'tablesVerified', 7,
+  'secondaryIndexesVerified', 18,
   'triggersVerified', 8,
   'checks', jsonb_build_array(
     'exact Subscription 17-column contract',
@@ -568,6 +575,7 @@ SELECT jsonb_build_object(
     'one-trial-per-subscriber/creator and write-once trial timestamps',
     'upgrade attempt idempotency and one-pending-per-subscription',
     'scheduled-change idempotency and one-pending-per-subscription',
+    'durable renewal-cycle receipt identity and timestamp constraints',
     'DOWNGRADE/BILLING_INTERVAL_CHANGE discriminator',
     'opaque D1-04 order reference only',
     'all synthetic writes rolled back'
@@ -578,7 +586,8 @@ SELECT jsonb_build_object(
     'membership_plan_versions', (SELECT COUNT(*) FROM membership_plan_versions),
     'membership_revenuecat_product_bindings', (SELECT COUNT(*) FROM membership_revenuecat_product_bindings),
     'membership_subscription_plan_change_attempts', (SELECT COUNT(*) FROM membership_subscription_plan_change_attempts),
-    'membership_subscription_scheduled_plan_changes', (SELECT COUNT(*) FROM membership_subscription_scheduled_plan_changes)
+    'membership_subscription_scheduled_plan_changes', (SELECT COUNT(*) FROM membership_subscription_scheduled_plan_changes),
+    'membership_subscription_renewal_cycle_applications', (SELECT COUNT(*) FROM membership_subscription_renewal_cycle_applications)
   ),
   'productionDatabaseTouched', false,
   'businessDataImported', false
