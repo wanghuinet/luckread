@@ -189,6 +189,9 @@ export async function updateRenewalCyclePostgres(
       `, version = version + 1, updated_at = $${next}::timestamptz WHERE cycle_id = $${next + 1} AND version = $${next + 2} RETURNING cycle_id`,
       [...values, updatedAt, cycle.cycle_id, cycle.version],
     )
+    // A CAS miss must not be reported as a successful update by returning the latest row.
+    // Callers must treat null as a lost version race and re-read/reconcile explicitly.
+    if (result.rows.length !== 1) return null
     return readRenewalCycleByIdPostgres(pool, cycle.cycle_id)
   } catch {
     return failUnavailable()
@@ -199,14 +202,15 @@ export async function transitionRenewalCycleToPaymentReadyPostgres(
   pool: W07WebhookPostgresPool,
   cycle: RenewalCycleRow,
   updatedAt: string,
-): Promise<RenewalCycleRow> {
+): Promise<RenewalCycleRow | null> {
   try {
-    await pool.query(
+    const result = await pool.query<{ cycle_id: string } & Record<string, unknown>>(
       "UPDATE subscription_renewal_cycles SET state = 'PAYMENT_READY', outcome_code = NULL, " +
       'version = version + 1, updated_at = $1::timestamptz WHERE cycle_id = $2 AND version = $3 AND state = $4 ' +
       'AND order_id IS NOT NULL AND payment_id IS NOT NULL RETURNING cycle_id',
       [updatedAt, cycle.cycle_id, cycle.version, cycle.state],
     )
+    if (result.rows.length !== 1) return null
     const latest = await readRenewalCycleByIdPostgres(pool, cycle.cycle_id)
     if (!latest) return failUnavailable()
     return latest
@@ -232,6 +236,31 @@ export async function acquireRenewalSubmissionLeasePostgres(
     )
     if (result.rows.length !== 1) return null
     return readRenewalCycleByIdPostgres(pool, cycle.cycle_id)
+  } catch {
+    return failUnavailable()
+  }
+}
+
+export async function finishRenewalSubmissionLeasePostgres(
+  pool: W07WebhookPostgresPool,
+  cycleId: string,
+  leaseToken: string,
+  now: string,
+  updatedAt: string,
+  outcome: Readonly<{
+    state: 'SUBMITTED' | 'RECONCILIATION_REQUIRED'
+    providerResponseStatus: string | null
+    outcomeCode: string
+  }>,
+): Promise<boolean> {
+  try {
+    const result = await pool.query<{ cycle_id: string } & Record<string, unknown>>(
+      'UPDATE subscription_renewal_cycles SET state = $1, provider_response_status = $2, outcome_code = $3, ' +
+      'lease_token = NULL, lease_expires_at = NULL, version = version + 1, updated_at = $4::timestamptz ' +
+      "WHERE cycle_id = $5 AND state = 'SUBMITTING' AND lease_token = $6 AND lease_expires_at > $7::timestamptz RETURNING cycle_id",
+      [outcome.state, outcome.providerResponseStatus, outcome.outcomeCode, updatedAt, cycleId, leaseToken, now],
+    )
+    return result.rows.length === 1
   } catch {
     return failUnavailable()
   }

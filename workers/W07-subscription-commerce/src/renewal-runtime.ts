@@ -55,6 +55,7 @@ import {
   updateRenewalCyclePostgres,
   transitionRenewalCycleToPaymentReadyPostgres,
   acquireRenewalSubmissionLeasePostgres,
+  finishRenewalSubmissionLeasePostgres,
   retryFailedRenewalCyclePostgres,
   type RenewalCycleRow,
   type RenewalCycleState,
@@ -863,7 +864,12 @@ async function transitionCycleToPaymentReady(
 ): Promise<RenewalCycleRow> {
   const updatedAt = strictlyAfter(now, cycle.updated_at);
   try {
-    return await transitionRenewalCycleToPaymentReadyPostgres(cycleStore, cycle, updatedAt);
+    const transitioned = await transitionRenewalCycleToPaymentReadyPostgres(cycleStore, cycle, updatedAt);
+    if (transitioned) return transitioned;
+    // Another worker advanced or changed this cycle after our snapshot. Re-read,
+    // but never treat our lost CAS as a successful transition of the stale row.
+    const latest = await readCycleById(cycleStore, cycle.cycle_id);
+    return latest;
   } catch {
     throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
@@ -1116,6 +1122,20 @@ export async function processSubscriptionRenewalCycle(
       }
     }
     cycle = await transitionCycleToPaymentReady(cycleStore, cycle, now);
+    // A lost PREPARED -> PAYMENT_READY CAS may reveal that another worker or
+    // the signed payment webhook already moved the cycle. Return that
+    // authoritative state instead of falling through to the generic PREPARED
+    // result (or attempting work against a stale snapshot).
+    if (cycle.state !== 'PAYMENT_READY') {
+      const action: RenewalProcessResult['action'] =
+        cycle.state === 'SUBMITTING' ? 'SUBMISSION_IN_PROGRESS'
+          : cycle.state === 'SUBMITTED' || cycle.state === 'SUCCEEDED' || cycle.state === 'FAILED' ? 'TERMINAL'
+            : cycle.state === 'RECONCILIATION_REQUIRED' ? 'RECONCILIATION_REQUIRED'
+              : cycle.state === 'AWAITING_PRICING' ? 'AWAITING_PRICING'
+                : cycle.state === 'AWAITING_MANDATE' ? 'AWAITING_MANDATE'
+                  : 'PREPARED';
+      return { cycleId, state: cycle.state, action, ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
+    }
   }
 
   if (cycle.state === 'PAYMENT_READY' || cycle.state === 'SUBMITTING') {
@@ -1147,28 +1167,56 @@ export async function processSubscriptionRenewalCycle(
     if (!payment || payment.merchant_id !== cycle.merchant_id || payment.provider !== PROVIDER ||
         payment.order_id !== cycle.order_id || payment.amount_minor !== cycle.amount_minor ||
         payment.currency !== cycle.currency) {
-      cycle = await writeCycleReconciliation(cycleStore, cycle, 'PAYMENT_ATTEMPT_BINDING_MISMATCH', now);
-      return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
+      await finishRenewalSubmissionLeasePostgres(cycleStore, cycleId, cycle.lease_token!, now,
+        strictlyAfter(now, cycle.updated_at), {
+          state: 'RECONCILIATION_REQUIRED', providerResponseStatus: null,
+          outcomeCode: 'PAYMENT_ATTEMPT_BINDING_MISMATCH',
+        });
+      const latest = await readCycleById(cycleStore, cycleId);
+      return { cycleId, state: latest.state, action: 'RECONCILIATION_REQUIRED' };
     }
 
     if (payment.status !== 'INITIATING') {
       if (['failed', 'cancelled', 'expired', 'cancelled_post_capture'].includes(payment.status)) {
-        cycle = await writeCycleReconciliation(cycleStore, cycle, 'PAYMENT_ALREADY_TERMINAL_WITHOUT_CYCLE_RESULT', now);
-        return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
+        await finishRenewalSubmissionLeasePostgres(cycleStore, cycleId, cycle.lease_token!, now,
+          strictlyAfter(now, cycle.updated_at), {
+            state: 'RECONCILIATION_REQUIRED', providerResponseStatus: null,
+            outcomeCode: 'PAYMENT_ALREADY_TERMINAL_WITHOUT_CYCLE_RESULT',
+          });
+        const latest = await readCycleById(cycleStore, cycleId);
+        return { cycleId, state: latest.state, action: 'RECONCILIATION_REQUIRED' };
       }
       now = nowIso(nowFn);
-      cycle = await updateCycle(cycleStore, cycle, now,
-        "state = 'SUBMITTED', provider_response_status = 'processing', outcome_code = 'RECOVERED_SUBMISSION_RESPONSE_UNKNOWN', lease_token = NULL, lease_expires_at = NULL",
-        [],
-      );
-      return { cycleId, state: cycle.state, action: 'SUBMITTED', ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
+      const finished = await finishRenewalSubmissionLeasePostgres(cycleStore, cycleId, cycle.lease_token!, now,
+        strictlyAfter(now, cycle.updated_at), {
+          state: 'SUBMITTED', providerResponseStatus: 'processing',
+          outcomeCode: 'RECOVERED_SUBMISSION_RESPONSE_UNKNOWN',
+        });
+      const latest = await readCycleById(cycleStore, cycleId);
+      return { cycleId, state: latest.state, action: finished ? 'SUBMITTED' : 'SUBMISSION_IN_PROGRESS', ...(latest.payment_id ? { paymentId: latest.payment_id } : {}) };
     }
 
     if (!(await isSubscriptionChargeableForCycle(membershipStore, cycle))) {
-      cycle = await writeCycleReconciliation(cycleStore, cycle, 'SUBSCRIPTION_NOT_CHARGEABLE_AT_SUBMISSION', now);
-      return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
+      await finishRenewalSubmissionLeasePostgres(cycleStore, cycleId, cycle.lease_token!, now,
+        strictlyAfter(now, cycle.updated_at), {
+          state: 'RECONCILIATION_REQUIRED', providerResponseStatus: null,
+          outcomeCode: 'SUBSCRIPTION_NOT_CHARGEABLE_AT_SUBMISSION',
+        });
+      const latest = await readCycleById(cycleStore, cycleId);
+      return { cycleId, state: latest.state, action: 'RECONCILIATION_REQUIRED' };
     }
 
+    // Revalidate ownership immediately before the external side effect. A worker
+    // whose lease was reclaimed must not start a new provider submission.
+    now = nowIso(nowFn);
+    const currentLease = await readCycleById(cycleStore, cycleId);
+    if (currentLease.state !== 'SUBMITTING' ||
+        currentLease.lease_token !== cycle.lease_token ||
+        !currentLease.lease_expires_at ||
+        Date.parse(currentLease.lease_expires_at) <= Date.parse(now)) {
+      return { cycleId, state: currentLease.state, action: 'SUBMISSION_IN_PROGRESS', ...(currentLease.payment_id ? { paymentId: currentLease.payment_id } : {}) };
+    }
+    cycle = currentLease;
     const createCharge = dependencies.createProviderCharge ?? createHyperswitchMerchantInitiatedPayment;
     let providerPayment: HyperswitchPayment;
     try {
@@ -1182,13 +1230,15 @@ export async function processSubscriptionRenewalCycle(
       });
     } catch (error) {
       now = nowIso(nowFn);
-      cycle = await writeCycleReconciliation(
-        cycleStore,
-        cycle,
-        error instanceof HyperswitchClientError ? 'PROVIDER_SUBMISSION_UNCERTAIN' : 'PROVIDER_SUBMISSION_DEPENDENCY_ERROR',
-        now,
+      const finished = await finishRenewalSubmissionLeasePostgres(
+        cycleStore, cycleId, cycle.lease_token!, now, strictlyAfter(now, cycle.updated_at), {
+          state: 'RECONCILIATION_REQUIRED',
+          providerResponseStatus: null,
+          outcomeCode: error instanceof HyperswitchClientError ? 'PROVIDER_SUBMISSION_UNCERTAIN' : 'PROVIDER_SUBMISSION_DEPENDENCY_ERROR',
+        },
       );
-      return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED', ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
+      const latest = await readCycleById(cycleStore, cycleId);
+      return { cycleId, state: latest.state, action: finished ? 'RECONCILIATION_REQUIRED' : 'SUBMISSION_IN_PROGRESS', ...(latest.payment_id ? { paymentId: latest.payment_id } : {}) };
     }
 
     try {
@@ -1205,21 +1255,30 @@ export async function processSubscriptionRenewalCycle(
       );
     } catch {
       now = nowIso(nowFn);
-      cycle = await writeCycleReconciliation(cycleStore, cycle, 'PROVIDER_RESPONSE_NOT_DURABLY_RECORDED', now);
-      return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED', ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
+      const finished = await finishRenewalSubmissionLeasePostgres(
+        cycleStore, cycleId, cycle.lease_token!, now, strictlyAfter(now, cycle.updated_at), {
+          state: 'RECONCILIATION_REQUIRED',
+          providerResponseStatus: null,
+          outcomeCode: 'PROVIDER_RESPONSE_NOT_DURABLY_RECORDED',
+        },
+      );
+      const latest = await readCycleById(cycleStore, cycleId);
+      return { cycleId, state: latest.state, action: finished ? 'RECONCILIATION_REQUIRED' : 'SUBMISSION_IN_PROGRESS', ...(latest.payment_id ? { paymentId: latest.payment_id } : {}) };
     }
 
     now = nowIso(nowFn);
-    const latest = await readCycleById(cycleStore, cycleId);
-    if (latest.state === 'SUCCEEDED' || latest.state === 'FAILED' ||
-        latest.state === 'RECONCILIATION_REQUIRED') {
-      return { cycleId, state: latest.state, action: 'TERMINAL', ...(latest.payment_id ? { paymentId: latest.payment_id } : {}) };
-    }
-    cycle = await updateCycle(cycleStore, latest, now,
-      "state = 'SUBMITTED', provider_response_status = ?, outcome_code = 'AWAITING_SIGNED_WEBHOOK', lease_token = NULL, lease_expires_at = NULL",
-      [providerPayment.status],
+    const finished = await finishRenewalSubmissionLeasePostgres(
+      cycleStore, cycleId, cycle.lease_token!, now, strictlyAfter(now, cycle.updated_at), {
+        state: 'SUBMITTED',
+        providerResponseStatus: providerPayment.status,
+        outcomeCode: 'AWAITING_SIGNED_WEBHOOK',
+      },
     );
-    return { cycleId, state: cycle.state, action: 'SUBMITTED', ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
+    const latest = await readCycleById(cycleStore, cycleId);
+    if (!finished) {
+      return { cycleId, state: latest.state, action: 'SUBMISSION_IN_PROGRESS', ...(latest.payment_id ? { paymentId: latest.payment_id } : {}) };
+    }
+    return { cycleId, state: latest.state, action: 'SUBMITTED', ...(latest.payment_id ? { paymentId: latest.payment_id } : {}) };
   }
 
   return { cycleId, state: cycle.state, action: cycle.state === 'RECONCILIATION_REQUIRED' ? 'RECONCILIATION_REQUIRED' : 'PREPARED', ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
