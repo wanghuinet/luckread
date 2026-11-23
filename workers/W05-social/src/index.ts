@@ -88,7 +88,7 @@ import type { PollVoteStore } from './poll-vote-store.js'
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
 interface Env {
-  /** Legacy D1 test/local adapter only; production entry injects Neon stores and has no DB binding. */
+  /** Legacy test-only compatibility surface; the production entry injects Neon stores. */
   DB: D1Database
   W05_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_02?: { connectionString?: string }
@@ -316,9 +316,9 @@ export type W05SocialWorkerDependencies = Readonly<{
   followingAuthorIdsReadStore?: FollowingAuthorIdsReadStore
   /** Required PostgreSQL comment page reader; missing composition fails closed. */
   commentListReadStore?: CommentListReadStore
-  /** Optional PostgreSQL-capable comment creation store; D1 remains the deployed default. */
+  /** Neon PostgreSQL comment creation store; missing composition fails closed. */
   commentCreateStore?: CommentCreateStore
-  /** Optional PostgreSQL-capable comment edit/delete store; D1 remains the deployed default. */
+  /** Neon PostgreSQL comment edit/delete store; missing composition fails closed. */
   commentMutationStore?: CommentMutationStore
   /** PostgreSQL comment/content token synchronization store; missing composition fails closed. */
   socialTokenSyncStore?: SocialTokenSyncStore
@@ -332,11 +332,11 @@ export type W05SocialWorkerDependencies = Readonly<{
   replyAudienceStore?: ReplyAudienceStore
   /** Optional PostgreSQL per-user notification preferences store; missing composition fails closed. */
   notificationPreferencesStore?: NotificationPreferencesStore
-  /** Optional PostgreSQL-capable owner profile pin store; D1 remains the deployed default. */
+  /** Neon PostgreSQL owner profile pin store; missing composition fails closed. */
   profilePinStore?: ProfilePinStore
-  /** Optional PostgreSQL-capable Repost relation store; D1 remains the deployed default. */
+  /** Neon PostgreSQL Repost relation store; missing composition fails closed. */
   repostStore?: RepostStore
-  /** Optional PostgreSQL-capable idempotent Share link store; D1 remains the deployed default. */
+  /** Neon PostgreSQL idempotent Share link store; missing composition fails closed. */
   shareStore?: ShareStore
   /** Neon PostgreSQL poll configuration Store; POST route fails closed when missing. */
   pollConfigurationStore?: PollConfigurationStore
@@ -352,7 +352,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   blockMuteRelationStore?: BlockMuteRelationStore
   /** Neon PostgreSQL Profile Channel reader; routes fail closed when missing. */
   profileChannelReadStore?: ProfileChannelReadStore
-  /** Optional PostgreSQL-capable content-liker page reader; D1 remains the deployed default. */
+  /** Neon PostgreSQL content-liker page reader; missing composition fails closed. */
   contentLikerReadStore?: ContentLikerReadStore
   /** Neon PostgreSQL favorite list reader; route fails closed when missing. */
   favoriteListReadStore?: FavoriteListReadStore
@@ -362,9 +362,9 @@ export type W05SocialWorkerDependencies = Readonly<{
   favoriteStatusReadStore?: FavoriteStatusReadStore
   /** Neon PostgreSQL like-status reader; cache misses fail closed when it is not composed. */
   likeStatusReadStore?: LikeStatusReadStore
-  /** Optional PostgreSQL-capable like-target context and Block preflight reader; D1 remains the deployed default. */
+  /** Neon PostgreSQL like-target context and Block preflight reader; missing composition fails closed. */
   likeTargetContextReadStore?: LikeTargetContextReadStore
-  /** Optional PostgreSQL-capable Like/Unlike mutation store; D1 remains the deployed default. */
+  /** Neon PostgreSQL Like/Unlike mutation store; missing composition fails closed. */
   likeMutationStore?: LikeMutationStore
 }>
 
