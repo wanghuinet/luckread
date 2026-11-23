@@ -186,7 +186,7 @@ for (const file of [
     if (!content.includes('createW01NeonPostgresAdapter')) failures.push('W01 active Payload config must use the Neon PostgreSQL adapter')
     if (content.includes('sqliteD1Adapter')) failures.push('W01 active Payload config must not retain a D1/SQLite runtime adapter')
   }
-  if (file === payload.postgresAdapter && !/push\\s*:\\s*false/.test(content)) failures.push('W01 Neon PostgreSQL adapter must keep push:false; do not admit automatic production DDL')
+  if (file === payload.postgresAdapter && !/push\s*:\s*false/.test(content)) failures.push('W01 Neon PostgreSQL adapter must keep push:false; do not admit automatic production DDL')
   if (file === payload.wrangler) {
     let config
     try { config = JSON.parse(content) } catch {
