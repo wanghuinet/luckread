@@ -196,7 +196,21 @@ export async function clearActiveAccountSelection(): Promise<void> {
   ]);
 }
 
+export type SessionCredentialSnapshot = { accountId: string | null; token: string | null };
+
+/** Bind a request credential to the account slot that supplied it. */
+export async function readSessionCredentialSnapshot(): Promise<SessionCredentialSnapshot> {
+  const accountId = await getActiveStoredAccountId();
+  const token = accountId
+    ? await SecureStore.getItemAsync(accountTokenKey(accountId))
+    : await SecureStore.getItemAsync(LEGACY_TOKEN_KEY);
+  return { accountId, token };
+}
+
 export async function readSessionToken(): Promise<string | null> {
+  const snapshot = await readSessionCredentialSnapshot();
+  return snapshot.token;
+}
   const activeAccountId = await getActiveStoredAccountId();
   if (activeAccountId) {
     return SecureStore.getItemAsync(accountTokenKey(activeAccountId));
