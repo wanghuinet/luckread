@@ -275,7 +275,461 @@ async function authorizeSelfServiceAction(
   }
 
   await lockAuthorizationFacts(client, subjectId)
-  const layerCase = roleLayerPriority.map((_, index) => `WHEN ${index * 2 + 3} THEN ${index * 2 + 4}`).join(' ')
+  const layerCase = roleLayerPriority.map((_, index) => 'WHEN 
+  const roleLayerBindings = roleLayerPriority.flatMap(([roleId, layer]) => [roleId, layer])
+  const assignments = await client.query<{ roleId: string }>(
+    `SELECT DISTINCT role_id AS "roleId" FROM role_assignments
+     WHERE subject_id = $1 AND status = 'ACTIVE' AND valid_from <= $2
+       AND (valid_until IS NULL OR $2 < valid_until)
+       AND scope_type = 'global' AND scope_id IS NULL
+     ORDER BY CASE role_id ${layerCase} ELSE -1 END DESC, role_id ASC
+     LIMIT 62`,
+    [subjectId, now, ...roleLayerBindings],
+  )
+
+  let subjectLayer = 0
+  const grantedPermissions = new Set<string>()
+  for (const assignment of assignments.rows) {
+    const layer = roleToLayer.get(assignment.roleId)
+    if (layer && layer > subjectLayer) subjectLayer = layer
+    for (const permission of rolePermissions.get(assignment.roleId) ?? []) {
+      grantedPermissions.add(permission)
+    }
+  }
+
+  const requiredLayer = Number(minimumLayer.slice(1))
+  if (subjectLayer < requiredLayer || !grantedPermissions.has(rule.permission)) {
+    throw new AccountStateTransitionPostgresError(
+      'FORBIDDEN',
+      'effective global role does not grant the required self-service transition permission',
+    )
+  }
+  return 'user'
+}
+
+async function authorizeAccountStateAction(
+  client: PoolClient,
+  subjectId: string,
+  targetUserId: string,
+  subject: LockedAccount,
+  rule: TransitionRule,
+  now: string,
+): Promise<'user' | 'operator' | 'admin'> {
+  if (rule.actor === 'user') {
+    return authorizeSelfServiceAction(client, subjectId, targetUserId, rule, now)
+  }
+  if (subjectId === targetUserId) {
+    throw new AccountStateTransitionPostgresError(
+      'FORBIDDEN',
+      'moderator/admin cannot apply account moderation to self',
+    )
+  }
+  return authorizeModeratorAction(client, subjectId, subject, rule, now)
+}
+
+function buildEvent(
+  input: AccountStateTransitionPostgresInput,
+  actorType: 'user' | 'operator' | 'admin',
+  from: AccountState,
+  nextVersion: number,
+  now: string,
+): AccountStateChangedEvent {
+  const eventId = randomUUID()
+  const actor = actorType === 'operator'
+    ? { actorId: input.subjectId, actorType: 'user' as const, operationalRole: 'PLATFORM_OPERATOR' as const }
+    : actorType === 'admin'
+      ? { actorId: input.subjectId, actorType: 'admin' as const }
+      : { actorId: input.subjectId, actorType: 'user' as const }
+
+  return {
+    eventId,
+    eventType: EVENT_TYPE,
+    schemaVersion: EVENT_SCHEMA_VERSION,
+    producer: 'W02',
+    resourceType: 'User',
+    resourceId: input.targetUserId,
+    occurredAt: now,
+    publishedAt: now,
+    correlationId: input.correlationId ?? eventId,
+    causationId: input.causationId ?? eventId,
+    idempotencyKey: 'auth013-' + input.targetUserId + '-' + input.expectedVersion,
+    attempt: 1,
+    sourceVersion: nextVersion,
+    actor,
+    before: {
+      accountState: from,
+      accountStateVersion: input.expectedVersion,
+    },
+    after: {
+      accountState: input.to,
+      accountStateVersion: nextVersion,
+    },
+    reason: input.reason,
+  }
+}
+
+/**
+ * PostgreSQL-native W02 self-service and moderator/admin account-state transition.
+ *
+ * This is a testable persistence adapter, not a production Worker binding.
+ * It admits permissionless user-owned transitions and canonical operator/admin
+ * transitions that require no separate approval receipt. Explicit self-service
+ * permissions are derived from effective global RoleAssignments; privileged
+ * actions additionally recheck MFA in the same transaction as the state CAS
+ * and AUTH-013 outbox write. Lifecycle preconditions, system jobs, and actions
+ * requiring separate approval remain on their dedicated W02 paths.
+ */
+export async function applyModeratorAccountStateTransitionPostgres(
+  pool: Pool,
+  input: AccountStateTransitionPostgresInput,
+  clock: AccountStateTransitionPostgresClock = systemClock,
+): Promise<AccountStateTransitionPostgresResult> {
+  assertInput(input)
+
+  const client = await pool.connect()
+  let transactionOpen = false
+
+  try {
+    await client.query('BEGIN')
+    transactionOpen = true
+
+    // Lock both identities in a stable order so opposing moderation requests
+    // cannot deadlock by acquiring actor/target rows in opposite order.
+    const accountIds = [...new Set([input.subjectId, input.targetUserId])].sort()
+    const locked = await client.query<LockedAccount>(
+      'SELECT id, account_state AS "accountState", ' +
+        'account_state_version AS "accountStateVersion" ' +
+        'FROM "user" WHERE id = ANY($1::text[]) ORDER BY id FOR UPDATE',
+      [accountIds],
+    )
+    const target = locked.rows.find((row) => row.id === input.targetUserId)
+    if (!target) {
+      throw new AccountStateTransitionPostgresError('NOT_FOUND', 'target user account not found')
+    }
+    const subject = locked.rows.find((row) => row.id === input.subjectId)
+    if (!subject) {
+      throw new AccountStateTransitionPostgresError('FORBIDDEN', 'moderator/admin subject account not found')
+    }
+    const rule = findTransition(target.accountState, input.to)
+    if (Number(target.accountStateVersion) !== input.expectedVersion) {
+      throw new AccountStateTransitionPostgresError('CONFLICT', 'account state version does not match If-Match')
+    }
+
+    const now = assertServerNow(clock).toISOString()
+    const actorType = await authorizeAccountStateAction(
+      client,
+      input.subjectId,
+      input.targetUserId,
+      subject,
+      rule,
+      now,
+    )
+    const nextVersion = input.expectedVersion + 1
+    const event = buildEvent(input, actorType, target.accountState, nextVersion, now)
+    const journalId = randomUUID()
+
+    const updated = await client.query<{ accountStateVersion: number }>(
+      'UPDATE "user" SET account_state = $1, account_state_version = account_state_version + 1, ' +
+        'updated_at = $2 WHERE id = $3 AND account_state = $4 AND account_state_version = $5 ' +
+        'RETURNING account_state_version AS "accountStateVersion"',
+      [input.to, now, input.targetUserId, target.accountState, input.expectedVersion],
+    )
+    if (updated.rowCount !== 1) {
+      throw new AccountStateTransitionPostgresError('CONFLICT', 'account state compare-and-set did not update exactly one row')
+    }
+
+    const inserted = await client.query<{ journalId: string }>(
+      'INSERT INTO auth_013_publication_journal ' +
+        '(journal_id, event_id, event_type, schema_version, resource_id, source_version, payload, status, attempt, next_attempt_at, created_at, published_at, last_error_code) ' +
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING', 1, NULL, $8, NULL, NULL) " +
+        'RETURNING journal_id AS "journalId"',
+      [
+        journalId,
+        event.eventId,
+        event.eventType,
+        event.schemaVersion,
+        event.resourceId,
+        event.sourceVersion,
+        JSON.stringify(event),
+        now,
+      ],
+    )
+    if (inserted.rowCount !== 1 || !inserted.rows[0]?.journalId) {
+      throw new Error('AUTH013_ACCOUNT_STATE_JOURNAL_INSERT_INCOMPLETE')
+    }
+
+    if (tokenInvalidationStates.has(input.to)) {
+      await client.query('DELETE FROM "session" WHERE user_id = $1', [input.targetUserId])
+    }
+
+    await client.query('COMMIT')
+    transactionOpen = false
+    return {
+      from: target.accountState,
+      to: input.to,
+      accountStateVersion: Number(updated.rows[0]?.accountStateVersion ?? nextVersion),
+      eventId: event.eventId,
+      journalId,
+    }
+  } catch (error) {
+    if (transactionOpen) {
+      try {
+        await client.query('ROLLBACK')
+      } catch {
+        throw new AccountStateTransitionPostgresError(
+          'JOURNAL_PERSISTENCE_FAILED',
+          'account-state transaction rollback failed',
+        )
+      }
+    }
+    if (error instanceof AccountStateTransitionPostgresError) throw error
+
+    const pgCode = error && typeof error === 'object' && 'code' in error
+      ? String((error as { code?: unknown }).code)
+      : ''
+    if (pgCode === '23505' || pgCode === '40001' || pgCode === '40P01') {
+      throw new AccountStateTransitionPostgresError(
+        'CONFLICT',
+        'account state changed concurrently or duplicate publication was rejected',
+      )
+    }
+
+    throw new AccountStateTransitionPostgresError(
+      'JOURNAL_PERSISTENCE_FAILED',
+      'account state and AUTH-013 publication journal transaction failed',
+    )
+  } finally {
+    client.release()
+  }
+}
+ + (index * 2 + 3) + ' THEN 
+  const roleLayerBindings = roleLayerPriority.flatMap(([roleId, layer]) => [roleId, layer])
+  const assignments = await client.query<{ roleId: string }>(
+    `SELECT DISTINCT role_id AS "roleId" FROM role_assignments
+     WHERE subject_id = $1 AND status = 'ACTIVE' AND valid_from <= $2
+       AND (valid_until IS NULL OR $2 < valid_until)
+       AND scope_type = 'global' AND scope_id IS NULL
+     ORDER BY CASE role_id ${layerCase} ELSE -1 END DESC, role_id ASC
+     LIMIT 62`,
+    [subjectId, now, ...roleLayerBindings],
+  )
+
+  let subjectLayer = 0
+  const grantedPermissions = new Set<string>()
+  for (const assignment of assignments.rows) {
+    const layer = roleToLayer.get(assignment.roleId)
+    if (layer && layer > subjectLayer) subjectLayer = layer
+    for (const permission of rolePermissions.get(assignment.roleId) ?? []) {
+      grantedPermissions.add(permission)
+    }
+  }
+
+  const requiredLayer = Number(minimumLayer.slice(1))
+  if (subjectLayer < requiredLayer || !grantedPermissions.has(rule.permission)) {
+    throw new AccountStateTransitionPostgresError(
+      'FORBIDDEN',
+      'effective global role does not grant the required self-service transition permission',
+    )
+  }
+  return 'user'
+}
+
+async function authorizeAccountStateAction(
+  client: PoolClient,
+  subjectId: string,
+  targetUserId: string,
+  subject: LockedAccount,
+  rule: TransitionRule,
+  now: string,
+): Promise<'user' | 'operator' | 'admin'> {
+  if (rule.actor === 'user') {
+    return authorizeSelfServiceAction(client, subjectId, targetUserId, rule, now)
+  }
+  if (subjectId === targetUserId) {
+    throw new AccountStateTransitionPostgresError(
+      'FORBIDDEN',
+      'moderator/admin cannot apply account moderation to self',
+    )
+  }
+  return authorizeModeratorAction(client, subjectId, subject, rule, now)
+}
+
+function buildEvent(
+  input: AccountStateTransitionPostgresInput,
+  actorType: 'user' | 'operator' | 'admin',
+  from: AccountState,
+  nextVersion: number,
+  now: string,
+): AccountStateChangedEvent {
+  const eventId = randomUUID()
+  const actor = actorType === 'operator'
+    ? { actorId: input.subjectId, actorType: 'user' as const, operationalRole: 'PLATFORM_OPERATOR' as const }
+    : actorType === 'admin'
+      ? { actorId: input.subjectId, actorType: 'admin' as const }
+      : { actorId: input.subjectId, actorType: 'user' as const }
+
+  return {
+    eventId,
+    eventType: EVENT_TYPE,
+    schemaVersion: EVENT_SCHEMA_VERSION,
+    producer: 'W02',
+    resourceType: 'User',
+    resourceId: input.targetUserId,
+    occurredAt: now,
+    publishedAt: now,
+    correlationId: input.correlationId ?? eventId,
+    causationId: input.causationId ?? eventId,
+    idempotencyKey: 'auth013-' + input.targetUserId + '-' + input.expectedVersion,
+    attempt: 1,
+    sourceVersion: nextVersion,
+    actor,
+    before: {
+      accountState: from,
+      accountStateVersion: input.expectedVersion,
+    },
+    after: {
+      accountState: input.to,
+      accountStateVersion: nextVersion,
+    },
+    reason: input.reason,
+  }
+}
+
+/**
+ * PostgreSQL-native W02 self-service and moderator/admin account-state transition.
+ *
+ * This is a testable persistence adapter, not a production Worker binding.
+ * It admits permissionless user-owned transitions and canonical operator/admin
+ * transitions that require no separate approval receipt. Explicit self-service
+ * permissions are derived from effective global RoleAssignments; privileged
+ * actions additionally recheck MFA in the same transaction as the state CAS
+ * and AUTH-013 outbox write. Lifecycle preconditions, system jobs, and actions
+ * requiring separate approval remain on their dedicated W02 paths.
+ */
+export async function applyModeratorAccountStateTransitionPostgres(
+  pool: Pool,
+  input: AccountStateTransitionPostgresInput,
+  clock: AccountStateTransitionPostgresClock = systemClock,
+): Promise<AccountStateTransitionPostgresResult> {
+  assertInput(input)
+
+  const client = await pool.connect()
+  let transactionOpen = false
+
+  try {
+    await client.query('BEGIN')
+    transactionOpen = true
+
+    // Lock both identities in a stable order so opposing moderation requests
+    // cannot deadlock by acquiring actor/target rows in opposite order.
+    const accountIds = [...new Set([input.subjectId, input.targetUserId])].sort()
+    const locked = await client.query<LockedAccount>(
+      'SELECT id, account_state AS "accountState", ' +
+        'account_state_version AS "accountStateVersion" ' +
+        'FROM "user" WHERE id = ANY($1::text[]) ORDER BY id FOR UPDATE',
+      [accountIds],
+    )
+    const target = locked.rows.find((row) => row.id === input.targetUserId)
+    if (!target) {
+      throw new AccountStateTransitionPostgresError('NOT_FOUND', 'target user account not found')
+    }
+    const subject = locked.rows.find((row) => row.id === input.subjectId)
+    if (!subject) {
+      throw new AccountStateTransitionPostgresError('FORBIDDEN', 'moderator/admin subject account not found')
+    }
+    const rule = findTransition(target.accountState, input.to)
+    if (Number(target.accountStateVersion) !== input.expectedVersion) {
+      throw new AccountStateTransitionPostgresError('CONFLICT', 'account state version does not match If-Match')
+    }
+
+    const now = assertServerNow(clock).toISOString()
+    const actorType = await authorizeAccountStateAction(
+      client,
+      input.subjectId,
+      input.targetUserId,
+      subject,
+      rule,
+      now,
+    )
+    const nextVersion = input.expectedVersion + 1
+    const event = buildEvent(input, actorType, target.accountState, nextVersion, now)
+    const journalId = randomUUID()
+
+    const updated = await client.query<{ accountStateVersion: number }>(
+      'UPDATE "user" SET account_state = $1, account_state_version = account_state_version + 1, ' +
+        'updated_at = $2 WHERE id = $3 AND account_state = $4 AND account_state_version = $5 ' +
+        'RETURNING account_state_version AS "accountStateVersion"',
+      [input.to, now, input.targetUserId, target.accountState, input.expectedVersion],
+    )
+    if (updated.rowCount !== 1) {
+      throw new AccountStateTransitionPostgresError('CONFLICT', 'account state compare-and-set did not update exactly one row')
+    }
+
+    const inserted = await client.query<{ journalId: string }>(
+      'INSERT INTO auth_013_publication_journal ' +
+        '(journal_id, event_id, event_type, schema_version, resource_id, source_version, payload, status, attempt, next_attempt_at, created_at, published_at, last_error_code) ' +
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING', 1, NULL, $8, NULL, NULL) " +
+        'RETURNING journal_id AS "journalId"',
+      [
+        journalId,
+        event.eventId,
+        event.eventType,
+        event.schemaVersion,
+        event.resourceId,
+        event.sourceVersion,
+        JSON.stringify(event),
+        now,
+      ],
+    )
+    if (inserted.rowCount !== 1 || !inserted.rows[0]?.journalId) {
+      throw new Error('AUTH013_ACCOUNT_STATE_JOURNAL_INSERT_INCOMPLETE')
+    }
+
+    if (tokenInvalidationStates.has(input.to)) {
+      await client.query('DELETE FROM "session" WHERE user_id = $1', [input.targetUserId])
+    }
+
+    await client.query('COMMIT')
+    transactionOpen = false
+    return {
+      from: target.accountState,
+      to: input.to,
+      accountStateVersion: Number(updated.rows[0]?.accountStateVersion ?? nextVersion),
+      eventId: event.eventId,
+      journalId,
+    }
+  } catch (error) {
+    if (transactionOpen) {
+      try {
+        await client.query('ROLLBACK')
+      } catch {
+        throw new AccountStateTransitionPostgresError(
+          'JOURNAL_PERSISTENCE_FAILED',
+          'account-state transaction rollback failed',
+        )
+      }
+    }
+    if (error instanceof AccountStateTransitionPostgresError) throw error
+
+    const pgCode = error && typeof error === 'object' && 'code' in error
+      ? String((error as { code?: unknown }).code)
+      : ''
+    if (pgCode === '23505' || pgCode === '40001' || pgCode === '40P01') {
+      throw new AccountStateTransitionPostgresError(
+        'CONFLICT',
+        'account state changed concurrently or duplicate publication was rejected',
+      )
+    }
+
+    throw new AccountStateTransitionPostgresError(
+      'JOURNAL_PERSISTENCE_FAILED',
+      'account state and AUTH-013 publication journal transaction failed',
+    )
+  } finally {
+    client.release()
+  }
+}
+ + (index * 2 + 4)).join(' ')
   const roleLayerBindings = roleLayerPriority.flatMap(([roleId, layer]) => [roleId, layer])
   const assignments = await client.query<{ roleId: string }>(
     `SELECT DISTINCT role_id AS "roleId" FROM role_assignments
