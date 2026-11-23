@@ -368,7 +368,7 @@ async function checkEvents() {
     const mfaReceiptSource = await readFile('workers/W02-identity/src/auth/mfa-audit-receipts.ts', 'utf8')
     const mfaReceiptStorePortSource = await readFile('workers/W02-identity/src/auth/mfa-audit-operation-receipt-store.ts', 'utf8')
     const mfaEventSource = await readFile('workers/W02-identity/src/auth/mfa-audit-events.ts', 'utf8')
-    const mfaPublicationSource = await readFile('workers/W02-identity/src/auth/mfa-audit-publication-journal.ts', 'utf8')
+    const mfaPublicationSource = await readFile('workers/W02-identity/src/neon/mfa-audit-publication-journal-publisher-postgres.ts', 'utf8')
     const mfaAuditEvidenceSource = await readFile('scripts/auth-007-mfa-audit-evidence.mjs', 'utf8')
     const mfaAuditDeliveryE2ESource = await readFile('scripts/auth-007-mfa-audit-delivery-e2e.mjs', 'utf8')
     const mfaLiveSecurityE2ESource = await readFile('scripts/auth-007-mfa-live-security-e2e.mjs', 'utf8')
@@ -433,7 +433,7 @@ async function checkEvents() {
       'const publishedAt = new Date().toISOString()',
       'event.publishedAt,',
       'const occurredAt = input.occurredAt ?? new Date().toISOString()',
-      'SET status = ?, published_at = ?',
+      \"SET status = 'PUBLISHED', published_at = $1\",
     ]
     if (!(await fileExists('workers/W02-identity/src/auth/mfa-audit-hooks.test.ts')) ||
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-events.test.ts')) ||
@@ -453,7 +453,7 @@ async function checkEvents() {
         ) ||
         !(await fileExists('scripts/auth-007-mfa-audit-evidence.test.mjs')) ||
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-events.test.ts')) ||
-        !(await fileExists('workers/W02-identity/src/auth/mfa-audit-publication-journal.test.ts')) ||
+        !(await fileExists('workers/W02-identity/src/neon/mfa-audit-publication-journal-publisher-postgres.ts')) ||
         !mfaEventSource.includes('auth_007_mfa_publication_journal') ||
         !["auth.mfa.challenge_succeeded", "auth.mfa.challenge_failed",
           "auth.mfa.factor_disabled", "auth.mfa.recovery_codes_rotated",
