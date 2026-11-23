@@ -217,6 +217,31 @@ describe('native PostgreSQL renewal outcome synchronization', () => {
     expect(f.transactionCalls[3]?.values).toEqual([6, originalPlanId, 1, updatedAt, 'rcy_' + 'd'.repeat(26), 5])
   })
 
+  it('rolls back the successful subscription CAS when receipt promotion loses its own CAS', async () => {
+    const failedSubscription = {
+      ...subscriptionRow(), status: 'PAST_DUE' as const, version: 5,
+    }
+    const receipt = {
+      cycle_id: 'rcy_' + 'd'.repeat(26), subscription_id: subscriptionId, subscriber_id: subscriberId,
+      cycle_start: cycleStart, cycle_end: cycleEnd, outcome: 'PAST_DUE',
+      applied_subscription_version: 5, plan_id: originalPlanId, plan_version: 1,
+    }
+    const retryInput = { ...input(false), subscription: failedSubscription, nextStatus: 'ACTIVE' as const }
+    const f = postgresPool(async (sql) => {
+      if (sql === 'BEGIN' || sql === 'ROLLBACK') return { rows: [], rowCount: null }
+      if (sql.includes('UPDATE membership_subscriptions SET plan_id')) return { rows: [{ subscription_id: subscriptionId }], rowCount: 1 }
+      throw new Error('unexpected PostgreSQL statement')
+    }, { receiptRow: receipt, receiptUpdateRows: [] })
+    await expect(applyRenewalSubscriptionUpdatePostgres(f.pool, retryInput)).resolves.toBe('CAS_LOST')
+    expect(f.transactionCalls.map(x => x.sql)).toEqual([
+      'BEGIN', expect.stringContaining('FROM membership_subscription_renewal_cycle_applications'),
+      expect.stringContaining('UPDATE membership_subscriptions SET plan_id'),
+      expect.stringContaining("UPDATE membership_subscription_renewal_cycle_applications SET outcome = 'ACTIVE'"),
+      'ROLLBACK',
+    ])
+    expect(f.transactionCalls.some(x => x.sql === 'COMMIT')).toBe(false)
+  })
+
   it('rolls back when cycle receipt insertion conflicts after subscription CAS', async () => {
     const f = postgresPool(async (sql) => { if (sql === 'BEGIN' || sql === 'ROLLBACK') return { rows: [], rowCount: null }; if (sql.includes('UPDATE membership_subscriptions SET plan_id')) return { rows: [{ subscription_id: subscriptionId }], rowCount: 1 }; throw new Error('unexpected PostgreSQL statement') }, { receiptInsertRows: [] })
     await expect(applyRenewalSubscriptionUpdatePostgres(f.pool, input(false))).resolves.toBe('CAS_LOST')
