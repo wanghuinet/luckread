@@ -40,7 +40,7 @@ const makeRequest = (
   body: JSON.stringify(body),
 })
 
-function makeMemoryStore(): MfaEnrollmentStartStore & { state: () => string | null } {
+function makeMemoryStore() {
   let reservation: string | null = null
   const store = {
     reserve: vi.fn(async ({ keyHash }: Parameters<MfaEnrollmentStartStore['reserve']>[0]) => {
