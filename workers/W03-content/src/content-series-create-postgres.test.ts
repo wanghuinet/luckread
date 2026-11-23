@@ -221,7 +221,7 @@ describe('W03 Neon Series creation', () => {
         },
         body: JSON.stringify({ title: 'My series', description: 'A short description' }),
       }),
-      { D1_02: database } as never,
+      {} as never,
     )
 
     expect(response.status).toBe(201)
