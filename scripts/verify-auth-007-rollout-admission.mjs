@@ -417,8 +417,8 @@ if (blockers.length === 0) {
       exists('workers/W02-identity/src/auth/mfa-audit-events.test.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-hooks.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-hooks.test.ts') &&
-      exists('workers/W02-identity/src/auth/mfa-audit-publication-journal.ts') &&
-      exists('workers/W02-identity/src/auth/mfa-audit-publication-journal.test.ts') &&
+      exists('workers/W02-identity/src/neon/mfa-audit-publication-journal-postgres.ts') &&
+      exists('workers/W02-identity/src/neon/mfa-audit-publication-journal-publisher-postgres.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-receipts.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-receipts.test.ts') &&
       exists('workers/W02-identity/src/auth/mfa-challenge-verification.ts') &&
