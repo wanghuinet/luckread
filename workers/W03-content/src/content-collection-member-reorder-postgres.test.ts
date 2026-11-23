@@ -250,7 +250,7 @@ describe('W03 Neon Collection member reorder', () => {
     }
 
     const result = await reorderCollectionMember(
-      {} as never,
+      store,
       'creator_1',
       'collection_1',
       'content_3',
@@ -258,7 +258,6 @@ describe('W03 Neon Collection member reorder', () => {
       'W/"4"',
       'reorder-key',
       new Date('2026-11-16T02:00:00.000Z'),
-      store,
     )
 
     expect(result).toMatchObject({
