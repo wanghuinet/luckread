@@ -12,6 +12,7 @@ vi.mock('./better-auth.js', () => ({
 
 import type { BetterAuthEnv } from './better-auth.js'
 import type { MfaEnrollmentStartStore } from './mfa-enrollment-start-store.js'
+import type { MfaEnrollmentStartHandlerDependencies } from './mfa-enrollment-start.js'
 import { handleMfaEnrollmentStartRequest } from './mfa-enrollment-start.js'
 
 const principal = {
@@ -56,7 +57,8 @@ function makeMemoryStore(): MfaEnrollmentStartStore & { state: () => string | nu
   return store
 }
 
-const makeAuth = () => ({ handler: mocks.handler }) as unknown as Parameters<typeof handleMfaEnrollmentStartRequest>[2] extends { auth?: infer T } ? T : never
+const makeAuth = (): NonNullable<MfaEnrollmentStartHandlerDependencies['auth']> =>
+  ({ handler: mocks.handler }) as unknown as NonNullable<MfaEnrollmentStartHandlerDependencies['auth']>
 const makeEnv = (): BetterAuthEnv => ({
   AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
 } as unknown as BetterAuthEnv)
