@@ -63,7 +63,7 @@ const handleWithSqliteFixture = (
   overrides: Partial<MfaEnrollmentConfirmHandlerDependencies> = {},
 ) => {
   const db = env.D1_01!
-  return handleWithSqliteFixture(env, request, {
+  return handleMfaEnrollmentConfirmRequest(env, request, {
     store: createD1MfaEnrollmentConfirmStore(db),
     statusStore: { read: (userId, now) => mocks.readStatus(db, userId, now) },
     receiptStore: createD1MfaAuditOperationReceiptStore(db),
