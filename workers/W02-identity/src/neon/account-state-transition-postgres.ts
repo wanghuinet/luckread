@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg'
 
 import accountStateMachine from '../../../../contracts/state-machines/account.json'
 import permissions from '../../../../contracts/authz/permissions.json'
+import layers from '../../../../contracts/authz/layers.json'
 import type { AccountState } from '../account/account-state-transition.js'
 import { resolveGlobalLayerPostgres } from './role-assignment-postgres.js'
 
@@ -101,6 +102,13 @@ const systemClock: AccountStateTransitionPostgresClock = () => new Date()
 
 const permissionMinimumLayers = new Map(
   permissions['x-permissions'].map((permission) => [permission.name, permission.minLayer]),
+)
+const roleToLayer = new Map<string, number>()
+for (const layer of layers['x-layers']) {
+  for (const role of layer.roles ?? []) roleToLayer.set(role, Number(layer.id.slice(1)))
+}
+const roleLayerPriority = [...roleToLayer.entries()].sort(([roleA, layerA], [roleB, layerB]) =>
+  layerB - layerA || (roleA < roleB ? -1 : roleA > roleB ? 1 : 0),
 )
 const rolePermissions = new Map<string, Set<string>>()
 for (const role of permissions['x-role-permissions'].roles) {
@@ -234,9 +242,96 @@ async function authorizeModeratorAction(
   return rule.actor
 }
 
+async function authorizeSelfServiceAction(
+  client: PoolClient,
+  subjectId: string,
+  targetUserId: string,
+  rule: TransitionRule,
+  now: string,
+): Promise<'user'> {
+  if (subjectId !== targetUserId) {
+    throw new AccountStateTransitionPostgresError(
+      'FORBIDDEN',
+      'user-owned account transitions require the authenticated user to be the target',
+    )
+  }
+  if (rule.precondition) {
+    throw new AccountStateTransitionPostgresError(
+      'PRECONDITION_FAILED',
+      'transition precondition must be proven by its dedicated W02 lifecycle path: ' + rule.precondition,
+    )
+  }
+  if (rule.requiresApproval) {
+    throw new AccountStateTransitionPostgresError(
+      'FORBIDDEN',
+      'transition requires a separately verified approval; approval-required transitions fail closed',
+    )
+  }
+  if (!rule.permission) return 'user'
+
+  const minimumLayer = permissionMinimumLayers.get(rule.permission)
+  if (typeof minimumLayer !== 'string' || !/^L[0-8]$/.test(minimumLayer)) {
+    throw new AccountStateTransitionPostgresError('FORBIDDEN', 'transition permission authority is unavailable')
+  }
+
+  await lockAuthorizationFacts(client, subjectId)
+  const layerCase = roleLayerPriority.map((_, index) => 'WHEN $' + (index * 2 + 3) + ' THEN $' + (index * 2 + 4)).join(' ')
+  const roleLayerBindings = roleLayerPriority.flatMap(([roleId, layer]) => [roleId, layer])
+  const assignments = await client.query<{ roleId: string }>(
+    `SELECT role_id AS "roleId" FROM (
+       SELECT DISTINCT role_id FROM role_assignments
+       WHERE subject_id = $1 AND status = 'ACTIVE' AND valid_from <= $2
+         AND (valid_until IS NULL OR $2 < valid_until)
+         AND scope_type = 'global' AND scope_id IS NULL
+     ) AS effective_global_roles
+     ORDER BY CASE role_id ${layerCase} ELSE -1 END DESC, role_id ASC
+     LIMIT 62`,
+    [subjectId, now, ...roleLayerBindings],
+  )
+
+  let subjectLayer = 0
+  const grantedPermissions = new Set<string>()
+  for (const assignment of assignments.rows) {
+    const layer = roleToLayer.get(assignment.roleId)
+    if (layer && layer > subjectLayer) subjectLayer = layer
+    for (const permission of rolePermissions.get(assignment.roleId) ?? []) {
+      grantedPermissions.add(permission)
+    }
+  }
+
+  const requiredLayer = Number(minimumLayer.slice(1))
+  if (subjectLayer < requiredLayer || !grantedPermissions.has(rule.permission)) {
+    throw new AccountStateTransitionPostgresError(
+      'FORBIDDEN',
+      'effective global role does not grant the required self-service transition permission',
+    )
+  }
+  return 'user'
+}
+
+async function authorizeAccountStateAction(
+  client: PoolClient,
+  subjectId: string,
+  targetUserId: string,
+  subject: LockedAccount,
+  rule: TransitionRule,
+  now: string,
+): Promise<'user' | 'operator' | 'admin'> {
+  if (rule.actor === 'user') {
+    return authorizeSelfServiceAction(client, subjectId, targetUserId, rule, now)
+  }
+  if (subjectId === targetUserId) {
+    throw new AccountStateTransitionPostgresError(
+      'FORBIDDEN',
+      'moderator/admin cannot apply account moderation to self',
+    )
+  }
+  return authorizeModeratorAction(client, subjectId, subject, rule, now)
+}
+
 function buildEvent(
   input: AccountStateTransitionPostgresInput,
-  actorType: 'operator' | 'admin',
+  actorType: 'user' | 'operator' | 'admin',
   from: AccountState,
   nextVersion: number,
   now: string,
@@ -244,7 +339,9 @@ function buildEvent(
   const eventId = randomUUID()
   const actor = actorType === 'operator'
     ? { actorId: input.subjectId, actorType: 'user' as const, operationalRole: 'PLATFORM_OPERATOR' as const }
-    : { actorId: input.subjectId, actorType: 'admin' as const }
+    : actorType === 'admin'
+      ? { actorId: input.subjectId, actorType: 'admin' as const }
+      : { actorId: input.subjectId, actorType: 'user' as const }
 
   return {
     eventId,
@@ -274,14 +371,15 @@ function buildEvent(
 }
 
 /**
- * PostgreSQL-native W02 moderator/admin account-state transition.
+ * PostgreSQL-native W02 self-service and moderator/admin account-state transition.
  *
  * This is a testable persistence adapter, not a production Worker binding.
- * It admits canonical operator/admin transitions that require no separate
- * approval receipt. It re-evaluates global RoleAssignment permissions and
- * MFA in the same transaction as the state CAS and AUTH-013 outbox write.
- * Registration, email activation, lifecycle windows, system jobs, and
- * approval-required transitions remain on their dedicated W02 paths.
+ * It admits permissionless user-owned transitions and canonical operator/admin
+ * transitions that require no separate approval receipt. Explicit self-service
+ * permissions are derived from effective global RoleAssignments; privileged
+ * actions additionally recheck MFA in the same transaction as the state CAS
+ * and AUTH-013 outbox write. Lifecycle preconditions, system jobs, and actions
+ * requiring separate approval remain on their dedicated W02 paths.
  */
 export async function applyModeratorAccountStateTransitionPostgres(
   pool: Pool,
@@ -314,17 +412,20 @@ export async function applyModeratorAccountStateTransitionPostgres(
     if (!subject) {
       throw new AccountStateTransitionPostgresError('FORBIDDEN', 'moderator/admin subject account not found')
     }
-    if (input.subjectId === input.targetUserId) {
-      throw new AccountStateTransitionPostgresError('FORBIDDEN', 'moderator/admin cannot apply account moderation to self')
-    }
-
     const rule = findTransition(target.accountState, input.to)
     if (Number(target.accountStateVersion) !== input.expectedVersion) {
       throw new AccountStateTransitionPostgresError('CONFLICT', 'account state version does not match If-Match')
     }
 
     const now = assertServerNow(clock).toISOString()
-    const actorType = await authorizeModeratorAction(client, input.subjectId, subject, rule, now)
+    const actorType = await authorizeAccountStateAction(
+      client,
+      input.subjectId,
+      input.targetUserId,
+      subject,
+      rule,
+      now,
+    )
     const nextVersion = input.expectedVersion + 1
     const event = buildEvent(input, actorType, target.accountState, nextVersion, now)
     const journalId = randomUUID()
