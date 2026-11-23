@@ -417,15 +417,23 @@ export async function syncTerminalRenewalCycleToSubscription(
       subscription.current_period_end === cycle.cycle_end && subscription.plan_id === receipt.plan_id &&
       subscription.plan_version === receipt.plan_version;
     const pastDueMatches = receipt.outcome === 'PAST_DUE' && subscription.status === 'PAST_DUE' &&
-      subscription.current_period_start < cycle.cycle_start && subscription.current_period_end === cycle.cycle_start;
+      subscription.current_period_start < cycle.cycle_start && subscription.current_period_end === cycle.cycle_start &&
+      subscription.plan_id === receipt.plan_id && subscription.plan_version === receipt.plan_version;
     if (identityMatches && (activePeriodMatches || pastDueMatches)) {
       // A membership receipt proves the transaction committed, but not that its
       // cross-service governance audit was delivered. Replay the deterministic
       // audit before acknowledging the finance cycle.
-      if (receipt.outcome === 'ACTIVE' && subscription.trial_started_at &&
-          subscription.trial_ends_at === cycle.cycle_start &&
-          subscription.trial_converted_at === cycle.cycle_start &&
-          cycle.state === 'SUCCEEDED' &&
+      const hasTrialMetadata = subscription.trial_started_at !== null ||
+        subscription.trial_ends_at !== null || subscription.trial_converted_at !== null;
+      if (receipt.outcome === 'ACTIVE' && hasTrialMetadata &&
+          (!isCanonicalIso(subscription.trial_started_at) ||
+           !isCanonicalIso(subscription.trial_ends_at) ||
+           subscription.trial_started_at >= subscription.trial_ends_at ||
+           subscription.trial_ends_at !== cycle.cycle_start ||
+           subscription.trial_converted_at !== cycle.cycle_start)) {
+        return reconcile(env, cycleStore, cycle, 'TRIAL_RECEIPT_METADATA_MISMATCH', now);
+      }
+      if (receipt.outcome === 'ACTIVE' && hasTrialMetadata &&
           !(await auditAppliedSubscriptionTrialConversion(env, cycle, subscription))) {
         return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
       }
