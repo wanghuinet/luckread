@@ -1,21 +1,12 @@
 import { resolveBetterAuthPrincipal } from './principal.js'
 import type { AuthenticatedPrincipal } from './principal.js'
-import { requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
+import type { BetterAuthEnv } from './better-auth.js'
 
 export type AuthoritativeMfaStatus = {
   enabled: boolean
   verified: boolean
   enrolledAt: string | null
 }
-
-type MfaStatusRow = {
-  userEnabled: number | boolean | null
-  enrolledAt: string | null
-  factorVerified: number | boolean | null
-}
-
-const isTrue = (value: number | boolean | null | undefined): boolean =>
-  value === true || value === 1
 
 export interface MfaStatusStore {
   read(userId: string, now: Date): Promise<AuthoritativeMfaStatus | null>
@@ -27,59 +18,6 @@ export type MfaStatusHandlerDependencies = {
     env: BetterAuthEnv,
     request: Request,
   ) => Promise<Pick<AuthenticatedPrincipal, 'userId' | 'accountState'> | null>
-}
-
-/**
- * Reads only the public MFA status projection from W02's authoritative D1-01.
- * Never returns factor secrets, backup codes, lockout counters or replay state.
- * A partial or stale database state does not establish MFA assurance.
- */
-export async function readAuthoritativeMfaStatus(
-  db: D1Database,
-  userId: string,
-  now = new Date(),
-): Promise<AuthoritativeMfaStatus | null> {
-  if (typeof userId !== 'string' || userId.length < 1 || userId.length > 128) {
-    throw new TypeError('invalid MFA status subject')
-  }
-  if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
-    throw new TypeError('invalid MFA status clock')
-  }
-
-  const row = await db.prepare(
-    'SELECT u.two_factor_enabled AS userEnabled, u.mfa_enrolled_at AS enrolledAt, ' +
-    'tf.verified AS factorVerified FROM "user" u ' +
-    'LEFT JOIN "twoFactor" tf ON tf.userId = u.id WHERE u.id = ? LIMIT 1',
-  ).bind(userId).first<MfaStatusRow>()
-
-  if (!row) return null
-
-  const timestamp = typeof row.enrolledAt === 'string' ? Date.parse(row.enrolledAt) : Number.NaN
-  const validEnrollment = Number.isFinite(timestamp) && timestamp <= now.getTime()
-  // A factor verification bit alone is insufficient if the authoritative
-  // enrollment timestamp is missing, invalid, or in the future.
-  const verified = isTrue(row.factorVerified) && validEnrollment
-  const enabled = isTrue(row.userEnabled) && verified
-
-  return {
-    enabled,
-    verified,
-    enrolledAt: enabled ? new Date(timestamp).toISOString() : null,
-  }
-}
-
-/** D1 remains the production-default MFA status projection store. */
-/**
- * @deprecated-next-version
- * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
- * Replacement: PostgreSQL MFA status Store in src/neon/mfa-factor-state-postgres.ts.
- * Removal: Next release.
- * Condition: MFA status tests use PostgreSQL/in-memory Store fixtures and no D1 status projection remains.
- */
-export function createD1MfaStatusStore(db: D1Database): MfaStatusStore {
-  return {
-    read: (userId, now) => readAuthoritativeMfaStatus(db, userId, now),
-  }
 }
 
 const response = (body: unknown, status = 200): Response =>
@@ -108,7 +46,8 @@ export async function handleMfaStatusRequest(
     if (!principal || principal.accountState !== 'ACTIVE') {
       return response({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }, 401)
     }
-    const store = dependencies.store ?? createD1MfaStatusStore(requireLegacyW02D1Database(env))
+    const store = dependencies.store
+    if (!store) throw new Error('W02_MFA_STATUS_POSTGRES_STORE_REQUIRED')
     const status = await store.read(principal.userId, new Date())
     if (!status) return response({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }, 401)
     return response({ data: status })
