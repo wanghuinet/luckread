@@ -378,7 +378,8 @@ export async function markRenewalCycleSyncStatePostgres(
     if (result.rows.length === 1) return true
     const latest = await readRenewalCycleByIdPostgres(pool, cycle.cycle_id)
     if (!latest) return failUnavailable()
-    return latest.subscription_sync_state === nextState
+    return latest.subscription_sync_state === nextState &&
+      latest.subscription_sync_error_code === errorCode
   } catch {
     return failUnavailable()
   }
