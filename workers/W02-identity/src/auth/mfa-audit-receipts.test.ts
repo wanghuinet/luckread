@@ -30,11 +30,7 @@ describe('MFA audit receipt plan domain helpers', () => {
       idempotencyKey: baseEvent.idempotencyKey,
     })
 
-    const retry = mergeMfaAuditReceiptPlan(receiptId, first, [{
-      ...baseEvent,
-      eventId: 'evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      occurredAt: '2026-11-23T12:01:00.000Z',
-    }], '2026-11-23T12:01:00.000Z')
+    const retry = mergeMfaAuditReceiptPlan(receiptId, first, [baseEvent], '2026-11-23T12:00:00.000Z')
     expect(retry).toEqual(first)
   })
 
