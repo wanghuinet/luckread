@@ -10,10 +10,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./principal.js', () => ({ resolveBetterAuthPrincipal: mocks.resolvePrincipal }))
 vi.mock('./better-auth.js', () => ({
   createLuckReadAuth: mocks.createAuth,
-  requireLegacyW02D1Database: (env: { D1_01?: D1Database }) => {
-    if (!env.D1_01) throw new Error('W02_D1_TEST_BINDING_REQUIRED')
-    return env.D1_01
-  },
 }))
 
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
@@ -21,7 +17,7 @@ import type { MfaEnrollmentStartStore } from './mfa-enrollment-start-store.js'
 import { handleMfaEnrollmentStartRequest } from './mfa-enrollment-start.js'
 import { createD1MfaEnrollmentStartStore } from './mfa-enrollment-start-store.js'
 
-const handleWithSqliteFixture = (env: BetterAuthEnv, request: Request) =>
+const handleWithSqliteFixture = (env: BetterAuthEnv & { D1_01: D1Database }, request: Request) =>
   handleMfaEnrollmentStartRequest(env, request, {
     store: createD1MfaEnrollmentStartStore(env.D1_01!),
   })
@@ -124,7 +120,7 @@ describe('W02 MFA enrollment-start authority', () => {
   it('fails closed when no persistence store is injected', async () => {
     const response = await handleMfaEnrollmentStartRequest({
       AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
-    } as unknown as BetterAuthEnv, makeRequest())
+    } as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest())
     expect(response.status).toBe(503)
     expect(mocks.handler).not.toHaveBeenCalled()
   })
@@ -135,7 +131,7 @@ describe('W02 MFA enrollment-start authority', () => {
       const response = await handleWithSqliteFixture({
         D1_01: db,
         AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
-      } as BetterAuthEnv, makeRequest())
+      } as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest())
       expect(response.status).toBe(200)
       await expect(response.json()).resolves.toEqual({
         data: {
@@ -181,7 +177,7 @@ describe('W02 MFA enrollment-start authority', () => {
     }))
     const response = await handleMfaEnrollmentStartRequest({
       AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
-    } as unknown as BetterAuthEnv, makeRequest(), {
+    } as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest(), {
       auth,
       store,
       resolvePrincipal,
@@ -212,13 +208,13 @@ describe('W02 MFA enrollment-start authority', () => {
     try {
       const forbidden = await handleWithSqliteFixture({
         D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
-      } as BetterAuthEnv, makeRequest(undefined, 'mfa-enroll-key-0001', false))
+      } as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest(undefined, 'mfa-enroll-key-0001', false))
       expect(forbidden.status).toBe(403)
 
       mocks.resolvePrincipal.mockResolvedValueOnce({ ...principal, accountState: 'SUSPENDED' })
       const inactive = await handleWithSqliteFixture({
         D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
-      } as BetterAuthEnv, makeRequest())
+      } as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest())
       expect(inactive.status).toBe(403)
       expect(mocks.handler).not.toHaveBeenCalled()
     } finally {
@@ -229,7 +225,7 @@ describe('W02 MFA enrollment-start authority', () => {
   it('rejects repeated or competing keys without calling Better Auth a second time', async () => {
     const { db, close } = makeDb()
     try {
-      const env = { D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter } as BetterAuthEnv
+      const env = { D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter } as unknown as BetterAuthEnv & { D1_01: D1Database }
       const first = await handleWithSqliteFixture(env, makeRequest())
       expect(first.status).toBe(200)
       const sameKeyReplay = await handleWithSqliteFixture(env, makeRequest())
@@ -248,7 +244,7 @@ describe('W02 MFA enrollment-start authority', () => {
   it('requires a real idempotency key and clears only an unmaterialized reservation after adapter failure', async () => {
     const { db, sqlite, close } = makeDb()
     try {
-      const env = { D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter } as BetterAuthEnv
+      const env = { D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter } as unknown as BetterAuthEnv & { D1_01: D1Database }
       const noKey = await handleWithSqliteFixture(env, makeRequest(
         { currentPassword: 'correct horse battery staple' }, '',
       ))
@@ -269,12 +265,12 @@ describe('W02 MFA enrollment-start authority', () => {
   it('fails closed on malformed enrollment output or unavailable rate-limit binding', async () => {
     const { db, close } = makeDb()
     try {
-      const env = { D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter } as BetterAuthEnv
+      const env = { D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter } as unknown as BetterAuthEnv & { D1_01: D1Database }
       mocks.handler.mockResolvedValueOnce(Response.json({ method: 'totp', totpURI: 'bad', backupCodes: [] }))
       const malformed = await handleWithSqliteFixture(env, makeRequest())
       expect(malformed.status).toBe(503)
 
-      const noLimiter = await handleWithSqliteFixture({ D1_01: db } as BetterAuthEnv, makeRequest())
+      const noLimiter = await handleWithSqliteFixture({} as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest())
       expect(noLimiter.status).toBe(503)
     } finally {
       close()

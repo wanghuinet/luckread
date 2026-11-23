@@ -379,7 +379,6 @@ async function checkEvents() {
       "'/two-factor/generate-backup-codes'",
       "classifyMfaAuditHookOutcome",
       'mfaAuditOperationReceiptStore?: MfaAuditOperationReceiptStore',
-      'createD1MfaAuditOperationReceiptStore(legacyD1!)',
       'effectiveMfaAuditReceiptStore!.create(',
       'effectiveMfaAuditReceiptStore!.append(',
       'finalizeMfaAuditOperationReceiptWithRetry(effectiveMfaAuditReceiptStore!',

@@ -1,23 +1,18 @@
 import { getW02PostgresRuntime } from '../neon/runtime.js'
 import { activateEmailVerifiedAccountPostgres } from '../neon/email-verification-activation-postgres.js'
 import { ensureBaseUserRolePostgres } from '../neon/role-assignment-postgres.js'
-import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
-import { ensureBaseUserRole, ensureVerifiedUserRole } from '../authz/role-assignment.js'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { symmetricDecrypt } from 'better-auth/crypto'
 import { betterAuth } from 'better-auth'
 import { bearer, twoFactor } from 'better-auth/plugins'
 import { matchTotpTimeStep } from './totp-replay-guard.js'
-import { createD1MfaFactorStateStore, type MfaFactorStateStore } from './mfa-factor-state-store.js'
+import type { MfaFactorStateStore } from './mfa-factor-state-store.js'
 import { isUnexpiredMfaChallengeRecord } from './mfa-challenge-verification.js'
 import { deriveMfaAuditEventIdForIdempotencyKey } from './mfa-audit-events.js'
 import { sendResendEmail } from './resend-email.js'
 import { buildPasswordResetPageUrl } from './password-reset-link.js'
 import type { MfaAuditReceiptEvent } from './mfa-audit-receipts.js'
-import {
-  createD1MfaAuditOperationReceiptStore,
-  type MfaAuditOperationReceiptStore,
-} from './mfa-audit-operation-receipt-store.js'
+import type { MfaAuditOperationReceiptStore } from './mfa-audit-operation-receipt-store.js'
 import {
   classifyMfaAuditHookOutcome,
   getMfaAuditHookState,
@@ -31,8 +26,6 @@ export interface RateLimitBinding {
 }
 
 export interface BetterAuthEnv {
-  /** @deprecated-next-version: isolated Better Auth D1 fixture support only; never bound by production W02. */
-  D1_01?: D1Database
   W02_DATABASE_DRIVER?: string
   HYPERDRIVE?: { connectionString: string }
   RESEND_API_KEY?: string
@@ -79,37 +72,6 @@ async function sendPasswordResetEmail(
     text: 'Reset your LuckRead password by opening this link: ' + resetPageUrl,
     html: '<p>We received a request to reset your password.</p><p>If you requested this, use the link below to choose a new password:</p><p><a href="' + safeUrl + '">Reset password</a></p><p>If you did not request this, you can ignore this email.</p>',
   })
-}
-
-/**
- * @deprecated-next-version
- * Reason: Explicit D1 database accessor exists only for the legacy Better Auth schema/test profile.
- * Replacement: createLuckReadAuth uses the W02 Neon Hyperdrive runtime exclusively.
- * Removal: Next release.
- * Condition: Better Auth schema generation and all D1-profile unit tests move to PostgreSQL or isolated in-memory fixtures.
- */
-export function requireLegacyW02D1Database(env: BetterAuthEnv): D1Database {
-  if (!env.D1_01) throw new Error('W02_D1_TEST_BINDING_REQUIRED')
-  return env.D1_01
-}
-
-/**
- * @deprecated-next-version
- * Reason: Legacy D1 account activation remains only for the isolated Better Auth D1 test profile.
- * Replacement: activateEmailVerifiedAccountPostgres in the production Neon lifecycle callback.
- * Removal: Next release.
- * Condition: D1 Better Auth profile tests and source-schema tooling no longer invoke the compatibility profile.
- */
-async function activateVerifiedAccount(db: D1Database, userId: string): Promise<void> {
-  const now = new Date().toISOString()
-  const activation = await activateEmailVerifiedAccount(db, userId, now)
-
-  // The account transition and canonical L2 assignment are committed in one
-  // D1 batch. This idempotent guard also repairs an already-active account
-  // whose verification callback previously stopped before role materialization.
-  if (activation.accountState === 'ACTIVE') {
-    await ensureVerifiedUserRole(db, userId, now)
-  }
 }
 
 const sanitizeAuthDiagnostic = (value: string): string => value
@@ -163,7 +125,7 @@ async function finalizeKnownMfaRejection(
 
 type BetterAuthDatabase = NonNullable<Parameters<typeof betterAuth>[0]['database']>
 
-export type BetterAuthPersistenceProfile = 'legacy-d1-test' | 'postgres-rehearsal' | 'postgres'
+export type BetterAuthPersistenceProfile = 'postgres-rehearsal' | 'postgres'
 
 export type BetterAuthPostgresLifecycleAdapters = {
   afterUserCreated: (userId: string) => Promise<void>
@@ -179,8 +141,6 @@ export const buildLuckReadAuth = (
   mfaAuditOperationReceiptStore?: MfaAuditOperationReceiptStore,
   resolveMfaSessionSubject?: (headers: Headers) => Promise<string | null>,
 ) => {
-  const postgresPersistence = persistenceProfile !== 'legacy-d1-test'
-  const legacyD1 = postgresPersistence ? undefined : requireLegacyW02D1Database(env)
   const unavailablePostgresRehearsalMfaFactorStateStore: MfaFactorStateStore = {
     async isActiveSubject() {
       throw new Error('W02_MFA_FACTOR_STORE_NOT_CONFIGURED_FOR_SCHEMA_PROFILE')
@@ -192,15 +152,10 @@ export const buildLuckReadAuth = (
       throw new Error('W02_MFA_FACTOR_STORE_NOT_CONFIGURED_FOR_SCHEMA_PROFILE')
     },
   }
-  const effectiveMfaFactorStateStore = mfaFactorStateStore ??
-    (postgresPersistence
-      ? unavailablePostgresRehearsalMfaFactorStateStore
-      : createD1MfaFactorStateStore(legacyD1!))
+  const effectiveMfaFactorStateStore = mfaFactorStateStore ?? unavailablePostgresRehearsalMfaFactorStateStore
   const postgresEmailVerifiedCallback = postgresLifecycleAdapters?.afterEmailVerified
-  // The Neon production factory injects a provider-matched receipt store;
-  // only the deprecated explicit D1 test/schema profile constructs a D1 store.
-  const effectiveMfaAuditReceiptStore = mfaAuditOperationReceiptStore ??
-    (postgresPersistence ? undefined : createD1MfaAuditOperationReceiptStore(legacyD1!))
+  // Receipt persistence is injected by the Neon runtime; schema-only profiles omit MFA hooks.
+  const effectiveMfaAuditReceiptStore = mfaAuditOperationReceiptStore
   // Keep local origins available only to the local evidence/runtime profile.
   // Production must never inherit localhost trust from a shared config.
   const trustedOrigins = [
@@ -543,70 +498,33 @@ export const buildLuckReadAuth = (
           console.info(JSON.stringify({ event: 'w02.better_auth.verification_email_completed' }))
         }
       },
-      ...(postgresPersistence
-        ? (postgresEmailVerifiedCallback ? {
-            afterEmailVerification: async (user) => {
-              await postgresEmailVerifiedCallback(String(user.id))
-            },
-          } : {})
-        : {
-            afterEmailVerification: async (user) => {
-              const userId = String(user.id)
-              await activateVerifiedAccount(legacyD1!, userId)
-            },
-          }),
+      ...(postgresEmailVerifiedCallback ? {
+        afterEmailVerification: async (user) => {
+          await postgresEmailVerifiedCallback(String(user.id))
+        },
+      } : {}),
     },
-    ...(postgresPersistence
-      ? (postgresLifecycleAdapters ? {
-          databaseHooks: {
-            user: {
-              create: {
-                before: async () => {
-                  if (env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development') {
-                    console.info(JSON.stringify({ event: 'w02.better_auth.user_create_before' }))
-                  }
-                },
-                after: async (user) => {
-                  const developmentDiagnostics = env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development'
-                  if (developmentDiagnostics) console.info(JSON.stringify({ event: 'w02.better_auth.role_materialization_started' }))
-                  await postgresLifecycleAdapters.afterUserCreated(String(user.id))
-                  if (developmentDiagnostics) console.info(JSON.stringify({ event: 'w02.better_auth.role_materialization_completed' }))
-                },
-              },
+    ...(postgresLifecycleAdapters ? {
+      databaseHooks: {
+        user: {
+          create: {
+            before: async () => {
+              if (env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development') {
+                console.info(JSON.stringify({ event: 'w02.better_auth.user_create_before' }))
+              }
+            },
+            after: async (user) => {
+              const developmentDiagnostics = env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development'
+              if (developmentDiagnostics) console.info(JSON.stringify({ event: 'w02.better_auth.role_materialization_started' }))
+              await postgresLifecycleAdapters.afterUserCreated(String(user.id))
+              if (developmentDiagnostics) console.info(JSON.stringify({ event: 'w02.better_auth.role_materialization_completed' }))
             },
           },
-        } : {})
-      : { databaseHooks: {
-          user: {
-            create: {
-              after: async (user) => {
-                await ensureBaseUserRole(legacyD1!, String(user.id), new Date().toISOString())
-              },
-            },
-            update: {
-              after: async (user) => {
-                const userId = String(user.id)
-                const pendingMfaEnrollment = await legacyD1!.prepare(
-                  'SELECT id FROM "user" WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL LIMIT 1',
-                ).bind(userId).first<{ id: string }>()
-                if (!pendingMfaEnrollment) return
-
-                // The reviewed D1 lifecycle triggers are authoritative and revoke
-                // sessions on every enable/disable transition. This hook is a fallback
-                // for a legacy or partially migrated row with a missing enrollment time.
-                const enrolledAt = new Date().toISOString()
-                await legacyD1!.batch([
-                  legacyD1!.prepare(
-                    'UPDATE "user" SET mfa_enrolled_at = ? WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL',
-                  ).bind(enrolledAt, userId),
-                  legacyD1!.prepare('DELETE FROM "session" WHERE user_id = ?').bind(userId),
-                ])
-              },
-            },
-          },
-        } }),
+        },
+      },
+    } : {}),
     user: {
-      // The checked-in D1 schema deliberately uses snake_case columns.
+      // The PostgreSQL schema deliberately uses snake_case columns.
       // Map Better Auth's camelCase core fields to those exact column names.
       fields: {
         emailVerified: 'email_verified',
@@ -750,8 +668,8 @@ export const buildLuckReadAuth = (
 
 const authInstances = new WeakMap<object, ReturnType<typeof buildLuckReadAuth>>()
 
-// Each production isolate uses the existing Neon Hyperdrive pool. The D1 profile
-// remains reachable only through buildLuckReadAuth's explicit test/schema fixture API.
+// Each production isolate uses the existing Neon Hyperdrive pool. Both runtime and
+// rehearsal configurations use the same PostgreSQL-only Better Auth builder.
 export const createLuckReadAuth = (env: BetterAuthEnv) => {
   const runtime = getW02PostgresRuntime(env)
   const cached = authInstances.get(runtime.pool)

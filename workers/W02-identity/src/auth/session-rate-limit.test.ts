@@ -7,7 +7,6 @@ import {
 } from './session-rate-limit.js'
 
 const makeEnv = (overrides: Partial<BetterAuthEnv> = {}): BetterAuthEnv => ({
-  D1_01: {} as D1Database,
   AUTH_SESSION_READ_LIMITER: { limit: vi.fn().mockResolvedValue({ success: true }) },
   AUTH_SESSION_WRITE_LIMITER: { limit: vi.fn().mockResolvedValue({ success: true }) },
   ...overrides,
