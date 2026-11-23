@@ -160,6 +160,8 @@ for (const module of expected.w01PayloadModules) {
 
 for (const file of [
   payload.config,
+  payload.postgresAdapter,
+  payload.productionWrangler,
   payload.wrangler,
   ...payload.collections,
   ...payload.sqliteSchemaSnapshots,
@@ -181,8 +183,15 @@ for (const file of [
     compareSets('W01 latest Payload SQLite table catalog', tables, payload.expectedCurrentTableNames)
   }
   if (file === payload.config) {
-    if (!content.includes('@payloadcms/db-d1-sqlite')) failures.push('W01 current Payload adapter no longer matches the source contract')
-    if (!/push\s*:\s*false/.test(content)) failures.push('W01 Payload push:false was not found; do not admit automatic production DDL')
+    if (!content.includes('createW01NeonPostgresAdapter')) {
+      failures.push('W01 active Payload config must use the Neon PostgreSQL adapter')
+    }
+    if (content.includes('sqliteD1Adapter')) {
+      failures.push('W01 active Payload config must not retain a D1/SQLite runtime adapter')
+    }
+  }
+  if (file === payload.postgresAdapter && !/push\s*:\s*false/.test(content)) {
+    failures.push('W01 Neon PostgreSQL adapter must keep push:false; do not admit automatic production DDL')
   }
   if (file === payload.wrangler) {
     let config
