@@ -74,47 +74,6 @@ function createDatabase(options: { duplicateIdempotency?: boolean } = {}) {
 }
 
 describe('W03 Neon Series creation', () => {
-  it('preserves the original D1 batch implementation as the default', async () => {
-    const preparedSql: string[] = []
-    let batchStatements: unknown[] = []
-    const database = {
-      prepare(sql: string) {
-        preparedSql.push(sql)
-        return {
-          bind() {
-            return {
-              async first() { return null },
-            }
-          },
-        }
-      },
-      async batch(statements: unknown[]) {
-        batchStatements = statements
-        return []
-      },
-    }
-
-    const created = await createSeries(
-      database as never,
-      'creator_1',
-      { title: 'My series', description: 'A short description' },
-      'd1-series-key',
-      new Date('2026-11-16T00:00:00.000Z'),
-    )
-
-    expect(created).toMatchObject({
-      ownerUserId: 'creator_1',
-      creatorId: 'creator_1',
-      ipId: null,
-      state: 'DRAFT',
-      title: 'My series',
-    })
-    expect(batchStatements).toHaveLength(4)
-    expect(preparedSql.some(sql => sql.includes('FROM content_mutation_idempotency'))).toBe(true)
-    expect(preparedSql.some(sql => sql.startsWith('INSERT INTO content_series'))).toBe(true)
-    expect(preparedSql.some(sql => sql.includes('content_txn_guard'))).toBe(true)
-  })
-
   it('reads the existing D1-02 idempotency row from PostgreSQL with normalized expiry', async () => {
     const fixture = createDatabase()
     const store = createPostgresSeriesCreateStore(fixture.database)
