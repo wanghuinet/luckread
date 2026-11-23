@@ -58,17 +58,6 @@ export interface W10ExecutionJobReadStore {
   list(input: W10ExecutionJobReadInput): Promise<readonly W10ExecutionJobReadRow[]>
 }
 
-export interface W10D1Statement {
-  bind(...values: unknown[]): {
-    first<T>(): Promise<T | null>
-    all<T>(): Promise<{ results?: T[] | null }>
-  }
-}
-
-export interface W10D1ReadExecutor {
-  prepare(sql: string): W10D1Statement
-}
-
 export class W10ExecutionJobReadStoreError extends Error {
   readonly code = 'SERVICE_UNAVAILABLE'
   readonly status = 503
@@ -99,61 +88,3 @@ const SELECT_JOB_COLUMNS = `
   j.error_code,j.result_ref
 `
 
-/** D1 remains the current production-default adapter. */
-export function createD1W10T16MembershipRenewalJobReadStore(
-  db: W10D1ReadExecutor,
-): W10ExecutionJobReadStore {
-  return {
-    async getByOperationId(operationId) {
-      try {
-        return await db.prepare(
-          `SELECT ${SELECT_JOB_COLUMNS}
-             FROM jobs j
-            WHERE j.operation_id = ?
-              AND j.owner_worker = 'W07'
-              AND j.owner_task_id = 'T16'`,
-        ).bind(operationId).first<W10ExecutionJobReadRow>()
-      } catch {
-        throw new W10ExecutionJobReadStoreError()
-      }
-    },
-
-    async list(input) {
-      assertValidRead(input)
-      if (input.states?.length === 0) return []
-
-      const values: unknown[] = []
-      const predicates = ["j.owner_worker = 'W07'", "j.owner_task_id = 'T16'"]
-
-      if (input.states) {
-        predicates.push('j.state IN (' + input.states.map(() => '?').join(',') + ')')
-        values.push(...input.states)
-      }
-
-      if (input.cursor) {
-        predicates.push(
-          '(j.updated_at < ? OR (j.updated_at = ? AND j.operation_id < ?))',
-        )
-        values.push(
-          input.cursor.updatedAt,
-          input.cursor.updatedAt,
-          input.cursor.operationId,
-        )
-      }
-
-      values.push(input.limit)
-      try {
-        const result = await db.prepare(
-          `SELECT ${SELECT_JOB_COLUMNS}
-             FROM jobs j
-            WHERE ${predicates.join(' AND ')}
-            ORDER BY j.updated_at DESC,j.operation_id DESC
-            LIMIT ?`,
-        ).bind(...values).all<W10ExecutionJobReadRow>()
-        return result.results ?? []
-      } catch {
-        throw new W10ExecutionJobReadStoreError()
-      }
-    },
-  }
-}
