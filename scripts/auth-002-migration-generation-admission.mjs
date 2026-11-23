@@ -15,7 +15,7 @@ const users = readFileSync(join(payloadRoot, 'src', 'collections', 'Users.ts'), 
 // Current W01 lock is Payload 3.90.2; 3.82.1 remains only the upstream
 // Cloudflare-template observation (see PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md).
 if (pkg.dependencies?.payload !== '3.90.2') fail('W01 Payload dependency is not exactly 3.90.2')
-if (pkg.dependencies?.['@payloadcms/db-postgres'] !== '3.90.2') fail('W01 official PostgreSQL adapter dependency is not exactly 3.90.2')
+if ((pkg.dependencies?.['@payloadcms/db-postgres'] ?? pkg.devDependencies?.['@payloadcms/db-postgres']) !== '3.90.2') fail('W01 official PostgreSQL adapter dependency is not exactly 3.90.2')
 if (pkg.dependencies?.['@payloadcms/db-d1-sqlite']) fail('W01 must not declare the retired Cloudflare D1 adapter')
 if (!config.includes('createW01NeonPostgresAdapter')) fail('W01 active Payload config must use the Neon PostgreSQL adapter')
 if (!adapter.includes('push: false')) fail('W01 PostgreSQL adapter must keep push:false')
