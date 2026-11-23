@@ -125,6 +125,12 @@ describe('W02 MFA enrollment confirmation authority', () => {
     mocks.reconcileReceipts.mockResolvedValue({ selected: 1, emitted: 1, failed: 0, unknown: 0 })
   })
 
+  it('fails closed when Neon persistence stores are not injected', async () => {
+    const response = await handleMfaEnrollmentConfirmRequest({} as BetterAuthEnv, makeRequest())
+    expect(response.status).toBe(503)
+    expect(mocks.handler).not.toHaveBeenCalled()
+  })
+
   it('verifies the pending factor through Better Auth then returns D1 read-back without session tokens', async () => {
     const { db, prepare, statement } = makeDb()
     const response = await handleWithSqliteFixture({ D1_01: db } as BetterAuthEnv, makeRequest())
