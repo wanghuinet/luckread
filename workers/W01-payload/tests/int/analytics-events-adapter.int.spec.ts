@@ -3,8 +3,8 @@ import { POST } from '../../src/app/api/v1/analytics/events/route.js'
 import { TrafficLimitError } from '../../src/auth/traffic-limit.js'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import w11Worker, { type W11Env } from '../../../W11-growth-campaign-analytics-operations/src/worker.js'
-import type { AnalyticsD1PreparedStatement, AnalyticsD1Result } from '../../../W11-growth-campaign-analytics-operations/src/analytics-d1-store.js'
+import w11Worker, { type W11PostgresEnv } from '../../../W11-growth-campaign-analytics-operations/src/worker.js'
+import type { AnalyticsPostgresPool } from '../../../W11-growth-campaign-analytics-operations/src/analytics-postgres-store.js'
 
 const mocks = vi.hoisted(() => ({
   w11Fetch: vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
@@ -129,25 +129,20 @@ describe('W01 analytics event route integration', () => {
 
   it('runs the allowed route through the real W11 handler without persisting user or session identity', async () => {
     const persistedBindings: (string | number | null)[][] = []
+    const clientQuery = vi.fn(async (sql: string, values: (string | number | null)[] = []) => {
+      if (sql.includes('INSERT INTO analytics_event_dedupe')) {
+        persistedBindings.push(values)
+        return { rows: [{ event_id: String(values[0] ?? '') }], rowCount: 1 }
+      }
+      return { rows: [], rowCount: 1 }
+    })
+    const client = { query: clientQuery, release: vi.fn() }
     const database = {
-      prepare: vi.fn((_query: string) => {
-        const statement: AnalyticsD1PreparedStatement = {
-          bind: vi.fn((...values: (string | number | null)[]) => {
-            persistedBindings.push(values)
-            return statement
-          }),
-        }
-        return statement
-      }),
-      batch: vi.fn(async (statements: AnalyticsD1PreparedStatement[]): Promise<AnalyticsD1Result[]> =>
-        statements.map((_, index) => ({
-          success: true,
-          meta: { changes: index === 0 ? 1 : 0 },
-        })),
-      ),
-    } as unknown as W11Env['D1_05']
-    const env: W11Env = {
-      D1_05: database,
+      query: vi.fn(async () => ({ rows: [], rowCount: 1 })),
+      connect: vi.fn(async () => client),
+    } as unknown as AnalyticsPostgresPool
+    const env: W11PostgresEnv = {
+      W11_POSTGRES: database,
       W11_ANALYTICS_INGEST_ENABLED: 'true',
     }
 
@@ -177,7 +172,9 @@ describe('W01 analytics event route integration', () => {
     expect(body.data.persistence.lateInserted).toBe(0)
     expect(body.requestId).toBe('corr_route_000001')
     expect(mocks.enforceLimit).toHaveBeenCalledTimes(1)
-    expect(database.batch).toHaveBeenCalledTimes(1)
+    expect(database.connect).toHaveBeenCalledTimes(1)
+    expect(clientQuery).toHaveBeenCalledWith('BEGIN')
+    expect(clientQuery).toHaveBeenCalledWith('COMMIT')
     const forwardedInput = mocks.w11Fetch.mock.calls[0]?.[0]
     expect(forwardedInput).toBeInstanceOf(Request)
     const forwarded = forwardedInput as Request
