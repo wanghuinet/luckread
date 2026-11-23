@@ -163,7 +163,7 @@ async function finalizeKnownMfaRejection(
 
 type BetterAuthDatabase = NonNullable<Parameters<typeof betterAuth>[0]['database']>
 
-export type BetterAuthPersistenceProfile = 'production' | 'postgres-rehearsal' | 'postgres'
+export type BetterAuthPersistenceProfile = 'legacy-d1-test' | 'postgres-rehearsal' | 'postgres'
 
 export type BetterAuthPostgresLifecycleAdapters = {
   afterUserCreated: (userId: string) => Promise<void>
@@ -172,14 +172,14 @@ export type BetterAuthPostgresLifecycleAdapters = {
 
 export const buildLuckReadAuth = (
   env: BetterAuthEnv,
-  database: BetterAuthDatabase = requireLegacyW02D1Database(env) as BetterAuthDatabase,
-  persistenceProfile: BetterAuthPersistenceProfile = 'production',
+  database: BetterAuthDatabase,
+  persistenceProfile: BetterAuthPersistenceProfile,
   mfaFactorStateStore?: MfaFactorStateStore,
   postgresLifecycleAdapters?: BetterAuthPostgresLifecycleAdapters,
   mfaAuditOperationReceiptStore?: MfaAuditOperationReceiptStore,
   resolveMfaSessionSubject?: (headers: Headers) => Promise<string | null>,
 ) => {
-  const postgresPersistence = persistenceProfile !== 'production'
+  const postgresPersistence = persistenceProfile !== 'legacy-d1-test'
   const legacyD1 = postgresPersistence ? undefined : requireLegacyW02D1Database(env)
   const unavailablePostgresRehearsalMfaFactorStateStore: MfaFactorStateStore = {
     async isActiveSubject() {
