@@ -419,6 +419,25 @@ export async function syncTerminalRenewalCycleToSubscription(
     const pastDueMatches = receipt.outcome === 'PAST_DUE' && subscription.status === 'PAST_DUE' &&
       subscription.current_period_start < cycle.cycle_start && subscription.current_period_end === cycle.cycle_start;
     if (identityMatches && (activePeriodMatches || pastDueMatches)) {
+      // A membership receipt proves the transaction committed, but not that its
+      // cross-service governance audit was delivered. Replay the deterministic
+      // audit before acknowledging the finance cycle.
+      if (receipt.outcome === 'ACTIVE' && subscription.trial_started_at &&
+          subscription.trial_ends_at === cycle.cycle_start &&
+          subscription.trial_converted_at === cycle.cycle_start &&
+          cycle.state === 'SUCCEEDED' &&
+          !(await auditAppliedSubscriptionTrialConversion(env, cycle, subscription))) {
+        return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
+      }
+      if (receipt.outcome === 'ACTIVE') {
+        const recoveredChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
+          membershipStore, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
+        );
+        if (recoveredChange?.status === 'APPLIED' &&
+            !(await auditAppliedSubscriptionPlanChange(env, cycle, recoveredChange))) {
+          return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
+        }
+      }
       const marked = await markCycleSyncState(cycleStore, cycle, 'APPLIED', null, now);
       return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id,
         outcome: marked ? 'ALREADY_APPLIED' : 'PENDING_RETRY' };
