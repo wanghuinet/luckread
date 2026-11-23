@@ -149,13 +149,14 @@ jobs:
           import fs from 'node:fs'
           const source = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
           const config = JSON.parse(fs.readFileSync('wrangler.neon.jsonc', 'utf8'))
-          const sourceD1 = (source.d1_databases ?? []).find((binding) => binding.binding === 'D1_01')
+          const schemaContract = JSON.parse(fs.readFileSync('../../contracts/database/neon-d1-01-w02-identity-schema.v1.json', 'utf8'))
           const hyperdrive = (config.hyperdrive ?? []).find((binding) => binding.binding === 'HYPERDRIVE')
-          if (sourceD1?.database_name !== 'luckread' ||
-              sourceD1?.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64' ||
-              sourceD1?.migrations_dir !== 'migrations') {
-            throw new Error('W02 historical D1-01 migration source identity must remain unchanged')
+          if (schemaContract.target?.cloudflareD1DatabaseName !== 'luckread' ||
+              schemaContract.target?.cloudflareD1DatabaseUuid !== '2f80471e-3756-49f9-8db1-7707a433ad64') {
+            throw new Error('W02 historical D1-01 source identity must remain recorded in the schema contract')
           }
+          if (source.name !== 'luckread-w02') throw new Error('W02 source Worker identity mismatch')
+          if ((source.d1_databases ?? []).length !== 0) throw new Error('W02 source config must not bind Cloudflare D1')
           if (config.name !== 'luckread-w02') throw new Error('W02 Worker identity mismatch')
           if ((config.d1_databases ?? []).length !== 0) throw new Error('W02 production config must not declare Cloudflare D1 bindings')
           if (config.vars?.W02_DATABASE_DRIVER !== 'neon') throw new Error('W02 production runtime must select Neon')
