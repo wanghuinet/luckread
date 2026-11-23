@@ -203,3 +203,28 @@ export async function applyRenewalSubscriptionUpdatePostgres(
     client?.release()
   }
 }
+
+export type RenewalCycleReceiptRow = Readonly<{
+  cycle_id: string; subscription_id: string; subscriber_id: string; cycle_start: string;
+  cycle_end: string; outcome: 'ACTIVE' | 'PAST_DUE'; applied_subscription_version: number;
+  plan_id: string; plan_version: number; applied_at: string;
+}>;
+
+export async function readRenewalCycleReceiptPostgres(
+  pool: W07WebhookPostgresPool, cycleId: string,
+): Promise<RenewalCycleReceiptRow | null> {
+  try {
+    const result = await pool.query<RenewalCycleReceiptRow & Record<string, unknown>>(
+      'SELECT cycle_id, subscription_id, subscriber_id, ' +
+      `to_char(cycle_start AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS cycle_start, ` +
+      `to_char(cycle_end AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS cycle_end, ` +
+      'outcome, applied_subscription_version, plan_id, plan_version, ' +
+      `to_char(applied_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS applied_at ` +
+      'FROM membership_subscription_renewal_cycle_applications WHERE cycle_id = $1 LIMIT 1',
+      [cycleId],
+    );
+    return result.rows[0] ?? null;
+  } catch {
+    return failUnavailable();
+  }
+}

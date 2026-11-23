@@ -399,6 +399,32 @@ export async function syncTerminalRenewalCycleToSubscription(
     return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_UPDATED_AT_INVALID', now);
   }
 
+  // Recover cross-store sync after the Membership transaction committed but the
+  // Finance marker did not. The receipt is cycle-specific durable proof.
+  const receipt = await readRenewalCycleReceiptPostgres(membershipStore, cycle.cycle_id);
+  if (receipt) {
+    const identityMatches = receipt.cycle_id === cycle.cycle_id &&
+      receipt.subscription_id === cycle.subscription_id && receipt.subscriber_id === cycle.subscriber_id &&
+      receipt.cycle_start === cycle.cycle_start && receipt.cycle_end === cycle.cycle_end &&
+      receipt.outcome === (cycle.state === 'SUCCEEDED' ? 'ACTIVE' : 'PAST_DUE') &&
+      Number.isSafeInteger(receipt.applied_subscription_version) &&
+      receipt.applied_subscription_version > 0 && receipt.applied_subscription_version <= subscription.version &&
+      Number.isSafeInteger(receipt.plan_version) && receipt.plan_version > 0 &&
+      isCanonicalIso(receipt.applied_at);
+    const activePeriodMatches = receipt.outcome === 'ACTIVE' &&
+      subscription.status === 'ACTIVE' && subscription.current_period_start === cycle.cycle_start &&
+      subscription.current_period_end === cycle.cycle_end && subscription.plan_id === receipt.plan_id &&
+      subscription.plan_version === receipt.plan_version;
+    const pastDueMatches = receipt.outcome === 'PAST_DUE' && subscription.status === 'PAST_DUE' &&
+      subscription.current_period_start < cycle.cycle_start && subscription.current_period_end === cycle.cycle_start;
+    if (identityMatches && (activePeriodMatches || pastDueMatches)) {
+      const marked = await markCycleSyncState(cycleStore, cycle, 'APPLIED', null, now);
+      return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id,
+        outcome: marked ? 'ALREADY_APPLIED' : 'PENDING_RETRY' };
+    }
+    return reconcile(env, cycleStore, cycle, 'CYCLE_RECEIPT_SUBSCRIPTION_STATE_MISMATCH', now);
+  }
+
   const trialHasAnyMetadata = subscription.trial_started_at !== null ||
     subscription.trial_ends_at !== null || subscription.trial_converted_at !== null;
   if (subscription.status === 'TRIALING' || (trialHasAnyMetadata && subscription.trial_converted_at === null)) {
