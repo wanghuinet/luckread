@@ -11,9 +11,6 @@ importers:
       '@opennextjs/cloudflare':
         specifier: 1.20.1
         version: 1.20.1(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@playwright/test@1.63.0)(@types/node@24.12.3)(babel-plugin-macros@3.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(supports-color@10.2.2)(wrangler@4.116.0)
-      '@payloadcms/db-d1-sqlite':
-        specifier: 3.90.2
-        version: 3.90.2(@types/pg@8.20.0)(payload@3.90.2(graphql@16.14.2)(supports-color@10.2.2)(typescript@5.7.3))(pg@8.20.0)(supports-color@10.2.2)
       '@payloadcms/next':
         specifier: 3.90.2
         version: 3.90.2(@types/react@19.2.14)(graphql@16.14.2)(monaco-editor@0.56.0)(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@playwright/test@1.63.0)(@types/node@24.12.3)(babel-plugin-macros@3.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.90.2(graphql@16.14.2)(supports-color@10.2.2)(typescript@5.7.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(supports-color@10.2.2)(typescript@5.7.3)
@@ -2211,11 +2208,6 @@ packages:
     peerDependenciesMeta:
       rclone.js:
         optional: true
-
-  '@payloadcms/db-d1-sqlite@3.90.2':
-    resolution: {integrity: sha512-rbhHN6XRUEXUDuB18bl6cRIlAt4BqszXUashPLf7cnhaawYcTDe/Yj83TglLasSf4AV6xdhKv6BE1MEhNuTmhA==}
-    peerDependencies:
-      payload: 3.90.2
 
   '@payloadcms/db-postgres@3.90.2':
     resolution: {integrity: sha512-0DgQh5bZTnc8I7RdyE1Tvaj2MpFPGEtz0rbRdEvABYyFnhxSzuwSX0PevxAL4xma6sOdhbSSqOvW4hC3MayS9w==}
@@ -8050,48 +8042,6 @@ snapshots:
       yargs: 18.1.0
     transitivePeerDependencies:
       - encoding
-      - supports-color
-
-  '@payloadcms/db-d1-sqlite@3.90.2(@types/pg@8.20.0)(payload@3.90.2(graphql@16.14.2)(supports-color@10.2.2)(typescript@5.7.3))(pg@8.20.0)(supports-color@10.2.2)':
-    dependencies:
-      '@payloadcms/drizzle': 3.90.2(@types/pg@8.20.0)(payload@3.90.2(graphql@16.14.2)(supports-color@10.2.2)(typescript@5.7.3))(pg@8.20.0)
-      console-table-printer: 2.12.1
-      drizzle-kit: 0.31.7(supports-color@10.2.2)
-      drizzle-orm: 0.45.2(@types/pg@8.20.0)(pg@8.20.0)
-      payload: 3.90.2(graphql@16.14.2)(supports-color@10.2.2)(typescript@5.7.3)
-      prompts: 2.4.2
-      to-snake-case: 1.0.0
-      uuid: 13.0.2
-    transitivePeerDependencies:
-      - '@aws-sdk/client-rds-data'
-      - '@cloudflare/workers-types'
-      - '@electric-sql/pglite'
-      - '@libsql/client'
-      - '@libsql/client-wasm'
-      - '@neondatabase/serverless'
-      - '@op-engineering/op-sqlite'
-      - '@opentelemetry/api'
-      - '@planetscale/database'
-      - '@prisma/client'
-      - '@tidbcloud/serverless'
-      - '@types/better-sqlite3'
-      - '@types/pg'
-      - '@types/sql.js'
-      - '@upstash/redis'
-      - '@vercel/postgres'
-      - '@xata.io/client'
-      - better-sqlite3
-      - bun-types
-      - expo-sqlite
-      - gel
-      - knex
-      - kysely
-      - mysql2
-      - pg
-      - postgres
-      - prisma
-      - sql.js
-      - sqlite3
       - supports-color
 
   '@payloadcms/db-postgres@3.90.2(payload@3.90.2(graphql@16.14.2)(supports-color@10.2.2)(typescript@5.7.3))(supports-color@10.2.2)':

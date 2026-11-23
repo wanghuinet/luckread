@@ -14,11 +14,10 @@ describe('W06 moderation database runtime admission', () => {
   it('selects the existing Neon Hyperdrive with no production D1 binding and preserves service/queue bindings', () => {
     const source = JSON.parse(readFileSync(new URL('../../wrangler.jsonc', import.meta.url), 'utf8'))
     const config = JSON.parse(readFileSync(new URL('../../wrangler.neon.jsonc', import.meta.url), 'utf8'))
-    expect(source.d1_databases).toContainEqual(expect.objectContaining({
-      binding: 'D1_03',
-      database_name: 'secondary',
-      database_id: 'bda1d247-a371-4244-91ae-aef96034db7f',
-    }))
+    // Both the canonical and Neon deployment configs must be free of
+    // Cloudflare D1 database bindings. The logical D1-03 domain is served
+    // through the existing Neon Hyperdrive binding below.
+    expect(source.d1_databases ?? []).toEqual([])
     expect(config.d1_databases ?? []).toEqual([])
     expect(config.vars?.W06_MODERATION_DATABASE_DRIVER).toBeUndefined()
     const hyperdrive = (config.hyperdrive ?? []).find((binding: { binding?: string }) => binding.binding === 'HYPERDRIVE_D1_03')

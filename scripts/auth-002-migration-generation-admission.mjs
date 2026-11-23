@@ -9,15 +9,17 @@ const fail = (message) => {
 }
 const pkg = JSON.parse(readFileSync(join(payloadRoot, 'package.json'), 'utf8'))
 const config = readFileSync(join(payloadRoot, 'src', 'payload.config.ts'), 'utf8')
+const adapter = readFileSync(join(payloadRoot, 'src', 'neon-postgres-adapter.ts'), 'utf8')
 const users = readFileSync(join(payloadRoot, 'src', 'collections', 'Users.ts'), 'utf8')
 
 // Current W01 lock is Payload 3.90.2; 3.82.1 remains only the upstream
 // Cloudflare-template observation (see PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md).
 if (pkg.dependencies?.payload !== '3.90.2') fail('W01 Payload dependency is not exactly 3.90.2')
-if (pkg.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.90.2') fail('W01 D1 adapter dependency is not exactly 3.90.2')
-if (!config.includes('sqliteD1Adapter')) fail('W01 sqliteD1Adapter is not configured')
-if (!config.includes('push: false')) fail('W01 push:false is required')
-if (!config.includes('migrationDir')) fail('W01 migrationDir is not configured')
+if ((pkg.dependencies?.['@payloadcms/db-postgres'] ?? pkg.devDependencies?.['@payloadcms/db-postgres']) !== '3.90.2') fail('W01 official PostgreSQL adapter dependency is not exactly 3.90.2')
+if (pkg.dependencies?.['@payloadcms/db-d1-sqlite']) fail('W01 must not declare the retired Cloudflare D1 adapter')
+if (!config.includes('createW01NeonPostgresAdapter')) fail('W01 active Payload config must use the Neon PostgreSQL adapter')
+if (!adapter.includes('push: false')) fail('W01 PostgreSQL adapter must keep push:false')
+if (!adapter.includes("migrationDir: path.resolve(dirname, 'neon-postgres-migrations')")) fail('W01 PostgreSQL adapter must use the Neon migration directory')
 const usesBetterAuth =
   users.includes('betterAuthPayloadStrategy') &&
   /auth\s*:\s*\{/.test(users) &&
@@ -28,7 +30,7 @@ if (usesBetterAuth && !users.includes('auth: true')) {
 }
 if (!users.includes('auth: true')) fail('W01 Users native auth is not enabled')
 
-const migrationsDir = join(payloadRoot, 'src', 'migrations')
+const migrationsDir = join(payloadRoot, 'src', 'neon-postgres-migrations')
 if (!existsSync(migrationsDir)) {
   console.error('AUTH-002_MIGRATION_GENERATION_READY: W01 configuration is admissible, but no migration artifact exists yet')
   console.error('NEXT: generate with the W01 repository Payload CLI; do not hand-author DDL and do not apply a migration in this admission check')
@@ -42,7 +44,7 @@ const baselineSnapshots = entries.filter((name) => name.endsWith('.json'))
 
 if (baselineMigrations.length > 0 && baselineSnapshots.length === 0) {
   console.warn('AUTH-002_MIGRATION_GENERATION_BASELINE_WARNING: committed migration sources have no JSON schema snapshot')
-  console.warn('Observed: 20250929_111647.ts exists; no migration JSON snapshot exists in W01 src/migrations/')
+  console.warn('Observed: 20250929_111647.ts exists; no migration JSON snapshot exists in W01 src/neon-postgres-migrations/')
   console.warn('Impact: do not accept migrate:create output as an additive migration until the authoritative baseline/snapshot state is established')
   console.warn('Reference: docs/change-control/CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20.md')
 }

@@ -32,7 +32,6 @@
     "three-client:contract": "node scripts/verify-three-client-development-contract.mjs"
   },
   "dependencies": {
-    "@payloadcms/db-d1-sqlite": "3.90.2",
     "@payloadcms/next": "3.90.2",
     "@payloadcms/richtext-lexical": "3.90.2",
     "next": "16.3.3",

@@ -336,11 +336,13 @@ const w01Package = JSON.parse(read('workers/W01-payload/package.json'))
 const w02Package = JSON.parse(read('workers/W02-identity/package.json'))
 const packageState = {
   payloadVersion: w01Package.dependencies?.payload ?? null,
-  payloadD1Adapter: w01Package.dependencies?.['@payloadcms/db-d1-sqlite'] ?? null,
-  payloadPostgresAdapterInstalled: Boolean(w01Package.dependencies?.['@payloadcms/db-postgres']),
+  payloadD1AdapterInstalled: Boolean(w01Package.dependencies?.['@payloadcms/db-d1-sqlite']),
+  payloadPostgresAdapterInstalled: Boolean(w01Package.dependencies?.['@payloadcms/db-postgres'] ?? w01Package.devDependencies?.['@payloadcms/db-postgres']),
   betterAuthVersion: w02Package.dependencies?.['better-auth'] ?? null,
   betterAuthPgDriverInstalled: Boolean(w02Package.dependencies?.pg),
 }
+if (packageState.payloadD1AdapterInstalled) failures.push('W01 must not install or declare @payloadcms/db-d1-sqlite')
+if (!packageState.payloadPostgresAdapterInstalled) failures.push('W01 must install the official PostgreSQL adapter as a runtime dependency')
 
 const directD1CodeBreakdown = Object.fromEntries(
   Object.entries(directD1Code).map(([owner, files]) => {
