@@ -75,14 +75,15 @@ function input(scheduled = true): ApplyRenewalSubscriptionUpdateInput {
 
 function postgresPool(
   handler: (sql: string, values: unknown[]) => Promise<{ rows: Array<Record<string, unknown>>; rowCount: number | null }>,
+  options: { receiptRow?: Record<string, unknown> | null; receiptInsertRows?: Array<Record<string, unknown>> } = {},
 ) {
   const transactionCalls: Array<{ sql: string; values: unknown[] }> = []
   const query = vi.fn(async (sql: string, values: unknown[] = []) => handler(sql, values))
   const client = {
     query: vi.fn(async (sql: string, values: unknown[] = []) => {
       transactionCalls.push({ sql, values })
-      if (sql.includes('FROM membership_subscription_renewal_cycle_applications')) return { rows: [], rowCount: 0 }
-      if (sql.includes('INSERT INTO membership_subscription_renewal_cycle_applications')) return { rows: [{ cycle_id: 'rcy_' + 'd'.repeat(26) }], rowCount: 1 }
+      if (sql.includes('FROM membership_subscription_renewal_cycle_applications')) return { rows: options.receiptRow ? [options.receiptRow] : [], rowCount: options.receiptRow ? 1 : 0 }
+      if (sql.includes('INSERT INTO membership_subscription_renewal_cycle_applications')) { const rows = options.receiptInsertRows ?? [{ cycle_id: 'rcy_' + 'd'.repeat(26) }]; return { rows, rowCount: rows.length } }
       return handler(sql, values)
     }),
     release: vi.fn(),
@@ -167,6 +168,27 @@ describe('native PostgreSQL renewal outcome synchronization', () => {
       expect.stringContaining('UPDATE membership_subscriptions SET plan_id'),
       expect.stringContaining('INSERT INTO membership_subscription_renewal_cycle_applications'), 'COMMIT',
     ])
+  })
+
+  it('accepts an exact existing cycle receipt as ALREADY_APPLIED without mutating subscription state', async () => {
+    const receipt = { cycle_id: 'rcy_' + 'd'.repeat(26), subscription_id: subscriptionId, subscriber_id: subscriberId, cycle_start: cycleStart, cycle_end: cycleEnd, outcome: 'ACTIVE', applied_subscription_version: 5, plan_id: targetPlanId, plan_version: 2 }
+    const f = postgresPool(async () => { throw new Error('unexpected mutation') }, { receiptRow: receipt })
+    await expect(applyRenewalSubscriptionUpdatePostgres(f.pool, input(true))).resolves.toBe('ALREADY_APPLIED')
+    expect(f.transactionCalls.map(x => x.sql)).toEqual(['BEGIN', expect.stringContaining('FROM membership_subscription_renewal_cycle_applications'), 'COMMIT'])
+  })
+
+  it('rejects an existing receipt with mismatched cycle identity or plan and rolls back', async () => {
+    const receipt = { cycle_id: 'rcy_' + 'd'.repeat(26), subscription_id: subscriptionId, subscriber_id: subscriberId, cycle_start: cycleStart, cycle_end: cycleEnd, outcome: 'ACTIVE', applied_subscription_version: 5, plan_id: originalPlanId, plan_version: 1 }
+    const f = postgresPool(async () => { throw new Error('unexpected mutation') }, { receiptRow: receipt })
+    await expect(applyRenewalSubscriptionUpdatePostgres(f.pool, input(true))).resolves.toBe('CAS_LOST')
+    expect(f.transactionCalls.map(x => x.sql)).toEqual(['BEGIN', expect.stringContaining('FROM membership_subscription_renewal_cycle_applications'), 'ROLLBACK'])
+  })
+
+  it('rolls back when cycle receipt insertion conflicts after subscription CAS', async () => {
+    const f = postgresPool(async (sql) => { if (sql === 'BEGIN' || sql === 'ROLLBACK') return { rows: [], rowCount: null }; if (sql.includes('UPDATE membership_subscriptions SET plan_id')) return { rows: [{ subscription_id: subscriptionId }], rowCount: 1 }; throw new Error('unexpected PostgreSQL statement') }, { receiptInsertRows: [] })
+    await expect(applyRenewalSubscriptionUpdatePostgres(f.pool, input(false))).resolves.toBe('CAS_LOST')
+    expect(f.transactionCalls.map(x => x.sql)).toEqual(['BEGIN', expect.stringContaining('FROM membership_subscription_renewal_cycle_applications'), expect.stringContaining('UPDATE membership_subscriptions SET plan_id'), expect.stringContaining('INSERT INTO membership_subscription_renewal_cycle_applications'), 'ROLLBACK'])
+    expect(f.transactionCalls.some(x => x.sql === 'COMMIT')).toBe(false)
   })
 
   it('rolls back and sanitizes database errors', async () => {
