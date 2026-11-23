@@ -296,7 +296,7 @@ describe('W03 Neon Collection update', () => {
         },
         body: JSON.stringify({ title: 'New title', description: 'New description' }),
       }),
-      { D1_02: database } as never,
+      {} as never,
     )
 
     expect(response.status).toBe(200)
