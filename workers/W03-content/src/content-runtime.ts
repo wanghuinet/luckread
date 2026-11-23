@@ -859,6 +859,52 @@ export async function searchPublishedContents(
 }
 
 
+type FollowingContentsCursor = {
+  version: 1
+  viewerUserId: string
+  scopeHash: string
+  createdAt: string
+  id: string
+}
+
+const encodeFollowingContentsCursor = (cursor: FollowingContentsCursor): string =>
+  btoa(JSON.stringify(cursor)).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '')
+
+const decodeFollowingContentsCursor = (
+  value: string | null,
+  viewerUserId: string,
+  scopeHash: string,
+): FollowingContentsCursor | null => {
+  if (!value) return null
+  if (value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) {
+    throw new ContentRuntimeError('INVALID_CURSOR', 400)
+  }
+  try {
+    const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4)
+    const parsed = JSON.parse(atob(padded)) as Partial<FollowingContentsCursor>
+    if (
+      parsed.version !== 1 ||
+      parsed.viewerUserId !== viewerUserId ||
+      parsed.scopeHash !== scopeHash ||
+      typeof parsed.createdAt !== 'string' ||
+      !Number.isFinite(Date.parse(parsed.createdAt)) ||
+      typeof parsed.id !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.id)
+    ) {
+      throw new Error('invalid following cursor')
+    }
+    return {
+      version: 1,
+      viewerUserId,
+      scopeHash,
+      createdAt: parsed.createdAt,
+      id: parsed.id,
+    }
+  } catch {
+    throw new ContentRuntimeError('INVALID_CURSOR', 400)
+  }
+}
+
 export async function listFollowingOwnerContents(
   readStore: FollowingOwnerContentsReadStore,
   viewerUserId: string,
