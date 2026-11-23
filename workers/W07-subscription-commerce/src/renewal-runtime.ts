@@ -1122,6 +1122,20 @@ export async function processSubscriptionRenewalCycle(
       }
     }
     cycle = await transitionCycleToPaymentReady(cycleStore, cycle, now);
+    // A lost PREPARED -> PAYMENT_READY CAS may reveal that another worker or
+    // the signed payment webhook already moved the cycle. Return that
+    // authoritative state instead of falling through to the generic PREPARED
+    // result (or attempting work against a stale snapshot).
+    if (cycle.state !== 'PAYMENT_READY') {
+      const action: RenewalProcessResult['action'] =
+        cycle.state === 'SUBMITTING' ? 'SUBMISSION_IN_PROGRESS'
+          : cycle.state === 'SUBMITTED' || cycle.state === 'SUCCEEDED' || cycle.state === 'FAILED' ? 'TERMINAL'
+            : cycle.state === 'RECONCILIATION_REQUIRED' ? 'RECONCILIATION_REQUIRED'
+              : cycle.state === 'AWAITING_PRICING' ? 'AWAITING_PRICING'
+                : cycle.state === 'AWAITING_MANDATE' ? 'AWAITING_MANDATE'
+                  : 'PREPARED';
+      return { cycleId, state: cycle.state, action, ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
+    }
   }
 
   if (cycle.state === 'PAYMENT_READY' || cycle.state === 'SUBMITTING') {
