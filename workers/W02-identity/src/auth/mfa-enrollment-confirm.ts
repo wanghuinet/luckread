@@ -1,4 +1,4 @@
-import { createLuckReadAuth, requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
+import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
 import {
   createD1MfaAuditOperationReceiptStore,
   type MfaAuditOperationReceiptStore,
@@ -8,11 +8,7 @@ import {
   type MfaEnrollmentConfirmStore,
 } from './mfa-enrollment-confirm-store.js'
 import { resolveBetterAuthPrincipal } from './principal.js'
-import {
-  createD1MfaStatusStore,
-  type MfaStatusStore,
-  type AuthoritativeMfaStatus,
-} from './mfa-status.js'
+import type { MfaStatusStore, AuthoritativeMfaStatus } from './mfa-status.js'
 
 const json = (body: unknown, status = 200): Response => Response.json(body, {
   status,
@@ -149,7 +145,10 @@ export async function handleMfaEnrollmentConfirmRequest(
   }
 
   const store = dependencies.store ?? createD1MfaEnrollmentConfirmStore(requireLegacyW02D1Database(env))
-  const statusStore = dependencies.statusStore ?? createD1MfaStatusStore(requireLegacyW02D1Database(env))
+  const statusStore = dependencies.statusStore
+  if (!statusStore) {
+    return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'MFA status unavailable' } }, 503)
+  }
   const receiptStore = dependencies.receiptStore ?? createD1MfaAuditOperationReceiptStore(requireLegacyW02D1Database(env))
   const auth = dependencies.auth ?? createLuckReadAuth(env)
 
