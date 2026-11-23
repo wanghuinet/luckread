@@ -47,10 +47,8 @@ function assertStartedEvent(event: MfaAuditEvent, userId: string): void {
 }
 
 /**
- * D1 remains the production-default MFA enrollment reservation store.
- * Reservation and the secret-free enrollment_started audit outbox row are
- * committed in one D1 batch; the outbox insert is conditional on the exact
- * reservation update changing one user row.
+ * Legacy D1 test/schema-profile adapter only. Production handlers require the
+ * injected Neon Store; reservation and audit intent are transactionally paired.
  */
 /**
  * @deprecated-next-version

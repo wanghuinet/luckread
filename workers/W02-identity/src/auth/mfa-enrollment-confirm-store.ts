@@ -61,9 +61,8 @@ function mapState(row: {
 }
 
 /**
- * D1 remains the production-default enrollment-confirm state store.
- * The read is a secret-free projection; the final marker update is conditional
- * on the authoritative Better Auth factor already being verified.
+ * Legacy D1 test/schema-profile adapter only. Production handlers require the
+ * injected Neon Store for the confirmation state projection and marker write.
  */
 /**
  * @deprecated-next-version
