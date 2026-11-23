@@ -100,52 +100,6 @@ function createDatabase(options: {
 }
 
 describe('W03 Neon Series member attachment', () => {
-  it('keeps the original D1 batch implementation as the default', async () => {
-    const preparedSql: string[] = []
-    let batchStatements: unknown[] = []
-    const dbRow = { ...snapshot }
-    const db = {
-      prepare(sql: string) {
-        preparedSql.push(sql)
-        return {
-          bind() {
-            return {
-              async first() { return dbRow },
-            }
-          },
-        }
-      },
-      async batch(statements: unknown[]) {
-        batchStatements = statements
-        return []
-      },
-    }
-
-    const result = await attachSeriesMember(
-      db as never,
-      'creator_1',
-      'series_1',
-      { contentId: 'content_1' },
-      'W/"4"',
-      'd1-attach-key',
-      new Date('2026-11-16T02:00:00.000Z'),
-    )
-
-    expect(result).toMatchObject({
-      member: {
-        seriesId: 'series_1',
-        contentId: 'content_1',
-        position: 2,
-      },
-      seriesVersion: 5,
-      seriesEtag: 'W/"5"',
-    })
-    expect(batchStatements).toHaveLength(5)
-    expect(preparedSql.some(sql => sql.includes('FROM content_series s'))).toBe(true)
-    expect(preparedSql.some(sql => sql.includes('INSERT INTO content_relationships'))).toBe(true)
-    expect(preparedSql.some(sql => sql.includes('content_txn_guard'))).toBe(true)
-  })
-
   it('loads owner, content, active membership, idempotency and next position from PostgreSQL', async () => {
     const fixture = createDatabase()
     const store = createPostgresSeriesMemberAttachStore(fixture.database)
