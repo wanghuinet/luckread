@@ -159,13 +159,13 @@ describe('W02 username change authority', () => {
     const response = await handleUsernameChangeWithFixture(env, changeRequest({ ifMatch: '"username-v1"' }))
     expect(response.status).toBe(412)
     expect(response.headers.get('etag')).toBe('"username-v2"')
-    expect(batch).not.toHaveBeenCalled()
+    expect(store.applyChange).not.toHaveBeenCalled()
   })
 
   it('replays a successful idempotent operation without another write', async () => {
     const keyHash = await hashUsernameIdempotencyKey('username-change-key-0001')
     const fingerprint = await fingerprintUsernameChange('NewHandle', '"username-v0"')
-    const { env, batch } = createEnv({
+    const { env, store } = createEnv({
       ...defaultRow, username: 'NewHandle', usernameVersion: 1,
       replayKeyHash: keyHash, replayUsername: 'NewHandle', replayFingerprint: fingerprint,
       replayChangedAt: '2026-11-02T12:00:00.000Z',
@@ -182,12 +182,12 @@ describe('W02 username change authority', () => {
       },
       meta: { idempotentReplay: true },
     })
-    expect(batch).not.toHaveBeenCalled()
+    expect(store.applyChange).not.toHaveBeenCalled()
   })
 
   it('rejects reuse of a live idempotency key with different intent', async () => {
     const keyHash = await hashUsernameIdempotencyKey('username-change-key-0001')
-    const { env, batch } = createEnv({
+    const { env, store } = createEnv({
       ...defaultRow, replayKeyHash: keyHash, replayUsername: 'NewHandle', replayFingerprint: '0'.repeat(64),
       replayChangedAt: '2026-11-02T12:00:00.000Z',
       replayExpiresAt: '2026-11-03T12:00:00.000Z',
@@ -195,7 +195,7 @@ describe('W02 username change authority', () => {
     const response = await handleUsernameChangeWithFixture(env, changeRequest())
     expect(response.status).toBe(409)
     expect(await response.json()).toMatchObject({ error: { code: 'IDEMPOTENCY_KEY_REUSE_CONFLICT' } })
-    expect(batch).not.toHaveBeenCalled()
+    expect(store.applyChange).not.toHaveBeenCalled()
   })
 
   it('writes one compact per-user state row rather than an append-only history log', async () => {
@@ -220,6 +220,6 @@ describe('W02 username change authority', () => {
     limiter.limit.mockRejectedValueOnce(new Error('limiter unavailable'))
     const response = await handleUsernameChangeWithFixture(env, changeRequest())
     expect(response.status).toBe(503)
-    expect(batch).not.toHaveBeenCalled()
+    expect(store.applyChange).not.toHaveBeenCalled()
   })
 })
