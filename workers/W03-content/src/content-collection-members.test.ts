@@ -18,7 +18,7 @@ const member = {
 
 describe('W03 collection membership / Neon ordering', () => {
   it('preserves historical membership schema and unique position authority', () => {
-    const migration = readFileSync(resolve(process.cwd(), 'workers/W03-content/migrations/0010_content_collection_membership_ordering.sql'), 'utf8')
+    const migration = readFileSync(resolve(process.cwd(), 'workers/W03-content/migrations/0010_collection_membership_ordering.sql'), 'utf8')
     expect(migration).toContain('CREATE TABLE content_relationships')
     expect(migration).toContain('position INTEGER')
     expect(migration).toContain('content_relationships_collection_position_unique_idx')
