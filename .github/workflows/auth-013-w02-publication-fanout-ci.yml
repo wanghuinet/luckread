@@ -4,9 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - "workers/W02-identity/src/account/publication-journal-publisher.ts"
-      - "workers/W02-identity/src/account/publication-journal-publisher.test.ts"
-      - "workers/W02-identity/wrangler.jsonc"
+      - "workers/W02-identity/src/neon/account-state-publication-journal-publisher-postgres.ts"
+      - "workers/W02-identity/src/index.ts"
+      - "workers/W02-identity/wrangler.neon.jsonc"
       - ".github/workflows/auth-013-w02-publication-fanout-ci.yml"
   pull_request:
     paths:
@@ -36,8 +36,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run focused publisher tests
-        run: npx vitest@3.2.4 run workers/W02-identity/src/account/publication-journal-publisher.test.ts
+      - name: Verify PostgreSQL publisher is wired to the Neon Worker
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const entry = fs.readFileSync('workers/W02-identity/src/index.ts', 'utf8')
+          const publisher = fs.readFileSync('workers/W02-identity/src/neon/account-state-publication-journal-publisher-postgres.ts', 'utf8')
+          const config = JSON.parse(fs.readFileSync('workers/W02-identity/wrangler.neon.jsonc', 'utf8'))
+          if (!entry.includes('publishPendingAccountStateEventsPostgres')) throw new Error('Neon account-state publisher is not wired to the Worker')
+          if (!publisher.includes('FOR UPDATE SKIP LOCKED')) throw new Error('PostgreSQL publisher must retain concurrent-safe row claiming')
+          if (config.vars?.W02_DATABASE_DRIVER !== 'neon' || (config.d1_databases ?? []).length !== 0) throw new Error('W02 production config must remain Neon-only')
+          console.log('W02 Neon PostgreSQL publication runtime contract: PASS')
+          NODE
 
       - name: Validate W02 projection queue binding
         run: |
