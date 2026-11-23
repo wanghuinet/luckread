@@ -40,7 +40,7 @@ describe('W03 published content search', () => {
       return rows.slice(0, input.limit)
     })
     const store = { list: async () => rows, search }
-    const firstPage = await searchPublishedContents({} as never, 'LuckRead', null, 1, store)
+    const firstPage = await searchPublishedContents(store, 'LuckRead', null, 1)
 
     expect(firstPage.items).toHaveLength(1)
     expect(firstPage.items[0]?.id).toBe('content_1')
@@ -54,15 +54,15 @@ describe('W03 published content search', () => {
     )
     expect(cursor).toEqual({ updatedAt: '2026-10-20T00:00:00.000Z', id: 'content_1' })
 
-    await expect(searchPublishedContents({} as never, 'other query', firstPage.nextCursor, 1, store))
+    await expect(searchPublishedContents(store, 'other query', firstPage.nextCursor, 1))
       .rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
   })
 
   it('rejects an empty or oversized query', async () => {
     const store = { list: async () => [], search: async () => [] }
-    await expect(searchPublishedContents({} as never, '   ', null, 20, store))
+    await expect(searchPublishedContents(store, '   ', null, 20))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
-    await expect(searchPublishedContents({} as never, 'x'.repeat(257), null, 20, store))
+    await expect(searchPublishedContents(store, 'x'.repeat(257), null, 20))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
   })
 
