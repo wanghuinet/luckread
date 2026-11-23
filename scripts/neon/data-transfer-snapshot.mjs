@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, lstatSync } from 'node:fs';
 import { resolve, relative, sep } from 'node:path';
 
 const sha = (b) => createHash('sha256').update(b).digest('hex');
@@ -8,10 +8,10 @@ const safeRel = (p) => typeof p === 'string' && !p.startsWith('/') && !p.split(/
 function walk(root, dir=root, out=[]) {
   for (const name of readdirSync(dir).sort()) {
     if (name.startsWith('.')) throw new Error('hidden files/directories are not admitted: '+relative(root,resolve(dir,name)));
-    const path=resolve(dir,name), s=statSync(path), rel=relative(root,path).split(sep).join('/');
+    const path=resolve(dir,name), s=lstatSync(path), rel=relative(root,path).split(sep).join('/');
     if(s.isSymbolicLink()) throw new Error('symlinks are not admitted: '+rel);
     if(s.isDirectory()) walk(root,path,out);
-    else if(s.isFile()) out.push(rel);
+    else if(s.isFile() && name !== 'snapshot-manifest.json') out.push(rel);
     else throw new Error('unsupported snapshot entry: '+rel);
   }
   return out;
