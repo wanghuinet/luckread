@@ -8,7 +8,7 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 /**
  * Shared W01 PostgreSQL adapter for schema generation and the production
- * Hyperdrive runtime. The D1 adapter is confined to local/test compatibility.
+ * Hyperdrive runtime. No D1 or SQLite adapter fallback is supported.
  */
 export function createW01NeonPostgresAdapter(connectionString: string) {
   if (typeof connectionString !== 'string' || connectionString.trim() === '') {
