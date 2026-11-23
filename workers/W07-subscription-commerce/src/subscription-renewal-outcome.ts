@@ -532,7 +532,12 @@ export async function syncTerminalRenewalCycleToSubscription(
       membershipStore, cycle, subscription, 'ACTIVE', cycle.cycle_start, cycle.cycle_end, now,
       scheduledChange?.status === 'SCHEDULED' ? scheduledChange : undefined,
     );
-    if (result === 'CAS_LOST') return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_CAS_LOST', now);
+    if (result === 'CAS_LOST') {
+      // A competing delivery may have committed the cycle receipt while this
+      // transaction lost the subscription CAS. Keep Finance retryable: the next
+      // pass will read the durable receipt or reconcile a persistent mismatch.
+      return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
+    }
 
     const appliedSubscription = await readSubscription(membershipStore, cycle.subscription_id, cycle.subscriber_id);
     if (appliedSubscription?.trial_started_at && appliedSubscription.trial_ends_at === cycle.cycle_start &&
@@ -571,7 +576,12 @@ export async function syncTerminalRenewalCycleToSubscription(
     membershipStore, cycle, subscription, 'PAST_DUE',
     subscription.current_period_start, subscription.current_period_end, now,
   );
-  if (result === 'CAS_LOST') return reconcile(env, cycleStore, cycle, 'SUBSCRIPTION_CAS_LOST', now);
+  if (result === 'CAS_LOST') {
+    // A competing delivery may have committed the cycle receipt while this
+    // transaction lost the subscription CAS. Keep Finance retryable: the next
+    // pass will read the durable receipt or reconcile a persistent mismatch.
+    return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
+  }
   const marked = await markCycleSyncState(cycleStore, cycle, 'APPLIED', null, now);
   return {
     cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id,
