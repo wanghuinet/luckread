@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, mock, test } from 'bun:test';
 
 let storedToken = 'secure-test-token';
+let mockActiveAccountId = 'account-a';
 let savedTokens = [];
 let pendingFetch;
 let activeViewerId = 'stage3-bookmark-viewer';
@@ -14,7 +15,9 @@ const originalXMLHttpRequest = globalThis.XMLHttpRequest;
 
 mock.module('../lib/secure-session.ts', () => ({
   readSessionToken: async () => storedToken,
-  saveSessionToken: async (token) => {
+  readSessionCredentialSnapshot: async () => ({ accountId: mockActiveAccountId, token: storedToken }),
+  saveSessionTokenForSnapshot: async (token, snapshot) => {
+    if (snapshot.accountId !== mockActiveAccountId) return;
     storedToken = token;
     savedTokens.push(token);
   },
@@ -57,6 +60,7 @@ const { createContentShareLink } = await import('../lib/content-share.ts');
 
 beforeEach(() => {
   storedToken = 'secure-test-token';
+  mockActiveAccountId = 'account-a';
   savedTokens = [];
   activeViewerId = 'stage3-bookmark-viewer';
   pendingFetch = async () => new Response(JSON.stringify({ data: { ok: true } }), { status: 200 });
@@ -1299,4 +1303,26 @@ test('does not persist a newly-issued login credential before the auth store ass
   expect(result.response.headers.get('X-LuckRead-Session-Token')).toBe('new-account-token');
   expect(savedTokens).toEqual([]);
   expect(storedToken).toBe('secure-test-token');
+});
+
+test('does not write a request renewal into a different account after account switching', async () => {
+  const requestStarted = new Promise((resolve) => {
+    pendingFetch = async (_input, _init) => {
+      mockActiveAccountId = 'account-b';
+      storedToken = 'account-b-token';
+      resolve();
+      return new Response(JSON.stringify({ data: { ok: true } }), {
+        status: 200,
+        headers: { 'X-LuckRead-Session-Token': 'renewed-account-a-token' },
+      });
+    };
+  });
+
+  const resultPromise = apiRequest('/session-renewal-account-switch');
+  await requestStarted;
+  const result = await resultPromise;
+
+  expect(result.response.status).toBe(200);
+  expect(storedToken).toBe('account-b-token');
+  expect(savedTokens).toEqual([]);
 });
