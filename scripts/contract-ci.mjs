@@ -433,7 +433,7 @@ async function checkEvents() {
       'const publishedAt = new Date().toISOString()',
       'event.publishedAt,',
       'const occurredAt = input.occurredAt ?? new Date().toISOString()',
-      \"SET status = 'PUBLISHED', published_at = $1\",
+      "SET status = 'PUBLISHED', published_at = $1",
     ]
     if (!(await fileExists('workers/W02-identity/src/auth/mfa-audit-hooks.test.ts')) ||
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-events.test.ts')) ||
