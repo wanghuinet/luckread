@@ -524,7 +524,7 @@ export const buildLuckReadAuth = (
       },
     } : {}),
     user: {
-      // The checked-in D1 schema deliberately uses snake_case columns.
+      // The PostgreSQL schema deliberately uses snake_case columns.
       // Map Better Auth's camelCase core fields to those exact column names.
       fields: {
         emailVerified: 'email_verified',
