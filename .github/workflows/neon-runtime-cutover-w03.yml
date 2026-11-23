@@ -89,6 +89,10 @@ jobs:
           git merge-base --is-ancestor "$SOURCE_SHA" origin/main
           echo "W03_DEPLOY_SOURCE_IS_PROTECTED_MAIN=PASS"
 
+      - name: Require approved D1-02 business-data import and production cutover evidence
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: node scripts/neon/assert-production-cutover-authorized.mjs D1-02
+
       - name: Validate W03 Neon-only runtime and admitted provider wiring
         run: |
           set -euo pipefail

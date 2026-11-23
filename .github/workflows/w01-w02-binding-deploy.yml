@@ -52,6 +52,9 @@ jobs:
           ref: ${{ inputs.source_sha }}
           fetch-depth: 0
 
+      - name: Require imported business data and explicit Neon production cutover approval
+        run: node scripts/neon/assert-production-cutover-authorized.mjs D1-01
+
       - name: Verify protected AUTH-007 rollout admission before W01/W02 deployment
         env:
           GITHUB_TOKEN: ${{ github.token }}

@@ -55,6 +55,9 @@ jobs:
       - name: Install W02 runtime dependencies
         working-directory: workers/W02-identity
         run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Require imported business data and explicit Neon production cutover approval
+        run: node scripts/neon/assert-production-cutover-authorized.mjs D1-01
+
       - name: Verify Better Auth 1.7.8 package and runtime import
         working-directory: workers/W02-identity
         run: |

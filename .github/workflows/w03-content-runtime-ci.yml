@@ -5,7 +5,12 @@ on:
     paths:
       - "workers/W03-content/**"
       - "workers/W03-content/package.json"
+      - "scripts/neon/assert-production-cutover-authorized.*"
+      - "contracts/database/neon-five-domain-schema-bootstrap.v1.json"
+      - "contracts/database/neon-five-database-remote-schema-evidence.v1.json"
       - ".github/workflows/w03-content-runtime-ci.yml"
+      - ".github/workflows/neon-runtime-cutover-w03.yml"
+      - ".github/workflows/w03-content-runtime-deploy.yml"
       - "contracts/persistence/CONTENT-ARTICLE-d1-02-persistence.v1.json"
       - "contracts/transport/W01-W03-content-http-binding.v1.json"
       - "contracts/transport/W05-W03-owned-post-context-http-binding.v1.json"
@@ -14,6 +19,9 @@ on:
     branches: ["main"]
     paths:
       - "workers/W03-content/**"
+      - "scripts/neon/assert-production-cutover-authorized.*"
+      - "contracts/database/neon-five-domain-schema-bootstrap.v1.json"
+      - "contracts/database/neon-five-database-remote-schema-evidence.v1.json"
 
 permissions:
   contents: read
@@ -47,8 +55,28 @@ jobs:
         with:
           node-version: 24
 
+      - name: Verify W03 Neon deployment is gated by data import and cutover approval
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+          const workflows = [
+            '.github/workflows/neon-runtime-cutover-w03.yml',
+            '.github/workflows/w03-content-runtime-deploy.yml',
+          ]
+          for (const path of workflows) {
+            const source = fs.readFileSync(path, 'utf8')
+            if (!source.includes('scripts/neon/assert-production-cutover-authorized.mjs D1-02')) {
+              throw new Error(path + ' is missing the shared D1-02 data-import and cutover admission guard')
+            }
+          }
+          console.log('W03_NEON_DEPLOYMENT_DATA_ADMISSION=PASS')
+          NODE
+
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Test shared Neon production cutover admission guard
+        run: node --test scripts/neon/assert-production-cutover-authorized.test.mjs
 
       - name: Verify W03 migrations and nullable media warning constraints
         run: |

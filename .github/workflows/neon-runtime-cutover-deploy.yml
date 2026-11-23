@@ -26,6 +26,9 @@ jobs:
           ref: main
           fetch-depth: 1
 
+      - name: Require imported business data and explicit Neon production cutover approval
+        run: node scripts/neon/assert-production-cutover-authorized.mjs D1-02 D1-03
+
       - name: Validate W05 D1-free Neon D1-02 and delegated D1-03 runtimes
         run: |
           set -euo pipefail
