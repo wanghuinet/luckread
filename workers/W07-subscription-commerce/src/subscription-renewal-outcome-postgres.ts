@@ -152,22 +152,64 @@ export async function applyRenewalSubscriptionUpdatePostgres(
     )
     if (prior.rows.length === 1) {
       const row = prior.rows[0] as Record<string, unknown>
-      const matches = row.subscription_id === input.cycle.subscription_id &&
+      const cycleIdentityMatches = row.subscription_id === input.cycle.subscription_id &&
         row.subscriber_id === input.cycle.subscriber_id &&
         new Date(String(row.cycle_start)).toISOString() === input.cycle.cycle_start &&
-        new Date(String(row.cycle_end)).toISOString() === input.cycle.cycle_end &&
+        new Date(String(row.cycle_end)).toISOString() === input.cycle.cycle_end
+      const nextPlanId = input.scheduledChange && input.nextStatus === 'ACTIVE'
+        ? input.scheduledChange.targetPlanId : input.subscription.plan_id
+      const nextPlanVersion = input.scheduledChange && input.nextStatus === 'ACTIVE'
+        ? input.scheduledChange.targetPlanVersion : input.subscription.plan_version
+      const matches = cycleIdentityMatches &&
         row.outcome === input.nextStatus &&
         Number(row.applied_subscription_version) === input.subscription.version + 1 &&
-        row.plan_id === (input.scheduledChange && input.nextStatus === 'ACTIVE' ? input.scheduledChange.targetPlanId : input.subscription.plan_id) &&
-        Number(row.plan_version) === (input.scheduledChange && input.nextStatus === 'ACTIVE' ? input.scheduledChange.targetPlanVersion : input.subscription.plan_version)
-      if (!matches) {
+        row.plan_id === nextPlanId &&
+        Number(row.plan_version) === nextPlanVersion
+      if (matches) {
+        await client.query('COMMIT')
+        settled = true
+        return 'ALREADY_APPLIED'
+      }
+
+      // A failed payment may have already moved this exact cycle to PAST_DUE.
+      // A later successful retry can promote that receipt only if no subscription
+      // mutation has occurred since the failure receipt was committed.
+      const retryPromotionEligible = cycleIdentityMatches &&
+        input.nextStatus === 'ACTIVE' &&
+        row.outcome === 'PAST_DUE' &&
+        input.subscription.status === 'PAST_DUE' &&
+        Number(row.applied_subscription_version) === input.subscription.version &&
+        row.plan_id === input.subscription.plan_id &&
+        Number(row.plan_version) === input.subscription.plan_version &&
+        input.subscription.current_period_end === input.cycle.cycle_start
+      if (!retryPromotionEligible) {
+        await client.query('ROLLBACK')
+        settled = true
+        return 'CAS_LOST'
+      }
+
+      const applied = await updateSubscriptionForRenewalPostgres(client, input)
+      if (!applied) {
+        await client.query('ROLLBACK')
+        settled = true
+        return 'CAS_LOST'
+      }
+      const promoted = await client.query(
+        "UPDATE membership_subscription_renewal_cycle_applications SET outcome = 'ACTIVE', " +
+        'applied_subscription_version = $1, plan_id = $2, plan_version = $3, applied_at = $4::timestamptz ' +
+        "WHERE cycle_id = $5 AND outcome = 'PAST_DUE' AND applied_subscription_version = $6 " +
+        'RETURNING cycle_id',
+        [input.subscription.version + 1, nextPlanId, nextPlanVersion, input.updatedAt,
+         input.cycle.cycle_id, input.subscription.version],
+      )
+      if (promoted.rows.length !== 1) {
         await client.query('ROLLBACK')
         settled = true
         return 'CAS_LOST'
       }
       await client.query('COMMIT')
       settled = true
-      return 'ALREADY_APPLIED'
+      return 'APPLIED'
     }
     const applied = await updateSubscriptionForRenewalPostgres(client, input)
     if (!applied) {

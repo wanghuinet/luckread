@@ -407,7 +407,6 @@ export async function syncTerminalRenewalCycleToSubscription(
     const identityMatches = receipt.cycle_id === cycle.cycle_id &&
       receipt.subscription_id === cycle.subscription_id && receipt.subscriber_id === cycle.subscriber_id &&
       receipt.cycle_start === cycle.cycle_start && receipt.cycle_end === cycle.cycle_end &&
-      receipt.outcome === (cycle.state === 'SUCCEEDED' ? 'ACTIVE' : 'PAST_DUE') &&
       Number.isSafeInteger(receipt.applied_subscription_version) &&
       receipt.applied_subscription_version > 0 && receipt.applied_subscription_version <= subscription.version &&
       Number.isSafeInteger(receipt.plan_version) && receipt.plan_version > 0 &&
@@ -419,7 +418,8 @@ export async function syncTerminalRenewalCycleToSubscription(
     const pastDueMatches = receipt.outcome === 'PAST_DUE' && subscription.status === 'PAST_DUE' &&
       subscription.current_period_start < cycle.cycle_start && subscription.current_period_end === cycle.cycle_start &&
       subscription.plan_id === receipt.plan_id && subscription.plan_version === receipt.plan_version;
-    if (identityMatches && (activePeriodMatches || pastDueMatches)) {
+    if (identityMatches && (activePeriodMatches || pastDueMatches) &&
+        receipt.outcome === (cycle.state === 'SUCCEEDED' ? 'ACTIVE' : 'PAST_DUE')) {
       // A membership receipt proves the transaction committed, but not that its
       // cross-service governance audit was delivered. Replay the deterministic
       // audit before acknowledging the finance cycle.
@@ -450,7 +450,18 @@ export async function syncTerminalRenewalCycleToSubscription(
       return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id,
         outcome: marked ? 'ALREADY_APPLIED' : 'PENDING_RETRY' };
     }
-    return reconcile(env, cycleStore, cycle, 'CYCLE_RECEIPT_SUBSCRIPTION_STATE_MISMATCH', now);
+    const retryCanPromotePastDueReceipt = identityMatches &&
+      cycle.state === 'SUCCEEDED' && receipt.outcome === 'PAST_DUE' &&
+      subscription.status === 'PAST_DUE' &&
+      receipt.applied_subscription_version === subscription.version &&
+      receipt.plan_id === subscription.plan_id &&
+      receipt.plan_version === subscription.plan_version &&
+      subscription.current_period_end === cycle.cycle_start;
+    if (!retryCanPromotePastDueReceipt) {
+      return reconcile(env, cycleStore, cycle, 'CYCLE_RECEIPT_SUBSCRIPTION_STATE_MISMATCH', now);
+    }
+    // Continue into the normal ACTIVE subscription CAS. The transaction rechecks
+    // the receipt and performs the PAST_DUE -> ACTIVE receipt promotion atomically.
   }
 
   const trialHasAnyMetadata = subscription.trial_started_at !== null ||
