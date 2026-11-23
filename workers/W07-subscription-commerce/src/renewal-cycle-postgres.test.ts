@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js'
 import {
   acquireRenewalSubmissionLeasePostgres,
+  finishRenewalSubmissionLeasePostgres,
   insertRenewalCyclePostgres,
   listPendingRenewalCycleIdsPostgres,
   markRenewalCycleSyncStatePostgres,
@@ -198,6 +199,26 @@ describe('native PostgreSQL D1-04 renewal cycle persistence', () => {
     expect(f.calls[0]?.sql).toContain("state = 'PAYMENT_READY' OR (state = 'SUBMITTING' AND lease_expires_at <= $6::timestamptz)")
     expect(f.calls[0]?.values).toEqual(['lease_1', later, now, cycleId, 3, now])
     expect(f.calls[1]?.values).toEqual([cycleId])
+  })
+
+  it('finishes a submission only while the exact unexpired lease token is held', async () => {
+    const f = poolWith(async () => ({ rows: [], rowCount: 0 }))
+
+    await expect(finishRenewalSubmissionLeasePostgres(
+      f.pool, cycleId, 'lease_old', now, later, {
+        state: 'SUBMITTED',
+        providerResponseStatus: 'processing',
+        outcomeCode: 'AWAITING_SIGNED_WEBHOOK',
+      },
+    )).resolves.toBe(false)
+
+    expect(f.calls).toHaveLength(1)
+    expect(f.calls[0]?.sql).toContain("state = 'SUBMITTING'")
+    expect(f.calls[0]?.sql).toContain('lease_token = $6')
+    expect(f.calls[0]?.sql).toContain('lease_expires_at > $7::timestamptz')
+    expect(f.calls[0]?.values).toEqual([
+      'SUBMITTED', 'processing', 'AWAITING_SIGNED_WEBHOOK', later, cycleId, 'lease_old', now,
+    ])
   })
 
   it('reopens a failed synchronized cycle only via retry backoff and attempt CAS', async () => {
