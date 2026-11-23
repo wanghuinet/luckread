@@ -201,7 +201,7 @@ describe('W03 Neon Series member removal', () => {
           'Idempotency-Key': 'series-member-remove-neon-key',
         },
       }),
-      { D1_02: db } as never,
+      {} as never,
     )
 
     expect(response.status).toBe(200)
