@@ -146,6 +146,15 @@ describe('W03 content contract core', () => {
     expect(lookups.at(-1)?.candidates).not.toContain(historicalUrl)
     expect(w07Calls).toBe(0)
 
+    for (const contentType of ['article', 'video']) {
+      matchingRows = [{ ...publicPost, id: 'public_' + contentType, content_type: contentType }]
+      const typedPublicResponse = await neonWorker.fetch(request(publicUrl), env, {} as never)
+      expect(typedPublicResponse.status).toBe(200)
+      await expect(typedPublicResponse.json()).resolves.toMatchObject({
+        data: { isPublic: true, isMemberContent: false, allowed: true },
+      })
+    }
+
     matchingRows = [memberPost]
     const memberRequest = request(publicUrl, 'W01', {
       'X-LuckRead-Principal-User-Id': 'user_subscriber',
