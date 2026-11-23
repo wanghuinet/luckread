@@ -1,7 +1,7 @@
 import usernameReservationPolicy from '../../../../contracts/security/username-reservation-policy.v1.json'
-import { requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
+import type { BetterAuthEnv } from './better-auth.js'
 import { resolveBetterAuthPrincipal, type AuthenticatedPrincipal } from './principal.js'
-import { createD1UsernameChangeStore, type UsernameChangeContext, type UsernameChangeStore } from './username-change-store.js'
+import type { UsernameChangeContext, UsernameChangeStore } from './username-change-store.js'
 
 const COOLDOWN_MS = Number(usernameReservationPolicy.ownerDecision.renameCooldownDays) * 24 * 60 * 60 * 1000
 const RESERVATION_MS = Number(usernameReservationPolicy.ownerDecision.previousUsernameReservationDays) * 24 * 60 * 60 * 1000
@@ -153,13 +153,14 @@ export async function handleUsernameStateRequest(
   env: BetterAuthEnv,
   request: Request,
   now = new Date(),
-  store: UsernameChangeStore = createD1UsernameChangeStore(requireLegacyW02D1Database(env)),
+  store?: UsernameChangeStore,
 ): Promise<Response> {
   if (!callerAllowed(request)) return error(403, 'FORBIDDEN', 'Authorized W01 service boundary required')
   const auth = await authenticate(env, request)
   if (!auth.ok) return auth.response
   const limited = await enforceReadLimits(env, auth.principal.userId)
   if (limited) return limited
+  if (!store) return error(503, 'SERVICE_UNAVAILABLE', 'Username state unavailable')
 
   try {
     const row = await store.loadState(auth.principal.userId)
@@ -186,11 +187,12 @@ export async function handleUsernameChangeRequest(
   env: BetterAuthEnv,
   request: Request,
   now = new Date(),
-  store: UsernameChangeStore = createD1UsernameChangeStore(requireLegacyW02D1Database(env)),
+  store?: UsernameChangeStore,
 ): Promise<Response> {
   if (!callerAllowed(request)) return error(403, 'FORBIDDEN', 'Authorized W01 service boundary required')
   const auth = await authenticate(env, request)
   if (!auth.ok) return auth.response
+  if (!store) return error(503, 'SERVICE_UNAVAILABLE', 'Username change unavailable')
 
   const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   if (!IDEMPOTENCY_PATTERN.test(idempotencyKey)) return error(428, 'IDEMPOTENCY_KEY_REQUIRED', 'A valid Idempotency-Key is required')
