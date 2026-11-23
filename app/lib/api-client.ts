@@ -1,4 +1,4 @@
-import { readSessionToken, saveSessionToken } from './secure-session';
+import { readSessionCredentialSnapshot, saveSessionTokenForSnapshot, readSessionToken } from './secure-session';
 
 const DEFAULT_API_BASE_URL = 'https://api.luckread.com';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -559,7 +559,7 @@ export async function apiRequest<T>(
   let outcome: MutationOutcome = 'transient';
   try {
     const renewedCredential = response.headers.get('X-LuckRead-Session-Token');
-    if (renewedCredential && persistSessionCredential) await saveSessionToken(renewedCredential);
+    if (renewedCredential && persistSessionCredential && credentialSnapshot) await saveSessionTokenForSnapshot(renewedCredential, credentialSnapshot);
 
     let data: T | ApiErrorBody | null = null;
     try {
@@ -640,7 +640,7 @@ export async function fetchContentBodyReference(
 
   if (target.origin === base.origin) {
     const renewedCredential = response.headers.get('X-LuckRead-Session-Token');
-    if (renewedCredential) await saveSessionToken(renewedCredential);
+    if (renewedCredential && credentialSnapshot) await saveSessionTokenForSnapshot(renewedCredential, credentialSnapshot);
   }
   return response;
 }
