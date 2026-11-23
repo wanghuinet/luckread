@@ -217,6 +217,26 @@ describe('native PostgreSQL renewal outcome synchronization', () => {
     expect(f.transactionCalls[3]?.values).toEqual([6, originalPlanId, 1, updatedAt, 'rcy_' + 'd'.repeat(26), 5])
   })
 
+  it('rejects PAST_DUE receipt promotion when the subscription period start is not before the cycle', async () => {
+    const invalidSubscription = {
+      ...subscriptionRow(), status: 'PAST_DUE' as const, version: 5, current_period_start: cycleStart,
+    }
+    const receipt = {
+      cycle_id: 'rcy_' + 'd'.repeat(26), subscription_id: subscriptionId, subscriber_id: subscriberId,
+      cycle_start: cycleStart, cycle_end: cycleEnd, outcome: 'PAST_DUE',
+      applied_subscription_version: 5, plan_id: originalPlanId, plan_version: 1,
+    }
+    const retryInput = { ...input(false), subscription: invalidSubscription, nextStatus: 'ACTIVE' as const }
+    const f = postgresPool(async (sql) => {
+      if (sql === 'BEGIN' || sql === 'ROLLBACK' || sql === 'COMMIT') return { rows: [], rowCount: null }
+      throw new Error('unexpected subscription mutation')
+    }, { receiptRow: receipt })
+    await expect(applyRenewalSubscriptionUpdatePostgres(f.pool, retryInput)).resolves.toBe('CAS_LOST')
+    expect(f.transactionCalls.map(x => x.sql)).toEqual([
+      'BEGIN', expect.stringContaining('FROM membership_subscription_renewal_cycle_applications'), 'ROLLBACK',
+    ])
+  })
+
   it('rolls back the successful subscription CAS when receipt promotion loses its own CAS', async () => {
     const failedSubscription = {
       ...subscriptionRow(), status: 'PAST_DUE' as const, version: 5,

@@ -456,6 +456,7 @@ export async function syncTerminalRenewalCycleToSubscription(
       receipt.applied_subscription_version === subscription.version &&
       receipt.plan_id === subscription.plan_id &&
       receipt.plan_version === subscription.plan_version &&
+      subscription.current_period_start < cycle.cycle_start &&
       subscription.current_period_end === cycle.cycle_start;
     if (!retryCanPromotePastDueReceipt) {
       return reconcile(env, cycleStore, cycle, 'CYCLE_RECEIPT_SUBSCRIPTION_STATE_MISMATCH', now);

@@ -181,6 +181,7 @@ export async function applyRenewalSubscriptionUpdatePostgres(
         Number(row.applied_subscription_version) === input.subscription.version &&
         row.plan_id === input.subscription.plan_id &&
         Number(row.plan_version) === input.subscription.plan_version &&
+        input.subscription.current_period_start < input.cycle.cycle_start &&
         input.subscription.current_period_end === input.cycle.cycle_start
       if (!retryPromotionEligible) {
         await client.query('ROLLBACK')
