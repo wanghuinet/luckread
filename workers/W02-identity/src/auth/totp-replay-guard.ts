@@ -66,30 +66,3 @@ export async function matchTotpTimeStep(
  * Removal: Next release.
  * Condition: Replay-guard contract tests use the Neon factor-state Store and no direct D1 reservation remains.
  */
-export async function consumeTotpTimeStep(
-  db: D1Database,
-  subjectId: string,
-  timeStep: number,
-): Promise<boolean> {
-  if (
-    typeof subjectId !== 'string' ||
-    subjectId.length < 1 ||
-    subjectId.length > 128 ||
-    !Number.isSafeInteger(timeStep) ||
-    timeStep < 0
-  ) {
-    throw new TypeError('invalid TOTP replay-guard input')
-  }
-
-  const result = await db.prepare(
-    'UPDATE "twoFactor" SET lastAcceptedTotpTimeStep = ? ' +
-      'WHERE userId = ? AND (lastAcceptedTotpTimeStep IS NULL OR lastAcceptedTotpTimeStep < ?)',
-  ).bind(timeStep, subjectId, timeStep).run()
-
-  // A row-count value is not proof of a successful D1 operation. Never accept
-  // a TOTP step unless D1 explicitly confirms the atomic reservation succeeded.
-  if (result.success !== true) {
-    throw new Error('TOTP_REPLAY_GUARD_PERSISTENCE_FAILED')
-  }
-  return result.meta?.changes === 1
-}
