@@ -447,7 +447,7 @@ async function checkEvents() {
         !requiredAuditDeliveryE2ETokens.every((token) => mfaAuditDeliveryE2ESource.includes(token)) ||
         !requiredLiveMfaNegativeTestTokens.every((token) => mfaLiveSecurityE2ESource.includes(token)) ||
         !requiredTimestampSemanticTokens.every((token) =>
-          token === 'SET status = ?, published_at = ?'
+          token === "SET status = 'PUBLISHED', published_at = $1"
             ? mfaPublicationSource.includes(token)
             : mfaEventSource.includes(token)
         ) ||
