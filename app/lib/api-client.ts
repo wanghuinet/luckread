@@ -621,9 +621,10 @@ export async function fetchContentBodyReference(
   const trustedMediaDeliveryHost = target.protocol === 'https:' &&
     ['img.luckread.com', 'video.luckread.com'].includes(target.hostname);
   const maySendSession = target.origin === base.origin || trustedMediaDeliveryHost;
+  let credentialSnapshot: Awaited<ReturnType<typeof readSessionCredentialSnapshot>> | null = null;
   if (maySendSession) {
     const token = options.sessionToken === undefined
-      ? await readSessionToken().catch(() => null)
+      ? (credentialSnapshot = await readSessionCredentialSnapshot()).token
       : options.sessionToken;
     if (token) headers.set('Authorization', 'Bearer ' + token);
   }
@@ -641,9 +642,9 @@ export async function fetchContentBodyReference(
     throw new LuckReadNetworkError();
   }
 
-  if (target.origin === base.origin) {
+  if (target.origin === base.origin && credentialSnapshot) {
     const renewedCredential = response.headers.get('X-LuckRead-Session-Token');
-    if (renewedCredential) await saveSessionToken(renewedCredential);
+    if (renewedCredential) await saveSessionTokenForSnapshot(renewedCredential, credentialSnapshot);
   }
   return response;
 }
