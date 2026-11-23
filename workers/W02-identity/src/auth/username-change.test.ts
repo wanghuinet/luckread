@@ -9,6 +9,12 @@ import {
   handleUsernameChangeRequest, handleUsernameStateRequest,
   isReservedUsername, normalizeUsernameCandidate,
 } from './username-change.js'
+import { createD1UsernameChangeStore } from './username-change-store.js'
+
+const handleUsernameStateWithFixture = (env: BetterAuthEnv, request: Request, now = new Date()) =>
+  handleUsernameStateRequest(env, request, now, createD1UsernameChangeStore(env.D1_01!))
+const handleUsernameChangeWithFixture = (env: BetterAuthEnv, request: Request, now = new Date()) =>
+  handleUsernameChangeRequest(env, request, now, createD1UsernameChangeStore(env.D1_01!))
 
 const activePrincipal = {
   userId: 'user-123', email: 'user@example.com', sessionId: 'session-123',
@@ -99,7 +105,7 @@ describe('W02 username change authority', () => {
     const request = new Request('https://luckread-w02.internal/internal/auth/username/state', {
       headers: { 'X-LuckRead-Caller': 'W01', 'X-LuckRead-Transport-Version': '1.0' },
     })
-    const response = await handleUsernameStateRequest(env, request)
+    const response = await handleUsernameStateWithFixture(env, request)
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe('"username-v0"')
     expect(await response.json()).toMatchObject({ data: { username: 'OldHandle', usernameVersion: 0, lastChangedAt: null, canChangeAt: null } })
@@ -112,13 +118,13 @@ describe('W02 username change authority', () => {
       headers: { 'X-LuckRead-Caller': 'W01', 'X-LuckRead-Transport-Version': '1.0' },
     })
 
-    const beforeExpiry = await handleUsernameStateRequest(env, request, new Date('2026-11-02T11:59:59.999Z'))
+    const beforeExpiry = await handleUsernameStateWithFixture(env, request, new Date('2026-11-02T11:59:59.999Z'))
     expect(beforeExpiry.status).toBe(200)
     await expect(beforeExpiry.json()).resolves.toMatchObject({
       data: { canChangeAt: '2026-11-02T12:00:00.000Z' },
     })
 
-    const atExpiry = await handleUsernameStateRequest(env, request, new Date('2026-11-02T12:00:00.000Z'))
+    const atExpiry = await handleUsernameStateWithFixture(env, request, new Date('2026-11-02T12:00:00.000Z'))
     expect(atExpiry.status).toBe(200)
     await expect(atExpiry.json()).resolves.toMatchObject({
       data: { canChangeAt: null },
@@ -127,7 +133,7 @@ describe('W02 username change authority', () => {
 
   it('rejects reserved handles before persistence', async () => {
     const { env, batch } = createEnv()
-    const response = await handleUsernameChangeRequest(env, changeRequest({ username: 'Support' }))
+    const response = await handleUsernameChangeWithFixture(env, changeRequest({ username: 'Support' }))
     expect(response.status).toBe(422)
     expect(await response.json()).toMatchObject({ error: { code: 'USERNAME_RESERVED' } })
     expect(batch).not.toHaveBeenCalled()
@@ -135,7 +141,7 @@ describe('W02 username change authority', () => {
 
   it('enforces the 30-day cooldown from the last successful change', async () => {
     const { env, batch } = createEnv({ ...defaultRow, usernameVersion: 1, lastChangedAt: '2026-10-20T12:00:00.000Z' })
-    const response = await handleUsernameChangeRequest(env, changeRequest({ ifMatch: '"username-v1"' }), new Date('2026-11-02T12:00:00.000Z'))
+    const response = await handleUsernameChangeWithFixture(env, changeRequest({ ifMatch: '"username-v1"' }), new Date('2026-11-02T12:00:00.000Z'))
     expect(response.status).toBe(409)
     expect(await response.json()).toMatchObject({ error: { code: 'USERNAME_CHANGE_COOLDOWN' } })
     expect(batch).not.toHaveBeenCalled()
@@ -143,7 +149,7 @@ describe('W02 username change authority', () => {
 
   it('allows a username change when the 30-day cooldown has expired', async () => {
     const { env, batch, prepared } = createEnv({ ...defaultRow, usernameVersion: 1, lastChangedAt: '2026-10-03T12:00:00.000Z' })
-    const response = await handleUsernameChangeRequest(env, changeRequest({ ifMatch: '"username-v1"' }), new Date('2026-11-02T12:00:00.000Z'))
+    const response = await handleUsernameChangeWithFixture(env, changeRequest({ ifMatch: '"username-v1"' }), new Date('2026-11-02T12:00:00.000Z'))
     expect(response.status).toBe(200)
     expect(batch).toHaveBeenCalledTimes(1)
     expect(batch.mock.calls[0][0]).toHaveLength(2)
@@ -153,7 +159,7 @@ describe('W02 username change authority', () => {
 
   it('rejects stale If-Match versions', async () => {
     const { env, batch } = createEnv({ ...defaultRow, usernameVersion: 2 })
-    const response = await handleUsernameChangeRequest(env, changeRequest({ ifMatch: '"username-v1"' }))
+    const response = await handleUsernameChangeWithFixture(env, changeRequest({ ifMatch: '"username-v1"' }))
     expect(response.status).toBe(412)
     expect(response.headers.get('etag')).toBe('"username-v2"')
     expect(batch).not.toHaveBeenCalled()
@@ -168,7 +174,7 @@ describe('W02 username change authority', () => {
       replayChangedAt: '2026-11-02T12:00:00.000Z',
       replayExpiresAt: '2026-11-03T12:00:00.000Z',
     })
-    const response = await handleUsernameChangeRequest(env, changeRequest(), new Date('2026-11-02T12:05:00.000Z'))
+    const response = await handleUsernameChangeWithFixture(env, changeRequest(), new Date('2026-11-02T12:05:00.000Z'))
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe('"username-v1"')
     expect(await response.json()).toMatchObject({
@@ -189,7 +195,7 @@ describe('W02 username change authority', () => {
       replayChangedAt: '2026-11-02T12:00:00.000Z',
       replayExpiresAt: '2026-11-03T12:00:00.000Z',
     })
-    const response = await handleUsernameChangeRequest(env, changeRequest())
+    const response = await handleUsernameChangeWithFixture(env, changeRequest())
     expect(response.status).toBe(409)
     expect(await response.json()).toMatchObject({ error: { code: 'IDEMPOTENCY_KEY_REUSE_CONFLICT' } })
     expect(batch).not.toHaveBeenCalled()
@@ -197,7 +203,7 @@ describe('W02 username change authority', () => {
 
   it('writes one compact per-user state row rather than an append-only history log', async () => {
     const { env, batch, prepared, limiter } = createEnv()
-    const response = await handleUsernameChangeRequest(env, changeRequest(), new Date('2026-11-02T12:00:00.000Z'))
+    const response = await handleUsernameChangeWithFixture(env, changeRequest(), new Date('2026-11-02T12:00:00.000Z'))
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe('"username-v1"')
     expect(batch).toHaveBeenCalledTimes(1)
@@ -218,7 +224,7 @@ describe('W02 username change authority', () => {
   it('fails closed when the existing write limiter is unavailable', async () => {
     const { env, batch, limiter } = createEnv()
     limiter.limit.mockRejectedValueOnce(new Error('limiter unavailable'))
-    const response = await handleUsernameChangeRequest(env, changeRequest())
+    const response = await handleUsernameChangeWithFixture(env, changeRequest())
     expect(response.status).toBe(503)
     expect(batch).not.toHaveBeenCalled()
   })
