@@ -289,7 +289,7 @@ describe('W03 Neon Series delete', () => {
           'Idempotency-Key': 'series-delete-neon-key',
         },
       }),
-      { D1_02: database } as never,
+      {} as never,
     )
 
     expect(response.status).toBe(204)
