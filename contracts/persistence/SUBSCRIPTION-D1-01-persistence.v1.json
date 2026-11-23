@@ -601,6 +601,72 @@
         "A failed or unpaid renewal does not apply the scheduled change; it retains the target for a verified retry and otherwise remains reconciliation-owned.",
         "D1-01 atomically applies the target plan identity, advances the period using the target interval, and marks the schedule APPLIED by subscription version CAS; W06 D1-03 audit confirmation is required before D1-04 renewal sync is acknowledged as complete."
       ]
+    },
+    {
+      "name": "membership_subscription_renewal_cycle_applications",
+      "purpose": "Cycle-specific durable W07 subscription outcome receipt; excludes finance/payment facts.",
+      "columns": [
+        {
+          "name": "cycle_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "name": "subscription_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "subscriber_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "cycle_start",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "cycle_end",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "outcome",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "applied_subscription_version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "plan_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "plan_version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "applied_at",
+          "type": "TEXT",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_membership_renewal_cycle_applications_subscription",
+          "columns": [
+            "subscription_id",
+            "cycle_start"
+          ]
+        }
+      ]
     }
   ]
 }
