@@ -189,6 +189,9 @@ export async function updateRenewalCyclePostgres(
       `, version = version + 1, updated_at = $${next}::timestamptz WHERE cycle_id = $${next + 1} AND version = $${next + 2} RETURNING cycle_id`,
       [...values, updatedAt, cycle.cycle_id, cycle.version],
     )
+    // A CAS miss must not be reported as a successful update by returning the latest row.
+    // Callers must treat null as a lost version race and re-read/reconcile explicitly.
+    if (result.rows.length !== 1) return null
     return readRenewalCycleByIdPostgres(pool, cycle.cycle_id)
   } catch {
     return failUnavailable()
