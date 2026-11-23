@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, expect, mock, test } from 'bun:test';
 
 let storedToken = 'secure-test-token';
-let savedTokens = [];\nlet activeSessionAccount = 'account-A';\nconst accountTokens = new Map();
+let savedTokens = [];
+let activeSessionAccount = 'account-A';
+const accountTokens = new Map();
 let pendingFetch;
 let activeViewerId = 'stage3-bookmark-viewer';
 const mockedAuthStore = Object.assign(
@@ -14,7 +16,9 @@ const originalXMLHttpRequest = globalThis.XMLHttpRequest;
 
 mock.module('../lib/secure-session.ts', () => ({
   readSessionToken: async () => storedToken,
-  saveSessionToken: async (token) => {
+  readSessionCredentialSnapshot: async () => ({ accountId: activeSessionAccount, token: storedToken }),
+  saveSessionTokenForSnapshot: async (token, snapshot) => {
+    accountTokens.set(snapshot.accountId, token);
     storedToken = token;
     savedTokens.push(token);
   },
@@ -58,6 +62,8 @@ const { createContentShareLink } = await import('../lib/content-share.ts');
 beforeEach(() => {
   storedToken = 'secure-test-token';
   savedTokens = [];
+  activeSessionAccount = 'account-A';
+  accountTokens.clear();
   activeViewerId = 'stage3-bookmark-viewer';
   pendingFetch = async () => new Response(JSON.stringify({ data: { ok: true } }), { status: 200 });
   globalThis.fetch = (input, init) => pendingFetch(input, init);
@@ -72,7 +78,8 @@ afterEach(() => {
   }
 });
 
-\ntest('persists renewal against the request account when the active account switches mid-flight', async () => {
+
+test('persists renewal against the request account when the active account switches mid-flight', async () => {
   let releaseResponse;
   pendingFetch = async () => await new Promise((resolve) => { releaseResponse = resolve; });
   const request = apiRequest('/account-bound-renewal-race');
@@ -87,7 +94,8 @@ afterEach(() => {
   expect(accountTokens.get('account-A')).toBe('renewed-account-A-token');
   expect(accountTokens.get('account-B')).toBeUndefined();
 });
-\ntest('adds the secure bearer session and an idempotency key to JSON writes at the canonical public API URL', async () => {
+
+test('adds the secure bearer session and an idempotency key to JSON writes at the canonical public API URL', async () => {
   let capturedInput;
   let capturedInit;
   pendingFetch = async (input, init) => {
@@ -1081,7 +1089,9 @@ test('uses authenticated XHR multipart transport when upload progress is request
     }
 
     getAllResponseHeaders() {
-      return 'Content-Type: application/json\r\nX-LuckRead-Session-Token: renewed-upload-token\r\n';
+      return 'Content-Type: application/json\r
+X-LuckRead-Session-Token: renewed-upload-token\r
+';
     }
   }
 
