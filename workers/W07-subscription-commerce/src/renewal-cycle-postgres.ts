@@ -241,6 +241,31 @@ export async function acquireRenewalSubmissionLeasePostgres(
   }
 }
 
+export async function finishRenewalSubmissionLeasePostgres(
+  pool: W07WebhookPostgresPool,
+  cycleId: string,
+  leaseToken: string,
+  now: string,
+  updatedAt: string,
+  outcome: Readonly<{
+    state: 'SUBMITTED' | 'RECONCILIATION_REQUIRED'
+    providerResponseStatus: string | null
+    outcomeCode: string
+  }>,
+): Promise<boolean> {
+  try {
+    const result = await pool.query<{ cycle_id: string } & Record<string, unknown>>(
+      'UPDATE subscription_renewal_cycles SET state = $1, provider_response_status = $2, outcome_code = $3, ' +
+      'lease_token = NULL, lease_expires_at = NULL, version = version + 1, updated_at = $4::timestamptz ' +
+      "WHERE cycle_id = $5 AND state = 'SUBMITTING' AND lease_token = $6 AND lease_expires_at > $7::timestamptz RETURNING cycle_id",
+      [outcome.state, outcome.providerResponseStatus, outcome.outcomeCode, updatedAt, cycleId, leaseToken, now],
+    )
+    return result.rows.length === 1
+  } catch {
+    return failUnavailable()
+  }
+}
+
 export async function retryFailedRenewalCyclePostgres(
   pool: W07WebhookPostgresPool,
   cycle: RenewalCycleRow,
