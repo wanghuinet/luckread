@@ -4,6 +4,8 @@ import {
   encodeScopedCursor,
 } from './content-runtime.js'
 
+export const MAX_POST_THREAD_ITEMS = 50
+
 export type ContentRelationshipStatus = 'ACTIVE' | 'REVOKED' | 'SUPERSEDED'
 export type ContentRelationshipDirection = 'out' | 'in' | 'both'
 export type ContentRelationshipType = 'reference' | 'quote-post' | 'thread-next'
