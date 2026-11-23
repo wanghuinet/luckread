@@ -39,7 +39,6 @@ if (lockText.includes('@payloadcms/db-d1-sqlite')) fail('Cloudflare D1 Payload a
 // is retained solely as historical provenance, not as a dependency baseline.
 const required = {
   payload: '3.90.2',
-  '@payloadcms/db-postgres': '3.90.2',
   '@payloadcms/next': '3.90.2',
   '@payloadcms/richtext-lexical': '3.90.2',
   '@payloadcms/storage-r2': '3.90.2',
@@ -50,6 +49,8 @@ const required = {
   '@opennextjs/cloudflare': '1.20.1',
 }
 
+const postgresAdapterVersion = pkg.dependencies?.['@payloadcms/db-postgres'] ?? pkg.devDependencies?.['@payloadcms/db-postgres']
+if (postgresAdapterVersion !== '3.90.2') fail('W01 official PostgreSQL adapter must resolve to 3.90.2')
 for (const [name, expected] of Object.entries(required)) {
   const actual = pkg.dependencies?.[name]
   if (actual !== expected) fail(`${name} must be ${expected}; found ${actual ?? '<missing>'}`)
