@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, mock, test } from 'bun:test';
 
 let storedToken = 'secure-test-token';
-let savedTokens = [];
+let savedTokens = [];\nlet activeSessionAccount = 'account-A';\nconst accountTokens = new Map();
 let pendingFetch;
 let activeViewerId = 'stage3-bookmark-viewer';
 const mockedAuthStore = Object.assign(
@@ -72,7 +72,22 @@ afterEach(() => {
   }
 });
 
-test('adds the secure bearer session and an idempotency key to JSON writes at the canonical public API URL', async () => {
+\ntest('persists renewal against the request account when the active account switches mid-flight', async () => {
+  let releaseResponse;
+  pendingFetch = async () => await new Promise((resolve) => { releaseResponse = resolve; });
+  const request = apiRequest('/account-bound-renewal-race');
+  await Promise.resolve();
+  await Promise.resolve();
+  activeSessionAccount = 'account-B';
+  releaseResponse(new Response(JSON.stringify({ data: { ok: true } }), {
+    status: 200,
+    headers: { 'X-LuckRead-Session-Token': 'renewed-account-A-token' },
+  }));
+  await request;
+  expect(accountTokens.get('account-A')).toBe('renewed-account-A-token');
+  expect(accountTokens.get('account-B')).toBeUndefined();
+});
+\ntest('adds the secure bearer session and an idempotency key to JSON writes at the canonical public API URL', async () => {
   let capturedInput;
   let capturedInit;
   pendingFetch = async (input, init) => {
