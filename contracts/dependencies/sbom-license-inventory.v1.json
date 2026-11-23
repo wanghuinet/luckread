@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "1.0.0",
+  "status": "REVIEW_REQUIRED",
+  "scan": {
+    "repository": "wanghuinet/luckread",
+    "commit": "620d16bcc8596376d3d2097f1c62741651d7d018",
+    "tool": "Anchore Syft",
+    "action": "anchore/sbom-action",
+    "actionCommit": "66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c",
+    "format": "SPDX-2.3 JSON",
+    "artifactId": 14816290168,
+    "artifactName": "luckread-sbom-171db334324e7fc652ef5936e59ddc0e32594743",
+    "artifactSizeBytes": 310465,
+    "artifactSha256": "e5114015b8d008d8ec937b678d4aed29190b76e43846daac63952109265f9ad4",
+    "artifactExpiresAt": "2027-02-21T11:45:19Z"
+  },
+  "inventory": {
+    "packageRecords": 2266,
+    "fileRecords": 178,
+    "relationships": 8067,
+    "licenseDeclaredKnownRecords": 486,
+    "licenseDeclaredNoAssertionRecords": 1780,
+    "licenseConcludedNoAssertionRecords": 2266,
+    "downloadLocationNoAssertionRecords": 1750
+  },
+  "licenseDeclaredCounts": {
+    "NOASSERTION": 1780,
+    "MIT": 417,
+    "Apache-2.0": 20,
+    "BSD-3-Clause": 13,
+    "ISC": 11,
+    "LGPL-3.0-or-later": 10,
+    "(Apache-2.0 AND LGPL-3.0-or-later)": 3,
+    "(MIT OR Apache-2.0)": 2,
+    "(Apache-2.0 AND LGPL-3.0-or-later AND MIT)": 1,
+    "Python-2.0": 1,
+    "CC-BY-4.0": 1,
+    "(MPL-2.0 OR Apache-2.0)": 1,
+    "BSD-2-Clause": 1,
+    "(WTFPL OR ISC)": 1,
+    "BlueOak-1.0.0": 1,
+    "WTFPL": 1,
+    "0BSD": 1,
+    "(WTFPL OR MIT)": 1
+  },
+  "reviewItems": [
+    {
+      "licenseExpression": "LGPL-3.0-or-later",
+      "packageFamily": "@img/sharp-libvips-*",
+      "recordCount": 10,
+      "note": "Platform-specific libvips package variants are present in the lockfile-derived inventory; determine which variants ship in each production artifact and review applicable distribution obligations."
+    },
+    {
+      "licenseExpression": "(Apache-2.0 AND LGPL-3.0-or-later)",
+      "packageFamily": "@img/sharp-*",
+      "recordCount": 4,
+      "note": "Review exact package license files and deployment inclusion before release."
+    },
+    {
+      "licenseExpression": "CC-BY-4.0",
+      "package": "caniuse-lite",
+      "version": "1.0.30001810",
+      "recordCount": 1,
+      "note": "Review attribution requirements for the package data."
+    },
+    {
+      "licenseExpression": "(MPL-2.0 OR Apache-2.0)",
+      "package": "dompurify",
+      "version": "3.4.15",
+      "recordCount": 1,
+      "note": "Confirm selected license path and preserve notices."
+    },
+    {
+      "licenseExpression": "NOASSERTION",
+      "recordCount": 1780,
+      "note": "Metadata is absent or not recognized by Syft; these entries require registry/package license metadata or upstream LICENSE verification."
+    },
+    {
+      "sourceProvenance": "NOASSERTION",
+      "recordCount": 1750,
+      "note": "SBOM source download location is not asserted for these package records; reconcile against lockfile resolution/integrity and registry provenance."
+    }
+  ],
+  "limitations": [
+    "Syft SPDX licenseDeclared is package metadata, not a legal conclusion.",
+    "All 2266 licenseConcluded values are NOASSERTION; this SBOM is an inventory, not legal approval.",
+    "Package records can contain platform variants and duplicate package/version entries; do not equate 2266 records with 2266 unique packages.",
+    "The scan covers the repository snapshot and its manifests/lockfiles; it does not prove which optional packages ship in every production Worker bundle."
+  ]
+}

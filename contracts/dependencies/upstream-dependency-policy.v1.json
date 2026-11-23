@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "status": "ACTIVE",
+  "purpose": "Protect upstream open-source dependencies from unreviewed source replacement, patching, vendoring, or local forks.",
+  "protectedPackages": [
+    "payload",
+    "@payloadcms/*",
+    "better-auth",
+    "@better-auth/*",
+    "@casl/*",
+    "next",
+    "react",
+    "react-dom",
+    "@opennextjs/cloudflare",
+    "pg",
+    "expo-server-sdk"
+  ],
+  "allowedIntegration": [
+    "official configuration",
+    "documented plugin and extension APIs",
+    "LuckRead-owned adapters and services",
+    "version-pinned registry packages",
+    "documented upstream migration and upgrade procedures"
+  ],
+  "forbiddenWithoutExplicitArchitectureException": [
+    "editing upstream package source",
+    "private fork or git-based replacement",
+    "vendoring upstream package source",
+    "patch-package or pnpm patchedDependencies",
+    "runtime monkey-patching of upstream exports",
+    "local file or workspace replacement of protected packages"
+  ],
+  "reviewRequired": [
+    "dependency overrides or resolutions targeting protected packages",
+    "non-registry lockfile resolution for protected packages",
+    "unrecognized package source or license",
+    "copied upstream source whose provenance cannot be established"
+  ]
+}
