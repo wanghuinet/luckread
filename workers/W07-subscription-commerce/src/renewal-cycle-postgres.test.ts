@@ -174,6 +174,17 @@ describe('native PostgreSQL D1-04 renewal cycle persistence', () => {
     expect(f.calls[0]?.values).toEqual([later, cycleId, 3, 'PREPARED'])
   })
 
+  it('returns null when payment-ready transition loses its version CAS', async () => {
+    const f = poolWith(async () => ({ rows: [], rowCount: 0 }))
+
+    await expect(transitionRenewalCycleToPaymentReadyPostgres(
+      f.pool, cycleRow(), later,
+    )).resolves.toBeNull()
+
+    expect(f.calls).toHaveLength(1)
+    expect(f.calls[0]?.sql).toContain('RETURNING cycle_id')
+  })
+
   it('acquires a submission lease with a state/version CAS and expiry predicate', async () => {
     const row = cycleRow({ state: 'SUBMITTING', lease_token: 'lease_1', lease_expires_at: later, version: 4, updated_at: later })
     const f = poolWith(async (sql) => sql.startsWith('UPDATE')
