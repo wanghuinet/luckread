@@ -163,7 +163,7 @@ async function finalizeKnownMfaRejection(
 
 type BetterAuthDatabase = NonNullable<Parameters<typeof betterAuth>[0]['database']>
 
-export type BetterAuthPersistenceProfile = 'production' | 'postgres-rehearsal' | 'postgres'
+export type BetterAuthPersistenceProfile = 'legacy-d1-test' | 'postgres-rehearsal' | 'postgres'
 
 export type BetterAuthPostgresLifecycleAdapters = {
   afterUserCreated: (userId: string) => Promise<void>
@@ -172,14 +172,14 @@ export type BetterAuthPostgresLifecycleAdapters = {
 
 export const buildLuckReadAuth = (
   env: BetterAuthEnv,
-  database: BetterAuthDatabase = requireLegacyW02D1Database(env) as BetterAuthDatabase,
-  persistenceProfile: BetterAuthPersistenceProfile = 'production',
+  database: BetterAuthDatabase,
+  persistenceProfile: BetterAuthPersistenceProfile,
   mfaFactorStateStore?: MfaFactorStateStore,
   postgresLifecycleAdapters?: BetterAuthPostgresLifecycleAdapters,
   mfaAuditOperationReceiptStore?: MfaAuditOperationReceiptStore,
   resolveMfaSessionSubject?: (headers: Headers) => Promise<string | null>,
 ) => {
-  const postgresPersistence = persistenceProfile !== 'production'
+  const postgresPersistence = persistenceProfile !== 'legacy-d1-test'
   const legacyD1 = postgresPersistence ? undefined : requireLegacyW02D1Database(env)
   const unavailablePostgresRehearsalMfaFactorStateStore: MfaFactorStateStore = {
     async isActiveSubject() {
@@ -750,8 +750,8 @@ export const buildLuckReadAuth = (
 
 const authInstances = new WeakMap<object, ReturnType<typeof buildLuckReadAuth>>()
 
-// Each production isolate uses the existing Neon Hyperdrive pool. The D1 profile
-// remains reachable only through buildLuckReadAuth's explicit test/schema fixture API.
+// Each production isolate uses the existing Neon Hyperdrive pool. The legacy D1
+// profile is explicit and test-only; buildLuckReadAuth has no D1 defaults.
 export const createLuckReadAuth = (env: BetterAuthEnv) => {
   const runtime = getW02PostgresRuntime(env)
   const cached = authInstances.get(runtime.pool)
