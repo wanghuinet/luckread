@@ -187,7 +187,7 @@ export async function handleUsernameChangeRequest(
   env: BetterAuthEnv,
   request: Request,
   now = new Date(),
-  store: UsernameChangeStore = createD1UsernameChangeStore(requireLegacyW02D1Database(env)),
+  store?: UsernameChangeStore,
 ): Promise<Response> {
   if (!callerAllowed(request)) return error(403, 'FORBIDDEN', 'Authorized W01 service boundary required')
   const auth = await authenticate(env, request)
