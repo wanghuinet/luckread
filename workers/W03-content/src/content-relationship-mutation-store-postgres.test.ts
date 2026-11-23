@@ -358,13 +358,8 @@ describe('W03 Neon content relationship mutation store', () => {
       async loadAppendStats() { return appendStats },
       async appendThread() {},
     }
-    const d1 = {
-      prepare() { throw new Error('D1 must not be queried in Neon mode') },
-      batch() { throw new Error('D1 must not be written in Neon mode') },
-    }
-
     const created = await createContentRelationship(
-      d1 as never,
+      store,
       'user_123',
       'content_source',
       {
@@ -375,16 +370,14 @@ describe('W03 Neon content relationship mutation store', () => {
       },
       'neon-create-reference-key',
       now,
-      store,
     )
     const revoked = await revokeContentRelationship(
-      d1 as never,
+      store,
       'user_123',
       'content_source',
       created.relationshipId,
       'neon-revoke-reference-key',
       now,
-      store,
     )
 
     expect(created).toMatchObject({
@@ -531,13 +524,12 @@ describe('W03 Neon content relationship mutation store', () => {
     }
 
     const created = await appendPostThreadNext(
-      d1 as never,
+      store,
       'user_123',
       'content_source',
       'content_target',
       'neon-thread-append-key',
       now,
-      store,
     )
 
     expect(created).toMatchObject({
