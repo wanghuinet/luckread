@@ -10,10 +10,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./principal.js', () => ({ resolveBetterAuthPrincipal: mocks.resolvePrincipal }))
 vi.mock('./better-auth.js', () => ({
   createLuckReadAuth: mocks.createAuth,
-  requireLegacyW02D1Database: (env: { D1_01?: D1Database }) => {
-    if (!env.D1_01) throw new Error('W02_D1_TEST_BINDING_REQUIRED')
-    return env.D1_01
-  },
 }))
 
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
@@ -274,7 +270,7 @@ describe('W02 MFA enrollment-start authority', () => {
       const malformed = await handleWithSqliteFixture(env, makeRequest())
       expect(malformed.status).toBe(503)
 
-      const noLimiter = await handleWithSqliteFixture({ D1_01: db } as BetterAuthEnv, makeRequest())
+      const noLimiter = await handleWithSqliteFixture({} as BetterAuthEnv, makeRequest())
       expect(noLimiter.status).toBe(503)
     } finally {
       close()
