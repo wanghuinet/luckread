@@ -19,6 +19,12 @@ vi.mock('./better-auth.js', () => ({
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
 import type { MfaEnrollmentStartStore } from './mfa-enrollment-start-store.js'
 import { handleMfaEnrollmentStartRequest } from './mfa-enrollment-start.js'
+import { createD1MfaEnrollmentStartStore } from './mfa-enrollment-start-store.js'
+
+const handleWithSqliteFixture = (env: BetterAuthEnv, request: Request) =>
+  handleMfaEnrollmentStartRequest(env, request, {
+    store: createD1MfaEnrollmentStartStore(env.D1_01!),
+  })
 
 const makeDb = () => {
   const sqlite = new DatabaseSync(':memory:')
@@ -118,7 +124,7 @@ describe('W02 MFA enrollment-start authority', () => {
   it('uses real SQLite conditional SQL to reserve a single enrollment and returns a one-time DTO', async () => {
     const { db, sqlite, close } = makeDb()
     try {
-      const response = await handleMfaEnrollmentStartRequest({
+      const response = await handleWithSqliteFixture({
         D1_01: db,
         AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
       } as BetterAuthEnv, makeRequest())
@@ -196,13 +202,13 @@ describe('W02 MFA enrollment-start authority', () => {
   it('rejects non-W01 callers and inactive identities before a factor write', async () => {
     const { db, close } = makeDb()
     try {
-      const forbidden = await handleMfaEnrollmentStartRequest({
+      const forbidden = await handleWithSqliteFixture({
         D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
       } as BetterAuthEnv, makeRequest(undefined, 'mfa-enroll-key-0001', false))
       expect(forbidden.status).toBe(403)
 
       mocks.resolvePrincipal.mockResolvedValueOnce({ ...principal, accountState: 'SUSPENDED' })
-      const inactive = await handleMfaEnrollmentStartRequest({
+      const inactive = await handleWithSqliteFixture({
         D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
       } as BetterAuthEnv, makeRequest())
       expect(inactive.status).toBe(403)
@@ -216,11 +222,11 @@ describe('W02 MFA enrollment-start authority', () => {
     const { db, close } = makeDb()
     try {
       const env = { D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter } as BetterAuthEnv
-      const first = await handleMfaEnrollmentStartRequest(env, makeRequest())
+      const first = await handleWithSqliteFixture(env, makeRequest())
       expect(first.status).toBe(200)
-      const sameKeyReplay = await handleMfaEnrollmentStartRequest(env, makeRequest())
+      const sameKeyReplay = await handleWithSqliteFixture(env, makeRequest())
       expect(sameKeyReplay.status).toBe(409)
-      const differentKey = await handleMfaEnrollmentStartRequest(env, makeRequest(
+      const differentKey = await handleWithSqliteFixture(env, makeRequest(
         { currentPassword: 'correct horse battery staple' },
         'mfa-enroll-key-0002',
       ))
@@ -235,14 +241,14 @@ describe('W02 MFA enrollment-start authority', () => {
     const { db, sqlite, close } = makeDb()
     try {
       const env = { D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter } as BetterAuthEnv
-      const noKey = await handleMfaEnrollmentStartRequest(env, makeRequest(
+      const noKey = await handleWithSqliteFixture(env, makeRequest(
         { currentPassword: 'correct horse battery staple' }, '',
       ))
       expect(noKey.status).toBe(400)
       expect(mocks.handler).not.toHaveBeenCalled()
 
       mocks.handler.mockRejectedValueOnce(new Error('internal adapter failed'))
-      const failed = await handleMfaEnrollmentStartRequest(env, makeRequest())
+      const failed = await handleWithSqliteFixture(env, makeRequest())
       expect(failed.status).toBe(503)
       const account = sqlite.prepare('SELECT mfa_enrollment_key_hash FROM "user" WHERE id = ?')
         .get('user-12345678') as { mfa_enrollment_key_hash: string | null }
@@ -257,10 +263,10 @@ describe('W02 MFA enrollment-start authority', () => {
     try {
       const env = { D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter } as BetterAuthEnv
       mocks.handler.mockResolvedValueOnce(Response.json({ method: 'totp', totpURI: 'bad', backupCodes: [] }))
-      const malformed = await handleMfaEnrollmentStartRequest(env, makeRequest())
+      const malformed = await handleWithSqliteFixture(env, makeRequest())
       expect(malformed.status).toBe(503)
 
-      const noLimiter = await handleMfaEnrollmentStartRequest({ D1_01: db } as BetterAuthEnv, makeRequest())
+      const noLimiter = await handleWithSqliteFixture({ D1_01: db } as BetterAuthEnv, makeRequest())
       expect(noLimiter.status).toBe(503)
     } finally {
       close()
