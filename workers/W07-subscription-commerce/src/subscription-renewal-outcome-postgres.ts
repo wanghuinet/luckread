@@ -157,6 +157,7 @@ export async function applyRenewalSubscriptionUpdatePostgres(
         new Date(String(row.cycle_start)).toISOString() === input.cycle.cycle_start &&
         new Date(String(row.cycle_end)).toISOString() === input.cycle.cycle_end &&
         row.outcome === input.nextStatus &&
+        Number(row.applied_subscription_version) === input.subscription.version + 1 &&
         row.plan_id === (input.scheduledChange && input.nextStatus === 'ACTIVE' ? input.scheduledChange.targetPlanId : input.subscription.plan_id) &&
         Number(row.plan_version) === (input.scheduledChange && input.nextStatus === 'ACTIVE' ? input.scheduledChange.targetPlanVersion : input.subscription.plan_version)
       if (!matches) {
