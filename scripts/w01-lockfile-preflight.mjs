@@ -25,17 +25,20 @@ function run(command, args) {
 if (!existsSync(pkgPath)) fail('workers/W01-payload/package.json is missing')
 
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+if (pkg.dependencies?.['@payloadcms/db-d1-sqlite']) fail('Cloudflare D1 Payload adapter must not be declared')
+const lockText = existsSync(lockPath) ? readFileSync(lockPath, 'utf8') : ''
+if (lockText.includes('@payloadcms/db-d1-sqlite')) fail('Cloudflare D1 Payload adapter must not remain in the W01 lockfile')
 // Current W01 lock per workers/W01-payload/package.json (authoritative).
-// The upstream Cloudflare-template observation (3.82.1 family) is recorded
-// separately in workers/W01-payload/PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md.
+// W01 runtime and lockfile are Neon/PostgreSQL-only. The old Cloudflare template
+// is retained solely as historical provenance, not as a dependency baseline.
 const required = {
   payload: '3.90.2',
-  '@payloadcms/db-d1-sqlite': '3.90.2',
+  '@payloadcms/db-postgres': '3.90.2',
   '@payloadcms/next': '3.90.2',
   '@payloadcms/richtext-lexical': '3.90.2',
   '@payloadcms/storage-r2': '3.90.2',
   '@payloadcms/ui': '3.90.2',
-  next: '16.2.6',
+  next: '16.3.3',
   react: '19.2.6',
   'react-dom': '19.2.6',
   '@opennextjs/cloudflare': '1.20.1',
