@@ -348,13 +348,8 @@ async function applySubscriptionUpdate(
 
   const latest = await readSubscription(membershipStore, cycle.subscription_id, cycle.subscriber_id);
   if (!latest) return 'CAS_LOST';
-  if (latest.plan_id === nextPlanId && latest.plan_version === nextPlanVersion &&
-      latest.current_period_start === nextPeriodStart && latest.current_period_end === nextPeriodEnd) {
-    return 'ALREADY_APPLIED';
-  }
-  if (nextStatus === 'PAST_DUE' && latest.status === 'PAST_DUE' &&
-      latest.plan_id === subscription.plan_id && latest.plan_version === subscription.plan_version &&
-      latest.current_period_end === cycle.cycle_start) return 'ALREADY_APPLIED';
+  // A post-CAS state read is not cycle-specific durable proof. Treat a lost
+  // compare-and-set as a conflict and let reconciliation resolve it.
   return 'CAS_LOST';
 }
 
