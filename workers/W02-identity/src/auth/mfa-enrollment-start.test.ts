@@ -120,7 +120,7 @@ describe('W02 MFA enrollment-start authority', () => {
   it('fails closed when no persistence store is injected', async () => {
     const response = await handleMfaEnrollmentStartRequest({
       AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
-    } as unknown as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest())
+    } as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest())
     expect(response.status).toBe(503)
     expect(mocks.handler).not.toHaveBeenCalled()
   })
@@ -177,7 +177,7 @@ describe('W02 MFA enrollment-start authority', () => {
     }))
     const response = await handleMfaEnrollmentStartRequest({
       AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
-    } as unknown as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest(), {
+    } as unknown as BetterAuthEnv & { D1_01: D1Database }, makeRequest(), {
       auth,
       store,
       resolvePrincipal,
