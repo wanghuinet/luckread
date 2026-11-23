@@ -1,18 +1,8 @@
-import { createLuckReadAuth, requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
-import {
-  createD1MfaAuditOperationReceiptStore,
-  type MfaAuditOperationReceiptStore,
-} from './mfa-audit-operation-receipt-store.js'
-import {
-  createD1MfaEnrollmentConfirmStore,
-  type MfaEnrollmentConfirmStore,
-} from './mfa-enrollment-confirm-store.js'
+import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import type { MfaAuditOperationReceiptStore } from './mfa-audit-operation-receipt-store.js'
+import type { MfaEnrollmentConfirmStore } from './mfa-enrollment-confirm-store.js'
 import { resolveBetterAuthPrincipal } from './principal.js'
-import {
-  createD1MfaStatusStore,
-  type MfaStatusStore,
-  type AuthoritativeMfaStatus,
-} from './mfa-status.js'
+import type { MfaStatusStore, AuthoritativeMfaStatus } from './mfa-status.js'
 
 const json = (body: unknown, status = 200): Response => Response.json(body, {
   status,
@@ -109,7 +99,7 @@ const sha256Hex = async (value: string): Promise<string> => {
  * W02-owned enrollment confirmation. W02 derives the subject from the live
  * session, verifies the pending factor through Better Auth, and returns only
  * a read-back of the authoritative status. Persistence providers are injected
- * for rehearsal; deployed callers continue to use D1 and Better Auth by default.
+ * and Better Auth are injected by the Neon runtime composition.
  */
 export async function handleMfaEnrollmentConfirmRequest(
   env: BetterAuthEnv,
@@ -148,9 +138,12 @@ export async function handleMfaEnrollmentConfirmRequest(
     return json({ error: { code: 'VALIDATION_FAILED', message: 'a six-digit TOTP code is required' } }, 400)
   }
 
-  const store = dependencies.store ?? createD1MfaEnrollmentConfirmStore(requireLegacyW02D1Database(env))
-  const statusStore = dependencies.statusStore ?? createD1MfaStatusStore(requireLegacyW02D1Database(env))
-  const receiptStore = dependencies.receiptStore ?? createD1MfaAuditOperationReceiptStore(requireLegacyW02D1Database(env))
+  const store = dependencies.store
+  const statusStore = dependencies.statusStore
+  const receiptStore = dependencies.receiptStore
+  if (!store || !statusStore || !receiptStore) {
+    return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'MFA confirmation unavailable' } }, 503)
+  }
   const auth = dependencies.auth ?? createLuckReadAuth(env)
 
   try {
