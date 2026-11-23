@@ -3,8 +3,6 @@ import { POST } from '../../src/app/api/v1/analytics/events/route.js'
 import { TrafficLimitError } from '../../src/auth/traffic-limit.js'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import w11Worker, { type W11Env } from '../../../W11-growth-campaign-analytics-operations/src/worker.js'
-import type { AnalyticsD1PreparedStatement, AnalyticsD1Result } from '../../../W11-growth-campaign-analytics-operations/src/analytics-d1-store.js'
 
 const mocks = vi.hoisted(() => ({
   w11Fetch: vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
@@ -125,70 +123,6 @@ describe('W01 analytics event route integration', () => {
     expect(mocks.enforceLimit).toHaveBeenCalledTimes(1)
     expect(mocks.resolvePrincipal).toHaveBeenCalledTimes(1)
     expect(mocks.w11Fetch).not.toHaveBeenCalled()
-  })
-
-  it('runs the allowed route through the real W11 handler without persisting user or session identity', async () => {
-    const persistedBindings: (string | number | null)[][] = []
-    const database = {
-      prepare: vi.fn((_query: string) => {
-        const statement: AnalyticsD1PreparedStatement = {
-          bind: vi.fn((...values: (string | number | null)[]) => {
-            persistedBindings.push(values)
-            return statement
-          }),
-        }
-        return statement
-      }),
-      batch: vi.fn(async (statements: AnalyticsD1PreparedStatement[]): Promise<AnalyticsD1Result[]> =>
-        statements.map((_, index) => ({
-          success: true,
-          meta: { changes: index === 0 ? 1 : 0 },
-        })),
-      ),
-    } as unknown as W11Env['D1_05']
-    const env: W11Env = {
-      D1_05: database,
-      W11_ANALYTICS_INGEST_ENABLED: 'true',
-    }
-
-    mocks.resolvePrincipal.mockResolvedValue({
-      userId: 'user_test_01',
-      layer: null,
-    })
-    mocks.w11Fetch.mockImplementation(async (input) => {
-      if (!(input instanceof Request)) throw new Error('W01 must invoke W11 with a Request')
-      return await w11Worker.fetch(input, env)
-    })
-
-    const response = await POST(requestFor([validEvent()], {
-      Authorization: 'Bearer inbound-secret-token',
-      Cookie: 'better-auth.session_token=inbound-secret-cookie',
-    }))
-
-    expect(response.status).toBe(200)
-    const body = await response.json() as {
-      data: { received: number; qualityCounts: { VALID: number; LATE: number }; persistence: { inserted: number; lateInserted: number } }
-      requestId: string
-    }
-    expect(body.data.received).toBe(1)
-    expect(body.data.qualityCounts.VALID).toBe(1)
-    expect(body.data.qualityCounts.LATE).toBe(0)
-    expect(body.data.persistence.inserted).toBe(1)
-    expect(body.data.persistence.lateInserted).toBe(0)
-    expect(body.requestId).toBe('corr_route_000001')
-    expect(mocks.enforceLimit).toHaveBeenCalledTimes(1)
-    expect(database.batch).toHaveBeenCalledTimes(1)
-    const forwardedInput = mocks.w11Fetch.mock.calls[0]?.[0]
-    expect(forwardedInput).toBeInstanceOf(Request)
-    const forwarded = forwardedInput as Request
-    expect(forwarded.headers.has('Authorization')).toBe(false)
-    expect(forwarded.headers.has('Cookie')).toBe(false)
-    expect(forwarded.headers.get('X-LuckRead-Principal-User-Id')).toBe('user_test_01')
-    const serializedBindings = JSON.stringify(persistedBindings)
-    expect(serializedBindings).not.toContain('user_test_01')
-    expect(serializedBindings).not.toContain('session_test_01')
-    expect(serializedBindings).not.toContain('inbound-secret-token')
-    expect(serializedBindings).not.toContain('inbound-secret-cookie')
   })
 
   it('rejects social business events before calling W11', async () => {

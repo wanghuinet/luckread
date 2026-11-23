@@ -120,7 +120,7 @@
     "existingW02ToW06Binding": "AUTH013_QUEUE",
     "existingQueueName": "luckread-auth013-account-state",
     "outbox": "W02 D1-01 auth_007_mfa_publication_journal",
-    "publisher": "workers/W02-identity/src/auth/mfa-audit-publication-journal.ts",
+    "publisher": "workers/W02-identity/src/neon/mfa-audit-publication-journal-publisher-postgres.ts",
     "consumer": "workers/W06-governance/src/mfa-audit-queue-consumer.ts",
     "sourceImplementationStatus": "IMPLEMENTED_IN_SOURCE_NOT_PRODUCTION_VERIFIED",
     "newWorkerD1QueueOrServiceBindingAllowed": false,
