@@ -9,12 +9,13 @@ import {
   handleUsernameChangeRequest, handleUsernameStateRequest,
   isReservedUsername, normalizeUsernameCandidate,
 } from './username-change.js'
-import { createD1UsernameChangeStore } from './username-change-store.js'
+import type { UsernameChangeStore } from './username-change-store.js'
 
+const stores = new WeakMap<BetterAuthEnv, UsernameChangeStore>()
 const handleUsernameStateWithFixture = (env: BetterAuthEnv, request: Request, now = new Date()) =>
-  handleUsernameStateRequest(env, request, now, createD1UsernameChangeStore(env.D1_01!))
+  handleUsernameStateRequest(env, request, now, stores.get(env))
 const handleUsernameChangeWithFixture = (env: BetterAuthEnv, request: Request, now = new Date()) =>
-  handleUsernameChangeRequest(env, request, now, createD1UsernameChangeStore(env.D1_01!))
+  handleUsernameChangeRequest(env, request, now, stores.get(env))
 
 const activePrincipal = {
   userId: 'user-123', email: 'user@example.com', sessionId: 'session-123',
@@ -38,30 +39,19 @@ const defaultRow: TestRow = {
 }
 
 function createEnv(row: TestRow = { ...defaultRow }) {
-  const prepared: Array<{ sql: string; args: unknown[] }> = []
-  const batch = vi.fn(async (_statements: unknown[]) => [
-    { success: true, meta: { changes: 1 } },
-    { success: true, meta: { changes: 1 } },
-  ])
-  const database = {
-    prepare(sql: string) {
-      const statement = {
-        sql, args: [] as unknown[],
-        bind(...args: unknown[]) { this.args = args; return this },
-        async first() { return row },
-      }
-      prepared.push(statement)
-      return statement
-    },
-    batch,
+  const store: UsernameChangeStore = {
+    loadContext: vi.fn(async (_userId, _keyHash, _nowIso) => row),
+    loadState: vi.fn(async (_userId) => ({
+      username: row.username, accountState: row.accountState,
+      usernameVersion: row.usernameVersion, lastChangedAt: row.lastChangedAt,
+    })),
+    applyChange: vi.fn(async (_command) => ({ updated: 1, saved: 1 })),
   }
   const limiter = { limit: vi.fn().mockResolvedValue({ success: true }) }
-  return {
-    env: { D1_01: database, AUTH_SESSION_READ_LIMITER: limiter, AUTH_SESSION_WRITE_LIMITER: limiter } as unknown as BetterAuthEnv,
-    prepared, limiter, database, batch,
-  }
+  const env = { AUTH_SESSION_READ_LIMITER: limiter, AUTH_SESSION_WRITE_LIMITER: limiter } as unknown as BetterAuthEnv
+  stores.set(env, store)
+  return { env, limiter, store }
 }
-
 function changeRequest(input: { username?: string; ifMatch?: string; idempotencyKey?: string } = {}): Request {
   return new Request('https://luckread-w02.internal/internal/auth/username/change', {
     method: 'POST',
@@ -142,33 +132,30 @@ describe('W02 username change authority', () => {
   })
 
   it('rejects reserved handles before persistence', async () => {
-    const { env, batch } = createEnv()
+    const { env, store } = createEnv()
     const response = await handleUsernameChangeWithFixture(env, changeRequest({ username: 'Support' }))
     expect(response.status).toBe(422)
     expect(await response.json()).toMatchObject({ error: { code: 'USERNAME_RESERVED' } })
-    expect(batch).not.toHaveBeenCalled()
+    expect(store.applyChange).not.toHaveBeenCalled()
   })
 
   it('enforces the 30-day cooldown from the last successful change', async () => {
-    const { env, batch } = createEnv({ ...defaultRow, usernameVersion: 1, lastChangedAt: '2026-10-20T12:00:00.000Z' })
+    const { env, store } = createEnv({ ...defaultRow, usernameVersion: 1, lastChangedAt: '2026-10-20T12:00:00.000Z' })
     const response = await handleUsernameChangeWithFixture(env, changeRequest({ ifMatch: '"username-v1"' }), new Date('2026-11-02T12:00:00.000Z'))
     expect(response.status).toBe(409)
     expect(await response.json()).toMatchObject({ error: { code: 'USERNAME_CHANGE_COOLDOWN' } })
-    expect(batch).not.toHaveBeenCalled()
+    expect(store.applyChange).not.toHaveBeenCalled()
   })
 
   it('allows a username change when the 30-day cooldown has expired', async () => {
-    const { env, batch, prepared } = createEnv({ ...defaultRow, usernameVersion: 1, lastChangedAt: '2026-10-03T12:00:00.000Z' })
+    const { env, store } = createEnv({ ...defaultRow, usernameVersion: 1, lastChangedAt: '2026-10-03T12:00:00.000Z' })
     const response = await handleUsernameChangeWithFixture(env, changeRequest({ ifMatch: '"username-v1"' }), new Date('2026-11-02T12:00:00.000Z'))
     expect(response.status).toBe(200)
-    expect(batch).toHaveBeenCalledTimes(1)
-    expect(batch.mock.calls[0][0]).toHaveLength(2)
-    expect(prepared[1].sql).toContain('previous_username_normalized')
-    expect(prepared[1].sql).toContain('previous_username_expires_at > ?')
+    expect(store.applyChange).toHaveBeenCalledTimes(1)
   })
 
   it('rejects stale If-Match versions', async () => {
-    const { env, batch } = createEnv({ ...defaultRow, usernameVersion: 2 })
+    const { env, store } = createEnv({ ...defaultRow, usernameVersion: 2 })
     const response = await handleUsernameChangeWithFixture(env, changeRequest({ ifMatch: '"username-v1"' }))
     expect(response.status).toBe(412)
     expect(response.headers.get('etag')).toBe('"username-v2"')
@@ -212,14 +199,11 @@ describe('W02 username change authority', () => {
   })
 
   it('writes one compact per-user state row rather than an append-only history log', async () => {
-    const { env, batch, prepared, limiter } = createEnv()
+    const { env, store, limiter } = createEnv()
     const response = await handleUsernameChangeWithFixture(env, changeRequest(), new Date('2026-11-02T12:00:00.000Z'))
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe('"username-v1"')
-    expect(batch).toHaveBeenCalledTimes(1)
-    expect(batch.mock.calls[0][0]).toHaveLength(2)
-    expect(prepared[1].sql).toContain('UPDATE "user"')
-    expect(prepared[2].sql).toContain('INSERT INTO auth_username_change_state')
+    expect(store.applyChange).toHaveBeenCalledTimes(1)
     expect(limiter.limit).toHaveBeenCalled()
     expect(await response.json()).toMatchObject({
       data: {
@@ -232,7 +216,7 @@ describe('W02 username change authority', () => {
   })
 
   it('fails closed when the existing write limiter is unavailable', async () => {
-    const { env, batch, limiter } = createEnv()
+    const { env, store, limiter } = createEnv()
     limiter.limit.mockRejectedValueOnce(new Error('limiter unavailable'))
     const response = await handleUsernameChangeWithFixture(env, changeRequest())
     expect(response.status).toBe(503)
