@@ -344,6 +344,7 @@ async function applySubscriptionUpdate(
       scheduledChange,
     });
     if (result === 'APPLIED') return 'APPLIED';
+    if (result === 'ALREADY_APPLIED') return 'ALREADY_APPLIED';
   } catch {
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
   }
