@@ -249,7 +249,7 @@ describe('W03 Neon Series member reorder', () => {
     expect(batchStatements).toHaveLength(9)
   })
 
-  it('routes the Series member PATCH through the Neon-only runtime', async () => {
+  it('routes the Series member PATCH through Neon without touching D1', async () => {
     const reorder = vi.fn(async () => undefined)
     const store: SeriesMemberReorderStore = {
       loadMutation: vi.fn(async () => snapshot),
@@ -272,7 +272,10 @@ describe('W03 Neon Series member reorder', () => {
         },
         body: JSON.stringify({ position: 0 }),
       }),
-      {} as never,
+      { D1_02: {
+        prepare() { throw new Error('D1 must not be queried for Neon Series member reorder') },
+        batch() { throw new Error('D1 must not be used for Neon Series member reorder') },
+      } } as never,
     )
 
     expect(response.status).toBe(200)
