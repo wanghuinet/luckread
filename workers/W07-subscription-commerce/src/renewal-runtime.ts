@@ -1126,13 +1126,8 @@ export async function processSubscriptionRenewalCycle(
 
   if (cycle.state === 'PAYMENT_READY' || cycle.state === 'SUBMITTING') {
     if (!(await isExactMandateActiveFromStore(cycleStore, cycle))) {
-      await finishRenewalSubmissionLeasePostgres(cycleStore, cycleId, cycle.lease_token!, now,
-        strictlyAfter(now, cycle.updated_at), {
-          state: 'RECONCILIATION_REQUIRED', providerResponseStatus: null,
-          outcomeCode: 'MANDATE_NOT_ACTIVE_AT_SUBMISSION',
-        });
-      const latest = await readCycleById(cycleStore, cycleId);
-      return { cycleId, state: latest.state, action: 'RECONCILIATION_REQUIRED' };
+      cycle = await writeCycleReconciliation(cycleStore, cycle, 'MANDATE_NOT_ACTIVE_AT_SUBMISSION', now);
+      return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }
     let leased: RenewalCycleRow | null;
     try {
