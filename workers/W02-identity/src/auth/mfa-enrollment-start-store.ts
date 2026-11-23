@@ -47,7 +47,7 @@ function assertStartedEvent(event: MfaAuditEvent, userId: string): void {
 }
 
 /**
- * D1 remains the production-default MFA enrollment reservation store.
+ * Legacy D1 adapter retained only for explicit SQLite unit fixtures; production W02 injects the Neon PostgreSQL store.
  * Reservation and the secret-free enrollment_started audit outbox row are
  * committed in one D1 batch; the outbox insert is conditional on the exact
  * reservation update changing one user row.
