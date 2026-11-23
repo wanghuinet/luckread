@@ -80,6 +80,16 @@ describe('W02 username change authority', () => {
     mocks.resolveBetterAuthPrincipal.mockResolvedValue(activePrincipal)
   })
 
+  it('fails closed when no username persistence store is injected', async () => {
+    const { env } = createEnv()
+    const state = await handleUsernameStateRequest(env, new Request('https://luckread-w02.internal/internal/auth/username/state', {
+      method: 'GET', headers: { 'X-LuckRead-Caller': 'W01', 'X-LuckRead-Transport-Version': '1.0' },
+    }))
+    const change = await handleUsernameChangeRequest(env, changeRequest())
+    expect(state.status).toBe(503)
+    expect(change.status).toBe(503)
+  })
+
   it('binds normalized username, exact display value, and If-Match into the idempotency fingerprint', async () => {
     const actual = await fingerprintUsernameChange('NewHandle', '"username-v0"')
     const bytes = new TextEncoder().encode('newhandle\0NewHandle\0"username-v0"')
