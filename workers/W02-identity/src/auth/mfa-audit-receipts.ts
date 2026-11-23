@@ -205,16 +205,3 @@ export function mergeMfaAuditReceiptPlan(
 ): StoredReceiptEvent[] {
   return mergePlan(receiptId, existing, incoming, occurredAt)
 }
-
-/**
- * Verify a receipt passed from the W02 enrollment handler into its nested
- * Better Auth verification call. The receipt ID is server-generated and must
- * still belong to the same user/path and remain STARTED before reuse.
- */
-/**
- * @deprecated-next-version
- * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
- * Replacement: PostgreSQL MFA audit operation receipt Store in src/neon/mfa-audit-operation-receipts-postgres.ts.
- * Removal: Next release.
- * Condition: No production route or hook reads receipts through D1; tests use the Neon Store contract.
- */
