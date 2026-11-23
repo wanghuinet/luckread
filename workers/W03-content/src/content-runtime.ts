@@ -509,7 +509,7 @@ export async function resolvePublishedMediaReferenceAccess(
     return { isPublic: false, isMemberContent: true, allowed: true }
   }
 
-  const isPublic = rows.some((row) => row.content_type === 'post' && row.access_mode !== 'MEMBERS_ONLY')
+  const isPublic = rows.some((row) => row.access_mode !== 'MEMBERS_ONLY')
   return { isPublic, isMemberContent: false, allowed: isPublic }
 }
 
