@@ -89,4 +89,16 @@ describe('v1 messaging adapters', () => {
       expect(source).not.toMatch(/INSERT INTO|UPDATE social_|SELECT .* FROM social_/i)
     }
   })
+  it('forwards group ownership transfer through W01 with canonical target identity', () => {
+    const transfer = route('src/app/api/v1/conversations/[conversationId]/transfer-owner/route.ts')
+    expect(transfer).toContain('resolveCookieSocialPrincipal')
+    expect(transfer).toContain('resolveSocialProfileIdentityId')
+    expect(transfer).toContain('callW05Social')
+    expect(transfer).toContain('/internal/messaging/conversations/')
+    expect(transfer).toContain('/transfer-owner')
+    expect(transfer).toContain("method: 'POST'")
+    expect(transfer).toContain('targetUserId')
+    expect(transfer).not.toMatch(/INSERT INTO|UPDATE social_|SELECT .* FROM social_/i)
+  })
+
 })
