@@ -14,12 +14,10 @@ import {
 /**
  * PostgreSQL implementation of the provider-neutral W02 transition contract.
  *
- * The existing PostgreSQL transaction intentionally supports only moderator /
- * admin transitions without a separate approval receipt. Self-service,
- * lifecycle-job and approval-required transitions remain on their dedicated
- * adapters and fail closed here. The Neon-only W02 production runtime uses this
- * Store for moderator/admin transitions; the PostgreSQL rehearsal exercises
- * the same implementation.
+ * Permissionless self-service and no-approval moderator/admin transitions are
+ * admitted. System lifecycle operations, unproven lifecycle preconditions, and
+ * approval-required transitions remain on dedicated W02 paths and fail closed.
+ * The PostgreSQL rehearsal exercises the same implementation used by Neon runtime.
  */
 export function createPostgresAccountStateTransitionStore(
   pool: Pool,
