@@ -7,6 +7,8 @@ export type ApplyRenewalSubscriptionUpdateInput = Readonly<{
     subscription_id: string
     subscriber_id: string
     cycle_start: string
+    cycle_id: string
+    cycle_end: string
   }>
   subscription: SubscriptionOutcomeRow
   nextStatus: 'ACTIVE' | 'PAST_DUE'
@@ -17,7 +19,7 @@ export type ApplyRenewalSubscriptionUpdateInput = Readonly<{
   scheduledChange?: ScheduledSubscriptionPlanDowngrade
 }>
 
-export type ApplyRenewalSubscriptionUpdateResult = 'APPLIED' | 'CAS_LOST'
+export type ApplyRenewalSubscriptionUpdateResult = 'APPLIED' | 'ALREADY_APPLIED' | 'CAS_LOST'
 
 function failUnavailable(): never {
   throw new Error('W07_RENEWAL_OUTCOME_POSTGRES_UNAVAILABLE')
@@ -142,8 +144,49 @@ export async function applyRenewalSubscriptionUpdatePostgres(
   try {
     client = await pool.connect()
     await client.query('BEGIN')
+    const prior = await client.query<Record<string, unknown>>(
+      'SELECT cycle_id, subscription_id, subscriber_id, cycle_start, cycle_end, outcome, ' +
+      'applied_subscription_version, plan_id, plan_version FROM membership_subscription_renewal_cycle_applications ' +
+      'WHERE cycle_id = $1 FOR UPDATE',
+      [input.cycle.cycle_id],
+    )
+    if (prior.rows.length === 1) {
+      const row = prior.rows[0] as Record<string, unknown>
+      const matches = row.subscription_id === input.cycle.subscription_id &&
+        row.subscriber_id === input.cycle.subscriber_id &&
+        new Date(String(row.cycle_start)).toISOString() === input.cycle.cycle_start &&
+        new Date(String(row.cycle_end)).toISOString() === input.cycle.cycle_end &&
+        row.outcome === input.nextStatus &&
+        row.plan_id === (input.scheduledChange && input.nextStatus === 'ACTIVE' ? input.scheduledChange.targetPlanId : input.subscription.plan_id) &&
+        Number(row.plan_version) === (input.scheduledChange && input.nextStatus === 'ACTIVE' ? input.scheduledChange.targetPlanVersion : input.subscription.plan_version)
+      if (!matches) {
+        await client.query('ROLLBACK')
+        settled = true
+        return 'CAS_LOST'
+      }
+      await client.query('COMMIT')
+      settled = true
+      return 'ALREADY_APPLIED'
+    }
     const applied = await updateSubscriptionForRenewalPostgres(client, input)
     if (!applied) {
+      await client.query('ROLLBACK')
+      settled = true
+      return 'CAS_LOST'
+    }
+    const nextPlanId = input.scheduledChange && input.nextStatus === 'ACTIVE'
+      ? input.scheduledChange.targetPlanId : input.subscription.plan_id
+    const nextPlanVersion = input.scheduledChange && input.nextStatus === 'ACTIVE'
+      ? input.scheduledChange.targetPlanVersion : input.subscription.plan_version
+    const receipt = await client.query(
+      'INSERT INTO membership_subscription_renewal_cycle_applications ' +
+      '(cycle_id, subscription_id, subscriber_id, cycle_start, cycle_end, outcome, applied_subscription_version, plan_id, plan_version, applied_at) ' +
+      'VALUES ($1, $2, $3, $4::timestamptz, $5::timestamptz, $6, $7, $8, $9, $10::timestamptz) ' +
+      'ON CONFLICT (cycle_id) DO NOTHING RETURNING cycle_id',
+      [input.cycle.cycle_id,input.cycle.subscription_id,input.cycle.subscriber_id,input.cycle.cycle_start,
+       input.cycle.cycle_end,input.nextStatus,input.subscription.version+1,nextPlanId,nextPlanVersion,input.updatedAt],
+    )
+    if (receipt.rows.length !== 1) {
       await client.query('ROLLBACK')
       settled = true
       return 'CAS_LOST'
