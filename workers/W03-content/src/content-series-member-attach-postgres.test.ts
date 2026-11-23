@@ -327,7 +327,7 @@ describe('W03 Neon Series member attachment', () => {
         },
         body: JSON.stringify({ contentId: 'content_1' }),
       }),
-      { D1_02: db } as never,
+      {} as never,
     )
 
     expect(response.status).toBe(201)
