@@ -143,6 +143,12 @@ function membershipPoolFor(store: MemoryStore): W07WebhookPostgresPool {
     if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
       return { rows: [] as Row[], rowCount: 0 };
     }
+    if (sql.includes('FROM membership_subscription_renewal_cycle_applications')) {
+      return { rows: [] as Row[], rowCount: 0 };
+    }
+    if (sql.includes('INSERT INTO membership_subscription_renewal_cycle_applications')) {
+      return { rows: [{ cycle_id: values[0] } as Row], rowCount: 1 };
+    }
     if (sql.includes('FROM membership_subscription_scheduled_plan_changes')) {
       return { rows: [] as Row[], rowCount: 0 };
     }
