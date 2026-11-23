@@ -172,21 +172,21 @@ describe('native PostgreSQL renewal outcome synchronization', () => {
 
   it('accepts an exact existing cycle receipt as ALREADY_APPLIED without mutating subscription state', async () => {
     const receipt = { cycle_id: 'rcy_' + 'd'.repeat(26), subscription_id: subscriptionId, subscriber_id: subscriberId, cycle_start: cycleStart, cycle_end: cycleEnd, outcome: 'ACTIVE', applied_subscription_version: 5, plan_id: targetPlanId, plan_version: 2 }
-    const f = postgresPool(async (sql) => { if (sql === 'COMMIT') return { rows: [], rowCount: null }; throw new Error('unexpected mutation') }, { receiptRow: receipt })
+    const f = postgresPool(async (sql) => { if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return { rows: [], rowCount: null }; throw new Error('unexpected mutation') }, { receiptRow: receipt })
     await expect(applyRenewalSubscriptionUpdatePostgres(f.pool, input(true))).resolves.toBe('ALREADY_APPLIED')
     expect(f.transactionCalls.map(x => x.sql)).toEqual(['BEGIN', expect.stringContaining('FROM membership_subscription_renewal_cycle_applications'), 'COMMIT'])
   })
 
   it('rejects an existing receipt whose applied version does not match the CAS version', async () => {
     const receipt = { cycle_id: 'rcy_' + 'd'.repeat(26), subscription_id: subscriptionId, subscriber_id: subscriberId, cycle_start: cycleStart, cycle_end: cycleEnd, outcome: 'ACTIVE', applied_subscription_version: 6, plan_id: targetPlanId, plan_version: 2 }
-    const f = postgresPool(async (sql) => { if (sql === 'COMMIT') return { rows: [], rowCount: null }; throw new Error('unexpected mutation') }, { receiptRow: receipt })
+    const f = postgresPool(async (sql) => { if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return { rows: [], rowCount: null }; throw new Error('unexpected mutation') }, { receiptRow: receipt })
     await expect(applyRenewalSubscriptionUpdatePostgres(f.pool, input(true))).resolves.toBe('CAS_LOST')
     expect(f.transactionCalls.map(x => x.sql)).toEqual(['BEGIN', expect.stringContaining('FROM membership_subscription_renewal_cycle_applications'), 'ROLLBACK'])
   })
 
   it('rejects an existing receipt with mismatched cycle identity or plan and rolls back', async () => {
     const receipt = { cycle_id: 'rcy_' + 'd'.repeat(26), subscription_id: subscriptionId, subscriber_id: subscriberId, cycle_start: cycleStart, cycle_end: cycleEnd, outcome: 'ACTIVE', applied_subscription_version: 5, plan_id: originalPlanId, plan_version: 1 }
-    const f = postgresPool(async (sql) => { if (sql === 'COMMIT') return { rows: [], rowCount: null }; throw new Error('unexpected mutation') }, { receiptRow: receipt })
+    const f = postgresPool(async (sql) => { if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return { rows: [], rowCount: null }; throw new Error('unexpected mutation') }, { receiptRow: receipt })
     await expect(applyRenewalSubscriptionUpdatePostgres(f.pool, input(true))).resolves.toBe('CAS_LOST')
     expect(f.transactionCalls.map(x => x.sql)).toEqual(['BEGIN', expect.stringContaining('FROM membership_subscription_renewal_cycle_applications'), 'ROLLBACK'])
   })
