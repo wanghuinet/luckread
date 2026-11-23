@@ -15,8 +15,8 @@
   "review": {
     "reviewer": "GPT-6",
     "reviewType": "GPT-6 code-path audit plus current-SHA CI evidence reconciliation",
-    "reviewedAt": "2026-11-18",
-    "reviewedMainSha": "f0b7bba6641663b5d2e403ac4de74e263d3dc060",
+    "reviewedAt": "2026-11-23",
+    "reviewedMainSha": "ebce54248ca37c660ac9942aa26ad6f4580fab50",
     "implementationMergeSha": "62e2a8264cc0c6c128a2290e281dba16a8257d6e",
     "postflightTargetFixMergeSha": "c57fe841bb861c9310c361266396f9ffe6a00de1",
     "result": "NO_BLOCKING_FINDINGS",
@@ -99,7 +99,7 @@
       },
       {
         "path": "workers/W01-payload/src/auth/registration-persistence.ts",
-        "gitBlobSha1": "4ee38a33868b0c7fd779eb58f314ef59086c9bd2"
+        "gitBlobSha1": "b85586869de551121ec5f37e84fa2eed01139452"
       },
       {
         "path": "workers/W01-payload/src/migrations/20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts",
@@ -162,11 +162,11 @@
     ],
     "formalGitHubReviewSubmissions": 0,
     "followUpReview": {
-      "reviewedAt": "2026-11-18",
-      "scope": "Current-source D1-01/W01 AUTH-001 follow-up audit. The fifteen-entry D1-01 migration manifest retains the first fourteen applied ledger rows as an exact prefix; W01 AUTH-001 registration batch SQL is the fifteenth entry at append-only order 700 (not order 150). W01 registration uses its existing provider-neutral Neon persistence Store for registration-envelope idempotency, reservation/completion, and consent persistence through the existing D1-01 Neon Hyperdrive. After Better Auth signup, W01 confirms persisted identity only through its existing W01-to-W02 Service Binding: it sends the W01 caller and transport-version headers, W02 enforces that caller boundary, and W02's existing Neon PostgreSQL registrationRollbackStore performs the parameterized identity lookup and returns the narrow identity DTO. The W01 route fails closed on confirmation errors, releases the registration reservation, and does not query W02's user table through Payload. Current W01/W02 source, route tests, and the 700-order manifest position were inspected; the prior top-level order-150 description was stale and is corrected.",
+      "reviewedAt": "2026-11-23",
+      "scope": "Re-reviewed W01 registration persistence after the D1 fallback retirement. The current module contains only the PostgreSQL implementation; the provider-neutral environment contract exposes only PAYLOAD_DATABASE_DRIVER and Hyperdrive; the resolver accepts only the explicit neon driver and validates a PostgreSQL URL. The persistence factory no longer defines or selects D1 prepared statements, D1 batch transactions, or a D1 runtime branch. Reservation, release, consent insertion, registration completion and read-back remain transactional on PostgreSQL. The W01-to-W02 identity confirmation boundary remains the existing Service Binding and is unchanged.",
       "result": "NO_NEW_BLOCKING_FINDINGS",
       "formalGitHubReviewSubmissions": 0,
-      "limitations": "GPT-6 code-path audit, not a human GitHub approval or an independent third-party review; formalGitHubReviewSubmissions remains zero. The 15-entry manifest and current W01/W02 source pins are bound to reviewed main SHA f0b7bba6641663b5d2e403ac4de74e263d3dc060. Current-head CI must still validate all source pins, the exact fifteenth-entry manifest, and the disposable PostgreSQL 18 runtime rehearsal. Remote Neon DDL has not been executed; remote apply remains a separate manual workflow_dispatch requiring the exact confirmation token. Production D1 remains authoritative until a separate cutover authorization."
+      "limitations": "GPT-6 source review and current-main SHA reconciliation, not a human GitHub approval or an independent third-party review. No remote Neon DDL, business-data import, production D1 mutation or production cutover was performed."
     }
   },
   "verificationEvidence": {
