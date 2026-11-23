@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -1895,14 +1895,13 @@ describe('W03 content contract core', () => {
     expect(deleteSection).not.toContain('batchMutation')
     expect(deleteSection).not.toContain('ContentD1')
 
-    expect(runtime).toContain('INSERT OR REPLACE INTO content_txn_guard')
-    expect(runtime).toContain('VALUES (1, changes())')
-    const migration = readFileSync(
-      resolve(process.cwd(), 'workers/W03-content/migrations/0001_content_core.sql'),
+    expect(runtime).not.toMatch(/\bContentD1\b|\bD1PreparedStatement\b|\.prepare\s*\(|\.batch\s*\(/)
+    const worker = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/src/index.ts'),
       'utf8',
     )
-    expect(migration).toContain('CREATE TABLE content_txn_guard')
-    expect(migration).toContain('successful INTEGER NOT NULL CHECK (successful = 1)')
+    expect(worker).not.toMatch(/\bD1_02\b|NO_LEGACY_DATABASE_HANDLE/)
+    expect(worker).toContain('requireStore(dependencies.contentMutationStoreProvider?.(env))')
   })
 
   it('returns media references from the Neon public listing projection', async () => {
