@@ -84,7 +84,7 @@ jobs:
           if ((config.d1_databases ?? []).length !== 0) throw new Error('W08 production config must not bind Cloudflare D1')
           if (config.vars?.W08_DATABASE_DRIVER !== 'neon') throw new Error('W08 production runtime must select Neon')
           if (hyperdrive?.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') throw new Error('W08 must reuse the existing D1-01 Neon Hyperdrive')
-          if (pkg.dependencies?.pg !== '8.20.0') throw new Error('W08 pg must be a pinned runtime dependency')
+          if (pkg.dependencies?.pg !== '8.23.1') throw new Error('W08 pg must be a pinned runtime dependency')
           console.log('W08_NEON_ONLY_RUNTIME_AND_HYPERDRIVE_BINDING=PASS')
           NODE
 
