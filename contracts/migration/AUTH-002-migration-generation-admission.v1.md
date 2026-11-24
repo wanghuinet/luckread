@@ -2,7 +2,7 @@
 
 ## Status
 
-`CONTRACTED / GENERATION_BLOCKED_UNTIL_INPUTS_CLOSED`
+`SUPERSEDED_NOT_APPLICABLE_TO_W01_NATIVE_SESSION_RUNTIME`
 
 ## Runtime authority
 
@@ -83,3 +83,6 @@ Failure at any stage blocks subsequent stages.
 ## Non-promotion rule
 
 A generated or statically reviewed migration is not evidence that it was applied, and does not prove remote D1 schema, runtime persistence, security, concurrency, or AUTH-002 GREEN.
+
+
+> **Superseded for the active identity runtime (2026-11-24):** W01 `Users` uses `betterAuthPayloadStrategy` with Payload's local strategy disabled. W02 Better Auth 1.7.27 on Neon PostgreSQL is the authoritative identity/session runtime. Do not generate or apply a separate Payload-native session migration from this legacy contract. The historical D1/SQLite and Payload-native session wording below is retained only as provenance.
