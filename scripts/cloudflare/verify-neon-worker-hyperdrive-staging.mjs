@@ -40,7 +40,7 @@ export const STAGED_WORKERS = Object.freeze([
     worker: 'W05',
     script: 'luckread-w05',
     configPath: 'workers/W05-social/wrangler.jsonc',
-    binding: 'HYPERDRIVE_D1_02',
+    binding: 'HYPERDRIVE_NEON_SOCIAL',
     hyperdriveId: 'c55183e1cc3446409c9c1075832c6615',
     d1Bindings: [],
   },
@@ -67,7 +67,8 @@ export const STAGED_WORKERS = Object.freeze([
 export const ANALYTICS_RUNTIME_GUARD = Object.freeze({
   worker: 'W11',
   configPath: 'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc',
-  requiredD1Binding: 'D1_05',
+  requiredHyperdriveBinding: 'HYPERDRIVE_ANALYTICS_PG',
+  requiredHyperdriveId: '3eb2012cfbb04e429e18f8349377ffbc',
 })
 
 function parseConfig(raw, label) {
@@ -122,15 +123,14 @@ export async function inspectNeonWorkerHyperdriveStaging(rootDir = REPO_ROOT) {
   const analyticsRaw = await readFile(path.join(rootDir, ANALYTICS_RUNTIME_GUARD.configPath), 'utf8')
   const analyticsConfig = parseConfig(analyticsRaw, ANALYTICS_RUNTIME_GUARD.configPath)
   const analyticsD1Bindings = (analyticsConfig.d1_databases ?? []).map((entry) => entry.binding)
-  assert.ok(
-    analyticsD1Bindings.includes(ANALYTICS_RUNTIME_GUARD.requiredD1Binding),
-    'W11 must retain its D1-05 binding',
-  )
-  assert.equal(
-    (analyticsConfig.hyperdrive ?? []).length,
-    0,
-    'W11 D1-05 Hyperdrive runtime must remain unstaged until analytics admission is complete',
-  )
+  const analyticsHyperdrive = analyticsConfig.hyperdrive ?? []
+  assert.deepEqual(analyticsD1Bindings, [], 'W11 production config must have no Cloudflare D1 bindings')
+  assert.equal(analyticsConfig.vars?.W11_DATABASE_DRIVER, 'neon', 'W11 must select its Neon runtime')
+  assert.equal(analyticsConfig.vars?.W11_ANALYTICS_INGEST_ENABLED, 'false', 'W11 analytics ingestion must remain disabled')
+  assert.equal(analyticsHyperdrive.length, 1, 'W11 must declare exactly one analytics Hyperdrive binding')
+  assert.ok(analyticsHyperdrive.some((item) =>
+    item.binding === ANALYTICS_RUNTIME_GUARD.requiredHyperdriveBinding &&
+    item.id === ANALYTICS_RUNTIME_GUARD.requiredHyperdriveId), 'W11 Neon analytics Hyperdrive target drifted')
 
   return {
     schemaVersion: 1,
@@ -139,8 +139,10 @@ export async function inspectNeonWorkerHyperdriveStaging(rootDir = REPO_ROOT) {
     workers,
     analyticsRuntime: {
       worker: ANALYTICS_RUNTIME_GUARD.worker,
-      d1FallbackBinding: ANALYTICS_RUNTIME_GUARD.requiredD1Binding,
-      hyperdriveStaged: false,
+      hyperdriveBinding: ANALYTICS_RUNTIME_GUARD.requiredHyperdriveBinding,
+      hyperdriveId: ANALYTICS_RUNTIME_GUARD.requiredHyperdriveId,
+      d1FallbackBindings: analyticsD1Bindings,
+      hyperdriveStaged: true,
       runtimeIngestionEnabled: false,
     },
     expectedD1BindingSetsVerified: true,

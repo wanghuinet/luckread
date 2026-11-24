@@ -42,13 +42,10 @@ import { createPostgresNotificationPushEndpointAccessStore } from '../notificati
 import type { NotificationPushEndpointAccessStore } from '../notification-push-endpoint-access-store.js'
 import type { PushEndpointPostgresExecutor } from '../push-endpoint-runtime.js'
 
-/** W05 D1-02 social routes run on Neon PostgreSQL only. */
-export type W05SocialDatabaseDriver = 'neon'
-
+/** W05 social routes use Neon PostgreSQL only. */
 export interface W05SocialRuntimeEnv {
-  W05_DATABASE_DRIVER?: string
-  HYPERDRIVE_D1_02?: { connectionString?: string }
-  HYPERDRIVE_D1_03?: { connectionString?: string }
+  HYPERDRIVE_NEON_SOCIAL?: { connectionString?: string }
+  HYPERDRIVE_NEON_GOVERNANCE?: { connectionString?: string }
 }
 
 type W05PoolFactory = (config: PoolConfig) => Pool
@@ -59,28 +56,28 @@ const pushCompositions = new WeakMap<object, NotificationPushDeliveryRuntimeDepe
 const pushEndpointAccessStores = new WeakMap<object, NotificationPushEndpointAccessStore>()
 const pushRuntimeCompositions = new WeakMap<object, WeakMap<object, NotificationPushDeliveryRuntimeDependencies>>()
 
-function validateD103HyperdriveConnectionString(value: unknown): string {
+function validateNeonGovernanceConnectionString(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 4096) {
-    throw new Error('W05_HYPERDRIVE_D1_03_CONNECTION_STRING_REQUIRED')
+    throw new Error('W05_NEON_GOVERNANCE_HYPERDRIVE_CONNECTION_STRING_REQUIRED')
   }
   let target: URL
   try {
     target = new URL(value)
   } catch {
-    throw new Error('W05_HYPERDRIVE_D1_03_CONNECTION_STRING_INVALID')
+    throw new Error('W05_NEON_GOVERNANCE_HYPERDRIVE_CONNECTION_STRING_INVALID')
   }
   let databaseName = ''
   try {
     databaseName = decodeURIComponent(target.pathname.replace(/^\/+/, ''))
   } catch {
-    throw new Error('W05_HYPERDRIVE_D1_03_CONNECTION_STRING_INVALID')
+    throw new Error('W05_NEON_GOVERNANCE_HYPERDRIVE_CONNECTION_STRING_INVALID')
   }
   if (
     !['postgres:', 'postgresql:'].includes(target.protocol) ||
     !target.hostname ||
     databaseName !== 'luckread_governance'
   ) {
-    throw new Error('W05_HYPERDRIVE_D1_03_CONNECTION_STRING_INVALID')
+    throw new Error('W05_NEON_GOVERNANCE_HYPERDRIVE_CONNECTION_STRING_INVALID')
   }
   return value
 }
@@ -94,39 +91,31 @@ export function getW05PushEndpointPostgresDatabase(
   env: W05SocialRuntimeEnv,
   poolFactory: W05PoolFactory = (config) => new Pool(config),
 ): PushEndpointPostgresExecutor {
-  const binding = env.HYPERDRIVE_D1_03
+  const binding = env.HYPERDRIVE_NEON_GOVERNANCE
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W05_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+    throw new Error('W05_NEON_GOVERNANCE_HYPERDRIVE_BINDING_REQUIRED')
   }
-  const connectionString = validateD103HyperdriveConnectionString(binding.connectionString)
+  const connectionString = validateNeonGovernanceConnectionString(binding.connectionString)
   const pool = getPool(binding, connectionString, poolFactory)
   return asExecutor<PushEndpointPostgresExecutor>(pool)
 }
 
-export function resolveW05SocialDatabaseDriver(
-  env: W05SocialRuntimeEnv,
-): W05SocialDatabaseDriver {
-  const configured = env.W05_DATABASE_DRIVER?.trim().toLowerCase()
-  if (!configured || configured === 'neon') return 'neon'
-  throw new Error('W05_DATABASE_DRIVER_UNSUPPORTED')
-}
-
-function validateHyperdriveConnectionString(value: unknown): string {
+function validateNeonSocialConnectionString(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 4096) {
-    throw new Error('W05_HYPERDRIVE_D1_02_CONNECTION_STRING_REQUIRED')
+    throw new Error('W05_NEON_SOCIAL_HYPERDRIVE_CONNECTION_STRING_REQUIRED')
   }
   let target: URL
   try {
     target = new URL(value)
   } catch {
-    throw new Error('W05_HYPERDRIVE_D1_02_CONNECTION_STRING_INVALID')
+    throw new Error('W05_NEON_SOCIAL_HYPERDRIVE_CONNECTION_STRING_INVALID')
   }
   if (
     !['postgres:', 'postgresql:'].includes(target.protocol) ||
     !target.hostname ||
     target.pathname.length < 2
   ) {
-    throw new Error('W05_HYPERDRIVE_D1_02_CONNECTION_STRING_INVALID')
+    throw new Error('W05_NEON_SOCIAL_HYPERDRIVE_CONNECTION_STRING_INVALID')
   }
   return value
 }
@@ -168,16 +157,15 @@ export function getW05SocialWorkerDependencies(
   env: W05SocialRuntimeEnv,
   poolFactory: W05PoolFactory = (config) => new Pool(config),
 ): W05SocialWorkerDependencies {
-  resolveW05SocialDatabaseDriver(env)
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_NEON_SOCIAL
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W05_NEON_SOCIAL_HYPERDRIVE_BINDING_REQUIRED')
   }
 
   const cached = compositions.get(binding)
   if (cached) return cached
 
-  const connectionString = validateHyperdriveConnectionString(binding.connectionString)
+  const connectionString = validateNeonSocialConnectionString(binding.connectionString)
   const pool = getPool(binding, connectionString, poolFactory)
 
   const dependencies: W05SocialWorkerDependencies = {
@@ -279,21 +267,20 @@ export function getW05SocialWorkerDependencies(
   return dependencies
 }
 
-// Compose only W05-owned push delivery state over D1-02. The endpoint registry
-// remains W09-owned in D1-03 and is deliberately supplied by the scoped
-// D1_03 binding at execution time; it must never use the D1-02 pool.
+// Compose only W05-owned push delivery state over the social D1-02 logical domain.
+// The W09-owned endpoint registry uses the separately scoped Neon governance
+// binding in the D1-03 logical domain and never reuses the social pool.
 export function getW05NotificationPushDeliveryDependencies(
   env: W05SocialRuntimeEnv,
   poolFactory: W05PoolFactory = (config) => new Pool(config),
 ): NotificationPushDeliveryRuntimeDependencies {
-  resolveW05SocialDatabaseDriver(env)
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_NEON_SOCIAL
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W05_NEON_SOCIAL_HYPERDRIVE_BINDING_REQUIRED')
   }
-  const endpointBinding = env.HYPERDRIVE_D1_03
+  const endpointBinding = env.HYPERDRIVE_NEON_GOVERNANCE
   if (!endpointBinding || typeof endpointBinding !== 'object') {
-    throw new Error('W05_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+    throw new Error('W05_NEON_GOVERNANCE_HYPERDRIVE_BINDING_REQUIRED')
   }
 
   let scopedCompositions = pushRuntimeCompositions.get(binding)
@@ -302,7 +289,7 @@ export function getW05NotificationPushDeliveryDependencies(
 
   let dependencies = pushCompositions.get(binding)
   if (!dependencies) {
-    const connectionString = validateHyperdriveConnectionString(binding.connectionString)
+    const connectionString = validateNeonSocialConnectionString(binding.connectionString)
     const pool = getPool(binding, connectionString, poolFactory)
     dependencies = {
       fanoutStore: createPostgresNotificationPushFanoutStore(
@@ -347,7 +334,7 @@ export async function closeW05PostgresRuntimeForTest(
 ): Promise<void> {
   const closing = new Set<Pool>()
 
-  for (const binding of [env.HYPERDRIVE_D1_02, env.HYPERDRIVE_D1_03]) {
+  for (const binding of [env.HYPERDRIVE_NEON_SOCIAL, env.HYPERDRIVE_NEON_GOVERNANCE]) {
     if (!binding || typeof binding !== 'object') continue
     const pool = pools.get(binding)
     if (!pool) continue
@@ -371,9 +358,8 @@ export function getW05MessagingOutboxDatabase(
   query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string, values?: unknown[]): Promise<{ rows: Row[]; rowCount?: number | null }>
   connect(): Promise<{ query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string, values?: unknown[]): Promise<{ rows: Row[]; rowCount?: number | null }>; release(): void }>
 } {
-  resolveW05SocialDatabaseDriver(env)
-  const binding = env.HYPERDRIVE_D1_02
-  if (!binding || typeof binding !== 'object') throw new Error('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
-  const connectionString = validateHyperdriveConnectionString(binding.connectionString)
+  const binding = env.HYPERDRIVE_NEON_SOCIAL
+  if (!binding || typeof binding !== 'object') throw new Error('W05_NEON_SOCIAL_HYPERDRIVE_BINDING_REQUIRED')
+  const connectionString = validateNeonSocialConnectionString(binding.connectionString)
   return asExecutor(getPool(binding, connectionString, poolFactory))
 }

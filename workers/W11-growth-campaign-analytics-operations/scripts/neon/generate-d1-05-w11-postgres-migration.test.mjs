@@ -59,18 +59,18 @@ test('fails closed if retention/deletion/consent requirements are incorrectly ma
 test('fails closed when the W11 runtime acquires an unapproved D1 binding', () => {
   const wranglerPath = 'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc'
   const wrangler = JSON.parse(readSource(wranglerPath))
-  wrangler.d1_databases.push({
+  wrangler.d1_databases = [{
     binding: 'D1_03',
     database_name: 'luckread_governance',
     database_id: 'unapproved',
     migrations_dir: 'migrations-d1-03',
-  })
+  }]
   assert.throws(
     () => buildD105W11Migration({
       readSource: (relativePath) => relativePath === wranglerPath
         ? JSON.stringify(wrangler)
         : readSource(relativePath),
     }),
-    /single D1_05 binding/,
+    /no D1 bindings/,
   )
 })

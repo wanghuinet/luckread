@@ -7,7 +7,7 @@
   "review": {
     "reviewKind": "AUTOMATED_INDEPENDENT_READ_ONLY_CODE_PATH_REVIEW",
     "description": "Independent read-only review of W11-only D1-05 analytics ownership, four D1 source migrations, the PostgreSQL 18 schema baseline, privacy minimization, source-generator determinism and the shared runner's local-only restriction. This review is not remote DDL admission.",
-    "reviewedMainCommit": "920fef62b93e1798257a51bc9a42633fe24e4ec3",
+    "reviewedMainCommit": "2bae4a5384cb86d7a754c9dde63d88515d5d020f",
     "sharedExecutorPullRequest": 1660,
     "sharedExecutorHeadCommit": "5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de",
     "sharedPostgres18WorkflowRunId": 42509822425,
@@ -67,7 +67,7 @@
       },
       {
         "path": "workers/W11-growth-campaign-analytics-operations/wrangler.jsonc",
-        "gitBlobSha1": "7df80ec418aa46bb2ba09fa9252c88138d00ceaf"
+        "gitBlobSha1": "7ab936cb4f0680b2dc24b24590e4b771f51c3cf1"
       },
       {
         "path": "workers/W11-growth-campaign-analytics-operations/migrations/0001_analytics_projection.sql",
@@ -91,11 +91,11 @@
       },
       {
         "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.mjs",
-        "gitBlobSha1": "0254a4396adf3dcbfa66ba4f7fefbc954935f26f"
+        "gitBlobSha1": "a60a2ccc2b541a36ca0482053368d6e1929b3b84"
       },
       {
         "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.test.mjs",
-        "gitBlobSha1": "839d0cba87252598b668e32dc24b11153da0289e"
+        "gitBlobSha1": "0e6b5ad6fbb820f5816165c5cef19a2ec6798bb8"
       },
       {
         "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/templates/d1-05-w11-analytics-postgres.sql",
@@ -105,7 +105,7 @@
   },
   "reviewChecks": [
     "D1-05 is the canonical W11-exclusive analytics-only domain and retains the existing physical UUID.",
-    "W11 Wrangler retains exactly its pre-existing D1_05 binding to allluck and does not acquire a D1_03 binding.",
+    "W11 Wrangler uses its existing HYPERDRIVE_ANALYTICS_PG Neon binding, keeps analytics ingestion disabled, and has no D1 runtime binding; D1-05 remains the logical schema domain.",
     "The D1-05 shared manifest contains exactly one W11 PostgreSQL baseline migration and maps all four existing W11 D1 source migrations to that baseline.",
     "The final PostgreSQL schema contains exactly six analytics tables, eight explicit indexes, zero foreign keys, zero triggers, zero trigger functions and zero control seed rows.",
     "The SQL artifact does not create Campaign or GrowthOperation tables; those remain W11 logical D1-03 owners only.",

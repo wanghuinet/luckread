@@ -95,29 +95,29 @@ test('fails closed if W11 is granted a D1-03 Wrangler binding without admission'
   const override = jsonOverride(
     'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc',
     (value) => {
-      value.d1_databases.push({
+      value.d1_databases = [{
         binding: 'D1_03',
         database_name: 'secondary',
         database_id: 'bda1d247-a371-4244-91ae-aef96034db7f',
-      })
+      }]
     },
   )
   assert.throws(() => verifyW11D103OwnerReconciliation({
     readSource: readWithOverrides({
       'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc': override,
     }),
-  }), /single D1_05 analytics binding/)
+  }), /no D1 bindings/)
 })
 
-test('fails closed if the W11 runtime type exposes D1-03', () => {
+test('fails closed if the W11 runtime type exposes any D1 binding', () => {
   const override = readSource('workers/W11-growth-campaign-analytics-operations/src/worker.ts')
-    .replace('  D1_05: W11AnalyticsDatabase',
-      '  D1_05: W11AnalyticsDatabase\n  D1_03: D1Database')
+    .replace('  W11_POSTGRES: AnalyticsPostgresPool',
+      '  W11_POSTGRES: AnalyticsPostgresPool\n  D1_03: D1Database')
   assert.throws(() => verifyW11D103OwnerReconciliation({
     readSource: readWithOverrides({
       'workers/W11-growth-campaign-analytics-operations/src/worker.ts': override,
     }),
-  }), /runtime environment must expose D1_05 only/)
+  }), /runtime environment must expose only its native PostgreSQL pool/)
 })
 
 test('fails closed if a W11 D1-05 migration creates a non-analytics table', () => {

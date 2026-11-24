@@ -93,7 +93,7 @@ export function verifyD103SharedRunnerReview({ readSource = readText } = {}) {
       review.review?.sharedExecutorPullRequest !== 1660 ||
       review.review?.sharedExecutorHeadCommit !== '5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de' ||
       review.review?.sharedPostgres18WorkflowRunId !== 42509822425 ||
-      review.review?.reviewedMainCommit !== '4ed51dd2c105b38c15ca94fce496485facd83c58') {
+      review.review?.reviewedMainCommit !== '2bae4a5384cb86d7a754c9dde63d88515d5d020f') {
     fail('review evidence must bind to the merged shared executor and its completed PG18 run')
   }
   if (review.remoteApplyReady !== false ||
@@ -282,22 +282,29 @@ export function verifyD103SharedRunnerReview({ readSource = readText } = {}) {
   const w09Db = w09Wrangler.d1_databases ?? []
   const w10Db = w10Wrangler.d1_databases ?? []
   const w11Db = w11Wrangler.d1_databases ?? []
+  const w06Hyperdrive = w06Wrangler.hyperdrive ?? []
+  const w11Hyperdrive = w11Wrangler.hyperdrive ?? []
   const exactD103 = (rows, expectedBinding, expectedDir) =>
     rows.length === 1 && rows[0].binding === expectedBinding &&
     rows[0].database_name === 'secondary' &&
     rows[0].database_id === 'bda1d247-a371-4244-91ae-aef96034db7f' &&
     rows[0].migrations_dir === expectedDir
-  if (!exactD103(w06Db,'D1_03','migrations') ||
+  if (w06Wrangler.name !== 'luckread-w06' ||
+      w06Db.length !== 0 ||
+      !w06Hyperdrive.some((item) => item.binding === 'HYPERDRIVE_D1_03' && item.id === '7c8831416c18494faee04b96aa551cb9') ||
       w09Wrangler.name !== 'luckread-w09' ||
       !exactD103(w09Db,'D1_03','migrations-d1-03')) {
-    fail('W06/W09 existing D1-03 binding and W09 migration-config ownership must remain unchanged')
+    fail('W06 must use its existing Neon Hyperdrive and W09 must retain the D1-03 migration-only config ownership')
   }
   if (w10Db.length !== 0) {
     fail('W10 D1-03 runtime binding is not admitted by the reviewed schema slice')
   }
-  if (w11Db.length !== 1 || w11Db[0].binding !== 'D1_05' ||
-      w11Db[0].database_id !== '77d82be2-d12e-4a17-b410-9aa7d376bc11') {
-    fail('W11 must retain its D1-05-only runtime binding; no D1-03 binding is admitted')
+  if (w11Wrangler.name !== 'luckread-w11' ||
+      w11Db.length !== 0 ||
+      w11Wrangler.vars?.W11_DATABASE_DRIVER !== 'neon' ||
+      w11Wrangler.vars?.W11_ANALYTICS_INGEST_ENABLED !== 'false' ||
+      !w11Hyperdrive.some((item) => item.binding === 'HYPERDRIVE_ANALYTICS_PG' && item.id === '3eb2012cfbb04e429e18f8349377ffbc')) {
+    fail('W11 must use its Neon D1-05 logical-domain Hyperdrive with ingestion disabled and no D1 runtime binding')
   }
 
   if (w09Reconciliation.status !== 'LOGICAL_OWNERS_RECONCILED_SCHEMA_ADMISSION_PARTIAL' ||

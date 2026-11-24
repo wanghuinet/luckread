@@ -37,14 +37,12 @@ jobs:
           const w05 = JSON.parse(fs.readFileSync('workers/W05-social/wrangler.jsonc', 'utf8'))
           const bootstrap = JSON.parse(fs.readFileSync('contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
           if ((w05.d1_databases || []).length !== 0) throw new Error('W05 production config must not bind Cloudflare D1')
-          const hyperdrive = (w05.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_02')
-          const governanceHyperdrive = (w05.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_03')
+          const hyperdrive = (w05.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_NEON_SOCIAL')
+          const governanceHyperdrive = (w05.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_NEON_GOVERNANCE')
           const domain = (bootstrap.domains || []).find(x => x.domainId === 'D1-02')
           const governance = (bootstrap.domains || []).find(x => x.domainId === 'D1-03')
-          if (w05.vars?.W05_DATABASE_DRIVER !== 'neon' ||
-              w05.vars?.PUSH_DELIVERY_ENABLED !== 'false' ||
-              w05.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER !== 'neon' ||
-              !hyperdrive || hyperdrive.id !== 'c55183e1cc3446409c9c1075832c6615' ||
+          if (w05.vars?.PUSH_DELIVERY_ENABLED !== 'false' ||
+                            !hyperdrive || hyperdrive.id !== 'c55183e1cc3446409c9c1075832c6615' ||
               !governanceHyperdrive || governanceHyperdrive.id !== '7c8831416c18494faee04b96aa551cb9' ||
               domain?.databaseName !== 'luckreadpro' ||
               domain?.remoteSchemaApplied !== true ||

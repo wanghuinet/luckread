@@ -88,10 +88,8 @@ import type { PollVoteStore } from './poll-vote-store.js'
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
 interface Env {
-  W05_DATABASE_DRIVER?: string
-  HYPERDRIVE_D1_02?: { connectionString?: string }
-  W05_PUSH_ENDPOINT_DATABASE_DRIVER?: string
-  HYPERDRIVE_D1_03?: { connectionString?: string }
+  HYPERDRIVE_NEON_SOCIAL?: { connectionString?: string }
+  HYPERDRIVE_NEON_GOVERNANCE?: { connectionString?: string }
   W03_CONTENT?: W03ContentBinding
   SOCIAL_READ_LIMITER?: RateLimitBinding
   SOCIAL_WRITE_LIMITER?: RateLimitBinding

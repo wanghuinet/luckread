@@ -95,12 +95,14 @@ test('requires W01/W02/W08 Neon mode with D1-free production deployment configs'
   )
 })
 
-test('keeps W11 analytics on D1-05 with Hyperdrive runtime unstaged', async () => {
+test('keeps W11 analytics on Neon with ingestion disabled and no D1 fallback', async () => {
   const result = await inspectNeonWorkerHyperdriveStaging()
   assert.deepEqual(result.analyticsRuntime, {
     worker: ANALYTICS_RUNTIME_GUARD.worker,
-    d1FallbackBinding: ANALYTICS_RUNTIME_GUARD.requiredD1Binding,
-    hyperdriveStaged: false,
+    hyperdriveBinding: ANALYTICS_RUNTIME_GUARD.requiredHyperdriveBinding,
+    hyperdriveId: ANALYTICS_RUNTIME_GUARD.requiredHyperdriveId,
+    d1FallbackBindings: [],
+    hyperdriveStaged: true,
     runtimeIngestionEnabled: false,
   })
 })

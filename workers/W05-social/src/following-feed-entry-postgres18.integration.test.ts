@@ -138,10 +138,8 @@ integrationSuite('W05 Neon entrypoint following-feed PostgreSQL 18 integration',
     }
 
     env = {
-      W05_DATABASE_DRIVER: 'neon',
-      W05_PUSH_ENDPOINT_DATABASE_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: { connectionString: socialConnectionString },
-      HYPERDRIVE_D1_03: { connectionString: governanceConnectionString },
+      HYPERDRIVE_NEON_SOCIAL: { connectionString: socialConnectionString },
+      HYPERDRIVE_NEON_GOVERNANCE: { connectionString: governanceConnectionString },
       DB: legacyD1,
       D1_03: legacyD1,
     }

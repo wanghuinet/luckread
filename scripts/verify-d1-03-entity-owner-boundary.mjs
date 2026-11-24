@@ -60,10 +60,8 @@ const w05Hyperdrive = w05Config.hyperdrive ?? []
 if (
   w05Config.name !== 'luckread-w05' ||
   w05D1Bindings.length !== 0 ||
-  w05Config.vars?.W05_DATABASE_DRIVER !== 'neon' ||
-  w05Config.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER !== 'neon' ||
-  !w05Hyperdrive.some((item) => item.binding === 'HYPERDRIVE_D1_02' && item.id === 'c55183e1cc3446409c9c1075832c6615') ||
-  !w05Hyperdrive.some((item) => item.binding === 'HYPERDRIVE_D1_03' && item.id === '7c8831416c18494faee04b96aa551cb9') ||
+  !w05Hyperdrive.some((item) => item.binding === 'HYPERDRIVE_NEON_SOCIAL' && item.id === 'c55183e1cc3446409c9c1075832c6615') ||
+  !w05Hyperdrive.some((item) => item.binding === 'HYPERDRIVE_NEON_GOVERNANCE' && item.id === '7c8831416c18494faee04b96aa551cb9') ||
   existsSync(resolve(root, 'workers/W05-social/migrations-d1-03'))
 ) {
   throw new Error('W05 must use both existing Neon Hyperdrive databases with no production D1 bindings; all D1-03 schema migrations belong to W09')
@@ -84,7 +82,7 @@ if (
   !w05Source.includes('upsertPushEndpoint(dependencies.pushEndpointDatabase') ||
   !w05Source.includes('deletePushEndpoint(dependencies.pushEndpointDatabase')
 ) {
-  throw new Error('W05 must use the existing HYPERDRIVE_D1_03 Neon executor for the two delegated NotificationPushEndpoint operations, with no D1_03 binding fallback')
+  throw new Error('W05 must use the existing HYPERDRIVE_NEON_GOVERNANCE Neon executor for the two delegated NotificationPushEndpoint operations, with no D1_03 binding fallback')
 }
 
 const w09MigrationConfig = JSON.parse(readFileSync(w09MigrationConfigPath, 'utf8'))

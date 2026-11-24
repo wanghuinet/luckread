@@ -25,9 +25,8 @@ describe('W05 notification push Neon runtime', () => {
       config.connectionString === endpointBinding.connectionString ? endpointPool : socialPool,
     )
     const dependencies = getW05NotificationPushDeliveryDependencies({
-      W05_DATABASE_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: socialBinding,
-      HYPERDRIVE_D1_03: endpointBinding,
+      HYPERDRIVE_NEON_SOCIAL: socialBinding,
+      HYPERDRIVE_NEON_GOVERNANCE: endpointBinding,
     }, poolFactory)
     const env = { PUSH_DELIVERY_ENABLED: 'true' } as NotificationPushDeliveryEnv
 

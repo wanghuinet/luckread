@@ -83,18 +83,16 @@ for (const dir of dirs) {
     }
   }
 
-  // W05 D1-02 social routes require Neon Store injection. The separately scoped
-  // D1-03 Hyperdrive is a PostgreSQL connection to W09-owned endpoint state, not
-  // a Cloudflare D1 binding. Production Wrangler must bind neither D1 database.
+  // W05 social routes use the D1-02 logical domain through Neon PostgreSQL.
+  // W09-owned endpoint state uses a separately scoped Neon governance Hyperdrive
+  // in the D1-03 logical domain; neither binding is a Cloudflare D1 database.
   const w05NeonProduction = workerId === 'W05' &&
     config?.name === 'luckread-w05' &&
     (config?.d1_databases ?? []).length === 0 &&
-    config.vars?.W05_DATABASE_DRIVER === 'neon' &&
-    config.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER === 'neon' &&
     (config.hyperdrive ?? []).some((entry) =>
-      entry.binding === 'HYPERDRIVE_D1_02' && entry.id === 'c55183e1cc3446409c9c1075832c6615') &&
+      entry.binding === 'HYPERDRIVE_NEON_SOCIAL' && entry.id === 'c55183e1cc3446409c9c1075832c6615') &&
     (config.hyperdrive ?? []).some((entry) =>
-      entry.binding === 'HYPERDRIVE_D1_03' && entry.id === '7c8831416c18494faee04b96aa551cb9')
+      entry.binding === 'HYPERDRIVE_NEON_GOVERNANCE' && entry.id === '7c8831416c18494faee04b96aa551cb9')
   if (workerId === 'W05' && !w05NeonProduction) {
     throw new Error('W05 production must use both approved Neon Hyperdrive resources and no D1 bindings')
   }

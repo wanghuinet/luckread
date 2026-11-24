@@ -48,14 +48,12 @@ export function buildW05PostgresMigration({ inventory, socialContract, readSourc
   try { wrangler = JSON.parse(wranglerSource) } catch { fail('W05 production Wrangler config is invalid JSON') }
   const hyperdrive = wrangler.hyperdrive ?? []
   const socialBinding = hyperdrive.find((item) =>
-    item.binding === 'HYPERDRIVE_D1_02' && item.id === 'c55183e1cc3446409c9c1075832c6615')
+    item.binding === 'HYPERDRIVE_NEON_SOCIAL' && item.id === 'c55183e1cc3446409c9c1075832c6615')
   const delegatedGovernanceBinding = hyperdrive.find((item) =>
-    item.binding === 'HYPERDRIVE_D1_03' && item.id === '7c8831416c18494faee04b96aa551cb9')
+    item.binding === 'HYPERDRIVE_NEON_GOVERNANCE' && item.id === '7c8831416c18494faee04b96aa551cb9')
   if (
     wrangler.name !== 'luckread-w05' ||
     (wrangler.d1_databases ?? []).length !== 0 ||
-    wrangler.vars?.W05_DATABASE_DRIVER !== 'neon' ||
-    wrangler.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER !== 'neon' ||
     !socialBinding ||
     !delegatedGovernanceBinding
   ) {

@@ -4,7 +4,6 @@ import {
   getW05SocialWorkerDependencies,
   getW05NotificationPushDeliveryDependencies,
   getW05PushEndpointPostgresDatabase,
-  resolveW05SocialDatabaseDriver,
 } from './runtime.js'
 
 function fakePool(): Pool {
@@ -15,26 +14,18 @@ function fakePool(): Pool {
 }
 
 describe('W05 Neon runtime composition', () => {
-  it('uses Neon as the only default runtime and requires its Hyperdrive binding', () => {
+  it('requires the Neon social Hyperdrive binding before composing stores', () => {
     const poolFactory = vi.fn(() => fakePool())
 
-    expect(resolveW05SocialDatabaseDriver({})).toBe('neon')
     expect(() => getW05SocialWorkerDependencies({}, poolFactory))
-      .toThrow('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+      .toThrow('W05_NEON_SOCIAL_HYPERDRIVE_BINDING_REQUIRED')
     expect(poolFactory).not.toHaveBeenCalled()
   })
 
-  it('rejects unsupported driver values and missing or invalid Hyperdrive connection strings', () => {
-    expect(() => resolveW05SocialDatabaseDriver({ W05_DATABASE_DRIVER: 'mysql' }))
-      .toThrow('W05_DATABASE_DRIVER_UNSUPPORTED')
-    expect(() => resolveW05SocialDatabaseDriver({ W05_DATABASE_DRIVER: 'd1' }))
-      .toThrow('W05_DATABASE_DRIVER_UNSUPPORTED')
-    expect(() => getW05SocialWorkerDependencies({ W05_DATABASE_DRIVER: 'neon' }))
-      .toThrow('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  it('rejects missing or invalid Neon social Hyperdrive connection strings', () => {
     expect(() => getW05SocialWorkerDependencies({
-      W05_DATABASE_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: { connectionString: 'https://example.invalid/database' },
-    })).toThrow('W05_HYPERDRIVE_D1_02_CONNECTION_STRING_INVALID')
+      HYPERDRIVE_NEON_SOCIAL: { connectionString: 'https://example.invalid/database' },
+    })).toThrow('W05_NEON_SOCIAL_HYPERDRIVE_CONNECTION_STRING_INVALID')
   })
 
   it('composes all existing injection-ready PostgreSQL stores over one cached Hyperdrive pool', () => {
@@ -45,7 +36,7 @@ describe('W05 Neon runtime composition', () => {
       capturedConfig = config
       return pool
     }
-    const env = { W05_DATABASE_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+    const env = { HYPERDRIVE_NEON_SOCIAL: binding }
 
     const first = getW05SocialWorkerDependencies(env, poolFactory)
     const second = getW05SocialWorkerDependencies(env, poolFactory)
@@ -108,9 +99,8 @@ describe('W05 Neon notification push composition', () => {
       config.connectionString === endpointBinding.connectionString ? endpointPool : socialPool,
     )
     const env = {
-      W05_DATABASE_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: socialBinding,
-      HYPERDRIVE_D1_03: endpointBinding,
+      HYPERDRIVE_NEON_SOCIAL: socialBinding,
+      HYPERDRIVE_NEON_GOVERNANCE: endpointBinding,
     }
 
     const first = getW05NotificationPushDeliveryDependencies(env, poolFactory)
@@ -128,7 +118,7 @@ describe('W05 Neon notification push composition', () => {
     expect(first.endpointAccessStore).toBeDefined()
   })
 
-  it('uses a separate D1-03 Neon Hyperdrive only for W09-owned push endpoint access', async () => {
+  it('uses a separate Neon governance Hyperdrive only for W09-owned push endpoint access', async () => {
     const socialBinding = { connectionString: 'postgresql://user:secret@social.example/db?sslmode=require' }
     const endpointBinding = {
       connectionString: 'postgresql://user:secret@governance.example:5432/luckread_governance?sslmode=require',
@@ -139,9 +129,8 @@ describe('W05 Neon notification push composition', () => {
       config.connectionString === endpointBinding.connectionString ? endpointPool : socialPool,
     )
     const env = {
-      W05_DATABASE_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: socialBinding,
-      HYPERDRIVE_D1_03: endpointBinding,
+      HYPERDRIVE_NEON_SOCIAL: socialBinding,
+      HYPERDRIVE_NEON_GOVERNANCE: endpointBinding,
     }
 
     expect(getW05PushEndpointPostgresDatabase(env, poolFactory)).toBe(endpointPool)
@@ -158,20 +147,14 @@ describe('W05 Neon notification push composition', () => {
     expect(socialPool.query).not.toHaveBeenCalled()
   })
 
-  it('fails closed when Neon is selected for D1-03 but its binding or database identity is invalid', () => {
+  it('fails closed when the Neon governance binding or database identity is invalid', () => {
     expect(() => getW05PushEndpointPostgresDatabase({
-    })).toThrow('W05_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+    })).toThrow('W05_NEON_GOVERNANCE_HYPERDRIVE_BINDING_REQUIRED')
     expect(() => getW05PushEndpointPostgresDatabase({
-      HYPERDRIVE_D1_03: {
+      HYPERDRIVE_NEON_GOVERNANCE: {
         connectionString: 'postgresql://user:secret@governance.example:5432/luckread?sslmode=require',
       },
-    })).toThrow('W05_HYPERDRIVE_D1_03_CONNECTION_STRING_INVALID')
+    })).toThrow('W05_NEON_GOVERNANCE_HYPERDRIVE_CONNECTION_STRING_INVALID')
   })
 
-  it('fails closed instead of selecting D1 when the W05 social driver is not Neon', () => {
-    const poolFactory = vi.fn(() => fakePool())
-    expect(() => getW05NotificationPushDeliveryDependencies({ W05_DATABASE_DRIVER: 'd1' }, poolFactory))
-      .toThrow('W05_DATABASE_DRIVER_UNSUPPORTED')
-    expect(poolFactory).not.toHaveBeenCalled()
-  })
 })

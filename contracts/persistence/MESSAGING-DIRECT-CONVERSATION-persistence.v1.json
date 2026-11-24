@@ -7,7 +7,7 @@
   "physicalResource": {
     "databaseName": "luckreadpro",
     "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
-    "runtime": "Neon PostgreSQL via W05 HYPERDRIVE_D1_02"
+    "runtime": "Neon PostgreSQL via W05 HYPERDRIVE_NEON_SOCIAL"
   },
   "tables": {
     "social_conversations": {

@@ -105,15 +105,11 @@ export function validateWorkerBindings(config, owner) {
     }
     if (actual.length !== 0) errors.push('W05 Neon production config must have zero D1 bindings')
     const hyperdrive = config?.hyperdrive ?? []
-    const vars = config?.vars ?? {}
-    if (vars.W05_DATABASE_DRIVER !== 'neon' || vars.W05_PUSH_ENDPOINT_DATABASE_DRIVER !== 'neon') {
-      errors.push('W05 must select Neon for both D1-02 and delegated D1-03 runtime data')
+    if (!hyperdrive.some((item) => item.binding === 'HYPERDRIVE_NEON_SOCIAL' && item.id === 'c55183e1cc3446409c9c1075832c6615')) {
+      errors.push('W05 HYPERDRIVE_NEON_SOCIAL target mismatch')
     }
-    if (!hyperdrive.some((item) => item.binding === 'HYPERDRIVE_D1_02' && item.id === 'c55183e1cc3446409c9c1075832c6615')) {
-      errors.push('W05 HYPERDRIVE_D1_02 target mismatch')
-    }
-    if (!hyperdrive.some((item) => item.binding === 'HYPERDRIVE_D1_03' && item.id === '7c8831416c18494faee04b96aa551cb9')) {
-      errors.push('W05 delegated HYPERDRIVE_D1_03 target mismatch')
+    if (!hyperdrive.some((item) => item.binding === 'HYPERDRIVE_NEON_GOVERNANCE' && item.id === '7c8831416c18494faee04b96aa551cb9')) {
+      errors.push('W05 delegated HYPERDRIVE_NEON_GOVERNANCE target mismatch')
     }
     return errors
   }

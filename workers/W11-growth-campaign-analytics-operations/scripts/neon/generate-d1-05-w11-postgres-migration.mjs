@@ -127,13 +127,13 @@ export function buildD105W11Migration({
   }
 
   const bindings = wrangler.d1_databases ?? []
+  const hyperdrive = wrangler.hyperdrive ?? []
   if (wrangler.name !== 'luckread-w11' ||
-      bindings.length !== 1 ||
-      bindings[0]?.binding !== 'D1_05' ||
-      bindings[0]?.database_name !== 'allluck' ||
-      bindings[0]?.database_id !== '77d82be2-d12e-4a17-b410-9aa7d376bc11' ||
-      bindings[0]?.migrations_dir !== 'migrations') {
-    fail('W11 must keep its existing single D1_05 binding; this schema slice must not change runtime binding')
+      bindings.length !== 0 ||
+      wrangler.vars?.W11_DATABASE_DRIVER !== 'neon' ||
+      wrangler.vars?.W11_ANALYTICS_INGEST_ENABLED !== 'false' ||
+      !hyperdrive.some((item) => item.binding === 'HYPERDRIVE_ANALYTICS_PG' && item.id === '3eb2012cfbb04e429e18f8349377ffbc')) {
+    fail('W11 must retain its existing Neon analytics Hyperdrive and no D1 bindings; this schema slice must not change runtime binding')
   }
 
   const sourceMigrations = contract.scope?.sourceMigrations
