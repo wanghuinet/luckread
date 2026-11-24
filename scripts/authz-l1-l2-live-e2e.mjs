@@ -108,7 +108,7 @@ const readAuthorizationState = (userId) => {
   let stdout = ''
   try {
     stdout = execFileSync('npx', [
-      '--yes', 'wrangler@4.116.0', 'd1', 'execute', 'luckread',
+      '--yes', 'wrangler@4.166.0', 'd1', 'execute', 'luckread',
       '--remote', '--json', '--config', 'workers/W02-identity/wrangler.jsonc',
       '--command', sql,
     ], {
