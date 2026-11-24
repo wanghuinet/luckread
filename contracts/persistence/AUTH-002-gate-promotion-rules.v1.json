@@ -33,7 +33,7 @@
       "promotionState": "NOT_EVALUATED_UNTIL_EXECUTED",
       "passState": "GATE2_PASS",
       "requires": [
-        "Payload 3.94.1 + @payloadcms/db-postgres 3.94.1 Neon runtime identity",
+        "W02 Better Auth 1.7.27 + @better-auth/utils 0.5.1 Neon identity/session runtime",
         "disposable controlled authentication flow",
         "login-to-session-id correlation",
         "native session persistence correlation",
