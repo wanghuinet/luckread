@@ -10,6 +10,7 @@ const baselineSha = process.env.E5_BASELINE_SHA
 const currentPackage = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 const currentPayloadVersion = currentPackage.dependencies?.payload
 const currentPostgresAdapterVersion = currentPackage.devDependencies?.['@payloadcms/db-postgres'] ?? currentPackage.dependencies?.['@payloadcms/db-postgres']
+const currentD1AdapterVersion = currentPackage.dependencies?.['@payloadcms/db-d1-sqlite'] ?? 'NOT_INSTALLED'
 if (!currentPayloadVersion || !currentPostgresAdapterVersion) {
   throw new Error('Current W01 Payload and PostgreSQL adapter package versions are required')
 }
