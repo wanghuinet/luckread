@@ -4,7 +4,7 @@ W01's active Payload runtime uses the official `@payloadcms/db-postgres@3.94.1` 
 
 - `src/payload.config.ts` selects the Neon PostgreSQL adapter in the Worker runtime.
 - `src/neon-postgres-adapter.ts` uses the official Payload PostgreSQL adapter, `push: false`, and `src/neon-postgres-migrations`.
-- `@payloadcms/db-postgres@3.94.1` and `pg@8.20.0` are runtime dependencies.
+- `@payloadcms/db-postgres@3.94.1` and `pg@8.23.1` are runtime dependencies.
 - The upstream Payload 3.94.1 adapter contains the PostgreSQL bootstrap pool-client release fix; no local patch is applied.
 - R2 remains the media/object store through Payload's official R2 storage integration.
 - Next.js 16.4.6, React 19.3.1, TypeScript 6.0.3, OpenNext 1.20.18, Wrangler 4.166.0, and Node 24.22.3 form the validated upgrade baseline.
