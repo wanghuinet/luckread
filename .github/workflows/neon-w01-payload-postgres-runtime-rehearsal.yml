@@ -115,7 +115,7 @@ jobs:
           const payloadConfig = fs.readFileSync('src/payload.config.ts', 'utf8')
           const adapterSource = fs.readFileSync('src/neon-postgres-adapter.ts', 'utf8')
           const deployWorkflow = fs.readFileSync('../../.github/workflows/w01-payload-app-deploy.yml', 'utf8')
-          if (pkg.devDependencies?.['@payloadcms/db-postgres'] !== '3.90.2') {
+          if (pkg.devDependencies?.['@payloadcms/db-postgres'] !== '3.94.1') {
             throw new Error('Payload PostgreSQL adapter must remain pinned for the W01 production bundle build')
           }
           if (pkg.dependencies?.pg !== '8.20.0') {
@@ -165,10 +165,10 @@ jobs:
         working-directory: workers/W01-payload
         run: node --check scripts/neon/rehearse-payload-postgres-runtime.mjs
 
-      - name: Apply the upstream Postgres pool-client release fix to this disposable 3.90.2 rehearsal install
+      - name: Verify the upstream Postgres pool-client release fix in Payload 3.94.1
         working-directory: workers/W01-payload
         run: |
-          node --check scripts/neon/patch-payload-postgres-runtime-connect.mjs
+          node --check scripts/neon/verify-payload-postgres-runtime-connect.mjs
           node scripts/neon/patch-payload-postgres-runtime-connect.mjs
 
       - name: Exercise the same W01 production Collections and plugins through Payload Local API
