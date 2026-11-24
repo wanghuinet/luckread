@@ -110,6 +110,18 @@ const pnpmMajor = Number(pnpmVersion.split('.')[0])
 if (![9, 10, 11].includes(pnpmMajor)) fail(`pnpm 9/10/11 is required; current pnpm is ${pnpmVersion}`)
 
 if (existsSync(lockPath)) {
+  const pgImporter = lockText.match(/^      pg:\\n        specifier: ([^\\s]+)\\n        version: ([^\\s]+)/m)
+  if (!pgImporter || pgImporter[1] !== '8.23.1' || !pgImporter[2].startsWith('8.23.1')) {
+    fail('W01 pnpm lockfile must resolve the declared pg@8.23.1 runtime dependency')
+  }
+  const wranglerImporter = lockText.match(/^      wrangler:\\n        specifier: ([^\\s]+)\\n        version: ([^\\s]+)/m)
+  if (!wranglerImporter || wranglerImporter[1] !== '~4.166.0' || !wranglerImporter[2].startsWith('4.166.0')) {
+    fail('W01 pnpm lockfile must resolve the policy-admitted Wrangler 4.166.0 toolchain')
+  }
+  if (lockText.includes('miniflare@5.') || lockText.includes('wrangler@4.167.0') || lockText.includes('@cloudflare/workers-utils@0.57.0')) {
+    fail('W01 lockfile contains a newly published Wrangler/Miniflare dependency graph rejected by the release-age policy')
+  }
+  console.log('PASS: W01 pg 8.23.1 and Wrangler 4.166.0 lockfile pins are exact')
   console.log('PASS: W01 pnpm-lock.yaml exists')
   console.log(`LOCKFILE=${lockPath}`)
   console.log(`PNPM=${pnpmVersion}`)
