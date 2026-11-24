@@ -3,6 +3,8 @@ name: Payload Foundation CI
 on:
   push:
     paths:
+      - 'package.json'
+      - 'package-lock.json'
       - 'workers/W01-payload/**'
       - 'contracts/payload/**'
       - 'scripts/payload-native-inventory.mjs'
@@ -31,7 +33,7 @@ jobs:
       - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.22.3
 
       - name: Setup pnpm 11 for the committed W01 lockfile
         uses: pnpm/action-setup@v4
@@ -42,6 +44,10 @@ jobs:
       - name: Install W01 dependencies from committed lockfile
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Audit the locked W01 dependency graph for high and critical advisories
+        working-directory: workers/W01-payload
+        run: pnpm audit --audit-level high
 
       - name: Typecheck W01
         working-directory: workers/W01-payload
@@ -58,6 +64,10 @@ jobs:
       - name: W01 production build
         working-directory: workers/W01-payload
         run: pnpm run build
+
+      - name: Build the Cloudflare Worker output without deploying
+        working-directory: workers/W01-payload
+        run: pnpm exec opennextjs-cloudflare build --config=wrangler.neon.jsonc
 
 
       - name: Verify remote migration admission state
