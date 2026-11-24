@@ -251,7 +251,7 @@ jobs:
 
       - name: Install W03 PostgreSQL Worker runtime dependency
         working-directory: workers/W03-content
-        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Deploy W03 Content with the exact reviewed Neon source
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
