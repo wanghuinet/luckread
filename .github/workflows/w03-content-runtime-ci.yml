@@ -136,7 +136,7 @@ jobs:
 
       - name: Install W03 PostgreSQL Worker runtime dependency
         working-directory: workers/W03-content
-        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Bundle W03 Worker with Hyperdrive PostgreSQL runtime dependency
         working-directory: workers/W03-content
