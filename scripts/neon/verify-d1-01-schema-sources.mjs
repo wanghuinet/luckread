@@ -105,9 +105,16 @@ const expected = {
   w08: contract.owners[3].sqlMigrations,
 }
 
-const payloadTsDir = 'workers/W01-payload/src/migrations'
+const payload = contract.owners[0]
+const payloadTsDir = path.posix.dirname(payload.migrationIndex)
 const payloadModules = listFiles(payloadTsDir, '.ts').filter((name) => name !== 'index.ts')
-compareSets('W01 Payload migration modules', payloadModules, expected.w01PayloadModules)
+compareSets('W01 active Neon PostgreSQL migration modules', payloadModules, expected.w01PayloadModules)
+
+// Keep the original SQLite/D1 migration source set separately inventoried as
+// historical provenance. It must never be treated as the active Neon source.
+const legacyPayloadTsDir = path.posix.dirname(payload.legacyMigrationIndex)
+const legacyPayloadModules = listFiles(legacyPayloadTsDir, '.ts').filter((name) => name !== 'index.ts')
+compareSets('W01 historical D1 migration modules', legacyPayloadModules, payload.legacyMigrationModules)
 
 const migrationIndex = read(contract.owners[0].migrationIndex)
 if (migrationIndex !== null) {
@@ -149,12 +156,19 @@ for (const [owner, dir, expectedFiles] of [
   for (const file of expectedFiles) scanSql(`${dir}/${file}`, owner)
 }
 
-const payload = contract.owners[0]
 for (const module of expected.w01PayloadModules) {
   const relativePath = `${payloadTsDir}/${module}`
   const content = read(relativePath)
+  addSource('W01', 'payload-postgres-migration', relativePath, content, {
+    executionPolicy: 'Active Neon PostgreSQL migration source; apply only through the reviewed schema migration workflow.',
+  })
+}
+
+for (const module of payload.legacyMigrationModules) {
+  const relativePath = `${legacyPayloadTsDir}/${module}`
+  const content = read(relativePath)
   addSource('W01', 'payload-d1-migration-reference-only', relativePath, content, {
-    executionPolicy: 'Do not execute D1 adapter migration modules on PostgreSQL; regenerate a PostgreSQL-native baseline from the official Payload Postgres adapter.',
+    executionPolicy: 'Historical SQLite/D1 migration provenance only; never execute this source against PostgreSQL.',
   })
 }
 
