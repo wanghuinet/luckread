@@ -1901,7 +1901,8 @@ describe('W03 content contract core', () => {
       'utf8',
     )
     expect(worker).not.toMatch(/\bD1_02\b|NO_LEGACY_DATABASE_HANDLE/)
-    expect(worker).toContain('requireStore(dependencies.contentMutationStoreProvider?.(env))')
+    expect(worker).toMatch(/contentMutationStoreProvider\?\.\(env\)/)
+    expect(worker).toContain('SERVICE_UNAVAILABLE')
   })
 
   it('returns media references from the Neon public listing projection', async () => {
