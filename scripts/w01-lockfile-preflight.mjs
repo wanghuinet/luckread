@@ -47,7 +47,7 @@ const required = {
   next: '16.4.6',
   react: '19.3.1',
   'react-dom': '19.3.1',
-  pg: '8.20.0',
+  pg: '8.23.1',
   '@opennextjs/cloudflare': '1.20.18',
 }
 
