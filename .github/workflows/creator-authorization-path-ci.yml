@@ -71,7 +71,7 @@ jobs:
 
       - name: Install W08 runtime dependencies
         working-directory: workers/W08-creator
-        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Verify W08 Neon-only production config and existing Hyperdrive binding
         working-directory: workers/W08-creator
