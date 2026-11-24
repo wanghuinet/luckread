@@ -142,6 +142,18 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
     }
   }, [contentId, sort, currentUserId]);
 
+  const viewerScopeRef = useRef<string | null>(currentUserId);
+  useEffect(() => {
+    if (viewerScopeRef.current === currentUserId) return;
+    viewerScopeRef.current = currentUserId;
+    setLikedComments({});
+    setComments([]);
+    setProfiles({});
+    setCursor(null);
+    setHasMore(false);
+    setMessage('');
+  }, [currentUserId]);
+
   useEffect(() => {
     void loadComments();
     return () => {
