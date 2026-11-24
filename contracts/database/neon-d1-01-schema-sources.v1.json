@@ -64,7 +64,7 @@
       "worker": "W02",
       "role": "Better Auth identity/session core and identity/account domain state",
       "schemaMode": "Generate Better Auth core/plugin tables from the pinned Better Auth configuration/CLI; port W02-owned custom D1 SQL and all direct D1 query/transaction code separately.",
-      "betterAuthVersion": "1.7.8",
+      "betterAuthVersion": "1.7.27",
       "config": "workers/W02-identity/src/auth/better-auth.ts",
       "wrangler": "workers/W02-identity/wrangler.jsonc",
       "builtInSchemaMigrations": [
@@ -139,7 +139,7 @@
   "executionOrder": [
     "Verify source inventory and current Worker-to-D1-01 mapping",
     "Generate Payload PostgreSQL base migration using @payloadcms/db-postgres",
-    "Generate Better Auth 1.7.8 PostgreSQL schema from the canonical auth configuration",
+    "Generate Better Auth 1.7.27 PostgreSQL schema from the canonical auth configuration",
     "Port W02 custom identity SQL and transaction code with PostgreSQL tests",
     "Port W07 D1-01 subscription/entitlement schema and tests",
     "Port W08 creator schema and tests",
