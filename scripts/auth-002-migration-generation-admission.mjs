@@ -13,7 +13,7 @@ const adapter = readFileSync(join(payloadRoot, 'src', 'neon-postgres-adapter.ts'
 const users = readFileSync(join(payloadRoot, 'src', 'collections', 'Users.ts'), 'utf8')
 
 // Current W01 runtime is Payload 3.94.1 with the official Neon PostgreSQL adapter.
- // The original D1 template remains historical provenance only.
+// The original D1 template remains historical provenance only.
 if (pkg.dependencies?.payload !== '3.94.1') fail('W01 Payload dependency is not exactly 3.94.1')
 if (pkg.dependencies?.['@payloadcms/db-postgres'] !== '3.94.1' || pkg.devDependencies?.['@payloadcms/db-postgres']) fail('W01 official PostgreSQL adapter must be a 3.94.1 runtime dependency')
 if (pkg.dependencies?.['@payloadcms/db-d1-sqlite']) fail('W01 must not declare the retired Cloudflare D1 adapter')
