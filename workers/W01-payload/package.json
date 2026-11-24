@@ -78,5 +78,10 @@
         "description": "Generate a random string using `openssl rand -hex 32`"
       }
     }
+  },
+  "pnpm": {
+    "overrides": {
+      "happy-dom": "21.0.4"
+    }
   }
 }
