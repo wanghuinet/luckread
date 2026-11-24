@@ -1,6 +1,8 @@
 # W01 Payload Cloudflare D1 Runtime Evidence Queue v1
 
-Status: `OPEN / FAIL-CLOSED`
+Status: `SUPERSEDED_HISTORICAL_D1_TEMPLATE_EVIDENCE`
+
+> Superseded on 2026-11-24. The active W01 runtime is Neon PostgreSQL with Payload 3.94.1 and the official `@payloadcms/db-postgres@3.94.1` runtime dependency. W01 delegates identity authentication to W02 Better Auth. The statements below are retained as historical D1-template audit evidence only; they are not current runtime facts or active release gates.
 
 Purpose: close the remaining runtime/evidence gap for Mapping-0 without promoting inferred Payload session semantics or inventing D1 schema bindings.
 
