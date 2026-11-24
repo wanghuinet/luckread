@@ -28,8 +28,14 @@ const relationshipGraphCache = new Map<string, { value: RelationshipGraph; expir
 
 const relationshipGraphKey = (viewerUserId: string, targetUserId: string): string => viewerUserId + '\\0' + targetUserId
 
-const pruneRelationshipGraphCache = (): void => {
+const pruneRelationshipGraphCache = (now: number): void => {
   if (relationshipGraphCache.size < RELATIONSHIP_GRAPH_CACHE_MAX_ENTRIES) return
+  // Remove expired entries first so valid relationship state survives pressure.
+  for (const [key, entry] of relationshipGraphCache) {
+    if (entry.expiresAt <= now) relationshipGraphCache.delete(key)
+    if (relationshipGraphCache.size < RELATIONSHIP_GRAPH_CACHE_MAX_ENTRIES) return
+  }
+  // Map insertion order is LRU after successful cache hits are promoted.
   const oldestKey = relationshipGraphCache.keys().next().value
   if (typeof oldestKey === 'string') relationshipGraphCache.delete(oldestKey)
 }
@@ -75,7 +81,11 @@ export async function getRelationshipGraph(
   const cacheKey = relationshipGraphKey(viewer, target)
   const cached = relationshipGraphCache.get(cacheKey)
   if (cached) {
-    if (cached.expiresAt > Date.now()) return { ...cached.value }
+    if (cached.expiresAt > Date.now()) {
+      relationshipGraphCache.delete(cacheKey)
+      relationshipGraphCache.set(cacheKey, cached)
+      return { ...cached.value }
+    }
     relationshipGraphCache.delete(cacheKey)
   }
 
@@ -105,8 +115,9 @@ export async function getRelationshipGraph(
     relationshipId: relationshipVisible ? row?.relationship_id ?? null : null,
     createdAt: relationshipVisible ? row?.created_at ?? null : null,
   }
-  pruneRelationshipGraphCache()
-  relationshipGraphCache.set(cacheKey, { value, expiresAt: Date.now() + RELATIONSHIP_GRAPH_CACHE_TTL_MS })
+  const now = Date.now()
+  pruneRelationshipGraphCache(now)
+  relationshipGraphCache.set(cacheKey, { value, expiresAt: now + RELATIONSHIP_GRAPH_CACHE_TTL_MS })
   return { ...value }
 }
 
