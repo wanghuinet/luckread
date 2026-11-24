@@ -4,7 +4,11 @@
 
 `SUPERSEDED_NOT_APPLICABLE_TO_W01_NATIVE_SESSION_RUNTIME`
 
-## Authority
+## Supersession
+
+W02 Better Auth 1.7.27 on Neon PostgreSQL is the active identity/session authority. This legacy W01 Payload-native session execution runbook is not applicable to the current runtime and must not be used to create a second session identity.
+
+## Historical authority
 
 This runbook operationalizes `contracts/persistence/AUTH-002-runtime-session-evidence-gate.v1.json`.
 It does not authorize production migration application or promote `AUTH-002` by itself.
