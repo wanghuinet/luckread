@@ -20,6 +20,15 @@ const EMPTY_SNAPSHOT: ContentRepostSnapshot = Object.freeze({
 });
 const snapshots = new Map<string, ContentRepostSnapshot>();
 const listeners = new Map<string, Set<() => void>>();
+const MAX_REPOST_SNAPSHOTS = 400;
+
+function pruneRepostSnapshots(): void {
+  if (snapshots.size < MAX_REPOST_SNAPSHOTS) return;
+  for (const key of snapshots.keys()) {
+    if (!listeners.has(key)) snapshots.delete(key);
+    if (snapshots.size < MAX_REPOST_SNAPSHOTS) break;
+  }
+}
 
 function normalizeContentId(contentId?: string): string {
   return typeof contentId === 'string' ? contentId.trim() : '';
@@ -43,6 +52,7 @@ export function getContentRepostSnapshot(
   const key = snapshotKey(viewerId, id);
   const current = snapshots.get(key);
   if (current) return current;
+  pruneRepostSnapshots();
   const snapshot: ContentRepostSnapshot = {
     reposted: viewerId ? (typeof initial.reposted === 'boolean' ? initial.reposted : false) : false,
     repostCount: normalizeCount(initial.repostCount),
