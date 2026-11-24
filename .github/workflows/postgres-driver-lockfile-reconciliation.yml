@@ -7,6 +7,8 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'workers/W03-content/package.json'
+      - 'workers/W01-payload/package.json'
+      - 'workers/W01-payload/pnpm-lock.yaml'
       - 'workers/W02-identity/package.json'
       - 'workers/W02-identity/package-lock.json'
       - 'workers/W05-social/package.json'
@@ -37,6 +39,12 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '24.22.3'
+
+      - name: Setup pnpm 11 for W01 Payload lockfile
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
 
       - name: Regenerate root repository lockfile for pinned Workers runtime types
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
@@ -114,6 +122,33 @@ jobs:
         working-directory: workers/W07-subscription-commerce
         run: npm audit --audit-level=high
 
+      - name: Regenerate W01 Payload pnpm lockfile for patched test dependency graph
+        working-directory: workers/W01-payload
+        run: pnpm install --lockfile-only --ignore-scripts
+
+      - name: Install W01 Payload dependency graph from regenerated pnpm lockfile
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Audit W01 Payload dependency graph
+        working-directory: workers/W01-payload
+        run: pnpm audit --audit-level high
+
+      - name: Verify W01 Happy DOM security override in frozen lockfile
+        working-directory: workers/W01-payload
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const manifest = JSON.parse(readFileSync('package.json', 'utf8'))
+          const lock = readFileSync('pnpm-lock.yaml', 'utf8')
+          if (manifest.pnpm?.overrides?.['happy-dom'] !== '21.0.4' ||
+              !lock.includes('happy-dom@21.0.4:') ||
+              /happy-dom@(?:20\.|21\.0\.[0-3])/.test(lock)) {
+            throw new Error('W01 pnpm graph must resolve only the patched happy-dom 21.0.4 override')
+          }
+          console.log('W01 happy-dom override and lockfile=21.0.4')
+          NODE
+
       - name: Verify exact pg and @types/pg lockfile versions
         run: |
           node --input-type=module <<'NODE'
@@ -153,7 +188,7 @@ jobs:
           git checkout --detach "$PR_HEAD_SHA"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json workers/W02-identity/package-lock.json workers/W05-social/package-lock.json workers/W07-subscription-commerce/package-lock.json
+          git add package-lock.json workers/W01-payload/pnpm-lock.yaml workers/W02-identity/package-lock.json workers/W05-social/package-lock.json workers/W07-subscription-commerce/package-lock.json
           if git diff --cached --quiet; then
             echo "All Worker core dependency lockfiles are already current."
             exit 0
