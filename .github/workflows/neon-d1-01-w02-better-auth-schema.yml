@@ -145,7 +145,7 @@ jobs:
           if (pkg.devDependencies.auth !== '1.7.27' || cli.version !== '1.7.27') {
             throw new Error('W02 Better Auth schema CLI must match runtime version 1.7.27')
           }
-          if (pkg.devDependencies.pg !== '8.20.0') {
+          if (pkg.dependencies.pg !== '8.23.1' || pkg.devDependencies.pg !== undefined) {
             throw new Error('W02 schema-generation PostgreSQL driver pin drifted')
           }
           console.log('Better Auth runtime, schema CLI, and PostgreSQL driver pins: PASS')
@@ -178,7 +178,7 @@ jobs:
           generatorCommand=npm run neon:schema:generate
           betterAuth=1.7.27
           betterAuthCli=1.7.27
-          pg=8.20.0
+          pg=8.23.1
           firstGenerationSha256=$first_sha256
           secondGenerationSha256=$second_sha256
           deterministic=true
@@ -189,7 +189,7 @@ jobs:
             echo "## W02 Better Auth PostgreSQL schema generation"
             echo "- Generator: `npm run neon:schema:generate`"
             echo "- Better Auth runtime / CLI: `1.7.27 / 1.7.27`"
-            echo "- pg: `8.20.0`"
+            echo "- pg: `8.23.1`"
             echo "- Artifact SHA-256: `$second_sha256`"
             echo "- Two consecutive generations: **byte-identical**"
             echo "- Target: disposable PostgreSQL 18 only; no remote Neon connection"
