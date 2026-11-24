@@ -123,7 +123,7 @@ jobs:
           if (pkg.dependencies?.['@payloadcms/db-postgres'] !== '3.94.1') {
             throw new Error('Payload PostgreSQL adapter must be a 3.94.1 runtime dependency')
           }
-          if (pkg.dependencies?.pg !== '8.20.0') {
+          if (pkg.dependencies?.pg !== '8.23.1') {
             throw new Error('node-postgres must be a pinned runtime dependency')
           }
           if (!payloadConfig.includes("from './neon-postgres-adapter'") ||
