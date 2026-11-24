@@ -23,7 +23,7 @@ jobs:
           node-version: 24
 
       - name: Install Wrangler
-        run: npm install --no-save wrangler@4.116.0
+        run: npm install --no-save wrangler@4.166.0
 
       - name: Verify audit marker
         run: |
@@ -37,9 +37,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/admin-audit
-          npx wrangler@4.116.0 d1 execute luckread --remote --json --command "SELECT CAST(u.id AS TEXT) AS user_id, u.email, u.username, u.account_state, ra.role_id, ra.scope_type, ra.status, ra.valid_from, ra.valid_until FROM users u LEFT JOIN role_assignments ra ON CAST(ra.subject_id AS TEXT)=CAST(u.id AS TEXT) ORDER BY u.id, ra.status, ra.role_id;" > artifacts/admin-audit/all-roles.json
+          npx wrangler@4.166.0 d1 execute luckread --remote --json --command "SELECT CAST(u.id AS TEXT) AS user_id, u.email, u.username, u.account_state, ra.role_id, ra.scope_type, ra.status, ra.valid_from, ra.valid_until FROM users u LEFT JOIN role_assignments ra ON CAST(ra.subject_id AS TEXT)=CAST(u.id AS TEXT) ORDER BY u.id, ra.status, ra.role_id;" > artifacts/admin-audit/all-roles.json
           cp artifacts/admin-audit/all-roles.json artifacts/admin-audit/admin-roles.json
-          npx wrangler@4.116.0 d1 execute luckread --remote --json --command "SELECT COUNT(*) AS user_count FROM users;" > artifacts/admin-audit/user-count.json
+          npx wrangler@4.166.0 d1 execute luckread --remote --json --command "SELECT COUNT(*) AS user_count FROM users;" > artifacts/admin-audit/user-count.json
           cat artifacts/admin-audit/admin-roles.json
           cat artifacts/admin-audit/user-count.json
 
