@@ -22,12 +22,19 @@ const snapshots = new Map<string, ContentRepostSnapshot>();
 const listeners = new Map<string, Set<() => void>>();
 const MAX_REPOST_SNAPSHOTS = 400;
 
+function promoteRepostSnapshot(key: string, value: ContentRepostSnapshot): void {
+  snapshots.delete(key);
+  snapshots.set(key, value);
+}
+
 function pruneRepostSnapshots(): void {
   if (snapshots.size < MAX_REPOST_SNAPSHOTS) return;
   for (const key of snapshots.keys()) {
     if (!listeners.has(key)) snapshots.delete(key);
-    if (snapshots.size < MAX_REPOST_SNAPSHOTS) break;
+    if (snapshots.size < MAX_REPOST_SNAPSHOTS) return;
   }
+  const oldestKey = snapshots.keys().next().value;
+  if (typeof oldestKey === 'string') snapshots.delete(oldestKey);
 }
 
 function normalizeContentId(contentId?: string): string {
@@ -51,7 +58,7 @@ export function getContentRepostSnapshot(
   if (!id) return EMPTY_SNAPSHOT;
   const key = snapshotKey(viewerId, id);
   const current = snapshots.get(key);
-  if (current) return current;
+  if (current) { promoteRepostSnapshot(key, current); return current; }
   pruneRepostSnapshots();
   const snapshot: ContentRepostSnapshot = {
     reposted: viewerId ? (typeof initial.reposted === 'boolean' ? initial.reposted : false) : false,
@@ -63,7 +70,7 @@ export function getContentRepostSnapshot(
 }
 function publish(viewerId: string | null, contentId: string, patch: Partial<ContentRepostSnapshot>): void {
   const key = snapshotKey(viewerId, contentId);
-  snapshots.set(key, { ...getContentRepostSnapshot(contentId, viewerId), ...patch });
+  promoteRepostSnapshot(key, { ...getContentRepostSnapshot(contentId, viewerId), ...patch });
   for (const listener of listeners.get(key) ?? []) listener();
 }
 function subscribe(viewerId: string | null, contentId: string, listener: () => void): () => void {
