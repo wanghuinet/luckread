@@ -95,7 +95,7 @@
       },
       {
         "path": "contracts/database/neon-d1-03-shared-runner-independent-review.v1.json",
-        "gitBlobSha1": "8b6e63bd5508d26024a9491da95d8a491ed9ab1a"
+        "gitBlobSha1": "f9bff3e871662a59f65f56d6c424e330c96b566a"
       },
       {
         "path": "contracts/database/neon-d1-03-w06-moderation-schema.v1.json",
@@ -143,7 +143,7 @@
       },
       {
         "path": "workers/W06-governance/wrangler.jsonc",
-        "gitBlobSha1": "aac2cc472c9a0146613865527ffd13d767857e9f"
+        "gitBlobSha1": "dc0e20c80d28aed1129f2b0765d6ee0eaaacd8bb"
       },
       {
         "path": "workers/W09-platform/wrangler.d1-03-migrations.jsonc",
