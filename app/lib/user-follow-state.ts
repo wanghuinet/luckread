@@ -144,39 +144,31 @@ export async function resolveUserProfileId(
 /** Read relationship state from W01/W05; never infer it from local profile metadata. */
 export async function refreshUserFollowStatus(targetUserId?: string, viewerId?: string | null): Promise<void> {
   const id = normalizeUserId(targetUserId);
-  if (!id) return;
-
+  if (!id || !isCurrentViewer(viewerId)) return;
   const current = getUserFollowSnapshot(id, viewerId);
   if (current.loading || current.pending) return;
-
   publish(id, viewerId, { loading: true, error: null });
   try {
-    const result = await apiRequest<unknown>(
-      '/social/follows/' + encodeURIComponent(id),
-      { method: 'GET' },
-    );
-
-    if (!result.response.ok) {
-      publish(id, viewerId, {
-        loaded: false,
-        loading: false,
-        error: result.error?.message ?? 'Could not load this follow status.',
-      });
+    const result = await apiRequest<unknown>('/social/follows/' + encodeURIComponent(id), { method: 'GET' });
+    if (!isCurrentViewer(viewerId)) {
+      publish(id, viewerId, { following: false, loaded: false, loading: false, pending: false, error: null });
       return;
     }
-
+    if (!result.response.ok) {
+      publish(id, viewerId, { loaded: false, loading: false, error: result.error?.message ?? 'Could not load this follow status.' });
+      return;
+    }
     const following = parseFollowStatus(result.data);
     if (following === null) {
-      publish(id, viewerId, {
-        loaded: false,
-        loading: false,
-        error: 'LuckRead returned an invalid follow status.',
-      });
+      publish(id, viewerId, { loaded: false, loading: false, error: 'LuckRead returned an invalid follow status.' });
       return;
     }
-
     publish(id, viewerId, { following, loaded: true, loading: false, error: null });
   } catch (cause) {
+    if (!isCurrentViewer(viewerId)) {
+      publish(id, viewerId, { following: false, loaded: false, loading: false, pending: false, error: null });
+      return;
+    }
     publish(id, viewerId, { loaded: false, loading: false, error: failureMessage(cause) });
   }
 }
@@ -184,64 +176,43 @@ export async function refreshUserFollowStatus(targetUserId?: string, viewerId?: 
 /** Toggle one relationship through the existing W01 route and reconcile from the server. */
 export async function toggleUserFollow(targetUserId?: string, viewerId?: string | null): Promise<UserFollowOperationResult> {
   const id = normalizeUserId(targetUserId);
-  if (!id) {
-    return { ok: false, message: 'This profile is missing its LuckRead user ID.' };
-  }
-
-  if (!isCurrentViewer(viewerId)) {
-    return { ok: false, message: 'Your account changed. Refresh this profile before trying again.' };
-  }
-
+  if (!id) return { ok: false, message: 'This profile is missing its LuckRead user ID.' };
+  if (!isCurrentViewer(viewerId)) return { ok: false, message: 'Your account changed. Refresh this profile before trying again.' };
   const current = getUserFollowSnapshot(id, viewerId);
-  if (current.loading || current.pending) {
-    return { ok: false, message: 'Follow status is still syncing. Please try again.' };
-  }
-  if (!current.loaded) {
-    return {
-      ok: false,
-      message: current.error ?? 'Follow status is not available yet. Retry loading it first.',
-    };
-  }
+  if (current.loading || current.pending) return { ok: false, message: 'Follow status is still syncing. Please try again.' };
+  if (!current.loaded) return { ok: false, message: current.error ?? 'Follow status is not available yet. Retry loading it first.' };
 
   const previousFollowing = current.following;
   const nextFollowing = !previousFollowing;
-  publish(id, viewerId, {
-    following: nextFollowing,
-    pending: true,
-    error: null,
-  });
-
+  publish(id, viewerId, { following: nextFollowing, pending: true, error: null });
   try {
-    const result = await apiRequest<unknown>(
-      '/social/follows/' + encodeURIComponent(id),
-      {
-        method: nextFollowing ? 'POST' : 'DELETE',
-        idempotencyKey: createIdempotencyKey(),
-      },
-    );
-
+    if (!isCurrentViewer(viewerId)) {
+      publish(id, viewerId, { following: false, loaded: false, pending: false, loading: false, error: null });
+      return { ok: false, message: 'Your account changed before the follow request was sent.' };
+    }
+    const result = await apiRequest<unknown>('/social/follows/' + encodeURIComponent(id), {
+      method: nextFollowing ? 'POST' : 'DELETE',
+      idempotencyKey: createIdempotencyKey(),
+    });
+    if (!isCurrentViewer(viewerId)) {
+      publish(id, viewerId, { following: false, loaded: false, pending: false, loading: false, error: null });
+      return { ok: false, message: 'The active account changed while follow was updating.' };
+    }
     if (!result.response.ok) {
       const message = result.error?.message ?? 'Could not update this follow relationship.';
-      publish(id, viewerId, {
-        following: previousFollowing,
-        pending: false,
-        loading: false,
-        error: message,
-      });
+      publish(id, viewerId, { following: previousFollowing, pending: false, loading: false, error: message });
       return { ok: false, status: result.response.status, message };
     }
-
     publish(id, viewerId, { following: nextFollowing, loaded: true, pending: false, error: null });
-    if (isCurrentViewer(viewerId)) await refreshUserFollowStatus(id, viewerId);
+    await refreshUserFollowStatus(id, viewerId);
     return { ok: true };
   } catch (cause) {
+    if (!isCurrentViewer(viewerId)) {
+      publish(id, viewerId, { following: false, loaded: false, pending: false, loading: false, error: null });
+      return { ok: false, message: 'The active account changed while follow was updating.' };
+    }
     const message = failureMessage(cause);
-    publish(id, viewerId, {
-      following: previousFollowing,
-      pending: false,
-      loading: false,
-      error: message,
-    });
+    publish(id, viewerId, { following: previousFollowing, pending: false, loading: false, error: message });
     return { ok: false, message };
   }
 }
