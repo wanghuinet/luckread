@@ -35,7 +35,7 @@ if (
 ) fail('MFA lifecycle authority boundary')
 if (!/import\s*\{\s*bearer,\s*twoFactor\s*\}\s*from\s*['"]better-auth\/plugins['"]/.test(authSource) ||
     !/twoFactor\s*\(/.test(authSource)) {
-  fail('Better Auth 1.7.8 twoFactor plugin must remain in the official generated core schema')
+  fail('The pinned Better Auth twoFactor plugin must remain in the official generated core schema')
 }
 
 const userFields = factorContract.userExtensionFields ?? []
