@@ -82,6 +82,10 @@ jobs:
           version: 11
           run_install: false
 
+      - name: Regenerate W01 lockfile from exact package pins
+        working-directory: workers/W01-payload
+        run: pnpm install --lockfile-only --ignore-scripts
+
       - name: Install exact W01 dependency graph
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
@@ -169,7 +173,7 @@ jobs:
         working-directory: workers/W01-payload
         run: |
           node --check scripts/neon/verify-payload-postgres-runtime-connect.mjs
-          node scripts/neon/patch-payload-postgres-runtime-connect.mjs
+          node scripts/neon/verify-payload-postgres-runtime-connect.mjs
 
       - name: Exercise the same W01 production Collections and plugins through Payload Local API
         working-directory: workers/W01-payload
