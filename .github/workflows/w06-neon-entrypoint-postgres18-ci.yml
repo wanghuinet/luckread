@@ -64,7 +64,7 @@ jobs:
 
       - name: Install pinned W02 PostgreSQL driver and TypeScript runner
         working-directory: workers/W02-identity
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Install W06 PostgreSQL Worker runtime dependency
         working-directory: workers/W06-governance
