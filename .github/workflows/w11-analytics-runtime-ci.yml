@@ -51,7 +51,7 @@ jobs:
       - name: Install locked root dependencies
         run: npm ci
       - name: Install W11 PostgreSQL runtime dependency
-        run: npm install --prefix workers/W11-growth-campaign-analytics-operations --ignore-scripts --no-audit --no-fund --package-lock=false
+        run: npm ci --prefix workers/W11-growth-campaign-analytics-operations --ignore-scripts --no-audit --no-fund
       - name: Run PostgreSQL analytics tests
         run: >-
           npx vitest run
