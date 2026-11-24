@@ -80,7 +80,31 @@ const pnpmMajor = Number(pnpmVersion.split('.')[0])
 if (![9, 10, 11].includes(pnpmMajor)) fail(`pnpm 9/10/11 is required; current pnpm is ${pnpmVersion}`)
 
 if (existsSync(lockPath)) {
-  console.log('PASS: W01 pnpm-lock.yaml exists')
+  const lockedRequired = [
+    'payload@3.94.1',
+    '@payloadcms/db-postgres@3.94.1',
+    'next@16.4.6',
+    'react@19.3.1',
+    'react-dom@19.3.1',
+    '@opennextjs/cloudflare@1.20.18',
+    'wrangler@4.166.0',
+    '@cloudflare/workers-utils@0.56.0',
+    'miniflare@5.20261119.0-beta',
+  ]
+  for (const version of lockedRequired) {
+    if (!lockText.includes(version)) fail(`W01 pnpm-lock.yaml is missing the approved resolution ${version}`)
+  }
+
+  const releaseAgeBlocked = [
+    'wrangler@4.167.0',
+    '@cloudflare/workers-utils@0.57.0',
+    'miniflare@5.20261123.0-beta',
+  ]
+  for (const version of releaseAgeBlocked) {
+    if (lockText.includes(version)) fail(`W01 pnpm-lock.yaml still contains a resolution rejected by minimumReleaseAge: ${version}`)
+  }
+
+  console.log('PASS: W01 pnpm-lock.yaml exists and matches the release-age-safe dependency baseline')
   console.log(`LOCKFILE=${lockPath}`)
   console.log(`PNPM=${pnpmVersion}`)
   console.log('Next: run the W01 exact-resolution evidence probe and install verification.')
