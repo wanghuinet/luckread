@@ -1545,7 +1545,8 @@ describe('W03 content contract core', () => {
             'X-LuckRead-Correlation-Id': 'test-correlation-' + limit,
           },
         }),
-      , {} as never)
+        {} as never,
+      )
 
       expect(response.status).toBe(422)
       await expect(response.json()).resolves.toMatchObject({
