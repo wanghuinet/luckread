@@ -27,6 +27,9 @@ jobs:
       - name: Install W02 runtime dependencies
         working-directory: workers/W02-identity
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Audit the locked W02 dependency graph for high and critical advisories
+        working-directory: workers/W02-identity
+        run: npm audit --audit-level=high
       - name: Assert Better Auth is exactly 1.7.27 and imports
         working-directory: workers/W02-identity
         run: |
