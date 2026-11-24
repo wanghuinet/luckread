@@ -46,6 +46,7 @@ on:
       - 'workers/W06-governance/wrangler.jsonc'
       - 'workers/W06-governance/wrangler.neon.jsonc'
       - 'workers/W06-governance/package.json'
+      - 'workers/W06-governance/package-lock.json'
       - 'workers/W06-governance/migrations/**'
       - 'workers/W03-content/src/content-runtime.ts'
       - 'workers/W03-content/src/index.ts'
