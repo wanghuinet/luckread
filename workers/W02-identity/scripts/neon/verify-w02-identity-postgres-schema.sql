@@ -139,7 +139,7 @@ $$;
 SELECT jsonb_build_object(
   'database', current_database(),
   'postgresMajor', 18,
-  'betterAuthVersion', '1.7.8',
+  'betterAuthVersion', '1.7.27',
   'betterAuthCoreTables', 5,
   'customW02Tables', 9,
   'totalTables', 14,
