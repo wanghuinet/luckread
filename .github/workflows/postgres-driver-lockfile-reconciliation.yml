@@ -156,7 +156,7 @@ jobs:
           import { readFileSync } from 'node:fs'
           const manifest = JSON.parse(readFileSync('package.json', 'utf8'))
           const lock = readFileSync('pnpm-lock.yaml', 'utf8')
-          const resolved = lock.match(/^      pg:\n        specifier: ([^\\s]+)\n        version: ([^\\s]+)/m)
+          const resolved = lock.match(/^      pg:\n        specifier: (\S+)\n        version: (\S+)/m)
           if (manifest.dependencies?.pg !== '8.23.1' || !resolved || resolved[1] !== '8.23.1' || !resolved[2].startsWith('8.23.1')) {
             throw new Error(`W01 pg manifest/lock mismatch: manifest=${manifest.dependencies?.pg}, lock=${resolved?.[2]}`)
           }
