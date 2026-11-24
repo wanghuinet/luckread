@@ -70,7 +70,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+          npx --yes wrangler@4.166.0 deploy --config wrangler.jsonc
 
       - name: Apply pending D1-02 migrations
         working-directory: workers/W03-content
@@ -78,7 +78,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          npx --yes wrangler@4.116.0 d1 migrations apply D1_02 --remote --config wrangler.jsonc
+          npx --yes wrangler@4.166.0 d1 migrations apply D1_02 --remote --config wrangler.jsonc
 
       - name: Deploy W03
         working-directory: workers/W03-content
@@ -86,7 +86,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+          npx --yes wrangler@4.166.0 deploy --config wrangler.jsonc
 
       - name: Setup pnpm 11
         uses: pnpm/action-setup@v4
@@ -108,7 +108,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+          npx --yes wrangler@4.166.0 deploy --config wrangler.jsonc
 
       - name: Production smoke test
         run: |
