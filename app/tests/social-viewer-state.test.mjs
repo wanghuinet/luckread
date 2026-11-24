@@ -172,3 +172,11 @@ test('like and follow hooks resubscribe and re-read when the authenticated viewe
   }
   expect(followButtonSource).toContain('getUserFollowSnapshot(resolvedTargetId, viewerId)');
 });
+
+
+test('follow refresh and mutations guard awaited requests against viewer switches', () => {
+  const source = readFileSync(new URL('../lib/user-follow-state.ts', import.meta.url), 'utf8');
+  expect(source).toContain('if (!id || !isCurrentViewer(viewerId)) return;');
+  expect(source).toContain('Your account changed before the follow request was sent.');
+  expect(source).toContain('The active account changed while follow was updating.');
+});
