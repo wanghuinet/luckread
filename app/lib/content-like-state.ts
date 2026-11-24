@@ -142,45 +142,38 @@ function failureMessage(cause: unknown): string {
     : 'Could not reach LuckRead. Check your connection and try again.';
 }
 
-/** Re-read authoritative state on mount/re-entry; concurrent readers are deduplicated. */
+/** Re-read authoritative state on mount/re-entry, scoped to the active viewer. */
 export async function refreshContentLikeStatus(contentId?: string, viewerId?: string | null): Promise<void> {
   const id = normalizeContentId(contentId);
-  if (!id) return;
+  if (!id || !isCurrentViewer(viewerId)) return;
 
   const current = getContentLikeSnapshot(id, {}, viewerId);
   if (current.loading || current.pending) return;
-
   publish(id, viewerId, { loading: true, error: null });
   try {
     const result = await apiRequest<unknown>(
       '/interactions/likes?targetType=content&targetId=' + encodeURIComponent(id),
       { method: 'GET' },
     );
-
-    if (!result.response.ok) {
-      publish(id, viewerId, {
-        loading: false,
-        error: result.error?.message ?? 'Could not load the current like status.',
-      });
+    if (!isCurrentViewer(viewerId)) {
+      publish(id, viewerId, { liked: false, likeCount: null, loading: false, pending: false, error: null });
       return;
     }
-
+    if (!result.response.ok) {
+      publish(id, viewerId, { loading: false, error: result.error?.message ?? 'Could not load the current like status.' });
+      return;
+    }
     const parsed = parseLikeStatus(result.data);
     if (!parsed) {
-      publish(id, viewerId, {
-        loading: false,
-        error: 'LuckRead returned an invalid like status.',
-      });
+      publish(id, viewerId, { loading: false, error: 'LuckRead returned an invalid like status.' });
       return;
     }
-
-    publish(id, viewerId, {
-      liked: parsed.liked,
-      likeCount: parsed.likeCount,
-      loading: false,
-      error: null,
-    });
+    publish(id, viewerId, { liked: parsed.liked, likeCount: parsed.likeCount, loading: false, error: null });
   } catch (cause) {
+    if (!isCurrentViewer(viewerId)) {
+      publish(id, viewerId, { liked: false, likeCount: null, loading: false, pending: false, error: null });
+      return;
+    }
     publish(id, viewerId, { loading: false, error: failureMessage(cause) });
   }
 }
@@ -188,66 +181,46 @@ export async function refreshContentLikeStatus(contentId?: string, viewerId?: st
 /** Toggle through W01/W05, optimistic for responsiveness and rolled back on failure. */
 export async function toggleContentLike(contentId?: string, viewerId?: string | null): Promise<ContentLikeOperationResult> {
   const id = normalizeContentId(contentId);
-  if (!id) {
-    return { ok: false, message: 'This item is not connected to a LuckRead content ID.' };
-  }
-
-  if (!isCurrentViewer(viewerId)) {
-    return { ok: false, message: 'Your account changed. Refresh the post before trying again.' };
-  }
+  if (!id) return { ok: false, message: 'This item is not connected to a LuckRead content ID.' };
+  if (!isCurrentViewer(viewerId)) return { ok: false, message: 'Your account changed. Refresh the post before trying again.' };
 
   const current = getContentLikeSnapshot(id, {}, viewerId);
-  if (current.loading || current.pending) {
-    return { ok: false, message: 'Like status is still syncing. Please try again.' };
-  }
-
+  if (current.loading || current.pending) return { ok: false, message: 'Like status is still syncing. Please try again.' };
   const previousLiked = current.liked;
   const previousCount = current.likeCount;
   const nextLiked = !previousLiked;
-  const optimisticCount = previousCount === null
-    ? null
-    : Math.max(0, previousCount + (nextLiked ? 1 : -1));
-
-  publish(id, viewerId, {
-    liked: nextLiked,
-    likeCount: optimisticCount,
-    pending: true,
-    error: null,
-  });
+  const optimisticCount = previousCount === null ? null : Math.max(0, previousCount + (nextLiked ? 1 : -1));
+  publish(id, viewerId, { liked: nextLiked, likeCount: optimisticCount, pending: true, error: null });
 
   try {
+    if (!isCurrentViewer(viewerId)) {
+      publish(id, viewerId, { liked: false, likeCount: null, pending: false, loading: false, error: null });
+      return { ok: false, message: 'Your account changed before the like request was sent.' };
+    }
     const result = await apiRequest<unknown>('/interactions/likes', {
       method: nextLiked ? 'POST' : 'DELETE',
       body: JSON.stringify({ targetType: 'content', targetId: id }),
       idempotencyKey: createIdempotencyKey(),
     });
-
+    if (!isCurrentViewer(viewerId)) {
+      publish(id, viewerId, { liked: false, likeCount: null, pending: false, loading: false, error: null });
+      return { ok: false, message: 'The active account changed while the like was updating.' };
+    }
     if (!result.response.ok) {
       const message = result.error?.message ?? 'Could not update this like. Please try again.';
-      publish(id, viewerId, {
-        liked: previousLiked,
-        likeCount: previousCount,
-        pending: false,
-        loading: false,
-        error: message,
-      });
+      publish(id, viewerId, { liked: previousLiked, likeCount: previousCount, pending: false, loading: false, error: message });
       return { ok: false, status: result.response.status, message };
     }
-
-    // The mutation response does not include an aggregate. Refresh from W05 to
-    // reconcile the optimistic count with the authoritative server count.
     publish(id, viewerId, { pending: false, error: null });
-    if (isCurrentViewer(viewerId)) await refreshContentLikeStatus(id, viewerId);
+    await refreshContentLikeStatus(id, viewerId);
     return { ok: true };
   } catch (cause) {
+    if (!isCurrentViewer(viewerId)) {
+      publish(id, viewerId, { liked: false, likeCount: null, pending: false, loading: false, error: null });
+      return { ok: false, message: 'The active account changed while the like was updating.' };
+    }
     const message = failureMessage(cause);
-    publish(id, viewerId, {
-      liked: previousLiked,
-      likeCount: previousCount,
-      pending: false,
-      loading: false,
-      error: message,
-    });
+    publish(id, viewerId, { liked: previousLiked, likeCount: previousCount, pending: false, loading: false, error: message });
     return { ok: false, message };
   }
 }
