@@ -56,7 +56,7 @@ if (postgresAdapterVersion !== '3.94.1' || pkg.devDependencies?.['@payloadcms/db
   fail('W01 official PostgreSQL adapter must be a 3.94.1 runtime dependency')
 }
 if (pkg.devDependencies?.typescript !== '6.0.3') fail('W01 TypeScript must be exactly 6.0.3')
-if (pkg.devDependencies?.wrangler !== '~4.167.0') fail('W01 Wrangler must be ~4.167.0')
+if (pkg.devDependencies?.wrangler !== '~4.166.0') fail('W01 Wrangler must be ~4.166.0; do not admit the newly published Wrangler release before the minimum release age is met')
 if (pkg.devDependencies?.['eslint-config-next'] !== '16.4.6') fail('W01 eslint-config-next must be 16.4.6')
 if (pkg.devDependencies?.['@types/react'] !== '19.3.0') fail('W01 @types/react must be 19.3.0')
 if (pkg.devDependencies?.['@types/react-dom'] !== '19.3.0') fail('W01 @types/react-dom must be 19.3.0')
