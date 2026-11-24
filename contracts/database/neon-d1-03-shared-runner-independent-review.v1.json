@@ -6,7 +6,7 @@
   "status": "LOCAL_SHARED_SCHEMA_REVIEW_PASSED_REMOTE_APPLY_BLOCKED",
   "review": {
     "reviewKind": "AUTOMATED_INDEPENDENT_READ_ONLY_CODE_PATH_REVIEW",
-    "description": "A separate verifier reviews the D1-03 manifest, ownership/transport boundaries, source schema contracts, W06/W09/W10 artifacts, runtime bindings and shared-runner local-only restrictions. This is not a remote-apply approval or production release.",
+    "description": "The separate verifier reviews the D1-03 manifest, ownership/transport boundaries, source schema contracts, W06 canonical and Neon deployment configurations, W09/W10/W11 migration sources, PostgreSQL artifacts and shared-runner local-only restrictions. This is not a remote-apply approval or production release.",
     "reviewedMainCommit": "2bae4a5384cb86d7a754c9dde63d88515d5d020f",
     "sharedExecutorPullRequest": 1660,
     "sharedExecutorHeadCommit": "5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de",
@@ -75,7 +75,11 @@
       },
       {
         "path": "workers/W06-governance/wrangler.jsonc",
-        "gitBlobSha1": "aac2cc472c9a0146613865527ffd13d767857e9f"
+        "gitBlobSha1": "dc0e20c80d28aed1129f2b0765d6ee0eaaacd8bb"
+      },
+      {
+        "path": "workers/W06-governance/wrangler.neon.jsonc",
+        "gitBlobSha1": "e61a86a235573689dad6ec2650d8fbbaa09c194c"
       },
       {
         "path": "workers/W09-platform/wrangler.d1-03-migrations.jsonc",
