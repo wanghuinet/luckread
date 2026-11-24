@@ -25,17 +25,9 @@
         "workers/W01-payload/src/collections/Users.ts",
         "workers/W01-payload/src/collections/Media.ts"
       ],
-      "migrationIndex": "workers/W01-payload/src/migrations/index.ts",
+      "migrationIndex": "workers/W01-payload/src/neon-postgres-migrations/index.ts",
       "migrationModules": [
-        "20250929_111647.ts",
-        "20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
-        "20260925_111503_MIG_ENT_USER_PROFILE_V1.ts",
-        "20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts",
-        "20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.ts",
-        "20261002_120000_media_owner.ts",
-        "20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.ts",
-        "20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts",
-        "20261101_163928_username_redirects.ts"
+        "20261107_202531_neon_d1_01_payload_baseline.ts"
       ],
       "sqliteSchemaSnapshots": [
         "workers/W01-payload/src/migrations/20250929_111647.json",
@@ -58,7 +50,21 @@
       ],
       "legacyMigrationSourceAdapter": "@payloadcms/db-d1-sqlite@3.90.2",
       "postgresAdapter": "workers/W01-payload/src/neon-postgres-adapter.ts",
-      "productionWrangler": "workers/W01-payload/wrangler.neon.jsonc"
+      "productionWrangler": "workers/W01-payload/wrangler.neon.jsonc",
+      "legacyMigrationIndex": "workers/W01-payload/src/migrations/index.ts",
+      "legacyMigrationModules": [
+        "20250929_111647.ts",
+        "20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
+        "20260925_111503_MIG_ENT_USER_PROFILE_V1.ts",
+        "20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts",
+        "20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.ts",
+        "20261002_120000_media_owner.ts",
+        "20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.ts",
+        "20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts",
+        "20261101_163928_username_redirects.ts"
+      ],
+      "activeDatabase": "Neon PostgreSQL 18",
+      "activeMigrationSourceAdapter": "@payloadcms/db-postgres@3.94.1"
     },
     {
       "worker": "W02",
