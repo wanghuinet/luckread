@@ -80,7 +80,7 @@ jobs:
             --no-audit \
             --no-fund \
             --ignore-scripts \
-            pg@8.20.0
+            pg@8.23.1
 
       - name: Inspect all five Neon targets in read-only transactions
         id: inspect
