@@ -72,7 +72,7 @@ jobs:
           workers/W10-async/src/index.ts
       - name: Validate and bundle the W10 Workflow configuration without deploying
         run: >-
-          npx --yes wrangler@4.156.0 deploy
+          npx --yes wrangler@4.166.0 deploy
           --dry-run
           --config workers/W10-async/wrangler.jsonc
           --outdir /tmp/w10-renewal-workflow-dry-run
