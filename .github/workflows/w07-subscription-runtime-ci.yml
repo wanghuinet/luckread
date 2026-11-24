@@ -155,7 +155,7 @@ jobs:
 
       - name: Validate W07 Neon payment webhook adapter bundle without deployment
         working-directory: workers/W07-subscription-commerce
-        run: npx --yes wrangler@4.156.0 deploy --dry-run --config wrangler.neon.jsonc --outdir /tmp/w07-neon-payment-webhook-runtime-dry-run
+        run: npx --yes wrangler@4.166.0 deploy --dry-run --config wrangler.neon.jsonc --outdir /tmp/w07-neon-payment-webhook-runtime-dry-run
       - name: Run W07 subscription-commerce unit tests
         working-directory: workers/W01-payload
         run: LUCKREAD_VITEST_SCOPE=w07-unit pnpm exec vitest run --config workers/W01-payload/vitest.config.mts --root ../..
