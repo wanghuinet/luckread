@@ -65,7 +65,8 @@ const readCachedLikeViewerState = async (
 ): Promise<boolean | null> => {
   const cache = getDefaultCache()
   if (!cache) return null
-  const hit = await cache.match(likeViewerStateCacheKey(actorUserId, targetType, targetId))
+  let hit: Response | undefined
+  try { hit = await cache.match(likeViewerStateCacheKey(actorUserId, targetType, targetId)) } catch { return null }
   if (!hit) return null
   try {
     const value = await hit.json() as { liked?: unknown }
@@ -81,7 +82,8 @@ const readCachedLikeAggregate = async (
 ): Promise<number | null> => {
   const cache = getDefaultCache()
   if (!cache) return null
-  const hit = await cache.match(likeAggregateCacheKey(targetType, targetId))
+  let hit: Response | undefined
+  try { hit = await cache.match(likeAggregateCacheKey(targetType, targetId)) } catch { return null }
   if (!hit) return null
   try {
     const value = await hit.json() as { likeCount?: unknown }
@@ -109,7 +111,7 @@ const writeCachedLikeViewerState = async (
       'cache-control': 'private, max-age=0, s-maxage=' + LIKE_STATUS_CACHE_TTL_SECONDS,
     },
   })
-  await cache.put(likeViewerStateCacheKey(actorUserId, targetType, targetId), response)
+  try { await cache.put(likeViewerStateCacheKey(actorUserId, targetType, targetId), response) } catch { /* cache is optional */ }
 }
 
 const writeCachedLikeAggregate = async (
@@ -125,7 +127,7 @@ const writeCachedLikeAggregate = async (
       'cache-control': 'public, max-age=0, s-maxage=' + LIKE_AGGREGATE_CACHE_TTL_SECONDS,
     },
   })
-  await cache.put(likeAggregateCacheKey(targetType, targetId), response)
+  try { await cache.put(likeAggregateCacheKey(targetType, targetId), response) } catch { /* cache is optional */ }
 }
 
 const invalidateCachedLikeViewerState = async (
@@ -135,7 +137,7 @@ const invalidateCachedLikeViewerState = async (
 ): Promise<void> => {
   const cache = getDefaultCache()
   if (!cache) return
-  await cache.delete(likeViewerStateCacheKey(actorUserId, targetType, targetId))
+  try { await cache.delete(likeViewerStateCacheKey(actorUserId, targetType, targetId)) } catch { /* mutation remains authoritative */ }
 }
 
 const invalidateCachedLikeAggregate = async (
@@ -144,7 +146,7 @@ const invalidateCachedLikeAggregate = async (
 ): Promise<void> => {
   const cache = getDefaultCache()
   if (!cache) return
-  await cache.delete(likeAggregateCacheKey(targetType, targetId))
+  try { await cache.delete(likeAggregateCacheKey(targetType, targetId)) } catch { /* mutation remains authoritative */ }
 }
 
 const validateTarget = (target: LikeTarget): { targetType: 'content' | 'comment'; targetId: string } => {
