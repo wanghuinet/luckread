@@ -1,12 +1,13 @@
 # W01 Neon PostgreSQL Runtime and Schema Migrations
 
-W01's active Payload runtime uses the official `@payloadcms/db-postgres@3.90.2` adapter through the LuckRead-owned Neon adapter. The active runtime has no Cloudflare D1 or SQLite fallback.
+W01's active Payload runtime uses the official `@payloadcms/db-postgres@3.94.1` adapter as a runtime dependency through the LuckRead-owned Neon adapter.
 
 - `src/payload.config.ts` selects the Neon PostgreSQL adapter in the Worker runtime.
 - `src/neon-postgres-adapter.ts` uses the official Payload PostgreSQL adapter, `push: false`, and `src/neon-postgres-migrations`.
-- The official `@payloadcms/db-postgres` adapter remains in the W01 dependency graph; this cleanup leaves its existing dependency classification unchanged.
+- `@payloadcms/db-postgres@3.94.1` and `pg@8.20.0` are runtime dependencies.
+- The upstream Payload 3.94.1 adapter contains the PostgreSQL bootstrap pool-client release fix; no local patch is applied.
 - R2 remains the media/object store through Payload's official R2 storage integration.
-- The existing `Users` and `Media` Collections and supported Payload plugin extension points remain unchanged.
+- Next.js 16.4.6, React 19.3.1, TypeScript 6.0.3, OpenNext 1.20.18, Wrangler 4.167.0, and Node 24.22.3 form the validated upgrade baseline.
 
 ## Historical migration sources
 
@@ -14,6 +15,6 @@ W01's active Payload runtime uses the official `@payloadcms/db-postgres@3.90.2` 
 
 ## Safety and deployment boundary
 
-The schema-generation and rollback checks use disposable PostgreSQL 18 databases. The generated `down` migration refuses to drop a non-empty business schema and does not use `CASCADE`. Remote schema application and production traffic/deployment remain subject to their separately approved release gates; this dependency cleanup does not deploy a Worker, alter production secrets, migrate business data, or change traffic routing.
+The schema-generation and rollback checks use disposable PostgreSQL 18 databases. The generated `down` migration refuses to drop a non-empty business schema and does not use `CASCADE`. Remote schema application and production traffic/deployment remain subject to their separately approved release gates; this dependency upgrade does not deploy a Worker, alter production secrets, migrate business data, or change traffic routing.
 
 The logical domain identifier `D1-01` is retained in historical contracts as a database-domain label. It is not a Cloudflare D1 adapter or a runtime dependency.
