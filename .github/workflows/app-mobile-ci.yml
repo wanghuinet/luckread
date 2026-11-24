@@ -182,6 +182,8 @@ jobs:
         run: bun run typecheck
       - name: TypeScript 6 compiler API compatibility typecheck
         run: bun run typecheck:ts6
+      - name: TypeScript 7.1 Beta compiler compatibility probe
+        run: bun run typecheck:ts71
       - name: Test PostHog APP crash-diagnostics configuration
         run: bun test tests/posthog-diagnostics.test.mjs
       - name: Test unified native API client rules
