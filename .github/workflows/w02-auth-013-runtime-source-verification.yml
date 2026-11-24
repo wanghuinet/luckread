@@ -39,7 +39,7 @@ jobs:
       - name: Run AUTH-013 source tests
         run: |
           set -o pipefail
-          npx vitest run workers/W02-identity/src/account/account-state-transition.test.ts workers/W02-identity/src/account/publication-journal-publisher.test.ts 2>&1 | tee artifacts/mapping-0/auth-013-runtime-source/test-output.txt
+          npx vitest run workers/W02-identity/src/account/account-state-transition.test.ts workers/W02-identity/src/neon/runtime.test.ts 2>&1 | tee artifacts/mapping-0/auth-013-runtime-source/test-output.txt
 
       - name: Capture AUTH-013 source provenance
         run: |
@@ -47,8 +47,8 @@ jobs:
             echo "workflow=W02 AUTH-013 Runtime Source Verification"
             echo "source_sha=${GITHUB_SHA}"
             echo "worker=W02"
-            echo "persistence=D1-01/users"
-            echo "test=account-state-transition + publication-journal-publisher"
+            echo "persistence=Neon PostgreSQL (logical domain D1-01) / Better Auth user"
+            echo "test=account-state-transition contract + Neon runtime"
             echo "typescript_check=PASS"
             echo "scope=SOURCE_IMPLEMENTATION_ONLY"
           } > artifacts/mapping-0/auth-013-runtime-source/provenance.txt

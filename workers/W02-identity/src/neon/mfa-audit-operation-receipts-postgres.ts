@@ -188,7 +188,7 @@ export async function createMfaAuditOperationReceiptPostgres(
 /**
  * Append an observed event while a receipt is STARTED. PostgreSQL row locking
  * serializes concurrent appenders; the shared plan validator preserves the
- * D1 implementation's idempotency and four-event bound.
+ * shared receipt contract's idempotency and four-event bound.
  */
 export async function appendMfaAuditOperationReceiptEventPostgres(
   pool: Pool,

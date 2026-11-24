@@ -1,12 +1,7 @@
-import {
-  appendMfaAuditOperationReceiptEvent,
-  assertMfaAuditOperationReceiptOwner,
-  createMfaAuditOperationReceipt,
-  finalizeMfaAuditOperationReceipt,
-  reconcileMfaAuditOperationReceipts,
-  type MfaAuditReceiptDrainSummary,
-  type MfaAuditReceiptEvent,
-  type MfaAuditReceiptOperationPath,
+import type {
+  MfaAuditReceiptDrainSummary,
+  MfaAuditReceiptEvent,
+  MfaAuditReceiptOperationPath,
 } from './mfa-audit-receipts.js'
 
 export type MfaAuditOperationReceiptOwnerInput = {
@@ -30,26 +25,4 @@ export interface MfaAuditOperationReceiptStore {
   append(receiptId: string, event: MfaAuditReceiptEvent): Promise<void>
   finalize(receiptId: string, events: MfaAuditReceiptEvent[], now?: string): Promise<boolean>
   reconcile(now?: string): Promise<MfaAuditReceiptDrainSummary>
-}
-
-/** Legacy D1 adapter is restricted to explicit test/schema profiles; production injects Neon. */
-/**
- * @deprecated-next-version
- * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
- * Replacement: PostgreSQL MFA audit operation receipt Store in src/neon/mfa-audit-operation-receipts-postgres.ts.
- * Removal: Next release.
- * Condition: MFA receipt tests and Better Auth test profile use the PostgreSQL implementation or in-memory Store fixtures.
- */
-export function createD1MfaAuditOperationReceiptStore(db: D1Database): MfaAuditOperationReceiptStore {
-  return {
-    assertOwner: (input) => assertMfaAuditOperationReceiptOwner(db, input),
-    create: (input) => createMfaAuditOperationReceipt(db, input),
-    append: (receiptId, event) => appendMfaAuditOperationReceiptEvent(db, receiptId, event),
-    finalize: (receiptId, events, now) => now === undefined
-      ? finalizeMfaAuditOperationReceipt(db, receiptId, events)
-      : finalizeMfaAuditOperationReceipt(db, receiptId, events, now),
-    reconcile: (now) => now === undefined
-      ? reconcileMfaAuditOperationReceipts(db)
-      : reconcileMfaAuditOperationReceipts(db, now),
-  }
 }

@@ -7,12 +7,16 @@ const workerRoot = resolve(scriptDirectory, '../..')
 const repositoryRoot = resolve(workerRoot, '../..')
 const migrationPath = resolve(workerRoot, 'migrations/0009_auth_007_mfa_operation_receipts.sql')
 const sourcePath = resolve(workerRoot, 'src/auth/mfa-audit-receipts.ts')
+const storeSourcePath = resolve(workerRoot, 'src/neon/mfa-audit-operation-receipts-postgres.ts')
+const reconcilerSourcePath = resolve(workerRoot, 'src/neon/mfa-audit-operation-receipt-reconciler-postgres.ts')
 const migrationContractPath = resolve(repositoryRoot, 'contracts/migration/AUTH-007-mfa-operation-receipt.v1.json')
 const eventContractPath = resolve(repositoryRoot, 'contracts/events/AUTH-007-mfa-audit-binding.v1.json')
 const outputPath = resolve(workerRoot, 'src/neon-postgres-migrations/0010_auth_007_mfa_operation_receipts.sql')
 
 const migration = readFileSync(migrationPath, 'utf8')
 const source = readFileSync(sourcePath, 'utf8')
+const storeSource = readFileSync(storeSourcePath, 'utf8')
+const reconcilerSource = readFileSync(reconcilerSourcePath, 'utf8')
 const contract = JSON.parse(readFileSync(migrationContractPath, 'utf8'))
 const eventContract = JSON.parse(readFileSync(eventContractPath, 'utf8'))
 const fail = (message) => { throw new Error('AUTH-007 MFA operation receipt PostgreSQL schema contract drift: ' + message) }
@@ -121,22 +125,24 @@ for (const token of sourceTokens) {
   if (!migration.includes(token)) fail('D1 source migration missing ' + token)
 }
 for (const operationPath of expectedPaths) {
-  if (!migration.includes("'" + operationPath + "'") || !source.includes("'" + operationPath + "'")) {
+  if (!migration.includes("'" + operationPath + "'") ||
+      (!source.includes("'" + operationPath + "'") && !storeSource.includes("'" + operationPath + "'"))) {
     fail('receipt operation path is missing from migration/runtime: ' + operationPath)
   }
 }
 for (const status of expectedStatuses) {
-  if (!migration.includes("'" + status + "'") || !source.includes("'" + status + "'")) {
+  if (!migration.includes("'" + status + "'") ||
+      (!source.includes("'" + status + "'") && !storeSource.includes("'" + status + "'") && !reconcilerSource.includes("'" + status + "'"))) {
     fail('receipt status is missing from migration/runtime: ' + status)
   }
 }
 if (!source.includes('function parsePlan(value: string | null)') ||
     !source.includes('Array.isArray(parsed)') ||
-    !source.includes('JSON.stringify(plan)') ||
-    !source.includes("const nextStatus = plan.length > 0 ? 'READY' : 'RESOLVED'") ||
-    !source.includes("SET attempt = attempt + 1, next_attempt_at = ?") ||
-    !source.includes("SET status = ?, last_error_code = ?, next_attempt_at = NULL")) {
-  fail('runtime receipt event-plan, retry or stale-UNKNOWN lifecycle source drift')
+    !storeSource.includes('JSON.stringify(plan)') ||
+    !storeSource.includes("const nextStatus = plan.length > 0 ? 'READY' : 'RESOLVED'") ||
+    !reconcilerSource.includes('SET attempt = attempt + 1, next_attempt_at = $1') ||
+    !reconcilerSource.includes("SET status = 'UNKNOWN', last_error_code = 'OUTCOME_NOT_FINALIZED', next_attempt_at = NULL")) {
+  fail('Neon receipt event-plan, retry or stale-UNKNOWN lifecycle source drift')
 }
 
 const pathList = expectedPaths.map((value) => "    '" + value + "'").join(',\n')

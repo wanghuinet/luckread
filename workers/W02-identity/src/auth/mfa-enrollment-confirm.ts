@@ -98,8 +98,8 @@ const sha256Hex = async (value: string): Promise<string> => {
 /**
  * W02-owned enrollment confirmation. W02 derives the subject from the live
  * session, verifies the pending factor through Better Auth, and returns only
- * a read-back of the authoritative status. Persistence providers are injected
- * for rehearsal; deployed callers continue to use D1 and Better Auth by default.
+ * a read-back of the authoritative status. Tests inject Store ports; the
+ * production W02 entrypoint supplies Neon PostgreSQL Stores.
  */
 export async function handleMfaEnrollmentConfirmRequest(
   env: BetterAuthEnv,

@@ -178,7 +178,9 @@ const factorContractPath = 'contracts/entity/AUTH-007-mfa-factor-field-contract.
 const lifecyclePath = 'contracts/state-machines/AUTH-007-mfa-lifecycle.v1.json'
 const reconciliationPath = 'contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md'
 const betterAuthPath = 'workers/W02-identity/src/auth/better-auth.ts'
-const replayGuardPath = 'workers/W02-identity/src/auth/totp-replay-guard.ts'
+const mfaReceiptPostgresStorePath = 'workers/W02-identity/src/neon/mfa-audit-operation-receipts-postgres.ts'
+const mfaAuditOutboxPostgresPath = 'workers/W02-identity/src/neon/mfa-audit-publication-journal-postgres.ts'
+const replayGuardPath = 'workers/W02-identity/src/neon/mfa-factor-state-postgres.ts'
 const policyPath = 'contracts/api/auth-operation-policy.v1.json'
 const rawAuthProxyRoutePath = 'workers/W01-payload/src/app/api/auth/[...segments]/route.ts'
 const rawAuthProxyTestPath = 'workers/W01-payload/tests/int/auth-raw-better-auth-proxy.int.spec.ts'
@@ -198,6 +200,8 @@ for (const file of [
   reconciliationPath,
   betterAuthPath,
   replayGuardPath,
+  mfaReceiptPostgresStorePath,
+  mfaAuditOutboxPostgresPath,
   rawAuthProxyRoutePath,
   'workers/W02-identity/src/auth/mfa-challenge-verification.ts',
   'workers/W02-identity/src/auth/mfa-challenge-verification.test.ts',
@@ -230,6 +234,8 @@ if (blockers.length === 0) {
   const logicalDataAuthority = JSON.parse(read(logicalDataAuthorityPath))
   const betterAuth = read(betterAuthPath)
   const mfaAuditReceiptStorePort = read('workers/W02-identity/src/auth/mfa-audit-operation-receipt-store.ts')
+  const mfaAuditReceiptPostgresStore = read(mfaReceiptPostgresStorePath)
+  const mfaAuditOutboxPostgres = read(mfaAuditOutboxPostgresPath)
   const replayGuard = read(replayGuardPath)
   const challengeVerification = read('workers/W02-identity/src/auth/mfa-challenge-verification.ts')
   const apiContract = JSON.parse(read(authContractPath))
@@ -403,13 +409,14 @@ if (blockers.length === 0) {
       /effectiveMfaAuditReceiptStore!\.reconcile\(\)/.test(betterAuth) &&
       /auth\.mfa\.replay_rejected/.test(betterAuth) &&
       /mfaAuditOperationReceiptStore\?: MfaAuditOperationReceiptStore/.test(betterAuth) &&
-      !/createD1MfaAuditOperationReceiptStore\(legacyD1!\)/.test(betterAuth) &&
-      !/legacy-d1-test|requireLegacyW02D1Database|D1_01/.test(betterAuth) &&
-      /mfaAuditOperationReceiptStore\?: MfaAuditOperationReceiptStore/.test(betterAuth) &&
-      /createD1MfaAuditOperationReceiptStore\(db: D1Database\)/.test(mfaAuditReceiptStorePort) &&
-      /appendMfaAuditOperationReceiptEvent\(db/.test(mfaAuditReceiptStorePort) &&
-      /finalizeMfaAuditOperationReceipt\(db/.test(mfaAuditReceiptStorePort) &&
-      /reconcileMfaAuditOperationReceipts\(db/.test(mfaAuditReceiptStorePort),
+      !/createD1MfaAuditOperationReceiptStore|D1Database|D1_01/.test(mfaAuditReceiptStorePort) &&
+      /createPostgresMfaAuditOperationReceiptStore/.test(mfaAuditReceiptPostgresStore) &&
+      /assertMfaAuditOperationReceiptOwnerPostgres/.test(mfaAuditReceiptPostgresStore) &&
+      /createMfaAuditOperationReceiptPostgres/.test(mfaAuditReceiptPostgresStore) &&
+      /appendMfaAuditOperationReceiptEventPostgres/.test(mfaAuditReceiptPostgresStore) &&
+      /finalizeMfaAuditOperationReceiptPostgres/.test(mfaAuditReceiptPostgresStore) &&
+      /reconcileMfaAuditOperationReceiptsPostgres/.test(mfaAuditReceiptPostgresStore) &&
+      /recordMfaAuditEventOncePostgres/.test(mfaAuditOutboxPostgres),
     mfaChallengeExpiryIsFailClosedAndWired:
       /isUnexpiredMfaChallengeRecord\(challenge\)/.test(betterAuth) &&
       /Number\.isFinite\(expiresAt\) && expiresAt > nowMs/.test(challengeVerification) &&
@@ -433,7 +440,7 @@ if (blockers.length === 0) {
     privilegedTrustDeviceDisabled: /trustDeviceMaxAge:\s*0/.test(betterAuth),
     persistedTotpReplayGuard: /consumeTotpTimeStep/.test(betterAuth) &&
       /two-factor\/verify-totp/.test(betterAuth) &&
-      /UPDATE "twoFactor" SET lastAcceptedTotpTimeStep/.test(replayGuard),
+      /UPDATE "twoFactor" SET "lastAcceptedTotpTimeStep"/.test(replayGuard),
     canonicalContractsDeclareExplicitStatus: ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(apiContract.status) &&
       ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(factorContract.status) &&
       ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(lifecycle.status),

@@ -367,6 +367,8 @@ async function checkEvents() {
     const mfaHookSource = await readFile('workers/W02-identity/src/auth/mfa-audit-hooks.ts', 'utf8')
     const mfaReceiptSource = await readFile('workers/W02-identity/src/auth/mfa-audit-receipts.ts', 'utf8')
     const mfaReceiptStorePortSource = await readFile('workers/W02-identity/src/auth/mfa-audit-operation-receipt-store.ts', 'utf8')
+    const mfaReceiptPostgresStoreSource = await readFile('workers/W02-identity/src/neon/mfa-audit-operation-receipts-postgres.ts', 'utf8')
+    const mfaAuditOutboxPostgresSource = await readFile('workers/W02-identity/src/neon/mfa-audit-publication-journal-postgres.ts', 'utf8')
     const mfaEventSource = await readFile('workers/W02-identity/src/auth/mfa-audit-events.ts', 'utf8')
     const mfaPublicationSource = await readFile('workers/W02-identity/src/neon/mfa-audit-publication-journal-publisher-postgres.ts', 'utf8')
     const mfaAuditEvidenceSource = await readFile('scripts/auth-007-mfa-audit-evidence.mjs', 'utf8')
@@ -389,22 +391,35 @@ async function checkEvents() {
       'auth.mfa.locked',
     ]
     const requiredReceiptStorePortTokens = [
-      'createD1MfaAuditOperationReceiptStore(db: D1Database)',
-      'assertMfaAuditOperationReceiptOwner(db, input)',
-      'createMfaAuditOperationReceipt(db, input)',
-      'appendMfaAuditOperationReceiptEvent(db, receiptId, event)',
-      'finalizeMfaAuditOperationReceipt(db, receiptId, events)',
-      'reconcileMfaAuditOperationReceipts(db)',
+      'export interface MfaAuditOperationReceiptStore',
+      'assertOwner(input: MfaAuditOperationReceiptOwnerInput)',
+      'create(input: MfaAuditOperationReceiptCreateInput)',
+      'append(receiptId: string, event: MfaAuditReceiptEvent)',
+      'finalize(receiptId: string, events: MfaAuditReceiptEvent[], now?: string)',
+      'reconcile(now?: string)',
+    ]
+    const requiredPostgresReceiptStoreTokens = [
+      'createPostgresMfaAuditOperationReceiptStore(pool: Pool)',
+      'assertMfaAuditOperationReceiptOwnerPostgres',
+      'createMfaAuditOperationReceiptPostgres',
+      'appendMfaAuditOperationReceiptEventPostgres',
+      'finalizeMfaAuditOperationReceiptPostgres',
+      'reconcileMfaAuditOperationReceiptsPostgres',
+    ]
+    const requiredPostgresOutboxTokens = [
+      'recordMfaAuditEventOncePostgres',
+      'MFA_AUDIT_OUTBOX_WRITE_FAILED',
+      'auth_007_mfa_publication_journal',
     ]
     const requiredChallengeExpiryTokens = [
       'Date.parse(String(challenge.expiresAt))',
       'expiresAt > nowMs',
     ]
     const requiredReceiptTokens = [
-      'recordMfaAuditEventOnce',
-      'idempotencyKey: event.idempotencyKey',
-      "'OUTBOX_WRITE_FAILED'",
-      "'OUTCOME_NOT_FINALIZED'",
+      'parseMfaAuditReceiptPlan',
+      'mergeMfaAuditReceiptPlan',
+      'MFA_AUDIT_EVENT_IDEMPOTENCY_CONFLICT',
+      'MFA_AUDIT_RECEIPT_PLAN_LIMIT_EXCEEDED',
     ]
     const requiredAuditEvidenceTokens = [
       'SCENARIO_SPECIFIC_MFA_AUDIT_EVENT_TYPES',
@@ -430,7 +445,7 @@ async function checkEvents() {
     ]
     const requiredTimestampSemanticTokens = [
       'const publishedAt = new Date().toISOString()',
-      'event.publishedAt,',
+      'new Date(event.publishedAt)',
       'const occurredAt = input.occurredAt ?? new Date().toISOString()',
       "SET status = 'PUBLISHED', published_at = $1",
     ]
@@ -439,21 +454,27 @@ async function checkEvents() {
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-receipts.test.ts')) ||
         !requiredHookTokens.every((token) => mfaProducerSource.includes(token)) ||
         !requiredReceiptStorePortTokens.every((token) => mfaReceiptStorePortSource.includes(token)) ||
+        !requiredPostgresReceiptStoreTokens.every((token) => mfaReceiptPostgresStoreSource.includes(token)) ||
+        !requiredPostgresOutboxTokens.every((token) => mfaAuditOutboxPostgresSource.includes(token)) ||
         !requiredChallengeExpiryTokens.every((token) => mfaChallengeVerificationSource.includes(token)) ||
         !(await fileExists('workers/W02-identity/src/auth/mfa-challenge-verification.test.ts')) ||
         !requiredReceiptTokens.every((token) => mfaReceiptSource.includes(token)) ||
         !requiredAuditEvidenceTokens.every((token) => mfaAuditEvidenceSource.includes(token)) ||
         !requiredAuditDeliveryE2ETokens.every((token) => mfaAuditDeliveryE2ESource.includes(token)) ||
         !requiredLiveMfaNegativeTestTokens.every((token) => mfaLiveSecurityE2ESource.includes(token)) ||
-        !requiredTimestampSemanticTokens.every((token) =>
-          token === "SET status = 'PUBLISHED', published_at = $1"
-            ? mfaPublicationSource.includes(token)
-            : mfaEventSource.includes(token)
-        ) ||
+        !requiredTimestampSemanticTokens.every((token) => {
+          if (token === "SET status = 'PUBLISHED', published_at = $1") {
+            return mfaPublicationSource.includes(token)
+          }
+          if (token === 'new Date(event.publishedAt)') {
+            return mfaAuditOutboxPostgresSource.includes(token)
+          }
+          return mfaEventSource.includes(token)
+        }) ||
         !(await fileExists('scripts/auth-007-mfa-audit-evidence.test.mjs')) ||
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-events.test.ts')) ||
         !(await fileExists('workers/W02-identity/src/neon/mfa-audit-publication-journal-publisher-postgres.ts')) ||
-        !mfaEventSource.includes('auth_007_mfa_publication_journal') ||
+        !mfaAuditOutboxPostgresSource.includes('auth_007_mfa_publication_journal') ||
         !["auth.mfa.challenge_succeeded", "auth.mfa.challenge_failed",
           "auth.mfa.factor_disabled", "auth.mfa.recovery_codes_rotated",
           "auth.mfa.recovery_code_consumed"].every((token) => mfaHookSource.includes(token))) {
