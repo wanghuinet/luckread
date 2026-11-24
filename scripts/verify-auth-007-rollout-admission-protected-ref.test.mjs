@@ -71,8 +71,8 @@ describe('AUTH-007 protected-ref admission contract', () => {
     assert.match(workflow, /GITHUB_REF_PROTECTED:\s*\$\{\{\s*github\.ref_protected\s*\}\}/)
     const admission = workflow.indexOf('run: node scripts/verify-auth-007-rollout-admission.mjs')
     const deployStep = workflow.indexOf('name: Deploy W06 Neon runtime and promote the exact Worker version')
-    const deploy = workflow.indexOf('npx --yes wrangler@4.156.0 deploy --config wrangler.neon.jsonc')
-    const promote = workflow.indexOf('npx --yes wrangler@4.156.0 versions deploy "$version_id@100%"')
+    const deploy = workflow.indexOf('npx --yes wrangler@4.166.0 deploy --config wrangler.neon.jsonc')
+    const promote = workflow.indexOf('npx --yes wrangler@4.166.0 versions deploy "$version_id@100%"')
     assert.ok(
       admission >= 0 && deployStep > admission && deploy > deployStep && promote > deploy,
       'AUTH-007 admission must run before W06 Neon deployment and exact-version 100% promotion',
