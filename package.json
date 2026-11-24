@@ -43,7 +43,7 @@
     "tldts": "7.4.16"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20260914.1",
+    "@cloudflare/workers-types": "5.20261119.1",
     "@types/node": "24.3.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
