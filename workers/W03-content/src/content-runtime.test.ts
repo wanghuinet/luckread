@@ -46,6 +46,12 @@ const makeContentMutationStore = (
   },
   update,
   transition,
+  async delete() {},
+  async moderationTransition() {},
+  async loadRevision() { return null },
+  async rollback() {},
+  async listDueScheduled() { return [] },
+  async publishScheduled() { return 0 },
 })
 
 describe('W03 content contract core', () => {
@@ -92,12 +98,12 @@ describe('W03 content contract core', () => {
       },
     })
     let w07Calls = 0
-    let w07Request: Request | null = null
+    const w07Capture: { request?: Request } = {}
     const env = {
       W07_SUBSCRIPTION: {
         fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
           w07Calls += 1
-          w07Request = input instanceof Request ? input : new Request(input, init)
+          w07Capture.request = input instanceof Request ? input : new Request(input, init)
           return Response.json({
             data: { allowed: true, reason: 'ACTIVE_CREATOR_MEMBERSHIP' },
             requestId: 'req_w07_test',
@@ -157,8 +163,8 @@ describe('W03 content contract core', () => {
       data: { isPublic: false, isMemberContent: true, allowed: true },
     })
     expect(w07Calls).toBe(1)
-    expect(w07Request?.url).toContain('/internal/entitlements/check-creator-membership')
-    expect(w07Request?.headers.get('X-LuckRead-Caller')).toBe('W03')
+    expect(w07Capture.request?.url).toContain('/internal/entitlements/check-creator-membership')
+    expect(w07Capture.request?.headers.get('X-LuckRead-Caller')).toBe('W03')
     expect(w07Request?.headers.get('X-LuckRead-Principal-User-Id')).toBe('user_subscriber')
     expect(w07Request?.headers.get('Cookie')).toBeNull()
     expect(await w07Request?.json()).toEqual({ creatorId: 'creator_1' })
@@ -1539,7 +1545,7 @@ describe('W03 content contract core', () => {
             'X-LuckRead-Correlation-Id': 'test-correlation-' + limit,
           },
         }),
-      )
+      , {} as never)
 
       expect(response.status).toBe(422)
       await expect(response.json()).resolves.toMatchObject({
@@ -1670,7 +1676,7 @@ describe('W03 content contract core', () => {
         },
       })
 
-    const response = await neonWorker.fetch(makeRequest())
+    const response = await neonWorker.fetch(makeRequest(), {} as never)
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
       data: {
@@ -1693,9 +1699,9 @@ describe('W03 content contract core', () => {
     expect(storeCalls[0]?.slice(0, 4)).toEqual(['creator_owner_123', null, 21, { status: 'SCHEDULED', contentType: 'post' }])
 
     const readsBeforeDeny = storeCalls.length
-    const l2Denied = await neonWorker.fetch(makeRequest('L2'))
+    const l2Denied = await neonWorker.fetch(makeRequest('L2'), {} as never)
     expect(l2Denied.status).toBe(403)
-    const wrongType = await neonWorker.fetch(makeRequest('L3', '?status=SCHEDULED&type=article'))
+    const wrongType = await neonWorker.fetch(makeRequest('L3', '?status=SCHEDULED&type=article'), {} as never)
     expect(wrongType.status).toBe(422)
     expect(storeCalls).toHaveLength(readsBeforeDeny)
   })
