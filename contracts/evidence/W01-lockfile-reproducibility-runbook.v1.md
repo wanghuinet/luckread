@@ -2,7 +2,7 @@
 
 Status: BLOCKED_UNTIL_LOCKFILE
 Authority: `workers/W01-payload/`
-Runtime baseline: official Payload `templates/with-cloudflare-d1` structure; current W01 lock `3.90.2` (`3.82.1` remains the historical upstream template observation)
+Runtime baseline: official Payload `templates/with-cloudflare-d1` structure; current W01 lock `3.94.1` (`3.82.1` remains the historical upstream template observation)
 
 ## Purpose
 
@@ -13,8 +13,8 @@ The official Cloudflare D1 template is the runtime source baseline for W01. Clou
 ## Preconditions
 
 1. `workers/W01-payload/package.json` is the active dependency manifest.
-2. Payload packages are exactly `3.90.2` for the W01 Cloudflare baseline.
-3. Next is `16.2.6`; React and React DOM are `19.2.6`.
+2. Payload packages are exactly `3.94.1` for the active Neon/PostgreSQL runtime.
+3. Next is `16.4.6`; React and React DOM are `19.3.1`.
 4. Node 24+ is used.
 5. pnpm 9, 10, or 11 is used.
 6. Installation is isolated from the repository root workspace.
