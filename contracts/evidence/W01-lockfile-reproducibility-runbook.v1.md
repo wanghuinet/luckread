@@ -1,35 +1,40 @@
-# W01 Lockfile Reproducibility Runbook v1.0
+# W01 Lockfile Reproducibility Runbook v1.1
 
-Status: BLOCKED_UNTIL_LOCKFILE
-Authority: `workers/W01-payload/`
-Runtime baseline: official Payload `templates/with-cloudflare-d1` structure; current W01 lock `3.90.2` (`3.82.1` remains the historical upstream template observation)
+Status: GENERATION_PENDING_CONTROLLED_CI
+Authority: root `package.json` / `package-lock.json` and `workers/W01-payload/package.json` / `pnpm-lock.yaml`
+
+## Current runtime baseline
+
+- Payload package family: 3.94.1.
+- Official `@payloadcms/db-postgres@3.94.1` is a runtime dependency.
+- Next.js 16.4.6; React / React DOM 19.3.1.
+- TypeScript 6.0.3.
+- OpenNext Cloudflare 1.20.18; Wrangler 4.167.0.
+- Node supported range: `^22.23.5 || ^24.22.3 || >=26.13.1`; CI uses 24.22.3.
+- PostgreSQL driver remains pg 8.20.0 in this phase.
+- Active database runtime is Neon PostgreSQL. The historical D1 template and SQLite migrations are provenance only.
 
 ## Purpose
 
-Close the W01 dependency reproducibility prerequisite without fabricating or copying a lockfile from another project or historical Payload release.
-
-The official Cloudflare D1 template is the runtime source baseline for W01. Cloudflare deployment support is documented as Workers + R2 + D1, and the template has its own build/runtime constraints.
-
-## Preconditions
-
-1. `workers/W01-payload/package.json` is the active dependency manifest.
-2. Payload packages are exactly `3.90.2` for the W01 Cloudflare baseline.
-3. Next is `16.2.6`; React and React DOM are `19.2.6`.
-4. Node 24+ is used.
-5. pnpm 9, 10, or 11 is used.
-6. Installation is isolated from the repository root workspace.
+Close dependency reproducibility for both the root Payload application and W01 Worker without fabricating or copying a lockfile from another project or historical Payload release.
 
 ## Controlled generation
 
-From `workers/W01-payload/`:
+Root npm lockfile:
+
+```text
+npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+```
+
+W01 pnpm lockfile, from `workers/W01-payload/`:
 
 ```text
 pnpm install --lockfile-only --ignore-workspace
 ```
 
-This generates the lockfile from the actual W01 manifest and the selected pnpm resolver. Do not hand-author a lockfile and do not copy a lockfile from the upstream monorepo, another branch, another Payload version, or another project.
+The controlled W01 schema workflow regenerates both lockfiles from the actual manifests and commits them to the same-repository upgrade branch. Do not hand-author either lockfile or copy one from the upstream Payload monorepo, another branch, or another Payload release.
 
-## Preflight
+## Preflight and evidence
 
 From repository root:
 
@@ -37,28 +42,22 @@ From repository root:
 node scripts/w01-lockfile-preflight.mjs
 ```
 
-The preflight fails closed when Node, pnpm, package versions, or the W01 lockfile requirement is not satisfied.
+The preflight fails closed when the Payload family, PostgreSQL adapter placement, Node range, pnpm version, or W01 lockfile requirement is not satisfied.
 
-## Admission evidence
+After generation:
 
-After `pnpm-lock.yaml` exists:
+1. Verify root `package-lock.json` and W01 `pnpm-lock.yaml` are committed on the tested branch.
+2. Run W01 dependency audit, TypeScript 6.0.3 checks, unit tests, Next.js build and OpenNext Worker build.
+3. Run the disposable PostgreSQL 18 schema-generation and runtime rehearsals.
+4. Capture exact commit SHA and lockfile hashes.
+5. Only after these checks pass may the W01 dependency upgrade be considered ready for review.
 
-1. Verify the lockfile is under `workers/W01-payload/`.
-2. Verify the tested commit contains the lockfile.
-3. Run the W01 schema evidence probe.
-4. Capture the exact dependency resolution reference and lockfile hash.
-5. Proceed to E1 dependency-resolution evidence.
-6. Only after E1 passes may AUTH-002 migration generation admission proceed.
+## Runtime-specific regression gates
 
-## Important runtime gate
+- Payload 3.94.1's official PostgreSQL adapter must include the bootstrap pool-client `result.release()` fix; no local source patch is permitted.
+- OpenNext 1.20.18 requires explicit `html_handling` and `not_found_handling` when `run_worker_first` is enabled; both W01 Wrangler configurations must preserve exact-path asset behavior.
+- The historical `@payloadcms/db-d1-sqlite` upsert defect belongs to the old D1 template observation and is not a current runtime dependency or active W01 regression gate.
 
-A reproducible lockfile does not prove that Payload D1 runtime behavior is correct. The known `@payloadcms/db-d1-sqlite` `upsert` defect observed on the upstream 3.82.1 family must remain an explicit E4.5 runtime regression gate against the installed 3.90.2 runtime; the project must not silently introduce an unapproved Payload-core workaround.
+## Safety
 
-## Current state
-
-- Package manifest: READY
-- Official Cloudflare D1 baseline: READY
-- W01 lockfile: MISSING
-- E1 exact dependency resolution: BLOCKED
-- AUTH-002 migration generation: BLOCKED
-- Mapping-0 final GREEN: NOT ADMITTED
+Lockfile generation and schema verification use CI and disposable PostgreSQL 18 databases. They do not authorize remote Neon DDL, production data changes, Worker deployment, secret changes, or traffic routing.
