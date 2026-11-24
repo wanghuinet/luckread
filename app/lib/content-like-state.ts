@@ -40,6 +40,22 @@ const EMPTY_SNAPSHOT: ContentLikeSnapshot = Object.freeze({
 
 const snapshots = new Map<string, ContentLikeSnapshot>();
 const listeners = new Map<string, Set<() => void>>();
+const SNAPSHOT_CACHE_MAX_ENTRIES = 1024;
+
+function promoteSnapshot(key: string, value: ContentLikeSnapshot): void {
+  snapshots.delete(key);
+  snapshots.set(key, value);
+}
+
+function pruneSnapshots(): void {
+  if (snapshots.size < SNAPSHOT_CACHE_MAX_ENTRIES) return;
+  for (const key of snapshots.keys()) {
+    if (!listeners.has(key)) snapshots.delete(key);
+    if (snapshots.size < SNAPSHOT_CACHE_MAX_ENTRIES) return;
+  }
+  const oldestKey = snapshots.keys().next().value;
+  if (typeof oldestKey === 'string') snapshots.delete(oldestKey);
+}
 
 function normalizeContentId(contentId?: string): string {
   return typeof contentId === 'string' ? contentId.trim() : '';
@@ -73,7 +89,7 @@ export function getContentLikeSnapshot(
 
   const key = contentScopeKey(id, viewerId);
   const current = snapshots.get(key);
-  if (current) return current;
+  if (current) { promoteSnapshot(key, current); return current; }
 
   const likeCount = normalizeCount(initial.likeCount);
   const initialSnapshot: ContentLikeSnapshot = {
@@ -83,6 +99,7 @@ export function getContentLikeSnapshot(
     pending: false,
     error: null,
   };
+  pruneSnapshots();
   snapshots.set(key, initialSnapshot);
   return initialSnapshot;
 }
@@ -91,7 +108,7 @@ function publish(contentId: string, viewerId: string | null | undefined, patch: 
   const key = contentScopeKey(contentId, viewerId);
   const current = getContentLikeSnapshot(contentId, {}, viewerId);
   const next = { ...current, ...patch };
-  snapshots.set(key, next);
+  promoteSnapshot(key, next);
   for (const listener of listeners.get(key) ?? []) listener();
 }
 
