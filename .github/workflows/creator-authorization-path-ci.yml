@@ -93,7 +93,7 @@ jobs:
 
       - name: Bundle W08 Worker with the PostgreSQL runtime dependency
         working-directory: workers/W08-creator
-        run: npx --yes wrangler@4.116.0 deploy --dry-run --config wrangler.jsonc
+        run: npx --yes wrangler@4.166.0 deploy --dry-run --config wrangler.jsonc
 
       - name: Verify creator authorization policy tests
         run: npx --yes vitest@3.2.4 run workers/W02-identity/src/authz/role-assignment-command.test.ts workers/W08-creator/src/policy.test.ts workers/W08-creator/src/authz/casl-policy.test.ts workers/W08-creator/src/authz/handler.test.ts workers/W08-creator/src/authz/role-layer.test.ts workers/W08-creator/src/authz/scheduled-publish.test.ts workers/W08-creator/src/index.runtime.test.ts workers/W08-creator/src/neon/runtime.test.ts workers/W08-creator/src/creator-store.test.ts workers/W01-payload/tests/int/creator-application-page.int.spec.ts
