@@ -140,7 +140,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
         setRefreshing(false);
       }
     }
-  }, [contentId, sort]);
+  }, [contentId, sort, currentUserId]);
 
   useEffect(() => {
     void loadComments();
