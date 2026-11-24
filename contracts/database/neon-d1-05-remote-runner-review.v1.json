@@ -151,14 +151,14 @@
   },
   "verificationEvidence": {
     "releaseValidation": {
-      "runId": 42564556552,
+      "runId": 45401190704,
       "conclusion": "success",
-      "headSha": "10a3c2ad408e06da78cfdc44bc3bbfea7e750c26",
+      "headSha": "ce1e818358d59b5c729e5fc2c9a895274787357d",
       "validationScope": "D1_05_SCHEMA_ONLY_REMOTE_RUNNER_VALIDATION_NO_NEON_CREDENTIALS",
-      "url": "https://github.com/wanghuinet/luckread/actions/runs/42564556552",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/45401190704",
       "remoteApplyJob": "skipped",
-      "artifactId": 13650638321,
-      "artifactDigest": "sha256:baa1658be4b121c6e38666b9951b00a4c7df6c1c7b064b28c4cb392eb8834ce4"
+      "artifactId": 14924205862,
+      "artifactDigest": "sha256:1696cd71cf2580226f287aa37cfbf6bcc2ec182d1fa903884a80b74aa23029ac"
     }
   },
   "runtimeAdmissionBlockers": [
