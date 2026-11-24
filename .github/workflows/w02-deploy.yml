@@ -58,10 +58,10 @@ jobs:
       - name: Require imported business data and explicit Neon production cutover approval
         run: node scripts/neon/assert-production-cutover-authorized.mjs D1-01
 
-      - name: Verify Better Auth 1.7.8 package and runtime import
+      - name: Verify Better Auth 1.7.27 package and runtime import
         working-directory: workers/W02-identity
         run: |
-          node --input-type=module -e "import { readFile } from 'node:fs/promises'; const pkg = JSON.parse(await readFile('./node_modules/better-auth/package.json', 'utf8')); if (pkg.version !== '1.7.8') throw new Error('Expected better-auth 1.7.8, got ' + pkg.version); await import('better-auth'); console.log('better-auth ' + pkg.version + ' import: OK')"
+          node --input-type=module -e "import { readFile } from 'node:fs/promises'; const pkg = JSON.parse(await readFile('./node_modules/better-auth/package.json', 'utf8')); if (pkg.version !== '1.7.27') throw new Error('Expected better-auth 1.7.27, got ' + pkg.version); await import('better-auth'); console.log('better-auth ' + pkg.version + ' import: OK')"
       - name: Verify W02 Neon-only production config and historical D1 migration source
         working-directory: workers/W02-identity
         run: |
