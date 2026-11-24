@@ -84,7 +84,7 @@ jobs:
 
       - name: Install W03 PostgreSQL Worker runtime dependency
         working-directory: workers/W03-content
-        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Validate W03 Neon bundle without deployment
         working-directory: workers/W03-content
