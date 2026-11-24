@@ -46,9 +46,9 @@
   "review": {
     "reviewer": "GPT-6",
     "reviewType": "SCOPED_REMOTE_CODE_PATH_AUDIT_AND_CURRENT_MAIN_SOURCE_PIN_RECONCILIATION",
-    "reviewedAt": "2026-11-09",
-    "reviewedMainSha": "ccdfacfa6603c14e3e894f02bcd38c8dc4be6d89",
-    "implementationMergeSha": "ccdfacfa6603c14e3e894f02bcd38c8dc4be6d89",
+    "reviewedAt": "2026-11-24",
+    "reviewedMainSha": "e5e6be32a6b8ee3dc9368329cb7f0fc0f0df9bcf",
+    "implementationMergeSha": "e5e6be32a6b8ee3dc9368329cb7f0fc0f0df9bcf",
     "result": "NO_BLOCKING_FINDINGS",
     "findings": [],
     "formalGitHubReviewSubmissions": 0,
@@ -95,7 +95,7 @@
       },
       {
         "path": "contracts/database/neon-d1-03-shared-runner-independent-review.v1.json",
-        "gitBlobSha1": "22c4c40ba70e55014909e8741c11e9119462b5d8"
+        "gitBlobSha1": "8b6e63bd5508d26024a9491da95d8a491ed9ab1a"
       },
       {
         "path": "contracts/database/neon-d1-03-w06-moderation-schema.v1.json",
@@ -143,7 +143,7 @@
       },
       {
         "path": "workers/W06-governance/wrangler.jsonc",
-        "gitBlobSha1": "2c4120ded4078feba776cad1c265c401647e47db"
+        "gitBlobSha1": "aac2cc472c9a0146613865527ffd13d767857e9f"
       },
       {
         "path": "workers/W09-platform/wrangler.d1-03-migrations.jsonc",
@@ -155,7 +155,7 @@
       },
       {
         "path": "workers/W11-growth-campaign-analytics-operations/wrangler.jsonc",
-        "gitBlobSha1": "7df80ec418aa46bb2ba09fa9252c88138d00ceaf"
+        "gitBlobSha1": "7ab936cb4f0680b2dc24b24590e4b771f51c3cf1"
       },
       {
         "path": "workers/W06-governance/migrations/0001_audit_event.sql",
@@ -195,11 +195,11 @@
       },
       {
         "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-03-w11-owner-reconciliation.mjs",
-        "gitBlobSha1": "bb849d17cd27d6bad5f042f2349a72341feb30f2"
+        "gitBlobSha1": "fbd43eeb5f5358d73118ae525df0aca9df5ab8ec"
       },
       {
         "path": "workers/W09-platform/README.md",
-        "gitBlobSha1": "c328e26c76d6659f346c418b95752f89b1402568"
+        "gitBlobSha1": "95024efc4d49d816d0ded771ebf0760de4886ce9"
       },
       {
         "path": "workers/W11-growth-campaign-analytics-operations/README.md",
@@ -232,7 +232,7 @@
     "releaseValidation": {
       "runId": 42562539811,
       "conclusion": "success",
-      "headSha": "ccdfacfa6603c14e3e894f02bcd38c8dc4be6d89",
+      "headSha": "10a3c2ad408e06da78cfdc44bc3bbfea7e750c26",
       "validationScope": "D1_03_PARTIAL_SCHEMA_REMOTE_RUNNER_VALIDATION_NO_NEON_CREDENTIALS",
       "url": "https://github.com/wanghuinet/luckread/actions/runs/42562539811",
       "remoteApplyJob": "skipped",

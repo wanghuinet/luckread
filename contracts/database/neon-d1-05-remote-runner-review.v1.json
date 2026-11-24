@@ -38,9 +38,9 @@
   "review": {
     "reviewer": "GPT-6",
     "reviewType": "SCOPED_REMOTE_CODE_PATH_AUDIT_AND_CURRENT_MAIN_SOURCE_PIN_RECONCILIATION",
-    "reviewedAt": "2026-11-09",
-    "reviewedMainSha": "7021c141af33c42bc3412386e12b23fe0991cc7d",
-    "implementationMergeSha": "7021c141af33c42bc3412386e12b23fe0991cc7d",
+    "reviewedAt": "2026-11-24",
+    "reviewedMainSha": "e5e6be32a6b8ee3dc9368329cb7f0fc0f0df9bcf",
+    "implementationMergeSha": "e5e6be32a6b8ee3dc9368329cb7f0fc0f0df9bcf",
     "result": "NO_BLOCKING_FINDINGS",
     "findings": [],
     "formalGitHubReviewSubmissions": 0,
@@ -79,7 +79,7 @@
       },
       {
         "path": "contracts/database/neon-d1-05-shared-runner-independent-review.v1.json",
-        "gitBlobSha1": "4a24a51fa20a99be235e5d8212a461fcd3d86f28"
+        "gitBlobSha1": "689108d47c3b031f588362b4951bf02cbfcb2b97"
       },
       {
         "path": "scripts/neon/shared-domain-schema-runner.mjs",
@@ -99,11 +99,11 @@
       },
       {
         "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.mjs",
-        "gitBlobSha1": "0254a4396adf3dcbfa66ba4f7fefbc954935f26f"
+        "gitBlobSha1": "a60a2ccc2b541a36ca0482053368d6e1929b3b84"
       },
       {
         "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.test.mjs",
-        "gitBlobSha1": "839d0cba87252598b668e32dc24b11153da0289e"
+        "gitBlobSha1": "0e6b5ad6fbb820f5816165c5cef19a2ec6798bb8"
       },
       {
         "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/templates/d1-05-w11-analytics-postgres.sql",
@@ -119,7 +119,7 @@
       },
       {
         "path": "workers/W11-growth-campaign-analytics-operations/wrangler.jsonc",
-        "gitBlobSha1": "7df80ec418aa46bb2ba09fa9252c88138d00ceaf"
+        "gitBlobSha1": "7ab936cb4f0680b2dc24b24590e4b771f51c3cf1"
       },
       {
         "path": "workers/W11-growth-campaign-analytics-operations/migrations/0001_analytics_projection.sql",
@@ -153,7 +153,7 @@
     "releaseValidation": {
       "runId": 42564556552,
       "conclusion": "success",
-      "headSha": "8c98a141ed3a3b63cd299cc3319b275282c8daf2",
+      "headSha": "10a3c2ad408e06da78cfdc44bc3bbfea7e750c26",
       "validationScope": "D1_05_SCHEMA_ONLY_REMOTE_RUNNER_VALIDATION_NO_NEON_CREDENTIALS",
       "url": "https://github.com/wanghuinet/luckread/actions/runs/42564556552",
       "remoteApplyJob": "skipped",
@@ -179,7 +179,6 @@
     "newServiceBindings": 0
   },
   "businessDataImport": false,
-  "runtimeDataIngestionEnabled": false,
   "productionCutoverAuthorized": false,
   "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_05_ALLLUCK_SCHEMA_ONLY"
 }
