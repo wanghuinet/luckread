@@ -68,7 +68,7 @@ jobs:
 
       - name: Install W06 PostgreSQL Worker runtime dependency
         working-directory: workers/W06-governance
-        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Rehearse actual W06 Neon moderation Worker entrypoint on PostgreSQL 18
         working-directory: workers/W02-identity
