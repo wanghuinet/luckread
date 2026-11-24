@@ -65,7 +65,11 @@ jobs:
 
       - name: Regenerate W01 frozen lockfile from pinned package versions
         working-directory: workers/W01-payload
-        run: pnpm install --lockfile-only --ignore-scripts
+        run: |
+          # Start from the package manifest, not the rejected stale graph. The
+          # following frozen install and all later gates validate the new lock.
+          rm -f pnpm-lock.yaml
+          pnpm install --lockfile-only --ignore-scripts
 
       - name: Install exact W01 dependency graph
         working-directory: workers/W01-payload
