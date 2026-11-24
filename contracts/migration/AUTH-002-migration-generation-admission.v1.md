@@ -4,7 +4,11 @@
 
 `SUPERSEDED_NOT_APPLICABLE_TO_W01_NATIVE_SESSION_RUNTIME`
 
-## Runtime authority
+## Supersession
+
+W02 Better Auth 1.7.27 on Neon PostgreSQL is the active identity/session authority. W01 `Users` delegates authentication through `betterAuthPayloadStrategy` with the Payload local strategy disabled. Do not generate or apply a separate Payload-native session migration from this legacy contract. The historical W01/D1 details below are retained only for provenance.
+
+## Historical runtime authority
 
 The active runtime authority for this contract is `workers/W01-payload/`.
 The active Payload baseline is the official `templates/with-cloudflare-d1` structure with the current W01 lock: Payload `3.90.2` and `@payloadcms/db-d1-sqlite` `3.90.2`. The `3.82.1` family is the historical upstream template observation recorded by the W01 upstream manifest and is not the current W01 lock.
