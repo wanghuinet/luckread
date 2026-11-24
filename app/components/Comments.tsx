@@ -346,8 +346,11 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
     setLikingCommentId(comment.id);
     setMessage('');
     try {
+      const viewerIdAtStart = currentUserId;
       const result = await toggleCommentLikeRequest(comment.id);
-      setLikedComments((current) => ({ ...current, [comment.id]: result.liked }));
+      if (useAuthStore.getState().user?.id === viewerIdAtStart) {
+        setLikedComments((current) => ({ ...current, [comment.id]: result.liked }));
+      }
     } catch (cause) {
       if (cause instanceof CommentLikeApiError && cause.status === 401) {
         router.push('/login' as never);
@@ -357,7 +360,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
     } finally {
       setLikingCommentId(null);
     }
-  }, [likingCommentId, router]);
+  }, [currentUserId, likingCommentId, router]);
 
   return (
     <View className="mt-3 border-t border-neutral-200 dark:border-neutral-800 px-3 pb-5">
