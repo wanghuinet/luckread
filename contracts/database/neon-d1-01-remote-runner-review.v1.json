@@ -23,7 +23,7 @@
     "reviewedFiles": [
       {
         "path": ".github/workflows/neon-d1-01-full-local-rehearsal.yml",
-        "gitBlobSha1": "0c118fed0b9d94ad86346122edf0fb651ef9cc12"
+        "gitBlobSha1": "9fdee9f84882cdf74094d780f60b3574f104f1b4"
       },
       {
         "path": ".github/workflows/neon-d1-01-migration-ledger.yml",
@@ -55,7 +55,7 @@
       },
       {
         "path": "scripts/neon/d1-01-migration-manifest.mjs",
-        "gitBlobSha1": "28d509d18669dd6d2da143df58e8949bbcb87191"
+        "gitBlobSha1": "7233bfe63328309ac724e0052338fb87a8d7ecfa"
       },
       {
         "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
@@ -162,11 +162,12 @@
     ],
     "formalGitHubReviewSubmissions": 0,
     "followUpReview": {
-      "reviewedAt": "2026-11-23",
-      "scope": "Follow-up source audit on main 65f9ed3cad935cb1a77c4b175930c7a379721d0f after W01 AUTH-001 Neon-only runtime cleanup (PR #2116) and subsequent repository integration. Reconciled all 29 reviewed-file Git blob SHA-1 pins against the complete main tree; all 29 match exactly and none are missing. The current registration-persistence implementation is the reviewed b85586869de551121ec5f37e84fa2eed01139452 blob. Reviewed the current D1-01 manifest, shared runner, review validator, W01 registration persistence and route, W02 schema/runtime sources, W07 membership migration and verifier, and W08 creator migration and verifier. The W01 cleanup removes the retired D1/SQLite adapter and D1 runtime selection while retaining the PostgreSQL registration persistence and transaction path. No stale source pins remain. Local disposable PostgreSQL 18 full rehearsal and shared ledger rehearsal must be rerun against this exact PR head; remote Neon DDL remains unexecuted.",
+      "reviewedAt": "2026-11-24",
+      "reviewedSourceHeadSha": "91ec0fb36d40a7a6894c046961efe2714312ac89",
+      "scope": "Follow-up GPT-6 source audit for PR #2163 Better Auth 1.7.27 upgrade. Re-reviewed the two changed files that are pinned by the D1-01 remote-runner review: scripts/neon/d1-01-migration-manifest.mjs changes only the W02 Better Auth runtime/CLI expected package versions from 1.7.8 to 1.7.27; .github/workflows/neon-d1-01-full-local-rehearsal.yml changes only the corresponding W02 runtime/CLI version assertions and provenance labels. No remote runner execution logic, target allowlist, TLS/channel binding, advisory-lock behavior, ordered migration execution, checksums, ledger SQL, remote apply authorization, or production cutover controls changed. Updated exactly these two Git blob pins; the other reviewed source pins remain unchanged. This follow-up review does not execute remote Neon DDL or authorize production cutover.",
       "result": "NO_NEW_BLOCKING_FINDINGS",
       "formalGitHubReviewSubmissions": 0,
-      "limitations": "GPT-6 source audit and exact Git blob reconciliation, not a human GitHub approval or independent third-party review. This update does not execute remote Neon DDL, import business data, or authorize production cutover. Full local PostgreSQL 18 and shared ledger workflows must pass on the current PR head."
+      "limitations": "GPT-6 source audit and Git blob reconciliation, not a human GitHub approval or independent third-party review. Current PR remote-runner guard tests and full local PostgreSQL 18 rehearsal must pass. Remote Neon DDL remains unexecuted."
     }
   },
   "verificationEvidence": {
@@ -207,11 +208,12 @@
   },
   "findings": [],
   "followUpReview": {
-    "reviewedAt": "2026-11-23",
-    "scope": "Follow-up source audit on main 65f9ed3cad935cb1a77c4b175930c7a379721d0f after W01 AUTH-001 Neon-only runtime cleanup (PR #2116) and subsequent repository integration. Reconciled all 29 reviewed-file Git blob SHA-1 pins against the complete main tree; all 29 match exactly and none are missing. The current registration-persistence implementation is the reviewed b85586869de551121ec5f37e84fa2eed01139452 blob. Reviewed the current D1-01 manifest, shared runner, review validator, W01 registration persistence and route, W02 schema/runtime sources, W07 membership migration and verifier, and W08 creator migration and verifier. The W01 cleanup removes the retired D1/SQLite adapter and D1 runtime selection while retaining the PostgreSQL registration persistence and transaction path. No stale source pins remain. Local disposable PostgreSQL 18 full rehearsal and shared ledger rehearsal must be rerun against this exact PR head; remote Neon DDL remains unexecuted.",
+    "reviewedAt": "2026-11-24",
+    "reviewedSourceHeadSha": "91ec0fb36d40a7a6894c046961efe2714312ac89",
+    "scope": "Follow-up GPT-6 source audit for PR #2163 Better Auth 1.7.27 upgrade. Re-reviewed the two changed files that are pinned by the D1-01 remote-runner review: scripts/neon/d1-01-migration-manifest.mjs changes only the W02 Better Auth runtime/CLI expected package versions from 1.7.8 to 1.7.27; .github/workflows/neon-d1-01-full-local-rehearsal.yml changes only the corresponding W02 runtime/CLI version assertions and provenance labels. No remote runner execution logic, target allowlist, TLS/channel binding, advisory-lock behavior, ordered migration execution, checksums, ledger SQL, remote apply authorization, or production cutover controls changed. Updated exactly these two Git blob pins; the other reviewed source pins remain unchanged. This follow-up review does not execute remote Neon DDL or authorize production cutover.",
     "result": "NO_NEW_BLOCKING_FINDINGS",
     "formalGitHubReviewSubmissions": 0,
-    "limitations": "GPT-6 source audit and exact Git blob reconciliation, not a human GitHub approval or independent third-party review. This update does not execute remote Neon DDL, import business data, or authorize production cutover. Full local PostgreSQL 18 and shared ledger workflows must pass on the current PR head."
+    "limitations": "GPT-6 source audit and Git blob reconciliation, not a human GitHub approval or independent third-party review. Current PR remote-runner guard tests and full local PostgreSQL 18 rehearsal must pass. Remote Neon DDL remains unexecuted."
   },
   "limitations": [
     "The AUTH-001 PostgreSQL migration is staged in the D1-01 shared manifest and has local PostgreSQL 18 evidence only; remote Neon application and production Worker cutover are not performed by PR validation."
