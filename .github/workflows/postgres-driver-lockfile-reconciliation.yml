@@ -149,6 +149,20 @@ jobs:
           console.log('W01 happy-dom override and lockfile=21.0.4')
           NODE
 
+      - name: Verify W01 pg 8.23.1 runtime dependency in pnpm lockfile
+        working-directory: workers/W01-payload
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const manifest = JSON.parse(readFileSync('package.json', 'utf8'))
+          const lock = readFileSync('pnpm-lock.yaml', 'utf8')
+          const resolved = lock.match(/^      pg:\n        specifier: ([^\\s]+)\n        version: ([^\\s]+)/m)
+          if (manifest.dependencies?.pg !== '8.23.1' || !resolved || resolved[1] !== '8.23.1' || !resolved[2].startsWith('8.23.1')) {
+            throw new Error(`W01 pg manifest/lock mismatch: manifest=${manifest.dependencies?.pg}, lock=${resolved?.[2]}`)
+          }
+          console.log(`W01 pg runtime dependency=${resolved[2]}`)
+          NODE
+
       - name: Verify exact pg and @types/pg lockfile versions
         run: |
           node --input-type=module <<'NODE'
