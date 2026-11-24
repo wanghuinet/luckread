@@ -94,10 +94,6 @@
         "gitBlobSha1": "4d5192c4baf140f2b9c3a76db401c894b8b45288"
       },
       {
-        "path": "contracts/database/neon-d1-03-shared-runner-independent-review.v1.json",
-        "gitBlobSha1": "8b6e63bd5508d26024a9491da95d8a491ed9ab1a"
-      },
-      {
         "path": "contracts/database/neon-d1-03-w06-moderation-schema.v1.json",
         "gitBlobSha1": "2feac89859bfe5729d461e369a3bf33dcbe421bc"
       },
@@ -140,10 +136,6 @@
       {
         "path": "docs/09-D1-DOMAIN-MASTER-v1.0.md",
         "gitBlobSha1": "6e30adc2a3997d7231c9e18a65d347bfd089fd57"
-      },
-      {
-        "path": "workers/W06-governance/wrangler.jsonc",
-        "gitBlobSha1": "aac2cc472c9a0146613865527ffd13d767857e9f"
       },
       {
         "path": "workers/W09-platform/wrangler.d1-03-migrations.jsonc",

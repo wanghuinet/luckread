@@ -151,7 +151,7 @@ try {
   )
 
   const env = {
-    HYPERDRIVE_D1_03: binding,
+    HYPERDRIVE_NEON_GOVERNANCE: binding,
     W03_CONTENT_MODERATION: {
       async fetch() {
         return new Response(JSON.stringify({

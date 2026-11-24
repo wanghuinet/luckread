@@ -18,7 +18,7 @@ import { createPostgresModerationDecisionWriteStore } from '../moderation-decisi
 import type { ModerationDecisionWriteStore } from '../moderation-decision-write-store-postgres.js'
 
 export type W06ModerationDatabaseRuntimeEnv = Readonly<{
-  HYPERDRIVE_D1_03?: Readonly<{ connectionString?: string }>
+  HYPERDRIVE_NEON_GOVERNANCE?: Readonly<{ connectionString?: string }>
 }>
 
 const pools = new WeakMap<object, Promise<NodePostgresPool>>()
@@ -31,13 +31,13 @@ const decisionWriteStores = new WeakMap<object, ModerationDecisionWriteStore>()
 
 function validateHyperdriveConnectionString(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 4096) {
-    throw new Error('W06_HYPERDRIVE_D1_03_CONNECTION_STRING_REQUIRED')
+    throw new Error('W06_HYPERDRIVE_NEON_GOVERNANCE_CONNECTION_STRING_REQUIRED')
   }
   let parsed: URL
   try {
     parsed = new URL(value)
   } catch {
-    throw new Error('W06_HYPERDRIVE_D1_03_CONNECTION_STRING_INVALID')
+    throw new Error('W06_HYPERDRIVE_NEON_GOVERNANCE_CONNECTION_STRING_INVALID')
   }
   if (
     !['postgres:', 'postgresql:'].includes(parsed.protocol) ||
@@ -45,7 +45,7 @@ function validateHyperdriveConnectionString(value: unknown): string {
     parsed.pathname.length < 2 ||
     decodeURIComponent(parsed.pathname.replace(/^\/+/, '')) !== 'luckread_governance'
   ) {
-    throw new Error('W06_HYPERDRIVE_D1_03_CONNECTION_STRING_INVALID')
+    throw new Error('W06_HYPERDRIVE_NEON_GOVERNANCE_CONNECTION_STRING_INVALID')
   }
   return value
 }
@@ -83,9 +83,9 @@ function loadW06PostgresPool(binding: object, connectionString: string): Promise
 export function getW06ModerationPostgresPool(
   env: W06ModerationDatabaseRuntimeEnv,
 ): W06ModerationPostgresPool {
-  const binding = env.HYPERDRIVE_D1_03
+  const binding = env.HYPERDRIVE_NEON_GOVERNANCE
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+    throw new Error('W06_HYPERDRIVE_NEON_GOVERNANCE_BINDING_REQUIRED')
   }
   const connectionString = validateHyperdriveConnectionString(binding.connectionString)
   const cached = poolAdapters.get(binding)
@@ -133,9 +133,9 @@ export function getW06ModerationReportWriteStore(
   env: W06ModerationDatabaseRuntimeEnv,
 ): ModerationReportWriteStore {
   const pool = getW06ModerationPostgresPool(env)
-  const binding = env.HYPERDRIVE_D1_03
+  const binding = env.HYPERDRIVE_NEON_GOVERNANCE
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+    throw new Error('W06_HYPERDRIVE_NEON_GOVERNANCE_BINDING_REQUIRED')
   }
   const cached = reportStores.get(binding)
   if (cached) return cached
@@ -148,9 +148,9 @@ export function getW06ModerationReportWriteStore(
 /** Native W06 consumer Store reuses W09's append-only SELECT/INSERT SQL policy. */
 export function getW06AuditEventStore(env: W06ModerationDatabaseRuntimeEnv): AuditEventStore {
   const pool = getW06ModerationPostgresPool(env)
-  const binding = env.HYPERDRIVE_D1_03
+  const binding = env.HYPERDRIVE_NEON_GOVERNANCE
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+    throw new Error('W06_HYPERDRIVE_NEON_GOVERNANCE_BINDING_REQUIRED')
   }
   const cached = auditEventStores.get(binding)
   if (cached) return cached
@@ -165,9 +165,9 @@ export function getW06ModerationDecisionWriteStore(
   env: W06ModerationDatabaseRuntimeEnv,
 ): ModerationDecisionWriteStore {
   const pool = getW06ModerationPostgresPool(env)
-  const binding = env.HYPERDRIVE_D1_03
+  const binding = env.HYPERDRIVE_NEON_GOVERNANCE
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+    throw new Error('W06_HYPERDRIVE_NEON_GOVERNANCE_BINDING_REQUIRED')
   }
   const cached = decisionWriteStores.get(binding)
   if (cached) return cached
@@ -182,9 +182,9 @@ export function getW06ModerationQueueReadStore(
   env: W06ModerationDatabaseRuntimeEnv,
 ): ModerationQueueReadStore {
   const pool = getW06ModerationPostgresPool(env)
-  const binding = env.HYPERDRIVE_D1_03
+  const binding = env.HYPERDRIVE_NEON_GOVERNANCE
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+    throw new Error('W06_HYPERDRIVE_NEON_GOVERNANCE_BINDING_REQUIRED')
   }
   const cached = queueStores.get(binding)
   if (cached) return cached
@@ -198,9 +198,9 @@ export function getW06ModerationQueueReadStore(
 export function getW06ModerationCaseDetailReadStore(
   env: W06ModerationDatabaseRuntimeEnv,
 ): ModerationCaseDetailReadStore {
-  const binding = env.HYPERDRIVE_D1_03
+  const binding = env.HYPERDRIVE_NEON_GOVERNANCE
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+    throw new Error('W06_HYPERDRIVE_NEON_GOVERNANCE_BINDING_REQUIRED')
   }
   const cached = caseDetailStores.get(binding)
   if (cached) return cached
@@ -212,7 +212,7 @@ export function getW06ModerationCaseDetailReadStore(
 
 /** Close the Neon pool cached for a disposable PostgreSQL entrypoint rehearsal. */
 export async function closeW06ModerationPostgresRuntimeForTest(
-  binding: NonNullable<W06ModerationDatabaseRuntimeEnv['HYPERDRIVE_D1_03']>,
+  binding: NonNullable<W06ModerationDatabaseRuntimeEnv['HYPERDRIVE_NEON_GOVERNANCE']>,
 ): Promise<void> {
   const pending = pools.get(binding)
   if (!pending) return

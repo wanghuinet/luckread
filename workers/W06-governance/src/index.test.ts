@@ -11,8 +11,8 @@ vi.mock('./neon/moderation-database-runtime.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./neon/moderation-database-runtime.js')>()
   return {
     ...actual,
-    getW06AuditEventStore: (env: { HYPERDRIVE_D1_03?: object }) => {
-      const binding = env.HYPERDRIVE_D1_03
+    getW06AuditEventStore: (env: { HYPERDRIVE_NEON_GOVERNANCE?: object }) => {
+      const binding = env.HYPERDRIVE_NEON_GOVERNANCE
       const registration = binding
         ? auditEventStoresByBinding.get(binding) as { store?: AuditEventStore } | undefined
         : undefined
@@ -65,7 +65,7 @@ const eventInput = {
 
 const auditStoreTestEnv = (binding: object) => {
   registerAuditEventStoreTestDouble(binding)
-  return { HYPERDRIVE_D1_03: binding }
+  return { HYPERDRIVE_NEON_GOVERNANCE: binding }
 }
 
 function createDb(writeSuccess = true) {
@@ -140,7 +140,7 @@ describe('W06 moderation queue pagination scope', () => {
     try {
       const runtime = await import('./index')
       const env = {
-        HYPERDRIVE_D1_03: {
+        HYPERDRIVE_NEON_GOVERNANCE: {
           connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread_governance',
         },
       }

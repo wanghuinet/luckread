@@ -6,13 +6,13 @@ Primary persistence domain: **D1-03** (historical migration source; production r
 
 This directory is the canonical source-implementation boundary for the frozen W06 Worker.
 
-Production deploys with `wrangler.neon.jsonc`, which declares no Cloudflare D1 binding and uses the existing D1-03 Neon Hyperdrive. The original `wrangler.jsonc` and D1 migrations remain as historical schema-source/local-test compatibility only.
+Production deploys with `wrangler.neon.jsonc`, which declares no Cloudflare D1 binding and uses the existing Neon governance Hyperdrive. The original `wrangler.jsonc` and D1 migrations remain as historical schema-source/local-test compatibility only.
 
 Important governance constraints:
 
 - Worker authority comes from the canonical Worker Master, not from directory names.
 - The existing `workers/W06-media` directory is a historical/physical-layout mismatch and is not promoted as W06 authority.
-- W09 is the frozen D1-03 primary owner for AuditEvent. W06 Report writes, direct AuditEvent HTTP ingestion and AUTH-013/AUTH-007/AUTH-010 queue consumers use native PostgreSQL Stores through the existing D1-03 Hyperdrive pool, with every AuditEvent SELECT/INSERT checked by W09's append-only SQL policy. Moderation decision and outbox persistence remain on the explicit compatibility bridge until separately migrated.
+- W09 is the frozen D1-03 primary owner for AuditEvent. W06 Report writes, direct AuditEvent HTTP ingestion and AUTH-013/AUTH-007/AUTH-010 queue consumers use native PostgreSQL Stores through the existing D1-03 Hyperdrive pool, with every AuditEvent SELECT/INSERT checked by W09's append-only SQL policy. Moderation decisions, idempotency and enforcement outbox persistence use native PostgreSQL Stores and transactions; no D1 compatibility bridge remains in the W06 production runtime.
 - AUTH-013 source implementation may consume W02 transition results but may not take ownership of D1-01 account-state mutation.
 - No ad-hoc AuditEvent table may be created in W02.
 - The existing physical D1-03 UUID remains recorded in the historical source config for migration provenance; the deployed W06 Worker uses the already admitted Neon `luckread_governance` schema and existing Hyperdrive binding.

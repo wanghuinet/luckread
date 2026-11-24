@@ -113,7 +113,7 @@ async function invokeQueue(messages: TestMessage[], store: AuditEventStore): Pro
   await queueRuntime.queue(
     { messages } as unknown as MessageBatch<unknown>,
     {
-      HYPERDRIVE_D1_03: {
+      HYPERDRIVE_NEON_GOVERNANCE: {
         connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread_governance',
       },
     },

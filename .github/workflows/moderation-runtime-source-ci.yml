@@ -139,7 +139,7 @@ jobs:
           const w01m = w01.services?.find(x => x.binding === 'W06_MODERATION');
           const w06m = w06.services?.find(x => x.binding === 'W03_CONTENT_MODERATION');
           const sourceD1 = w09Migration.d1_databases?.find(x => x.binding === 'D1_03');
-          const hyperdrive = w06.hyperdrive?.find(x => x.binding === 'HYPERDRIVE_D1_03');
+          const hyperdrive = w06.hyperdrive?.find(x => x.binding === 'HYPERDRIVE_NEON_GOVERNANCE');
           if (!w01m || w01m.service !== 'luckread-w06') throw new Error('W01 W06_MODERATION binding mismatch');
           if (!w06m || w06m.service !== 'luckread-w03') throw new Error('W06 W03_CONTENT_MODERATION binding mismatch');
           if ((w06Source.d1_databases || []).length !== 0) throw new Error('W06 canonical Worker config must not declare a Cloudflare D1 database');

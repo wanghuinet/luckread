@@ -119,7 +119,7 @@ jobs:
             throw new Error('W06 historical D1-03 migration source mapping drifted')
           }
           if ((config.d1_databases || []).length !== 0) throw new Error('W06 production Neon config must not bind Cloudflare D1')
-          const hyperdrive = (config.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE_D1_03')
+          const hyperdrive = (config.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE_NEON_GOVERNANCE')
           const service = (config.services || []).find((item) => item.binding === 'W03_CONTENT_MODERATION')
           const queue = (config.queues?.consumers || []).find((item) => item.queue === 'luckread-auth013-account-state')
           const bootstrap = JSON.parse(fs.readFileSync('../../contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
@@ -193,7 +193,7 @@ jobs:
           source_sha=${{ inputs.source_sha }}
           worker=luckread-w06
           database_driver=neon
-          hyperdrive_binding=HYPERDRIVE_D1_03
+          hyperdrive_binding=HYPERDRIVE_NEON_GOVERNANCE
           hyperdrive_id=7c8831416c18494faee04b96aa551cb9
           d1_bindings=none
           worker_version_id=$W06_UPLOADED_VERSION_ID

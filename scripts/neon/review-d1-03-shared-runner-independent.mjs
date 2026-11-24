@@ -291,7 +291,7 @@ export function verifyD103SharedRunnerReview({ readSource = readText } = {}) {
     rows[0].migrations_dir === expectedDir
   if (w06Wrangler.name !== 'luckread-w06' ||
       w06Db.length !== 0 ||
-      !w06Hyperdrive.some((item) => item.binding === 'HYPERDRIVE_D1_03' && item.id === '7c8831416c18494faee04b96aa551cb9') ||
+      !w06Hyperdrive.some((item) => item.binding === 'HYPERDRIVE_NEON_GOVERNANCE' && item.id === '7c8831416c18494faee04b96aa551cb9') ||
       w09Wrangler.name !== 'luckread-w09' ||
       !exactD103(w09Db,'D1_03','migrations-d1-03')) {
     fail('W06 must use its existing Neon Hyperdrive and W09 must retain the D1-03 migration-only config ownership')
