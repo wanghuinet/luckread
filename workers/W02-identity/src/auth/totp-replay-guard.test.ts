@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { base32 } from '@better-auth/utils/base32'
 import { createOTP } from '@better-auth/utils/otp'
-import { matchTotpTimeStep } from './totp-replay-guard.js'
+import { decodeTotpSecret, matchTotpTimeStep } from './totp-replay-guard.js'
 
 const SECRET = 'luckread-totp-test-secret'
 const NOW = Date.parse('2026-10-24T12:00:00.000Z')
@@ -21,6 +22,21 @@ describe('TOTP time-step matching', () => {
       kind: 'matched',
       timeStep: STEP - 1,
     })
+  })
+
+  it('matches Better Auth base32-prefixed imported secrets using decoded bytes', async () => {
+    const encoded = base32.encode(new TextEncoder().encode(SECRET), { padding: false }).toLowerCase()
+    const decoded = decodeTotpSecret('base32:' + encoded)
+    expect(decoded).toBeInstanceOf(Uint8Array)
+    const code = await createOTP(decoded).hotp(STEP)
+    await expect(matchTotpTimeStep(decoded, code, NOW)).resolves.toEqual({
+      kind: 'matched',
+      timeStep: STEP,
+    })
+  })
+
+  it('leaves locally generated unprefixed secrets unchanged', () => {
+    expect(decodeTotpSecret(SECRET)).toBe(SECRET)
   })
 
   it('rejects invalid code shapes and values', async () => {
