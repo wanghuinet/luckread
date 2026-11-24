@@ -6,8 +6,10 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "prebuild": "node ../../scripts/w01-lockfile-preflight.mjs",
     "build": "cross-env NODE_OPTIONS=\"--no-deprecation --max-old-space-size=8000\" next build --webpack",
     "deploy": "pnpm run deploy:app",
+    "predeploy:app": "node ../../scripts/w01-lockfile-preflight.mjs",
     "deploy:app": "opennextjs-cloudflare build --config=wrangler.neon.jsonc && opennextjs-cloudflare deploy --config=wrangler.neon.jsonc",
     "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev",
     "devsafe": "rm -rf .next && rm -rf .open-next && cross-env NODE_OPTIONS=--no-deprecation next dev",
