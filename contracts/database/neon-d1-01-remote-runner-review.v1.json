@@ -164,38 +164,38 @@
     "followUpReview": {
       "reviewedAt": "2026-11-24",
       "reviewedSourceHeadSha": "91ec0fb36d40a7a6894c046961efe2714312ac89",
-      "scope": "Follow-up GPT-6 source audit for PR #2163 Better Auth 1.7.27 upgrade. Re-reviewed the two changed files that are pinned by the D1-01 remote-runner review: scripts/neon/d1-01-migration-manifest.mjs changes only the W02 Better Auth runtime/CLI expected package versions from 1.7.8 to 1.7.27; .github/workflows/neon-d1-01-full-local-rehearsal.yml changes only the corresponding W02 runtime/CLI version assertions and provenance labels. No remote runner execution logic, target allowlist, TLS/channel binding, advisory-lock behavior, ordered migration execution, checksums, ledger SQL, remote apply authorization, or production cutover controls changed. Updated exactly these two Git blob pins; the other reviewed source pins remain unchanged. This follow-up review does not execute remote Neon DDL or authorize production cutover.",
+      "scope": "Follow-up GPT-6 source audit for PR #2163 Better Auth 1.7.27 upgrade. Re-reviewed the two changed files that are pinned by the D1-01 remote-runner review: scripts/neon/d1-01-migration-manifest.mjs changes only the W02 Better Auth runtime/CLI expected package versions from 1.7.8 to 1.7.27; .github/workflows/neon-d1-01-full-local-rehearsal.yml changes only the corresponding W02 runtime/CLI version assertions and provenance labels. No remote runner execution logic, target allowlist, TLS/channel binding, advisory-lock behavior, ordered migration execution, checksums, ledger SQL, remote apply authorization, or production cutover controls changed. Updated exactly these two Git blob pins; the other reviewed source pins remain unchanged. This follow-up review does not execute remote Neon DDL or authorize production cutover. Current PR CI evidence on the reviewed code head passed: W02 Better Auth PostgreSQL 18 schema run 45415771637; W02 boundary CI 45415772094; full D1-01 disposable PostgreSQL 18 rehearsal 45415771566; remote-runner guards 45415771590 with remote apply skipped; shared migration ledger 45415771521; contract admission 45415771382. No remote Neon DDL or production cutover was executed.",
       "result": "NO_NEW_BLOCKING_FINDINGS",
       "formalGitHubReviewSubmissions": 0,
-      "limitations": "GPT-6 source audit and Git blob reconciliation, not a human GitHub approval or independent third-party review. Current PR remote-runner guard tests and full local PostgreSQL 18 rehearsal must pass. Remote Neon DDL remains unexecuted."
+      "limitations": "GPT-6 source audit and Git blob reconciliation, not a human GitHub approval or independent third-party review. Current PR W02, schema, shared-ledger, remote-runner guard, contract-admission and full local PostgreSQL 18 CI passed. Remote Neon DDL remains unexecuted and production cutover is not authorized."
     }
   },
   "verificationEvidence": {
     "fullD1_01LocalPostgres18Rehearsal": {
-      "runId": 44272534619,
+      "runId": 45415771566,
       "conclusion": "success",
-      "url": "https://github.com/wanghuinet/luckread/actions/runs/44272534619"
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/45415771566"
     },
     "w02BetterAuthPostgres18": {
-      "runId": 42458291621,
+      "runId": 45415771637,
       "conclusion": "success",
-      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291621"
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/45415771637"
     },
     "remoteRunnerGuardsNoCredentials": {
-      "runId": 44272534820,
+      "runId": 45415771590,
       "conclusion": "success",
-      "url": "https://github.com/wanghuinet/luckread/actions/runs/44272534820",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/45415771590",
       "remoteApplyJob": "skipped"
     },
     "contractAdmission": {
-      "runId": 42458291617,
+      "runId": 45415771382,
       "conclusion": "success",
-      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291617"
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/45415771382"
     },
     "mapping0StructuralGate": {
-      "runId": 42458291520,
+      "runId": 45415771655,
       "conclusion": "success",
-      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291520"
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/45415771655"
     }
   },
   "safety": {
@@ -210,10 +210,10 @@
   "followUpReview": {
     "reviewedAt": "2026-11-24",
     "reviewedSourceHeadSha": "91ec0fb36d40a7a6894c046961efe2714312ac89",
-    "scope": "Follow-up GPT-6 source audit for PR #2163 Better Auth 1.7.27 upgrade. Re-reviewed the two changed files that are pinned by the D1-01 remote-runner review: scripts/neon/d1-01-migration-manifest.mjs changes only the W02 Better Auth runtime/CLI expected package versions from 1.7.8 to 1.7.27; .github/workflows/neon-d1-01-full-local-rehearsal.yml changes only the corresponding W02 runtime/CLI version assertions and provenance labels. No remote runner execution logic, target allowlist, TLS/channel binding, advisory-lock behavior, ordered migration execution, checksums, ledger SQL, remote apply authorization, or production cutover controls changed. Updated exactly these two Git blob pins; the other reviewed source pins remain unchanged. This follow-up review does not execute remote Neon DDL or authorize production cutover.",
+    "scope": "Follow-up GPT-6 source audit for PR #2163 Better Auth 1.7.27 upgrade. Re-reviewed the two changed files that are pinned by the D1-01 remote-runner review: scripts/neon/d1-01-migration-manifest.mjs changes only the W02 Better Auth runtime/CLI expected package versions from 1.7.8 to 1.7.27; .github/workflows/neon-d1-01-full-local-rehearsal.yml changes only the corresponding W02 runtime/CLI version assertions and provenance labels. No remote runner execution logic, target allowlist, TLS/channel binding, advisory-lock behavior, ordered migration execution, checksums, ledger SQL, remote apply authorization, or production cutover controls changed. Updated exactly these two Git blob pins; the other reviewed source pins remain unchanged. This follow-up review does not execute remote Neon DDL or authorize production cutover. Current PR CI evidence on the reviewed code head passed: W02 Better Auth PostgreSQL 18 schema run 45415771637; W02 boundary CI 45415772094; full D1-01 disposable PostgreSQL 18 rehearsal 45415771566; remote-runner guards 45415771590 with remote apply skipped; shared migration ledger 45415771521; contract admission 45415771382. No remote Neon DDL or production cutover was executed.",
     "result": "NO_NEW_BLOCKING_FINDINGS",
     "formalGitHubReviewSubmissions": 0,
-    "limitations": "GPT-6 source audit and Git blob reconciliation, not a human GitHub approval or independent third-party review. Current PR remote-runner guard tests and full local PostgreSQL 18 rehearsal must pass. Remote Neon DDL remains unexecuted."
+    "limitations": "GPT-6 source audit and Git blob reconciliation, not a human GitHub approval or independent third-party review. Current PR W02, schema, shared-ledger, remote-runner guard, contract-admission and full local PostgreSQL 18 CI passed. Remote Neon DDL remains unexecuted and production cutover is not authorized."
   },
   "limitations": [
     "The AUTH-001 PostgreSQL migration is staged in the D1-01 shared manifest and has local PostgreSQL 18 evidence only; remote Neon application and production Worker cutover are not performed by PR validation."
