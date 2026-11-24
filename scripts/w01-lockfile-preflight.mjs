@@ -110,11 +110,11 @@ const pnpmMajor = Number(pnpmVersion.split('.')[0])
 if (![9, 10, 11].includes(pnpmMajor)) fail(`pnpm 9/10/11 is required; current pnpm is ${pnpmVersion}`)
 
 if (existsSync(lockPath)) {
-  const pgImporter = lockText.match(/^      pg:\\n        specifier: ([^\\s]+)\\n        version: ([^\\s]+)/m)
+  const pgImporter = lockText.match(/^      pg:\n        specifier: ([^\s]+)\n        version: ([^\s]+)/m)
   if (!pgImporter || pgImporter[1] !== '8.23.1' || !pgImporter[2].startsWith('8.23.1')) {
     fail('W01 pnpm lockfile must resolve the declared pg@8.23.1 runtime dependency')
   }
-  const wranglerImporter = lockText.match(/^      wrangler:\\n        specifier: ([^\\s]+)\\n        version: ([^\\s]+)/m)
+  const wranglerImporter = lockText.match(/^      wrangler:\n        specifier: ([^\s]+)\n        version: ([^\s]+)/m)
   if (!wranglerImporter || wranglerImporter[1] !== '~4.166.0' || !wranglerImporter[2].startsWith('4.166.0')) {
     fail('W01 pnpm lockfile must resolve the policy-admitted Wrangler 4.166.0 toolchain')
   }
