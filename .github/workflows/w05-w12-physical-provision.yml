@@ -100,7 +100,7 @@ jobs:
           EOF
 
             echo "CREATE $worker"
-            npx --yes wrangler@4.116.0 deploy --config "$workdir/wrangler.jsonc" --cwd "$workdir"
+            npx --yes wrangler@4.166.0 deploy --config "$workdir/wrangler.jsonc" --cwd "$workdir"
             printf '%s\n' "$worker" >> /tmp/provisioned.txt
             rm -rf "$workdir"
           done
