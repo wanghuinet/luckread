@@ -161,7 +161,7 @@ jobs:
           NODE
       - name: Bundle W02 Worker with the PostgreSQL runtime dependency
         working-directory: workers/W02-identity
-        run: npx --yes wrangler@4.116.0 deploy --dry-run --config wrangler.neon.jsonc
+        run: npx --yes wrangler@4.166.0 deploy --dry-run --config wrangler.neon.jsonc
       - name: Run W02 username change authority tests
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/username-change.test.ts
       - name: Audit W02 username history migration with local SQLite only
