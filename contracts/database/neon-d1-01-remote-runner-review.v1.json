@@ -55,7 +55,7 @@
       },
       {
         "path": "scripts/neon/d1-01-migration-manifest.mjs",
-        "gitBlobSha1": "28d509d18669dd6d2da143df58e8949bbcb87191"
+        "gitBlobSha1": "6e1e0298807837357803352c2f0c1b707d621a4c"
       },
       {
         "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
@@ -163,10 +163,10 @@
     "formalGitHubReviewSubmissions": 0,
     "followUpReview": {
       "reviewedAt": "2026-11-24",
-      "scope": "Follow-up source audit on PR #2164 branch gpt/w01-payload-3.94.1-upgrade at source head 5a007343c9eef854e854f726a9e83a6b0b96460f. Re-reviewed .github/workflows/neon-w01-payload-postgres-runtime-rehearsal.yml after its changes to regenerate the W01 lockfile from exact package pins, use the official Payload 3.94.1 PostgreSQL adapter, and verify the upstream pool-client release fix in disposable PostgreSQL 18. Confirmed this workflow remains a local-only rehearsal with no remote Neon credentials, no production DDL path, no target allowlist change, and no change to the separate manual-only remote apply gate. All other previously reviewed source blob pins remain unchanged.",
+      "scope": "Follow-up source audit on PR #2164 branch gpt/w01-payload-3.94.1-upgrade at source head 0c97669b97c88306168a238dd4c6efbb52a95c75. Re-reviewed the D1-01 manifest validator after updating its W01 active Payload/PostgreSQL adapter pin from 3.90.2 to 3.94.1. W02 remains at its main-branch Better Auth 1.7.8 pin in this independent W01 PR; the separate W02 upgrade is not assumed or included. Confirmed migration ordering, artifact checksums, owner set, schema-only scope, target host/database allowlist, and manual-only remote apply gate are unchanged. The W01 runtime rehearsal workflow remains local-only and verifies the upstream pool-client release fix on disposable PostgreSQL 18.",
       "result": "NO_NEW_BLOCKING_FINDINGS",
       "formalGitHubReviewSubmissions": 0,
-      "limitations": "GPT-6 source audit and exact Git blob reconciliation only; not a human GitHub approval or independent third-party review. The updated W01 PR must pass its current-head local PostgreSQL and runtime CI. No remote Neon DDL, business-data import, Worker deployment, or production cutover was performed."
+      "limitations": "GPT-6 source audit and exact Git blob reconciliation only; not a human GitHub approval or independent third-party review. The updated W01 PR must pass current-head schema, lockfile, typecheck, build and PostgreSQL 18 rehearsals. No remote Neon DDL, business-data import, Worker deployment, or production cutover was performed."
     }
   },
   "verificationEvidence": {
@@ -208,10 +208,10 @@
   "findings": [],
   "followUpReview": {
     "reviewedAt": "2026-11-24",
-    "scope": "Follow-up source audit on PR #2164 branch gpt/w01-payload-3.94.1-upgrade at source head 5a007343c9eef854e854f726a9e83a6b0b96460f. Re-reviewed .github/workflows/neon-w01-payload-postgres-runtime-rehearsal.yml after its changes to regenerate the W01 lockfile from exact package pins, use the official Payload 3.94.1 PostgreSQL adapter, and verify the upstream pool-client release fix in disposable PostgreSQL 18. Confirmed this workflow remains a local-only rehearsal with no remote Neon credentials, no production DDL path, no target allowlist change, and no change to the separate manual-only remote apply gate. All other previously reviewed source blob pins remain unchanged.",
+    "scope": "Follow-up source audit on PR #2164 branch gpt/w01-payload-3.94.1-upgrade at source head 0c97669b97c88306168a238dd4c6efbb52a95c75. Re-reviewed the D1-01 manifest validator after updating its W01 active Payload/PostgreSQL adapter pin from 3.90.2 to 3.94.1. W02 remains at its main-branch Better Auth 1.7.8 pin in this independent W01 PR; the separate W02 upgrade is not assumed or included. Confirmed migration ordering, artifact checksums, owner set, schema-only scope, target host/database allowlist, and manual-only remote apply gate are unchanged. The W01 runtime rehearsal workflow remains local-only and verifies the upstream pool-client release fix on disposable PostgreSQL 18.",
     "result": "NO_NEW_BLOCKING_FINDINGS",
     "formalGitHubReviewSubmissions": 0,
-    "limitations": "GPT-6 source audit and exact Git blob reconciliation only; not a human GitHub approval or independent third-party review. The updated W01 PR must pass its current-head local PostgreSQL and runtime CI. No remote Neon DDL, business-data import, Worker deployment, or production cutover was performed."
+    "limitations": "GPT-6 source audit and exact Git blob reconciliation only; not a human GitHub approval or independent third-party review. The updated W01 PR must pass current-head schema, lockfile, typecheck, build and PostgreSQL 18 rehearsals. No remote Neon DDL, business-data import, Worker deployment, or production cutover was performed."
   },
   "limitations": [
     "The AUTH-001 PostgreSQL migration is staged in the D1-01 shared manifest and has local PostgreSQL 18 evidence only; remote Neon application and production Worker cutover are not performed by PR validation."
