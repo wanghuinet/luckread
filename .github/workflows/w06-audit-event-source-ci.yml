@@ -6,6 +6,7 @@ on:
     paths:
       - 'workers/W06-governance/src/**'
       - 'workers/W06-governance/package.json'
+      - 'workers/W06-governance/package-lock.json'
       - 'workers/W06-governance/tsconfig.json'
       - '.github/workflows/w06-audit-event-source-ci.yml'
       - 'package.json'
