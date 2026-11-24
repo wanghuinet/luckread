@@ -165,9 +165,9 @@ describe('W03 content contract core', () => {
     expect(w07Calls).toBe(1)
     expect(w07Capture.request?.url).toContain('/internal/entitlements/check-creator-membership')
     expect(w07Capture.request?.headers.get('X-LuckRead-Caller')).toBe('W03')
-    expect(w07Request?.headers.get('X-LuckRead-Principal-User-Id')).toBe('user_subscriber')
-    expect(w07Request?.headers.get('Cookie')).toBeNull()
-    expect(await w07Request?.json()).toEqual({ creatorId: 'creator_1' })
+    expect(w07Capture.request?.headers.get('X-LuckRead-Principal-User-Id')).toBe('user_subscriber')
+    expect(w07Capture.request?.headers.get('Cookie')).toBeNull()
+    expect(await w07Capture.request?.json()).toEqual({ creatorId: 'creator_1' })
 
     // Without a logged-in member, a member-only reference must not be exposed as public.
     w07Calls = 0
