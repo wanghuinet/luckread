@@ -23,7 +23,7 @@
     "reviewedFiles": [
       {
         "path": ".github/workflows/neon-d1-01-full-local-rehearsal.yml",
-        "gitBlobSha1": "ef37f8b503f4997e4e46e0b51024668ba4d72681"
+        "gitBlobSha1": "5b9ed529361247b2d10d416980c6e54e533e0afd"
       },
       {
         "path": ".github/workflows/neon-d1-01-migration-ledger.yml",
@@ -163,8 +163,8 @@
     "formalGitHubReviewSubmissions": 0,
     "followUpReview": {
       "reviewedAt": "2026-11-24",
-      "reviewedSourceHeadSha": "efcb6ff80e09c3eadc932ccd0761fdc78c6da403",
-      "scope": "Follow-up GPT-6 source audit for W01 Payload 3.94.1 / Next.js 16.4.6 / OpenNext 1.20.18. Re-reviewed all changed D1-01 remote-runner-pinned sources: scripts/neon/d1-01-migration-manifest.mjs changes only the active W01 Payload/PostgreSQL adapter version assertion and runtime dependency placement; neon-d1-01-full-local-rehearsal.yml and neon-d1-01-migration-ledger.yml pin CI to Node 24.22.3; neon-w01-payload-postgres-runtime-rehearsal.yml validates the upstream Payload pool-client release fix and exact-path OpenNext asset configuration while removing the CI-only local patch. No remote runner execution logic, target allowlist, TLS/channel binding, advisory-lock behavior, ordered migration execution, checksums, ledger SQL, remote apply authorization, or production cutover controls changed. Updated exactly these four Git blob pins; the other reviewed source pins remain unchanged.",
+      "reviewedSourceHeadSha": "9b9bc95d89f627e32237cd30832fe3a77340dc07",
+      "scope": "Follow-up GPT-6 source audit for W01 Payload 3.94.1 / Next.js 16.4.6 / OpenNext 1.20.18. Re-reviewed all changed D1-01 remote-runner-pinned sources: scripts/neon/d1-01-migration-manifest.mjs changes only the active W01 Payload/PostgreSQL adapter version assertion and runtime dependency placement; neon-d1-01-full-local-rehearsal.yml and neon-d1-01-migration-ledger.yml pin CI to Node 24.22.3; neon-w01-payload-postgres-runtime-rehearsal.yml validates the upstream Payload pool-client release fix and exact-path OpenNext asset configuration while removing the CI-only local patch. No remote runner execution logic, target allowlist, TLS/channel binding, advisory-lock behavior, ordered migration execution, checksums, ledger SQL, remote apply authorization, or production cutover controls changed. Updated exactly these four Git blob pins; the other reviewed source pins remain unchanged. The W02 dependency installation in the full local rehearsal now uses npm ci against the committed W02 package-lock.json; no migration execution or remote runner behavior changed.",
       "result": "NO_NEW_BLOCKING_FINDINGS",
       "formalGitHubReviewSubmissions": 0,
       "limitations": "GPT-6 source audit and Git blob reconciliation, not a human GitHub approval or independent third-party review. W01 lockfile, dependency audit, Next/OpenNext build, Payload schema generation and PostgreSQL 18 runtime CI must pass before this dependency stage is ready for review. No remote Neon DDL, production data migration, deployment, or cutover is authorized."
@@ -209,8 +209,8 @@
   "findings": [],
   "followUpReview": {
     "reviewedAt": "2026-11-24",
-    "reviewedSourceHeadSha": "efcb6ff80e09c3eadc932ccd0761fdc78c6da403",
-    "scope": "Follow-up GPT-6 source audit for W01 Payload 3.94.1 / Next.js 16.4.6 / OpenNext 1.20.18. Re-reviewed all changed D1-01 remote-runner-pinned sources: scripts/neon/d1-01-migration-manifest.mjs changes only the active W01 Payload/PostgreSQL adapter version assertion and runtime dependency placement; neon-d1-01-full-local-rehearsal.yml and neon-d1-01-migration-ledger.yml pin CI to Node 24.22.3; neon-w01-payload-postgres-runtime-rehearsal.yml validates the upstream Payload pool-client release fix and exact-path OpenNext asset configuration while removing the CI-only local patch. No remote runner execution logic, target allowlist, TLS/channel binding, advisory-lock behavior, ordered migration execution, checksums, ledger SQL, remote apply authorization, or production cutover controls changed. Updated exactly these four Git blob pins; the other reviewed source pins remain unchanged.",
+    "reviewedSourceHeadSha": "9b9bc95d89f627e32237cd30832fe3a77340dc07",
+    "scope": "Follow-up GPT-6 source audit for W01 Payload 3.94.1 / Next.js 16.4.6 / OpenNext 1.20.18. Re-reviewed all changed D1-01 remote-runner-pinned sources: scripts/neon/d1-01-migration-manifest.mjs changes only the active W01 Payload/PostgreSQL adapter version assertion and runtime dependency placement; neon-d1-01-full-local-rehearsal.yml and neon-d1-01-migration-ledger.yml pin CI to Node 24.22.3; neon-w01-payload-postgres-runtime-rehearsal.yml validates the upstream Payload pool-client release fix and exact-path OpenNext asset configuration while removing the CI-only local patch. No remote runner execution logic, target allowlist, TLS/channel binding, advisory-lock behavior, ordered migration execution, checksums, ledger SQL, remote apply authorization, or production cutover controls changed. Updated exactly these four Git blob pins; the other reviewed source pins remain unchanged. The W02 dependency installation in the full local rehearsal now uses npm ci against the committed W02 package-lock.json; no migration execution or remote runner behavior changed.",
     "result": "NO_NEW_BLOCKING_FINDINGS",
     "formalGitHubReviewSubmissions": 0,
     "limitations": "GPT-6 source audit and Git blob reconciliation, not a human GitHub approval or independent third-party review. W01 lockfile, dependency audit, Next/OpenNext build, Payload schema generation and PostgreSQL 18 runtime CI must pass before this dependency stage is ready for review. No remote Neon DDL, production data migration, deployment, or cutover is authorized."
