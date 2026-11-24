@@ -45,7 +45,7 @@ jobs:
           NODE
       - name: Deploy W04 with admitted bindings
         working-directory: workers/W04-feed-search
-        run: npx --yes wrangler@4.116.0 deploy
+        run: npx --yes wrangler@4.166.0 deploy
       - name: Verify live consumer and run controlled projection evidence
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
