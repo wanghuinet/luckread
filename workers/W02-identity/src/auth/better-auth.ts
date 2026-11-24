@@ -5,7 +5,7 @@ import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { symmetricDecrypt } from 'better-auth/crypto'
 import { betterAuth } from 'better-auth'
 import { bearer, twoFactor } from 'better-auth/plugins'
-import { matchTotpTimeStep } from './totp-replay-guard.js'
+import { decodeTotpSecret, matchTotpTimeStep } from './totp-replay-guard.js'
 import type { MfaFactorStateStore } from './mfa-factor-state-store.js'
 import { isUnexpiredMfaChallengeRecord } from './mfa-challenge-verification.js'
 import { deriveMfaAuditEventIdForIdempotencyKey } from './mfa-audit-events.js'
@@ -338,10 +338,11 @@ export const buildLuckReadAuth = (
         // Let the pinned plugin produce its canonical not-enabled/challenge error.
         if (!factor) return
 
-        const secret = await symmetricDecrypt({
+        const encryptedSecret = await symmetricDecrypt({
           key: ctx.context.secretConfig,
           data: factor.encryptedSecret,
         })
+        const secret = decodeTotpSecret(encryptedSecret)
         const match = await matchTotpTimeStep(secret, body.code as string)
         // Invalid codes continue through Better Auth so its failure counters and
         // challenge lockout remain authoritative.
