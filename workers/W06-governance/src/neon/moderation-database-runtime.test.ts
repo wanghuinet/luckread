@@ -20,10 +20,10 @@ describe('W06 moderation database runtime admission', () => {
     expect(source.d1_databases ?? []).toEqual([])
     expect(config.d1_databases ?? []).toEqual([])
     expect(config.vars?.W06_MODERATION_DATABASE_DRIVER).toBeUndefined()
-    const hyperdrive = (config.hyperdrive ?? []).find((binding: { binding?: string }) => binding.binding === 'HYPERDRIVE_D1_03')
+    const hyperdrive = (config.hyperdrive ?? []).find((binding: { binding?: string }) => binding.binding === 'HYPERDRIVE_NEON_GOVERNANCE')
 
     expect(hyperdrive).toEqual({
-      binding: 'HYPERDRIVE_D1_03',
+      binding: 'HYPERDRIVE_NEON_GOVERNANCE',
       id: '7c8831416c18494faee04b96aa551cb9',
     })
     expect(config.compatibility_flags).toContain('nodejs_compat')
@@ -38,15 +38,15 @@ describe('W06 moderation database runtime admission', () => {
   })
 
   it('fails closed for moderation Stores when the existing Hyperdrive binding is missing', () => {
-    expect(() => getW06ModerationPostgresPool({})).toThrow('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
-    expect(() => getW06ModerationCaseDetailReadStore({})).toThrow('W06_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+    expect(() => getW06ModerationPostgresPool({})).toThrow('W06_HYPERDRIVE_NEON_GOVERNANCE_BINDING_REQUIRED')
+    expect(() => getW06ModerationCaseDetailReadStore({})).toThrow('W06_HYPERDRIVE_NEON_GOVERNANCE_BINDING_REQUIRED')
   })
 
   it('composes all moderation Stores from the existing Neon Hyperdrive and caches them per binding', () => {
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread_governance',
     }
-    const env = { HYPERDRIVE_D1_03: binding }
+    const env = { HYPERDRIVE_NEON_GOVERNANCE: binding }
 
     const poolAdapter = getW06ModerationPostgresPool(env)
     expect(getW06ModerationPostgresPool(env)).toBe(poolAdapter)
@@ -59,9 +59,9 @@ describe('W06 moderation database runtime admission', () => {
 
   it('rejects a Hyperdrive connection string for a different logical database', () => {
     expect(() => getW06ModerationPostgresPool({
-      HYPERDRIVE_D1_03: {
+      HYPERDRIVE_NEON_GOVERNANCE: {
         connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckreadpro',
       },
-    })).toThrow('W06_HYPERDRIVE_D1_03_CONNECTION_STRING_INVALID')
+    })).toThrow('W06_HYPERDRIVE_NEON_GOVERNANCE_CONNECTION_STRING_INVALID')
   })
 })
