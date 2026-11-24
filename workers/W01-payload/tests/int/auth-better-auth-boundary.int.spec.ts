@@ -120,10 +120,13 @@ describe('W01 Better Auth boundary', () => {
       resolve(process.cwd(), '../W02-identity/src/account/account-state-transition.ts'),
       'utf8',
     )
-    expect(activation).toContain("to: 'ACTIVE'")
-    expect(activation).toContain("reason: 'email_verified'")
-    expect(activation).toContain('additionalStatements')
-    expect(activation).toContain("INSERT INTO role_assignments")
+    // This file defines the transition contract/types; the email verification
+    // callback and activation persistence are wired in Better Auth configuration.
+    expect(activation).toContain("export type AccountState")
+    expect(activation).toContain("'ACTIVE'")
+    expect(activation).toContain('AccountStateTransitionInput')
+    expect(authConfig).toContain('activateEmailVerifiedAccountPostgres(runtime.pool, userId, now)')
+    expect(authConfig).toContain('ensureBaseUserRolePostgres(runtime.pool, userId, new Date().toISOString())')
   })
 
   it('hardens W02 schema validation, auth initialization and production trusted origins', () => {
