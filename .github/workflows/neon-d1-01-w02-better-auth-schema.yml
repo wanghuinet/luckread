@@ -35,6 +35,7 @@ on:
       - 'docs/change-control/CC-AUTH-015-W02-LIFECYCLE-WINDOW-PERSISTENCE-2026-11-06.md'
       - 'contracts/authz/layers.json'
       - 'workers/W02-identity/package.json'
+      - 'workers/W02-identity/package-lock.json'
       - 'workers/W02-identity/src/auth/better-auth.ts'
       - 'workers/W02-identity/src/index.ts'
       - 'workers/W02-identity/src/auth/mfa-factor-state-store.ts'
