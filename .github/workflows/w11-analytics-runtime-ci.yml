@@ -50,6 +50,24 @@ jobs:
           cache: npm
       - name: Install locked root dependencies
         run: npm ci
+      - name: Verify Hyperdrive and Node.js compatibility required by pg
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const config = JSON.parse(readFileSync('workers/W11-growth-campaign-analytics-operations/wrangler.jsonc', 'utf8'))
+          const manifest = JSON.parse(readFileSync('workers/W11-growth-campaign-analytics-operations/package.json', 'utf8'))
+          if (!config.compatibility_flags?.includes('nodejs_compat')) {
+            throw new Error('W11 must enable nodejs_compat for node-postgres')
+          }
+          if (!config.hyperdrive?.some(binding => binding.binding === 'HYPERDRIVE_ANALYTICS_PG')) {
+            throw new Error('W11 Hyperdrive PostgreSQL binding is missing')
+          }
+          if (manifest.dependencies?.pg !== '8.23.1') {
+            throw new Error(`W11 node-postgres pin mismatch: ${manifest.dependencies?.pg}`)
+          }
+          console.log('W11 nodejs_compat + Hyperdrive + pg 8.23.1 verified')
+          NODE
+
       - name: Install W11 PostgreSQL runtime dependency
         run: npm ci --prefix workers/W11-growth-campaign-analytics-operations --ignore-scripts --no-audit --no-fund
       - name: Run PostgreSQL analytics tests
