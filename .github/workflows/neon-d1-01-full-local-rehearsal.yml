@@ -98,10 +98,10 @@ jobs:
           const pkg = JSON.parse(await readFile('./package.json', 'utf8'))
           const runtime = JSON.parse(await readFile('./node_modules/better-auth/package.json', 'utf8'))
           const cli = JSON.parse(await readFile('./node_modules/auth/package.json', 'utf8'))
-          if (pkg.dependencies['better-auth'] !== '1.7.8' || runtime.version !== '1.7.8') {
+          if (pkg.dependencies['better-auth'] !== '1.7.27' || runtime.version !== '1.7.27') {
             throw new Error('Better Auth runtime pin drifted')
           }
-          if (pkg.devDependencies.auth !== '1.7.8' || cli.version !== '1.7.8' ||
+          if (pkg.devDependencies.auth !== '1.7.27' || cli.version !== '1.7.27' ||
               pkg.devDependencies.pg !== '8.20.0') {
             throw new Error('Better Auth CLI / pg pin drifted')
           }
