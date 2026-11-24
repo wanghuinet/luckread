@@ -35,7 +35,7 @@
       },
       {
         "path": ".github/workflows/neon-w01-payload-postgres-runtime-rehearsal.yml",
-        "gitBlobSha1": "14f290497d4177f47d07872bed58482b3a874647"
+        "gitBlobSha1": "a004615544ef9f58f5e489e2912b257b5a84b9d1"
       },
       {
         "path": ".github/workflows/w01-auth-me-import-verification.yml",
@@ -162,11 +162,11 @@
     ],
     "formalGitHubReviewSubmissions": 0,
     "followUpReview": {
-      "reviewedAt": "2026-11-23",
-      "scope": "Follow-up source audit on main 65f9ed3cad935cb1a77c4b175930c7a379721d0f after W01 AUTH-001 Neon-only runtime cleanup (PR #2116) and subsequent repository integration. Reconciled all 29 reviewed-file Git blob SHA-1 pins against the complete main tree; all 29 match exactly and none are missing. The current registration-persistence implementation is the reviewed b85586869de551121ec5f37e84fa2eed01139452 blob. Reviewed the current D1-01 manifest, shared runner, review validator, W01 registration persistence and route, W02 schema/runtime sources, W07 membership migration and verifier, and W08 creator migration and verifier. The W01 cleanup removes the retired D1/SQLite adapter and D1 runtime selection while retaining the PostgreSQL registration persistence and transaction path. No stale source pins remain. Local disposable PostgreSQL 18 full rehearsal and shared ledger rehearsal must be rerun against this exact PR head; remote Neon DDL remains unexecuted.",
+      "reviewedAt": "2026-11-24",
+      "scope": "Follow-up source audit on PR #2164 branch gpt/w01-payload-3.94.1-upgrade at source head 5a007343c9eef854e854f726a9e83a6b0b96460f. Re-reviewed .github/workflows/neon-w01-payload-postgres-runtime-rehearsal.yml after its changes to regenerate the W01 lockfile from exact package pins, use the official Payload 3.94.1 PostgreSQL adapter, and verify the upstream pool-client release fix in disposable PostgreSQL 18. Confirmed this workflow remains a local-only rehearsal with no remote Neon credentials, no production DDL path, no target allowlist change, and no change to the separate manual-only remote apply gate. All other previously reviewed source blob pins remain unchanged.",
       "result": "NO_NEW_BLOCKING_FINDINGS",
       "formalGitHubReviewSubmissions": 0,
-      "limitations": "GPT-6 source audit and exact Git blob reconciliation, not a human GitHub approval or independent third-party review. This update does not execute remote Neon DDL, import business data, or authorize production cutover. Full local PostgreSQL 18 and shared ledger workflows must pass on the current PR head."
+      "limitations": "GPT-6 source audit and exact Git blob reconciliation only; not a human GitHub approval or independent third-party review. The updated W01 PR must pass its current-head local PostgreSQL and runtime CI. No remote Neon DDL, business-data import, Worker deployment, or production cutover was performed."
     }
   },
   "verificationEvidence": {
@@ -207,11 +207,11 @@
   },
   "findings": [],
   "followUpReview": {
-    "reviewedAt": "2026-11-23",
-    "scope": "Follow-up source audit on main 65f9ed3cad935cb1a77c4b175930c7a379721d0f after W01 AUTH-001 Neon-only runtime cleanup (PR #2116) and subsequent repository integration. Reconciled all 29 reviewed-file Git blob SHA-1 pins against the complete main tree; all 29 match exactly and none are missing. The current registration-persistence implementation is the reviewed b85586869de551121ec5f37e84fa2eed01139452 blob. Reviewed the current D1-01 manifest, shared runner, review validator, W01 registration persistence and route, W02 schema/runtime sources, W07 membership migration and verifier, and W08 creator migration and verifier. The W01 cleanup removes the retired D1/SQLite adapter and D1 runtime selection while retaining the PostgreSQL registration persistence and transaction path. No stale source pins remain. Local disposable PostgreSQL 18 full rehearsal and shared ledger rehearsal must be rerun against this exact PR head; remote Neon DDL remains unexecuted.",
+    "reviewedAt": "2026-11-24",
+    "scope": "Follow-up source audit on PR #2164 branch gpt/w01-payload-3.94.1-upgrade at source head 5a007343c9eef854e854f726a9e83a6b0b96460f. Re-reviewed .github/workflows/neon-w01-payload-postgres-runtime-rehearsal.yml after its changes to regenerate the W01 lockfile from exact package pins, use the official Payload 3.94.1 PostgreSQL adapter, and verify the upstream pool-client release fix in disposable PostgreSQL 18. Confirmed this workflow remains a local-only rehearsal with no remote Neon credentials, no production DDL path, no target allowlist change, and no change to the separate manual-only remote apply gate. All other previously reviewed source blob pins remain unchanged.",
     "result": "NO_NEW_BLOCKING_FINDINGS",
     "formalGitHubReviewSubmissions": 0,
-    "limitations": "GPT-6 source audit and exact Git blob reconciliation, not a human GitHub approval or independent third-party review. This update does not execute remote Neon DDL, import business data, or authorize production cutover. Full local PostgreSQL 18 and shared ledger workflows must pass on the current PR head."
+    "limitations": "GPT-6 source audit and exact Git blob reconciliation only; not a human GitHub approval or independent third-party review. The updated W01 PR must pass its current-head local PostgreSQL and runtime CI. No remote Neon DDL, business-data import, Worker deployment, or production cutover was performed."
   },
   "limitations": [
     "The AUTH-001 PostgreSQL migration is staged in the D1-01 shared manifest and has local PostgreSQL 18 evidence only; remote Neon application and production Worker cutover are not performed by PR validation."
