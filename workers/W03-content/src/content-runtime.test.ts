@@ -273,7 +273,7 @@ describe('W03 content contract core', () => {
       },
     });
 
-    const denied = await neonWorker.fetch(makeRequest(), env));
+    const denied = await neonWorker.fetch(makeRequest(), env);
     expect(denied.status).toBe(200);
     await expect(denied.json()).resolves.toMatchObject({
       id: 'content_member_1',
@@ -391,7 +391,7 @@ describe('W03 content contract core', () => {
       },
     )
 
-    const denied = await neonWorker.fetch(makeRequest(), env
+    const denied = await neonWorker.fetch(makeRequest(), env)
     expect(denied.status).toBe(200)
     await expect(denied.json()).resolves.toMatchObject({
       contentId: 'content_public_1',
