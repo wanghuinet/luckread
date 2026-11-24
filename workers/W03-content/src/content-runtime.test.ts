@@ -416,7 +416,7 @@ describe('W03 content contract core', () => {
 
   it('serves bookmarked contents only through authenticated W01 transport', async () => {
     const row = {
-      id: 'content_1', content_type: 'post', owner_user_id: 'user_1', creator_id: 'user_1',
+      id: 'content_1', content_type: 'post' as const, owner_user_id: 'user_1', creator_id: 'user_1',
       ip_id: null, state: 'PUBLISHED', scheduled_at: null, version: 1, revision: 1,
       slug: 'post-1', title: 'Post 1', body_ref: 'body_1', media_refs_json: '[]',
       cover_ref: null, etag: 'W/"1"', created_at: '2026-10-02T00:00:00.000Z',
@@ -1637,7 +1637,7 @@ describe('W03 content contract core', () => {
     );
     expect(denied.status).toBe(403);
     expect(storeCalls).toHaveLength(1);
-  });
+  }, {} as never, {} as never);
 
   it('lists only the authenticated Creator\'s scheduled social posts and returns edit preconditions', async () => {
     const storeCalls: unknown[][] = []
@@ -1985,7 +1985,7 @@ describe('W03 content contract core', () => {
       state: 'PUBLISHED',
       title: 'Public article',
     })
-  })
+  }, {} as never)
 
   it('resolves a published content request by stable slug through Neon', async () => {
     const slug = '中文文章-1234567890abcdef1234567890abcdef'
@@ -2031,7 +2031,7 @@ describe('W03 content contract core', () => {
       slug,
       title: row.title,
     })
-  })
+  }, {} as never)
 
   it('does not expose non-published content to an anonymous detail request', async () => {
     const neonWorker = createW03ContentWorker({
@@ -2049,7 +2049,7 @@ describe('W03 content contract core', () => {
     )
 
     expect(response.status).toBe(404)
-  })
+  }, {} as never)
 
 })
 
@@ -2838,7 +2838,7 @@ describe('W03 Neon canonical content detail access behavior', () => {
     )
     expect(response.status).toBe(503)
     expect(prepareCalled).toBe(false)
-  })
+  }, {} as never)
 
   it('keeps anonymous and owner principals explicit at the reader boundary', async () => {
     const principals: Array<string | null> = []
