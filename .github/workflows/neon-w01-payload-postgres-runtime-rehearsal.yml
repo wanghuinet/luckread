@@ -99,6 +99,11 @@ jobs:
           if (config.name !== 'luckread-w01-payload') throw new Error('W01 Worker identity mismatch')
           if (config.vars?.PAYLOAD_DATABASE_DRIVER !== 'neon') throw new Error('W01 production database driver must be Neon')
           if ((config.d1_databases || []).length !== 0) throw new Error('W01 production config must not declare Cloudflare D1 bindings')
+          if (config.assets?.run_worker_first !== true ||
+              config.assets?.html_handling !== 'none' ||
+              config.assets?.not_found_handling !== 'none') {
+            throw new Error('OpenNext run_worker_first assets require exact-path html_handling=none and not_found_handling=none')
+          }
           const hyperdrive = (config.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE')
           if (!hyperdrive || hyperdrive.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') {
             throw new Error('W01 must bind the verified D1-01 Neon Hyperdrive resource')
