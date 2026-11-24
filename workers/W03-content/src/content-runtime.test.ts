@@ -1998,7 +1998,7 @@ describe('W03 content contract core', () => {
       state: 'PUBLISHED',
       title: 'Public article',
     })
-  }, {} as never)
+  })
 
   it('resolves a published content request by stable slug through Neon', async () => {
     const slug = '中文文章-1234567890abcdef1234567890abcdef'
@@ -2045,7 +2045,7 @@ describe('W03 content contract core', () => {
       slug,
       title: row.title,
     })
-  }, {} as never)
+  })
 
   it('does not expose non-published content to an anonymous detail request', async () => {
     const neonWorker = createW03ContentWorker({
@@ -2064,7 +2064,7 @@ describe('W03 content contract core', () => {
     )
 
     expect(response.status).toBe(404)
-  }, {} as never)
+  })
 
 })
 
@@ -2854,7 +2854,7 @@ describe('W03 Neon canonical content detail access behavior', () => {
     )
     expect(response.status).toBe(503)
     expect(prepareCalled).toBe(false)
-  }, {} as never)
+  })
 
   it('keeps anonymous and owner principals explicit at the reader boundary', async () => {
     const principals: Array<string | null> = []
