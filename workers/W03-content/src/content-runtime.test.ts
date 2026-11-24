@@ -2023,6 +2023,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Correlation-Id': 'test-correlation-slug',
         },
       }),
+      {} as never,
     )
 
     expect(response.status).toBe(200)
