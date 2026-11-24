@@ -129,8 +129,8 @@ if (w01Package.dependencies?.payload !== '3.90.2' ||
     w01Package.devDependencies?.['@payloadcms/db-postgres'] !== '3.90.2') {
   fail('W01 Payload and official PostgreSQL adapter must remain pinned to 3.90.2')
 }
-if (w02Package.dependencies?.['better-auth'] !== '1.7.8' ||
-    w02Package.devDependencies?.auth !== '1.7.8' ||
+if (w02Package.dependencies?.['better-auth'] !== '1.7.27' ||
+    w02Package.devDependencies?.auth !== '1.7.27' ||
     w02Package.devDependencies?.pg !== '8.20.0') {
   fail('W02 Better Auth CLI/runtime and PostgreSQL driver pins drifted')
 }
