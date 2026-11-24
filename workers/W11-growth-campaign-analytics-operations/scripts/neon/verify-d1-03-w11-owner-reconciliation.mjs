@@ -172,20 +172,20 @@ export function verifyW11D103OwnerReconciliation({
   }
 
   const d1Bindings = wrangler.d1_databases ?? []
+  const analyticsHyperdrive = wrangler.hyperdrive ?? []
   if (
     wrangler.name !== 'luckread-w11' ||
-    d1Bindings.length !== 1 ||
-    d1Bindings[0]?.binding !== 'D1_05' ||
-    d1Bindings[0]?.database_name !== 'allluck' ||
-    d1Bindings[0]?.database_id !== '77d82be2-d12e-4a17-b410-9aa7d376bc11' ||
-    d1Bindings[0]?.migrations_dir !== 'migrations'
+    d1Bindings.length !== 0 ||
+    wrangler.vars?.W11_DATABASE_DRIVER !== 'neon' ||
+    wrangler.vars?.W11_ANALYTICS_INGEST_ENABLED !== 'false' ||
+    !analyticsHyperdrive.some((item) => item.binding === 'HYPERDRIVE_ANALYTICS_PG' && item.id === '3eb2012cfbb04e429e18f8349377ffbc')
   ) {
-    throw new Error('W11 Wrangler must retain its single D1_05 analytics binding; D1-03 access is not admitted')
+    throw new Error('W11 must use its Neon analytics Hyperdrive with ingestion disabled and no D1 bindings; D1-03 access is not admitted')
   }
 
-  const envInterface = worker.match(/export interface W11Env\s*\{([\s\S]*?)\}/)?.[1] ?? ''
-  if (!envInterface.includes('D1_05:') || /\bD1_03\b/.test(envInterface)) {
-    throw new Error('W11 runtime environment must expose D1_05 only; no D1_03 binding may be inferred')
+  const envInterface = worker.match(/export interface W11PostgresEnv\s*\{([\s\S]*?)\}/)?.[1] ?? ''
+  if (!envInterface.includes('W11_POSTGRES:') || /\bD1_(?:03|05)\b/.test(envInterface)) {
+    throw new Error('W11 runtime environment must expose only its native PostgreSQL pool; no D1 binding may be inferred')
   }
 
   if (

@@ -79,8 +79,10 @@ test('W05 historical schema source remains pinned while the production Worker us
   )
   const config = JSON.parse(readSource(owner.wrangler))
   assert.equal(config.d1_databases?.length ?? 0, 0)
-  assert.equal(config.vars?.W05_DATABASE_DRIVER, 'neon')
-  assert.equal(config.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER, 'neon')
+  assert.equal(config.vars?.W05_DATABASE_DRIVER, undefined)
+  assert.equal(config.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER, undefined)
+  assert.ok(config.hyperdrive.some((item) => item.binding === 'HYPERDRIVE_NEON_SOCIAL' && item.id === 'c55183e1cc3446409c9c1075832c6615'))
+  assert.ok(config.hyperdrive.some((item) => item.binding === 'HYPERDRIVE_NEON_GOVERNANCE' && item.id === '7c8831416c18494faee04b96aa551cb9'))
   assert.deepEqual(validateWorkerBindings(config, owner), [])
 })
 
@@ -106,9 +108,9 @@ test('binding validators reject Neon target drift and any W05 production D1 rein
   const wrongHyperdrive = {
     ...w05Config,
     hyperdrive: w05Config.hyperdrive.map((item) =>
-      item.binding === 'HYPERDRIVE_D1_02' ? { ...item, id: 'wrong-target' } : item),
+      item.binding === 'HYPERDRIVE_NEON_SOCIAL' ? { ...item, id: 'wrong-target' } : item),
   }
-  assert.ok(validateWorkerBindings(wrongHyperdrive, w05Owner).some((error) => error.includes('HYPERDRIVE_D1_02 target mismatch')))
+  assert.ok(validateWorkerBindings(wrongHyperdrive, w05Owner).some((error) => error.includes('HYPERDRIVE_NEON_SOCIAL target mismatch')))
 })
 
 test('SQLite portability scanner detects JSON1, randomblob, triggers, INSERT OR IGNORE and table rebuilds', () => {

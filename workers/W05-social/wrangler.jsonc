@@ -37,9 +37,7 @@
     }
   ],
   "vars": {
-    "PUSH_DELIVERY_ENABLED": "false",
-    "W05_DATABASE_DRIVER": "neon",
-    "W05_PUSH_ENDPOINT_DATABASE_DRIVER": "neon"
+    "PUSH_DELIVERY_ENABLED": "false"
   },
   "durable_objects": {
     "bindings": [
@@ -72,11 +70,11 @@
   ],
   "hyperdrive": [
     {
-      "binding": "HYPERDRIVE_D1_02",
+      "binding": "HYPERDRIVE_NEON_SOCIAL",
       "id": "c55183e1cc3446409c9c1075832c6615"
     },
     {
-      "binding": "HYPERDRIVE_D1_03",
+      "binding": "HYPERDRIVE_NEON_GOVERNANCE",
       "id": "7c8831416c18494faee04b96aa551cb9"
     }
   ],

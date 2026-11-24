@@ -80,18 +80,18 @@ test('fails closed if W11 gains an unapproved D1-03 runtime binding', () => {
     'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc',
     (text) => {
       const wrangler = JSON.parse(text)
-      wrangler.d1_databases.push({
+      wrangler.d1_databases = [{
         binding:'D1_03',
         database_name:'secondary',
         database_id:'bda1d247-a371-4244-91ae-aef96034db7f',
         migrations_dir:'migrations-d1-03',
-      })
+      }]
       return JSON.stringify(wrangler)
     },
   ]])
   assert.throws(
     () => verifyD105SharedRunnerReview({readSource:source}),
-    /W11 must retain exactly its existing D1_05 binding/,
+    /W11 must use its existing Neon analytics Hyperdrive/,
   )
 })
 

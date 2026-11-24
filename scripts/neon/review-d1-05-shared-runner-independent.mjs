@@ -117,7 +117,7 @@ export function verifyD105SharedRunnerReview({ readSource = readText } = {}) {
 
   if (review.status !== 'LOCAL_SHARED_SCHEMA_REVIEW_PASSED_ADMISSION_BLOCKED' ||
       review.review?.reviewKind !== 'AUTOMATED_INDEPENDENT_READ_ONLY_CODE_PATH_REVIEW' ||
-      review.review?.reviewedMainCommit !== '920fef62b93e1798257a51bc9a42633fe24e4ec3' ||
+      review.review?.reviewedMainCommit !== '2bae4a5384cb86d7a754c9dde63d88515d5d020f' ||
       review.review?.sharedExecutorPullRequest !== 1660 ||
       review.review?.sharedExecutorHeadCommit !== '5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de' ||
       review.review?.sharedPostgres18WorkflowRunId !== 42509822425 ||
@@ -273,13 +273,13 @@ export function verifyD105SharedRunnerReview({ readSource = readText } = {}) {
   }
 
   const d1Rows = wrangler.d1_databases ?? []
+  const analyticsHyperdrive = wrangler.hyperdrive ?? []
   if (wrangler.name !== 'luckread-w11' ||
-      d1Rows.length !== 1 ||
-      d1Rows[0].binding !== 'D1_05' ||
-      d1Rows[0].database_name !== 'allluck' ||
-      d1Rows[0].database_id !== '77d82be2-d12e-4a17-b410-9aa7d376bc11' ||
-      d1Rows[0].migrations_dir !== 'migrations') {
-    fail('W11 must retain exactly its existing D1_05 binding and must not gain D1-03 or other D1 runtime bindings')
+      d1Rows.length !== 0 ||
+      wrangler.vars?.W11_DATABASE_DRIVER !== 'neon' ||
+      wrangler.vars?.W11_ANALYTICS_INGEST_ENABLED !== 'false' ||
+      !analyticsHyperdrive.some((item) => item.binding === 'HYPERDRIVE_ANALYTICS_PG' && item.id === '3eb2012cfbb04e429e18f8349377ffbc')) {
+    fail('W11 must use its existing Neon analytics Hyperdrive with ingestion disabled and no D1 runtime bindings')
   }
 
   if (!artifact.startsWith('-- GENERATED FILE.') || artifact !== template) {
