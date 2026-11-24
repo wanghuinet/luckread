@@ -50,7 +50,7 @@ const required = {
   '@opennextjs/cloudflare': '1.20.18',
   'eslint-config-next': '16.4.6',
   typescript: '6.0.3',
-  wrangler: '~4.167.0',
+  wrangler: '~4.166.0',
 }
 
 const postgresAdapterVersion = pkg.dependencies?.['@payloadcms/db-postgres'] ?? pkg.devDependencies?.['@payloadcms/db-postgres']
