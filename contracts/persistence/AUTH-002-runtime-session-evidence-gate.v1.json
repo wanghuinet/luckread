@@ -3,21 +3,18 @@
   "$id": "https://luckread.com/contracts/persistence/AUTH-002-runtime-session-evidence-gate.v1.json",
   "title": "AUTH-002 Native Session Runtime Evidence Gate",
   "version": "1.1.0",
-  "status": "CONTRACTED_NOT_EXECUTED",
+  "status": "SUPERSEDED_NOT_APPLICABLE_TO_W01_NATIVE_SESSION_RUNTIME",
   "featureId": "AUTH-002",
   "entityId": "ENT-SESSION",
   "failClosed": true,
-  "authority": "workers/W01-payload",
-  "runtimeBaseline": "W01 active runtime: Payload 3.94.1 package family with @payloadcms/db-postgres 3.94.1 as a runtime dependency, Neon PostgreSQL through the LuckRead-owned adapter, Next.js 16.4.6, React 19.3.1, TypeScript 6.0.3, OpenNext 1.20.18, Wrangler 4.167.0, Node 24.22.3. The original Cloudflare D1 template and SQLite migrations are historical provenance only.",
-  "purpose": "Define the minimum executable evidence required to prove that the W01 Payload 3.94.1 native session identity and lifecycle correlate with the canonical AUTH-002 session contract against Neon PostgreSQL before runtime promotion.",
+  "authority": "workers/W02-identity",
+  "runtimeBaseline": "Current session identity and lifecycle authority is W02 Better Auth 1.7.27 on Neon PostgreSQL. W01 Payload 3.94.1 uses betterAuthPayloadStrategy with its local strategy disabled; it does not own an independent Payload-native session authority. The legacy Payload-native session evidence shape below is retained for historical contract provenance only.",
+  "purpose": "Historical AUTH-002 Payload-native session evidence gate. It is superseded by W02 Better Auth session runtime and must not be executed against W01 or used to create a second session identity.",
   "preconditions": [
-    "Gate-1 controlled Neon PostgreSQL 18 schema evidence is accepted for the same tested commit.",
-    "W01 dependency set is exactly the contract-pinned Payload 3.94.1 / Neon PostgreSQL baseline.",
-    "Payload and @payloadcms/db-postgres are exactly 3.94.1 in workers/W01-payload/package.json and the W01 pnpm lockfile.",
-    "Next.js is 16.4.6, React and React DOM are 19.3.1, TypeScript is 6.0.3, OpenNext is 1.20.18, and Wrangler is 4.167.0.",
-    "Node runtime is within the Payload 3.94.x supported range; CI evidence uses Node 24.22.3.",
-    "The runtime test uses a disposable isolated test account/session and never production credentials.",
-    "No independent custom session identifier is minted by the evidence harness."
+    "SUPERSEDED: W01 Users uses betterAuthPayloadStrategy and disables the local Payload authentication strategy.",
+    "W02 Better Auth 1.7.27 is the authoritative identity/session runtime.",
+    "Use W02 session runtime, MFA, revocation, account-state, and PostgreSQL 18 evidence for current session lifecycle validation.",
+    "Do not create a separate Payload-native session migration or a second canonical sessions table."
   ],
   "requiredArtifacts": [
     {
@@ -200,5 +197,12 @@
     "concurrencyEvidence": "ACCEPTED",
     "mapping0Validation": "REQUIRED",
     "auth002": "BLOCKED_UNTIL_ALL_GATES_ACCEPTED"
+  },
+  "supersededBy": {
+    "worker": "workers/W02-identity",
+    "runtime": "better-auth@1.7.27",
+    "database": "Neon PostgreSQL 18",
+    "validation": "W02 Better Auth boundary CI and disposable PostgreSQL 18 schema/runtime rehearsals",
+    "reason": "W01 Users delegates authentication to Better Auth through betterAuthPayloadStrategy; W02 owns identity/session lifecycle."
   }
 }
