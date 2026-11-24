@@ -26,8 +26,9 @@ const MAX_MEDIA_BYTES = 50 * 1024 * 1024
 const MAX_IMAGES = 50
 
 async function sha256(bytes: Uint8Array): Promise<string> {
-  const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
-  const digest = await crypto.subtle.digest('SHA-256', buffer)
+  const digestInput = new Uint8Array(bytes.byteLength)
+  digestInput.set(bytes)
+  const digest = await crypto.subtle.digest('SHA-256', digestInput)
   return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('')
 }
 
