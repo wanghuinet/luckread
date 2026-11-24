@@ -7,10 +7,10 @@
   },
   "dependencies": {
     "expo-server-sdk": "8.0.0",
-    "pg": "8.20.0"
+    "pg": "8.23.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260914.1",
-    "@types/pg": "8.20.0"
+    "@types/pg": "8.23.1"
   }
 }
