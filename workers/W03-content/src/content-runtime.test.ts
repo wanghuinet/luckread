@@ -424,7 +424,7 @@ describe('W03 content contract core', () => {
     }
     let storeCalls = 0
     const neonWorker = createW03ContentWorker({
-      publishedContentsByIdsReadStoreProvider: (_env: never) => ({
+      publishedContentsByIdsReadStoreProvider: (_env) => ({
         list: async (ids: readonly string[]) => {
           storeCalls += 1
           expect(ids).toEqual(['content_1'])
