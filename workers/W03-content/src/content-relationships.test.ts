@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { createW03ContentWorker } from './index.js'
 import {
@@ -267,8 +265,10 @@ describe('W03 Neon content relationship authority', () => {
     expect(denied.status).toBe(403)
   })
 
-  it('keeps historical D1-02 authority distinct from the Neon runtime adapter', () => {
-    const migration = readFileSync(resolve(process.cwd(), 'workers/W03-content/migrations/0014_content_relationship_idempotency.sql'), 'utf8')
-    expect(migration).toContain('content_mutation_idempotency')
+  it('keeps relationship mutation idempotency in the Neon PostgreSQL adapter', () => {
+    const adapter = readFileSync(resolve(process.cwd(), 'workers/W03-content/src/content-relationship-mutation-store-postgres.ts'), 'utf8')
+    expect(adapter).toContain('content_mutation_idempotency')
+    expect(adapter).toContain('BEGIN')
+    expect(adapter).toContain('COMMIT')
   })
 })
