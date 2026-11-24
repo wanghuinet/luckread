@@ -33,17 +33,20 @@ These are not the current W01 dependency versions.
 ## Current W01 architecture (reconciled)
 
 - W01 directory: `workers/W01-payload/`
-- Payload package family: `3.90.2`
-- `@opennextjs/cloudflare`: `1.20.1`
-- Next: `16.3.3` as declared by the current package manifest.
-- React / React DOM: `19.2.6`
-- Node engine: `>=24.15.0`
+- Payload package family: `3.94.1`
+- `@payloadcms/db-postgres`: `3.94.1`, declared as a runtime dependency.
+- `@opennextjs/cloudflare`: `1.20.18`
+- Next: `16.4.6`
+- React / React DOM: `19.3.1`
+- TypeScript: `6.0.3`
+- Wrangler: `4.167.0`
+- Node engine: `^22.23.5 || ^24.22.3 || >=26.13.1`
 - Database adapter: official `@payloadcms/db-postgres` through `src/neon-postgres-adapter.ts`.
 - Database connection: existing Hyperdrive binding `HYPERDRIVE`, with `PAYLOAD_DATABASE_DRIVER=neon`.
 - Active PostgreSQL migrations: `src/neon-postgres-migrations/`.
 - R2 integration remains the official Payload R2 storage plugin.
 
-The active Worker configurations `wrangler.jsonc` and `wrangler.neon.jsonc` declare Neon Hyperdrive and do not declare a D1 database binding. The W01 package manifest does not include `@payloadcms/db-d1-sqlite`.
+The active Worker configurations `wrangler.jsonc` and `wrangler.neon.jsonc` declare Neon Hyperdrive and do not declare a D1 database binding. The W01 package manifest does not include `@payloadcms/db-d1-sqlite`. The upstream PostgreSQL adapter already releases the bootstrap pool client; the old CI-only patch has been removed.
 
 ## Historical migration provenance
 
