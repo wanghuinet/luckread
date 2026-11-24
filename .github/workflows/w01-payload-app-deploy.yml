@@ -77,7 +77,7 @@ jobs:
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.22.3
 
       - name: Enable Corepack
         run: corepack enable
