@@ -509,6 +509,7 @@ describe('W03 Neon content relationship mutation store', () => {
   it('routes native post-thread append through Neon without issuing D1 statements', async () => {
     let appendInput: Parameters<ContentRelationshipMutationStore['appendThread']>[0] | undefined
     const store: ContentRelationshipMutationStore = {
+      async list() { return { items: [], hasMore: false, nextCursor: null } },
       async loadCreate() { return createRow },
       async create() {},
       async loadRevoke() {
