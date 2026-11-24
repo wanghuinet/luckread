@@ -389,6 +389,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Principal-Layer': 'L2',
         },
       },
+      {} as never,
     )
 
     const denied = await neonWorker.fetch(makeRequest(), env)
@@ -2046,6 +2047,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Correlation-Id': 'test-correlation-private',
         },
       }),
+      {} as never,
     )
 
     expect(response.status).toBe(404)
@@ -2835,6 +2837,7 @@ describe('W03 Neon canonical content detail access behavior', () => {
           'X-LuckRead-Correlation-Id': 'content-detail-neon-store-unavailable',
         },
       }),
+      {} as never,
     )
     expect(response.status).toBe(503)
     expect(prepareCalled).toBe(false)
