@@ -87,7 +87,7 @@ jobs:
 
       - name: Install pinned W02 Better Auth PostgreSQL toolchain
         working-directory: workers/W02-identity
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Verify pinned W02 generator and unit-test the combined verifier
         working-directory: workers/W02-identity
