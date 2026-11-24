@@ -9,14 +9,14 @@
   "dependencies": {
     "@better-auth/utils": "0.5.1",
     "better-auth": "1.7.27",
-    "pg": "8.20.0"
+    "pg": "8.23.1"
   },
   "devDependencies": {
     "@types/node": "24.3.0",
     "auth": "1.7.27",
     "@types/pg": "8.23.1",
     "tsx": "4.23.15",
-    "pg": "8.20.0"
+    "pg": "8.23.1"
   },
   "scripts": {
     "neon:schema:generate": "auth generate --config src/auth/neon-postgres-schema.config.ts --output artifacts/neon/w02-better-auth-postgres-schema.sql --yes",
