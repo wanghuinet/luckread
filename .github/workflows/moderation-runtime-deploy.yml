@@ -77,7 +77,7 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
-        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+        run: npx --yes wrangler@4.166.0 deploy --config wrangler.jsonc
 
       - name: Record W03 deployment
         run: echo W03_DEPLOYMENT_COMPLETE
@@ -99,7 +99,7 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
-        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+        run: npx --yes wrangler@4.166.0 deploy --config wrangler.jsonc
 
       - name: Verify W06 deployment record
         env:
@@ -107,7 +107,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.116.0 deployments list --name luckread-w06 --json > /tmp/w06-deployments.json
+          npx --yes wrangler@4.166.0 deployments list --name luckread-w06 --json > /tmp/w06-deployments.json
           node -e "const r=require('/tmp/w06-deployments.json'); if(!Array.isArray(r)||!r.length) throw new Error('No W06 deployment returned'); console.log('W06_DEPLOYMENT_RECORD=PASS')"
 
       - name: Install W01 locked dependencies
@@ -123,7 +123,7 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
-        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+        run: npx --yes wrangler@4.166.0 deploy --config wrangler.jsonc
 
       - name: Capture coordinated deployment provenance
         run: |
