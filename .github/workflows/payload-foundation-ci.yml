@@ -14,6 +14,8 @@ on:
       - '.github/workflows/payload-foundation-ci.yml'
   pull_request:
     paths:
+      - 'package.json'
+      - 'package-lock.json'
       - 'workers/W01-payload/**'
       - 'contracts/payload/**'
       - 'scripts/payload-native-inventory.mjs'
@@ -48,6 +50,9 @@ jobs:
       - name: Audit the locked W01 dependency graph for high and critical advisories
         working-directory: workers/W01-payload
         run: pnpm audit --audit-level high
+
+      - name: Audit the root Payload/Next dependency graph for high and critical advisories
+        run: npm audit --audit-level=high
 
       - name: Typecheck W01
         working-directory: workers/W01-payload
