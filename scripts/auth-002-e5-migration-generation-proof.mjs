@@ -7,6 +7,12 @@ import { execFileSync } from 'node:child_process'
 const root = process.cwd()
 const repoRoot = path.resolve(root, '../..')
 const baselineSha = process.env.E5_BASELINE_SHA
+const currentPackage = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
+const currentPayloadVersion = currentPackage.dependencies?.payload
+const currentPostgresAdapterVersion = currentPackage.devDependencies?.['@payloadcms/db-postgres'] ?? currentPackage.dependencies?.['@payloadcms/db-postgres']
+if (!currentPayloadVersion || !currentPostgresAdapterVersion) {
+  throw new Error('Current W01 Payload and PostgreSQL adapter package versions are required')
+}
 if (!baselineSha) throw new Error('E5_BASELINE_SHA is required')
 
 const outDir = path.join(repoRoot, 'artifacts/evidence/auth-002/e5-generation')
@@ -54,8 +60,8 @@ if (usesBetterAuth) {
         repository: 'wanghuinet/luckread',
         testedCommitSha: testedCommit,
         historicalBaselineSha: baselineSha,
-        payloadVersion: '3.90.2',
-        d1AdapterVersion: '3.90.2',
+        payloadVersion: currentPayloadVersion,
+        postgresAdapterVersion: currentPostgresAdapterVersion,
         result: 'NOT_APPLICABLE',
         reason:
           'W01 identity authentication is owned by Better Auth; Payload native Users auth migration generation is intentionally disabled.',
@@ -141,8 +147,8 @@ fs.writeFileSync(path.join(outDir, 'generation-manifest.json'), JSON.stringify({
   repository: 'wanghuinet/luckread',
   testedCommitSha: testedCommit,
   historicalBaselineSha: baselineSha,
-  payloadVersion: '3.90.2',
-  d1AdapterVersion: '3.90.2',
+  payloadVersion: currentPayloadVersion,
+  postgresAdapterVersion: currentPostgresAdapterVersion,
   generationCommand: 'pnpm exec payload migrate:create MIG-AUTH-002-SESSION-V1 --skip-empty',
   baselineGenerationCommand: 'pnpm exec payload migrate:create E5_BASELINE_FIXTURE --skip-empty',
   baselineConfigProvenance: baselineSha,
