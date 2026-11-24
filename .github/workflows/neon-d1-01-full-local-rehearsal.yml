@@ -102,7 +102,7 @@ jobs:
             throw new Error('Better Auth runtime pin drifted')
           }
           if (pkg.devDependencies.auth !== '1.7.27' || cli.version !== '1.7.27' ||
-              pkg.devDependencies.pg !== '8.20.0') {
+              pkg.dependencies.pg !== '8.23.1' || pkg.devDependencies.pg !== undefined) {
             throw new Error('Better Auth CLI / pg pin drifted')
           }
           console.log('W02 schema toolchain pins: PASS')
