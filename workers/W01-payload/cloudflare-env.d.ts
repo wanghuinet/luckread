@@ -1,5 +1,8 @@
 interface CloudflareEnv {
-  D1: D1Database
+  HYPERDRIVE: {
+    connectionString: string
+  }
+  PAYLOAD_DATABASE_DRIVER: 'neon'
   R2: R2Bucket
   ASSETS: Fetcher
   PAYLOAD_SECRET: string
