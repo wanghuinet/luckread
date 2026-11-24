@@ -7,7 +7,7 @@ W01's active Payload runtime uses the official `@payloadcms/db-postgres@3.94.1` 
 - `@payloadcms/db-postgres@3.94.1` and `pg@8.20.0` are runtime dependencies.
 - The upstream Payload 3.94.1 adapter contains the PostgreSQL bootstrap pool-client release fix; no local patch is applied.
 - R2 remains the media/object store through Payload's official R2 storage integration.
-- Next.js 16.4.6, React 19.3.1, TypeScript 6.0.3, OpenNext 1.20.18, Wrangler 4.167.0, and Node 24.22.3 form the validated upgrade baseline.
+- Next.js 16.4.6, React 19.3.1, TypeScript 6.0.3, OpenNext 1.20.18, Wrangler 4.166.0, and Node 24.22.3 form the validated upgrade baseline.
 
 ## Historical migration sources
 
