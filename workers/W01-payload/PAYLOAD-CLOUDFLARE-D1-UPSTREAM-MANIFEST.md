@@ -1,8 +1,8 @@
-# Payload Cloudflare D1 Upstream Manifest
+# Payload Cloudflare D1 Upstream Manifest — Historical Provenance
 
-Status: RECONCILE_PENDING
+Status: HISTORICAL_UPSTREAM_OBSERVATION_NOT_ACTIVE_RUNTIME
 
-## Upstream source
+## Upstream source observation
 
 - Repository: `payloadcms/payload`
 - Template: `templates/with-cloudflare-d1`
@@ -12,16 +12,11 @@ Status: RECONCILE_PENDING
 - Official template package manifest SHA: `b9d6de5442e65a7674e67f925f1b140f2d6738ef`
 - Official template: https://github.com/payloadcms/payload/tree/main/templates/with-cloudflare-d1
 
-## Baseline rule
+This file preserves the historical origin of W01's Cloudflare/OpenNext scaffold. The upstream D1 adapter and migration setup are not the active W01 database architecture.
 
-The official Payload Cloudflare D1 template is the W01 runtime source boundary. W01 MUST NOT be treated as a standard Payload scaffold with Cloudflare fixes added afterward.
+## Historical upstream package observation
 
-The template's runtime structure, Cloudflare bindings, OpenNext integration, D1 adapter, R2 integration, scripts, and engine requirements are the reference evidence for the Cloudflare shape. LuckRead-specific contracts and configuration are layered on top only where the applicable Mapping/Contract gates permit the move.
-
-## Historical upstream observation
-
-The following dependency versions belong specifically to the original upstream observation recorded by this manifest:
-
+The following versions belong only to the original upstream observation recorded by this manifest:
 - Payload: `3.82.1`
 - `@payloadcms/db-d1-sqlite`: `3.82.1`
 - `@payloadcms/next`: `3.82.1`
@@ -33,26 +28,31 @@ The following dependency versions belong specifically to the original upstream o
 - React / React DOM: `19.2.6`
 - Node engine: `>=24.15.0`
 
-These versions MUST NOT be represented as the current W01 package baseline without a fresh reconciliation.
+These are not the current W01 dependency versions.
 
-## Current repository state
+## Current W01 architecture (reconciled)
 
 - W01 directory: `workers/W01-payload/`
-- Current W01 package manifest is the authoritative source for the repository's locked dependency versions.
-- Current W01 package lock is Payload `3.90.2`, `@opennextjs/cloudflare` `1.20.1`, Next `16.2.6`, React / React DOM `19.2.6`, Node `>=24.15.0`.
-- W01 Wrangler binding targets D1 database `luckread`.
-- Existing LuckRead contracts and migrations remain protected; template reconciliation does not overwrite them.
+- Payload package family: `3.90.2`
+- `@opennextjs/cloudflare`: `1.20.1`
+- Next: `16.3.3` as declared by the current package manifest.
+- React / React DOM: `19.2.6`
+- Node engine: `>=24.15.0`
+- Database adapter: official `@payloadcms/db-postgres` through `src/neon-postgres-adapter.ts`.
+- Database connection: existing Hyperdrive binding `HYPERDRIVE`, with `PAYLOAD_DATABASE_DRIVER=neon`.
+- Active PostgreSQL migrations: `src/neon-postgres-migrations/`.
+- R2 integration remains the official Payload R2 storage plugin.
 
-## 2026-09-28 release-tag observation
+The active Worker configurations `wrangler.jsonc` and `wrangler.neon.jsonc` declare Neon Hyperdrive and do not declare a D1 database binding. The W01 package manifest does not include `@payloadcms/db-d1-sqlite`.
 
-The official Payload `v3.90.2` tag was inspected directly. Its `templates/with-cloudflare-d1/package.json` pins `payload` and the Payload package family to `3.90.0` (`package.json` blob `f10d83eb0f914b827bb5374e06136de7c525c8e2`). W01 is therefore a release-level package alignment to `3.90.2`, not a claim that the current upstream template manifest itself pins `3.90.2`.
+## Historical migration provenance
 
-This distinction is authoritative: **template structure comes from `with-cloudflare-d1`; W01 dependency pins are governed by LuckRead Change Control.**
+`src/migrations/` retains SQLite/D1 source migrations for schema lineage and reconciliation. These are not the active Payload migration directory and must never be executed against Neon PostgreSQL. The active migration authority is `src/neon-postgres-migrations/`.
 
-## Evidence rule
+The logical domain label `D1-01` may remain in migration/evidence contracts as historical ownership lineage. It does not mean that W01 uses a Cloudflare D1 database.
 
-Upstream template observation and dependency alignment do not establish runtime compatibility. W01 still requires actual dependency installation, type/lint validation, build, OpenNext output, D1 schema/migration, and runtime evidence before Mapping 0 can be promoted.
+## Evidence and safety
 
-## Gate
+The active Neon implementation is verified by the W01 PostgreSQL adapter, fail-closed database-driver resolver, local PostgreSQL 18 runtime rehearsal, and schema verifier. The historical upstream observation itself does not establish current runtime compatibility.
 
-This manifest does not declare Mapping 0 GREEN. It records the historical upstream Cloudflare D1 template observation and explicitly separates that observation from the current W01 dependency lock.
+No upstream Payload source is forked or patched by this manifest reconciliation. No remote schema application, production data change, Worker deployment, or traffic switch is authorized by this file.
