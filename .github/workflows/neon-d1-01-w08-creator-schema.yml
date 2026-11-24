@@ -14,6 +14,7 @@ on:
       - 'workers/W08-creator/src/neon/**'
       - 'workers/W08-creator/scripts/neon/**'
       - 'workers/W08-creator/package.json'
+      - 'workers/W08-creator/package-lock.json'
       - 'workers/W08-creator/wrangler.jsonc'
       - 'workers/W08-creator/README-neon-postgres-schema.md'
 
