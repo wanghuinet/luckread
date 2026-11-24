@@ -76,7 +76,7 @@ jobs:
             queue_action="preexisting"
           else
             echo "CREATE $QUEUE"
-            npx --yes wrangler@4.116.0 queues create "$QUEUE"
+            npx --yes wrangler@4.166.0 queues create "$QUEUE"
             queue_action="created"
           fi
 
@@ -85,7 +85,7 @@ jobs:
             dlq_action="preexisting"
           else
             echo "CREATE $DLQ"
-            npx --yes wrangler@4.116.0 queues create "$DLQ"
+            npx --yes wrangler@4.166.0 queues create "$DLQ"
             dlq_action="created"
           fi
 
