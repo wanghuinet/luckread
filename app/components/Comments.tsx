@@ -232,6 +232,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
     if (!trimmed || submitting || trimmed.length > 10000) return;
     setSubmitting(true);
     setMessage('');
+    const viewerIdAtStart = currentUserId;
 
     const existing = pendingSubmissionRef.current;
     const key = existing && existing.body === trimmed ? existing.key : createIdempotencyKey();
@@ -256,6 +257,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
 
       // Re-read W05's authoritative page instead of retaining an optimistic,
       // local-only comment. The same content ID is used for GET and POST.
+      if (useAuthStore.getState().user?.id !== viewerIdAtStart) return;
       pendingSubmissionRef.current = null;
       setBody('');
       await loadComments();
@@ -265,11 +267,12 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
     } finally {
       setSubmitting(false);
     }
-  }, [body, contentId, loadComments, router, submitting]);
+  }, [body, contentId, currentUserId, loadComments, router, submitting]);
 
   const deleteOwnComment = useCallback(async (comment: ApiComment) => {
     if (!currentUserId || comment.authorUserId !== currentUserId || deletingIds.has(comment.id)) return;
 
+    const viewerIdAtStart = currentUserId;
     setDeletingIds((current) => new Set(current).add(comment.id));
     setMessage('');
     const key = pendingDeleteKeysRef.current[comment.id] || createIdempotencyKey();
@@ -277,10 +280,12 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
 
     try {
       await deleteCommentRequest(comment.id, key);
+      if (useAuthStore.getState().user?.id !== viewerIdAtStart) return;
       delete pendingDeleteKeysRef.current[comment.id];
       setComments((current) => current.filter((candidate) => candidate.id !== comment.id));
       setMessage('Reply deleted.');
     } catch (cause) {
+      if (useAuthStore.getState().user?.id !== viewerIdAtStart) return;
       if (cause instanceof CommentDeleteApiError && cause.status === 401) {
         router.push('/login' as never);
         return;
