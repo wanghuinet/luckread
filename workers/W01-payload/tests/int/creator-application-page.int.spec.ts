@@ -98,7 +98,7 @@ describe('creator qualification application page', () => {
     expect(accountGate).toBeGreaterThanOrEqual(0)
     expect(payloadSecretMutation).toBeGreaterThan(accountGate)
     expect(browserPreflight).toBeGreaterThan(accountGate)
-    expect(workflow).not.toContain('wrangler@4.116.0 d1 migrations apply "luckread" --remote --config wrangler.jsonc')
+    expect(workflow).not.toContain('wrangler@4.166.0 d1 migrations apply "luckread" --remote --config wrangler.jsonc')
     expect(workflow).toContain('already_applied_to_neon_luckread;schema_postflight_run=42558978832')
     expect(w01Deploy).toBeGreaterThan(browserPreflight)
     expect(liveRun).toBeGreaterThan(w01Deploy)
@@ -121,7 +121,7 @@ describe('creator qualification application page', () => {
 
     expect(workflow).toContain("const w01 = read('workers/W01-payload/wrangler.neon.jsonc')")
     expect(workflow).toContain("opennextjs-cloudflare build --config=wrangler.neon.jsonc")
-    expect(workflow).toContain("wrangler@4.156.0 deploy --config wrangler.neon.jsonc")
+    expect(workflow).toContain("wrangler@4.166.0 deploy --config wrangler.neon.jsonc")
     expect(workflow).toContain("production Neon config must not bind Cloudflare D1")
     expect(workflow).toContain("readFileSync('wrangler.neon.jsonc','utf8')")
     expect(workflow).not.toContain('pnpm exec opennextjs-cloudflare build\\n')
