@@ -2,7 +2,7 @@
 
 ## Status
 
-`CONTRACTED_NOT_EXECUTED / NOT_GREEN`
+`SUPERSEDED_NOT_APPLICABLE_TO_W01_NATIVE_SESSION_RUNTIME`
 
 ## Runtime authority
 
@@ -84,3 +84,6 @@ It does not prove:
 ## Current status
 
 `WAITING_FOR_GENERATED_ARTIFACT`
+
+
+> **Superseded for the active identity runtime (2026-11-24):** W01 `Users` uses `betterAuthPayloadStrategy` with Payload's local strategy disabled. W02 Better Auth 1.7.27 on Neon PostgreSQL is the authoritative identity/session runtime. Do not generate or apply a separate Payload-native session migration from this legacy contract. The historical D1/SQLite and Payload-native session wording below is retained only as provenance.
