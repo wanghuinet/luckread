@@ -117,7 +117,7 @@ jobs:
 
       - name: Install pinned W02 toolchain
         working-directory: workers/W02-identity
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Verify L8 PostgreSQL migration generator is deterministic and isolated from D1-01 baseline
         working-directory: workers/W02-identity
