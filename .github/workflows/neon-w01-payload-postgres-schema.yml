@@ -59,7 +59,9 @@ jobs:
           run_install: false
 
       - name: Regenerate root npm lockfile from the pinned Payload/Next package manifest
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+        run: |
+          rm -f package-lock.json
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
       - name: Regenerate W01 frozen lockfile from pinned package versions
         working-directory: workers/W01-payload
