@@ -175,15 +175,11 @@ describe('W03 Neon Collection member removal', () => {
       .rejects.toMatchObject({ code: 'IDEMPOTENCY_IN_PROGRESS', status: 409 })
   })
 
-  it('routes DELETE through Neon without querying D1', async () => {
+  it('routes DELETE through Neon', async () => {
     const remove = vi.fn(async (_input: Parameters<CollectionMemberRemoveStore['remove']>[0]) => undefined)
     const store: CollectionMemberRemoveStore = {
       loadMutation: vi.fn(async () => snapshot),
       remove,
-    }
-    const db = {
-      prepare() { throw new Error('D1 must not be queried for Neon Collection member removal') },
-      batch() { throw new Error('D1 must not be used for Neon Collection member removal') },
     }
     const worker = createW03ContentWorker({
       collectionMemberRemoveStoreProvider: () => store,
@@ -201,7 +197,7 @@ describe('W03 Neon Collection member removal', () => {
           'Idempotency-Key': 'collection-member-remove-neon-key',
         },
       }),
-      { D1_02: db } as never,
+      {} as never,
     )
 
     expect(response.status).toBe(200)
@@ -219,45 +215,6 @@ describe('W03 Neon Collection member removal', () => {
       nextVersion: 5,
       collectionEtag: 'W/"5"',
     })
-  })
-
-  it('keeps the original D1 batch implementation as the default', async () => {
-    const preparedSql: string[] = []
-    let batchStatements: unknown[] = []
-    const db = {
-      prepare(sql: string) {
-        preparedSql.push(sql)
-        return {
-          bind() {
-            return {
-              async first() { return snapshot },
-            }
-          },
-        }
-      },
-      async batch(statements: unknown[]) {
-        batchStatements = statements
-        return []
-      },
-    }
-
-    const result = await removeCollectionMember(
-      db as never,
-      'creator_1',
-      'collection_1',
-      'content_1',
-      'W/"4"',
-      'd1-remove-key',
-      new Date('2026-11-16T04:00:00.000Z'),
-    )
-
-    expect(result).toMatchObject({
-      member: { collectionId: 'collection_1', contentId: 'content_1', position: 2 },
-      collectionVersion: 5,
-      collectionEtag: 'W/"5"',
-    })
-    expect(batchStatements).toHaveLength(6)
-    expect(preparedSql.some(sql => sql.includes("UPDATE content_relationships SET status = 'REVOKED'"))).toBe(true)
   })
 
 })

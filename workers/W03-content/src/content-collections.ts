@@ -1,4 +1,4 @@
-import { ContentRuntimeError, decodeScopedCursor, encodeScopedCursor, type ContentD1 } from './content-runtime.js'
+import { ContentRuntimeError, decodeScopedCursor, encodeScopedCursor } from './content-runtime.js'
 
 export type CollectionState =
   | 'DRAFT'
@@ -38,20 +38,6 @@ export interface CollectionListReadStore {
     cursor: CollectionListCursor | null,
     limit: number,
   ): Promise<readonly CollectionRecord[]>
-}
-
-interface CollectionRow {
-  id: string
-  owner_user_id: string
-  creator_id: string
-  state: CollectionState
-  version: number
-  title: string
-  description: string
-  cover_ref: string | null
-  etag: string
-  created_at: string
-  updated_at: string
 }
 
 export interface IdempotencyRow {
@@ -130,16 +116,6 @@ export interface CollectionDeleteStore {
   }>): Promise<void>
 }
 
-interface CollectionWithIdempotencyRow extends CollectionRow {
-  idem_id: string | null
-  idem_owner_user_id: string | null
-  idem_request_hash: string | null
-  idem_status: 'IN_PROGRESS' | 'COMPLETED' | null
-  idem_response_status: number | null
-  idem_response_json: string | null
-  idem_expires_at: string | null
-}
-
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
 const EDITABLE_STATES = new Set<CollectionState>(['DRAFT', 'REJECTED', 'UNPUBLISHED', 'RESTORED'])
 
@@ -188,20 +164,6 @@ const parseStored = (value: string | null): unknown => {
   if (!value) return null
   try { return JSON.parse(value) } catch { return null }
 }
-
-const toCollection = (row: CollectionRow): CollectionRecord => ({
-  id: row.id,
-  ownerUserId: row.owner_user_id,
-  creatorId: row.creator_id,
-  state: row.state,
-  version: row.version,
-  title: row.title,
-  description: row.description,
-  coverRef: row.cover_ref,
-  etag: row.etag,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-})
 
 const normalizeInput = (input: unknown): {
   title: string
@@ -263,276 +225,82 @@ const activeIdempotency = (
   }
 }
 
-const batchMutation = async (db: ContentD1, statements: D1PreparedStatement[]): Promise<void> => {
-  try {
-    await db.batch(statements)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    if (/unique constraint failed: content_mutation_idempotency./i.test(message)) {
-      throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
-    }
-    if (/CHECK constraint failed: successful|content_txn_guard/i.test(message)) {
-      throw new ContentRuntimeError('PRECONDITION_FAILED', 412)
-    }
-    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
-  }
-}
-
-const atomicGuard = (db: ContentD1): D1PreparedStatement =>
-  db.prepare('INSERT OR REPLACE INTO content_txn_guard(id, successful) VALUES (1, changes())')
-
-const loadIdempotency = async (
-  db: ContentD1,
-  ownerUserId: string,
-  operationId: string,
-  idempotencyKey: string,
-): Promise<IdempotencyRow | null> =>
-  db.prepare(
-    'SELECT id, owner_user_id, request_hash, status, response_status, response_json, expires_at ' +
-    'FROM content_mutation_idempotency ' +
-    'WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? ' +
-    'ORDER BY created_at DESC LIMIT 1',
-  ).bind(ownerUserId, operationId, idempotencyKey).first<IdempotencyRow>()
-
-const expireIdempotency = (
-  db: ContentD1,
-  ownerUserId: string,
-  operationId: string,
-  idempotencyKey: string,
-  nowIso: string,
-): D1PreparedStatement =>
-  db.prepare(
-    'DELETE FROM content_mutation_idempotency ' +
-    'WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? AND expires_at <= ?',
-  ).bind(ownerUserId, operationId, idempotencyKey, nowIso)
-
-const insertIdempotency = (
-  db: ContentD1,
-  ownerUserId: string,
-  operationId: string,
-  idempotencyKey: string,
-  hash: string,
-  status: number,
-  body: string,
-  nowIso: string,
-  expiresAt: string,
-): D1PreparedStatement =>
-  db.prepare(
-    'INSERT INTO content_mutation_idempotency ' +
-    '(id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at) ' +
-    "VALUES (?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?)",
-  ).bind(
-    crypto.randomUUID(), ownerUserId, operationId, idempotencyKey, hash,
-    status, body, nowIso, expiresAt,
-  )
-
 const listPageSize = (limit: number): number =>
   Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
 
-const loadCollectionMutation = async (
-  db: ContentD1,
-  principalUserId: string,
-  collectionId: string,
-  operationId: string,
-  idempotencyKey: string,
-): Promise<CollectionMutationSnapshot> => {
-  const row = await db.prepare(
-    'SELECT ' +
-    's.id, s.owner_user_id, s.creator_id, s.state, s.version, s.title, s.description, ' +
-    's.cover_ref, s.etag, s.created_at, s.updated_at, ' +
-    'i.id AS idem_id, i.owner_user_id AS idem_owner_user_id, i.request_hash AS idem_request_hash, ' +
-    'i.status AS idem_status, i.response_status AS idem_response_status, i.response_json AS idem_response_json, ' +
-    'i.expires_at AS idem_expires_at ' +
-    'FROM content_collections s ' +
-    'LEFT JOIN (SELECT id, owner_user_id, request_hash, status, response_status, response_json, expires_at ' +
-    'FROM content_mutation_idempotency WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? ' +
-    'ORDER BY created_at DESC LIMIT 1) i ON 1 = 1 ' +
-    'WHERE s.id = ? AND s.owner_user_id = ?',
-  ).bind(principalUserId, operationId, idempotencyKey, collectionId, principalUserId).first<CollectionWithIdempotencyRow>()
-
-  if (!row) return { collection: null, idempotency: null }
-  return {
-    collection: toCollection(row),
-    idempotency: row.idem_id
-      ? {
-        id: row.idem_id,
-        owner_user_id: row.idem_owner_user_id ?? principalUserId,
-        request_hash: row.idem_request_hash ?? '',
-        status: row.idem_status ?? 'COMPLETED',
-        response_status: row.idem_response_status,
-        response_json: row.idem_response_json,
-        expires_at: row.idem_expires_at ?? '',
-      }
-      : null,
-  }
-}
-
 export async function createCollection(
-  db: ContentD1,
-  ownerUserId: string,
-  input: unknown,
-  idempotencyKey: string,
-  now = new Date(),
-  createStore?: CollectionCreateStore,
+  createStore: CollectionCreateStore, ownerUserId: string, input: unknown, idempotencyKey: string, now = new Date(),
 ): Promise<CollectionRecord> {
   assertResourceId(ownerUserId)
-  if (!idempotencyKey || idempotencyKey.length > 256) {
-    throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
-  }
+  if (!idempotencyKey || idempotencyKey.length > 256) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
   const normalized = normalizeInput(input)
   const operationId = 'createCollection'
   const hash = await requestHash(operationId, { ownerUserId, input: normalized })
-  const existing = createStore
-    ? await createStore.loadIdempotency(ownerUserId, operationId, idempotencyKey)
-    : await loadIdempotency(db, ownerUserId, operationId, idempotencyKey)
+  const existing = await createStore.loadIdempotency(ownerUserId, operationId, idempotencyKey)
   const replay = activeIdempotency(existing && {
-    idem_id: existing.id,
-    idem_owner_user_id: existing.owner_user_id,
-    idem_request_hash: existing.request_hash,
-    idem_status: existing.status,
-    idem_response_status: existing.response_status,
-    idem_response_json: existing.response_json,
-    idem_expires_at: existing.expires_at,
+    idem_id: existing.id, idem_owner_user_id: existing.owner_user_id, idem_request_hash: existing.request_hash,
+    idem_status: existing.status, idem_response_status: existing.response_status,
+    idem_response_json: existing.response_json, idem_expires_at: existing.expires_at,
   }, ownerUserId, hash, now)
   if (replay.replayed) {
     if (!replay.body || typeof replay.body !== 'object') throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
     return replay.body as CollectionRecord
   }
-  const collectionId = crypto.randomUUID()
   const createdAt = now.toISOString()
   const collection: CollectionRecord = {
-    id: collectionId,
-    ownerUserId,
-    creatorId: ownerUserId,
-    state: 'DRAFT',
-    version: 1,
-    title: normalized.title,
-    description: normalized.description,
-    coverRef: normalized.coverRef,
-    etag: etagForVersion(1),
-    createdAt,
-    updatedAt: createdAt,
+    id: crypto.randomUUID(), ownerUserId, creatorId: ownerUserId, state: 'DRAFT', version: 1,
+    title: normalized.title, description: normalized.description, coverRef: normalized.coverRef,
+    etag: etagForVersion(1), createdAt, updatedAt: createdAt,
   }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  if (createStore) {
-    await createStore.create({
-      ownerUserId,
-      operationId,
-      idempotencyKey,
-      requestHash: hash,
-      responseJson: JSON.stringify(collection),
-      createdAt,
-      expiresAt,
-      collection,
-    })
-  } else {
-    await batchMutation(db, [
-      expireIdempotency(db, ownerUserId, operationId, idempotencyKey, createdAt),
-      insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(collection), createdAt, expiresAt),
-      db.prepare(
-        'INSERT INTO content_collections ' +
-        '(id, owner_user_id, creator_id, state, version, title, description, cover_ref, etag, created_at, updated_at) ' +
-        "VALUES (?, ?, ?, 'DRAFT', 1, ?, ?, ?, ?, ?, ?)",
-      ).bind(
-        collectionId, ownerUserId, ownerUserId, normalized.title, normalized.description,
-        normalized.coverRef, collection.etag, createdAt, createdAt,
-      ),
-      atomicGuard(db),
-    ])
-  }
+  await createStore.create({ ownerUserId, operationId, idempotencyKey, requestHash: hash,
+    responseJson: JSON.stringify(collection), createdAt, expiresAt, collection })
   return collection
 }
 
+
 export async function getCollection(
-  db: ContentD1,
-  principalUserId: string,
-  collectionId: string,
-  readStore?: CollectionListReadStore,
+  readStore: CollectionListReadStore, principalUserId: string, collectionId: string,
 ): Promise<CollectionRecord> {
   assertResourceId(principalUserId)
   assertResourceId(collectionId)
-  if (readStore) {
-    const collection = await readStore.getCollection(principalUserId, collectionId)
-    if (!collection) throw new ContentRuntimeError('NOT_FOUND', 404)
-    return collection
-  }
-  const row = await db.prepare(
-    'SELECT id, owner_user_id, creator_id, state, version, title, description, ' +
-    'cover_ref, etag, created_at, updated_at FROM content_collections WHERE id = ? AND owner_user_id = ?',
-  ).bind(collectionId, principalUserId).first<CollectionRow>()
-  if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
-  return toCollection(row)
+  const collection = await readStore.getCollection(principalUserId, collectionId)
+  if (!collection) throw new ContentRuntimeError('NOT_FOUND', 404)
+  return collection
 }
 
+
 export async function listCreatorCollections(
-  db: ContentD1,
-  ownerUserId: string,
-  cursor: string | null,
-  limit: number,
-  readStore?: CollectionListReadStore,
+  readStore: CollectionListReadStore, ownerUserId: string, cursor: string | null, limit: number,
 ): Promise<{ items: CollectionRecord[]; nextCursor: string | null; hasMore: boolean }> {
   assertResourceId(ownerUserId)
   const pageSize = listPageSize(limit)
   const cursorScope = JSON.stringify({ type: 'creator-collections', ownerUserId })
   const decoded = cursor ? decodeScopedCursor(cursor, cursorScope) : null
-  let rows: readonly CollectionRecord[]
-  if (readStore) {
-    rows = await readStore.listCreatorCollections(ownerUserId, decoded, pageSize + 1)
-  } else {
-    const cursorClause = decoded ? 'AND (updated_at < ? OR (updated_at = ? AND id < ?))' : ''
-    const bindings: unknown[] = [ownerUserId]
-    if (decoded) bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
-    bindings.push(pageSize + 1)
-    const result = await db.prepare(
-      'SELECT id, owner_user_id, creator_id, state, version, title, description, ' +
-      'cover_ref, etag, created_at, updated_at FROM content_collections ' +
-      'WHERE owner_user_id = ? ' + cursorClause +
-      ' ORDER BY updated_at DESC, id DESC LIMIT ?',
-    ).bind(...bindings).all<CollectionRow>()
-    rows = result.results.map(toCollection)
-  }
+  const rows = await readStore.listCreatorCollections(ownerUserId, decoded, pageSize + 1)
   const hasMore = rows.length > pageSize
   const page = rows.slice(0, pageSize)
   const last = page.at(-1)
-  return {
-    items: page,
-    hasMore,
-    nextCursor: hasMore && last
-      ? encodeScopedCursor(last.updatedAt, last.id, cursorScope)
-      : null,
-  }
+  return { items: [...page], hasMore,
+    nextCursor: hasMore && last ? encodeScopedCursor(last.updatedAt, last.id, cursorScope) : null }
 }
 
+
 export async function updateCollection(
-  db: ContentD1,
-  principalUserId: string,
-  collectionId: string,
-  input: unknown,
-  ifMatch: string,
-  idempotencyKey: string,
-  now = new Date(),
-  updateStore?: CollectionUpdateStore,
+  updateStore: CollectionUpdateStore, principalUserId: string, collectionId: string,
+  input: unknown, ifMatch: string, idempotencyKey: string, now = new Date(),
 ): Promise<CollectionRecord> {
   assertResourceId(principalUserId)
   assertResourceId(collectionId)
   if (!ifMatch || !idempotencyKey) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
   const normalized = normalizeInput(input)
   const operationId = 'updateCollection'
-  const hash = await requestHash(operationId, {
-    collectionId,
-    input: normalized,
-    ifMatch: normalizeEtag(ifMatch),
-  })
-  const loaded = updateStore
-    ? await updateStore.loadMutation(principalUserId, collectionId, operationId, idempotencyKey)
-    : await loadCollectionMutation(db, principalUserId, collectionId, operationId, idempotencyKey)
+  const hash = await requestHash(operationId, { collectionId, input: normalized, ifMatch: normalizeEtag(ifMatch) })
+  const loaded = await updateStore.loadMutation(principalUserId, collectionId, operationId, idempotencyKey)
   const replay = activeIdempotency(loaded.idempotency && {
-    idem_id: loaded.idempotency.id,
-    idem_owner_user_id: loaded.idempotency.owner_user_id,
-    idem_request_hash: loaded.idempotency.request_hash,
-    idem_status: loaded.idempotency.status,
-    idem_response_status: loaded.idempotency.response_status,
-    idem_response_json: loaded.idempotency.response_json,
+    idem_id: loaded.idempotency.id, idem_owner_user_id: loaded.idempotency.owner_user_id,
+    idem_request_hash: loaded.idempotency.request_hash, idem_status: loaded.idempotency.status,
+    idem_response_status: loaded.idempotency.response_status, idem_response_json: loaded.idempotency.response_json,
     idem_expires_at: loaded.idempotency.expires_at,
   }, principalUserId, hash, now)
   if (replay.replayed) {
@@ -545,71 +313,30 @@ export async function updateCollection(
   if (!EDITABLE_STATES.has(collection.state)) throw new ContentRuntimeError('INVALID_STATE', 409)
   const updatedAt = now.toISOString()
   const nextVersion = collection.version + 1
-  const updated: CollectionRecord = {
-    ...collection,
-    title: normalized.title,
-    description: normalized.description,
-    coverRef: normalized.coverRef,
-    version: nextVersion,
-    etag: etagForVersion(nextVersion),
-    updatedAt,
-  }
+  const updated: CollectionRecord = { ...collection, title: normalized.title, description: normalized.description,
+    coverRef: normalized.coverRef, version: nextVersion, etag: etagForVersion(nextVersion), updatedAt }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  if (updateStore) {
-    await updateStore.update({
-      ownerUserId: principalUserId,
-      operationId,
-      idempotencyKey,
-      requestHash: hash,
-      responseJson: JSON.stringify(updated),
-      updatedAt,
-      expiresAt,
-      expectedVersion: collection.version,
-      expectedEtag: collection.etag,
-      collection: updated,
-    })
-  } else {
-    await batchMutation(db, [
-      expireIdempotency(db, principalUserId, operationId, idempotencyKey, updatedAt),
-      insertIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(updated), updatedAt, expiresAt),
-      db.prepare(
-        'UPDATE content_collections SET title = ?, description = ?, cover_ref = ?, version = ?, etag = ?, updated_at = ? ' +
-        'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
-      ).bind(
-        updated.title, updated.description, updated.coverRef, updated.version, updated.etag,
-        updatedAt, collection.id, principalUserId, collection.version, collection.etag,
-      ),
-      atomicGuard(db),
-    ])
-  }
+  await updateStore.update({ ownerUserId: principalUserId, operationId, idempotencyKey, requestHash: hash,
+    responseJson: JSON.stringify(updated), updatedAt, expiresAt, expectedVersion: collection.version,
+    expectedEtag: collection.etag, collection: updated })
   return updated
 }
 
 
 export async function deleteCollection(
-  db: ContentD1,
-  principalUserId: string,
-  collectionId: string,
-  ifMatch: string,
-  idempotencyKey: string,
-  now = new Date(),
-  deleteStore?: CollectionDeleteStore,
+  deleteStore: CollectionDeleteStore, principalUserId: string, collectionId: string,
+  ifMatch: string, idempotencyKey: string, now = new Date(),
 ): Promise<void> {
   assertResourceId(principalUserId)
   assertResourceId(collectionId)
   if (!ifMatch || !idempotencyKey) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
   const operationId = 'deleteCollection'
   const hash = await requestHash(operationId, { collectionId, ifMatch: normalizeEtag(ifMatch) })
-  const loaded = deleteStore
-    ? await deleteStore.loadMutation(principalUserId, collectionId, operationId, idempotencyKey)
-    : await loadCollectionMutation(db, principalUserId, collectionId, operationId, idempotencyKey)
+  const loaded = await deleteStore.loadMutation(principalUserId, collectionId, operationId, idempotencyKey)
   const replay = activeIdempotency(loaded.idempotency && {
-    idem_id: loaded.idempotency.id,
-    idem_owner_user_id: loaded.idempotency.owner_user_id,
-    idem_request_hash: loaded.idempotency.request_hash,
-    idem_status: loaded.idempotency.status,
-    idem_response_status: loaded.idempotency.response_status,
-    idem_response_json: loaded.idempotency.response_json,
+    idem_id: loaded.idempotency.id, idem_owner_user_id: loaded.idempotency.owner_user_id,
+    idem_request_hash: loaded.idempotency.request_hash, idem_status: loaded.idempotency.status,
+    idem_response_status: loaded.idempotency.response_status, idem_response_json: loaded.idempotency.response_json,
     idem_expires_at: loaded.idempotency.expires_at,
   }, principalUserId, hash, now)
   if (replay.replayed) return
@@ -623,33 +350,8 @@ export async function deleteCollection(
   const nextVersion = collection.version + 1
   const nextEtag = etagForVersion(nextVersion)
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  if (deleteStore) {
-    await deleteStore.delete({
-      ownerUserId: principalUserId,
-      operationId,
-      idempotencyKey,
-      requestHash: hash,
-      deletedAt,
-      expiresAt,
-      collectionId: collection.id,
-      expectedVersion: collection.version,
-      expectedEtag: collection.etag,
-      nextVersion,
-      nextEtag,
-    })
-    return
-  }
-  await batchMutation(db, [
-    expireIdempotency(db, principalUserId, operationId, idempotencyKey, deletedAt),
-    insertIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 204, '', deletedAt, expiresAt),
-    db.prepare(
-      "UPDATE content_collections SET state = 'DELETED', version = ?, etag = ?, updated_at = ? " +
-      'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
-    ).bind(
-      nextVersion, nextEtag, deletedAt,
-      collection.id, principalUserId, collection.version, collection.etag,
-    ),
-    atomicGuard(db),
-  ])
+  await deleteStore.delete({ ownerUserId: principalUserId, operationId, idempotencyKey, requestHash: hash,
+    deletedAt, expiresAt, collectionId: collection.id, expectedVersion: collection.version,
+    expectedEtag: collection.etag, nextVersion, nextEtag })
 }
 

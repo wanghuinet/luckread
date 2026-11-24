@@ -4,11 +4,11 @@ import { decodeScopedCursor, searchPublishedContents } from './content-runtime.j
 
 const contentRow = (overrides: Record<string, unknown> = {}) => ({
   id: 'content_1',
-  content_type: 'post',
+  content_type: 'post' as const,
   owner_user_id: 'user_1',
   creator_id: 'user_1',
   ip_id: null,
-  state: 'PUBLISHED',
+  state: 'PUBLISHED' as const,
   scheduled_at: null,
   version: 1,
   revision: 1,
@@ -39,8 +39,8 @@ describe('W03 published content search', () => {
       expect(input).toMatchObject({ query: 'LuckRead', cursor: null, limit: 2 })
       return rows.slice(0, input.limit)
     })
-    const store = { list: async () => rows, search }
-    const firstPage = await searchPublishedContents({} as never, 'LuckRead', null, 1, store)
+    const store = { list: async (_input: { cursor: { createdAt: string; id: string } | null; limit: number; creatorId: string | null; ownerUserId: string | null; contentType: 'post' | 'article' | 'video' | null }) => rows, search }
+    const firstPage = await searchPublishedContents(store, 'LuckRead', null, 1)
 
     expect(firstPage.items).toHaveLength(1)
     expect(firstPage.items[0]?.id).toBe('content_1')
@@ -54,15 +54,15 @@ describe('W03 published content search', () => {
     )
     expect(cursor).toEqual({ updatedAt: '2026-10-20T00:00:00.000Z', id: 'content_1' })
 
-    await expect(searchPublishedContents({} as never, 'other query', firstPage.nextCursor, 1, store))
+    await expect(searchPublishedContents(store, 'other query', firstPage.nextCursor, 1))
       .rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
   })
 
   it('rejects an empty or oversized query', async () => {
-    const store = { list: async () => [], search: async () => [] }
-    await expect(searchPublishedContents({} as never, '   ', null, 20, store))
+    const store = { list: async (_input: { cursor: { createdAt: string; id: string } | null; limit: number; creatorId: string | null; ownerUserId: string | null; contentType: 'post' | 'article' | 'video' | null }) => [], search: async (_input: { query: string; cursor: { createdAt: string; id: string } | null; limit: number }) => [] }
+    await expect(searchPublishedContents(store, '   ', null, 20))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
-    await expect(searchPublishedContents({} as never, 'x'.repeat(257), null, 20, store))
+    await expect(searchPublishedContents(store, 'x'.repeat(257), null, 20))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
   })
 

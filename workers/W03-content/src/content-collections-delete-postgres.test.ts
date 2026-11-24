@@ -107,61 +107,6 @@ function createDatabase(options: { duplicateIdempotency?: boolean; updateNoMatch
 }
 
 describe('W03 Neon Collection deletion', () => {
-  it('preserves the original D1 batch delete as the default', async () => {
-    const preparedSql: string[] = []
-    let batchStatements: unknown[] = []
-    const d1Row = {
-      id: existing.id,
-      owner_user_id: existing.ownerUserId,
-      creator_id: existing.creatorId,
-      state: existing.state,
-      version: existing.version,
-      title: existing.title,
-      description: existing.description,
-      cover_ref: existing.coverRef,
-      etag: existing.etag,
-      created_at: existing.createdAt,
-      updated_at: existing.updatedAt,
-      idem_id: null,
-      idem_owner_user_id: null,
-      idem_request_hash: null,
-      idem_status: null,
-      idem_response_status: null,
-      idem_response_json: null,
-      idem_expires_at: null,
-    }
-    const database = {
-      prepare(sql: string) {
-        preparedSql.push(sql)
-        return {
-          bind() {
-            return {
-              async first() { return d1Row },
-            }
-          },
-        }
-      },
-      async batch(statements: unknown[]) {
-        batchStatements = statements
-        return []
-      },
-    }
-
-    await deleteCollection(
-      database as never,
-      existing.ownerUserId,
-      existing.id,
-      existing.etag,
-      'd1-delete-key',
-      new Date('2026-11-16T01:00:00.000Z'),
-    )
-
-    expect(batchStatements).toHaveLength(4)
-    expect(preparedSql.some(sql => sql.includes('FROM content_collections s'))).toBe(true)
-    expect(preparedSql.some(sql => sql.startsWith('UPDATE content_collections'))).toBe(true)
-    expect(preparedSql.some(sql => sql.includes('content_txn_guard'))).toBe(true)
-  })
-
   it('loads the existing owner-scoped Collection mutation snapshot from PostgreSQL', async () => {
     const fixture = createDatabase()
     const store = createPostgresCollectionDeleteStore(fixture.database)
@@ -274,7 +219,7 @@ describe('W03 Neon Collection deletion', () => {
           'Idempotency-Key': 'collection-delete-neon-key',
         },
       }),
-      { D1_02: database } as never,
+      {} as never,
     )
 
     expect(response.status).toBe(204)

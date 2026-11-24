@@ -45,6 +45,7 @@ on:
       - 'workers/W03-content/src/content-revision-read-store-postgres.ts'
       - 'workers/W03-content/src/entry.ts'
       - 'workers/W03-content/src/neon/runtime.ts'
+      - 'workers/W03-content/src/**'
   workflow_dispatch:
     inputs:
       source_sha:
@@ -127,6 +128,7 @@ jobs:
           const providers = [
             ['publishedMediaReferenceReadStoreProvider', 'getW03PublishedMediaReferenceReadStore'],
             ['publishedContentsByIdsReadStoreProvider', 'getW03PublishedContentsByIdsReadStore'],
+            ['publicContentListReadStoreProvider', 'getW03PublicContentListReadStore'],
             ['followingOwnerContentsReadStoreProvider', 'getW03FollowingOwnerContentsReadStore'],
             ['postThreadReadStoreProvider', 'getW03PostThreadReadStore'],
             ['contentRelationshipMutationStoreProvider', 'getW03ContentRelationshipMutationStore'],
@@ -157,9 +159,28 @@ jobs:
               throw new Error('W03 Neon provider wiring is incomplete: ' + provider)
             }
           }
-          const productionRuntime = [entry, runtime, contentRuntime, router, relationships].join('\n')
-          if (/\b(?:env|context\.env)\.D1_02\b/.test(productionRuntime)) {
-            throw new Error('W03 production entrypoint still directly accesses the removed D1_02 binding')
+          const legacyServicePaths = [
+            'workers/W03-content/src/content-runtime.ts',
+            'workers/W03-content/src/content-series.ts',
+            'workers/W03-content/src/content-collections.ts',
+            'workers/W03-content/src/content-series-members.ts',
+            'workers/W03-content/src/content-collection-members.ts',
+            'workers/W03-content/src/content-relationships.ts',
+            'workers/W03-content/src/index.ts',
+          ]
+          for (const path of legacyServicePaths) {
+            const source = fs.readFileSync(path, 'utf8')
+            if (/\bContentD1\b|\bD1PreparedStatement\b|\bD1Result\b|\.prepare\s*\(|\.batch\s*\(/.test(source)) {
+              throw new Error(path + ' still contains a legacy D1 adapter or SQL fallback')
+            }
+          }
+          const productionRuntime = [entry, runtime, contentRuntime, router, relationships].join('\\n')
+          if (/\b(?:env|context\.env)\.D1_02\b|NO_LEGACY_DATABASE_HANDLE/.test(productionRuntime)) {
+            throw new Error('W03 production runtime still contains a legacy D1 binding or compatibility path')
+          }
+          if (!router.includes('const requireStore = <T>(store: T | undefined): T =>') ||
+              !router.includes("throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)")) {
+            throw new Error('W03 content routes must fail closed when a Neon Store is not injected')
           }
           if (!entry.includes('contentRevisionReadStoreProvider') ||
               !runtime.includes('getW03ContentRevisionReadStore') ||
@@ -204,7 +225,7 @@ jobs:
           if (!relationships.includes('mutationStore.create({') ||
               !relationships.includes('mutationStore.revoke({') ||
               !relationships.includes('mutationStore.appendThread({') ||
-              !router.includes('dependencies.contentRelationshipMutationStoreProvider?.(env),')) {
+              !router.includes('requireStore(dependencies.contentRelationshipMutationStoreProvider?.(env))')) {
             throw new Error('W03 Neon content relationship and post-thread mutation wiring is incomplete')
           }
           if (!contentRuntime.includes('mutationStore.listDueScheduled(nowIso, limit)') ||
