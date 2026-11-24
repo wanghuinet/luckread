@@ -165,7 +165,7 @@ jobs:
 
       - name: Validate W05 Notification Workflow bundle with Wrangler
         working-directory: workers/W05-social
-        run: npx --yes wrangler@4.116.0 deploy --dry-run --outdir /tmp/w05-notify-003-dry-run
+        run: npx --yes wrangler@4.166.0 deploy --dry-run --outdir /tmp/w05-notify-003-dry-run
 
       - name: Typecheck durable W05 push delivery and Workflow modules
         working-directory: workers/W01-payload
