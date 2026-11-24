@@ -40,8 +40,14 @@ const favoriteStatusCache = new Map<string, { value: { favorited: boolean }; exp
 
 const favoriteStatusKey = (actorUserId: string, targetId: string): string => actorUserId + '\\0' + targetId
 
-const pruneFavoriteStatusCache = (): void => {
+const pruneFavoriteStatusCache = (now: number): void => {
   if (favoriteStatusCache.size < FAVORITE_STATUS_CACHE_MAX_ENTRIES) return
+  // Expired status entries are cheaper to discard than still-valid state.
+  for (const [key, entry] of favoriteStatusCache) {
+    if (entry.expiresAt <= now) favoriteStatusCache.delete(key)
+    if (favoriteStatusCache.size < FAVORITE_STATUS_CACHE_MAX_ENTRIES) return
+  }
+  // Cache hits promote entries to the newest Map position (bounded LRU).
   const oldestKey = favoriteStatusCache.keys().next().value
   if (typeof oldestKey === 'string') favoriteStatusCache.delete(oldestKey)
 }
@@ -161,7 +167,11 @@ export async function getFavoriteStatus(
 
   const cached = favoriteStatusCache.get(cacheKey)
   if (cached) {
-    if (cached.expiresAt > Date.now()) return { ...cached.value }
+    if (cached.expiresAt > Date.now()) {
+      favoriteStatusCache.delete(cacheKey)
+      favoriteStatusCache.set(cacheKey, cached)
+      return { ...cached.value }
+    }
     favoriteStatusCache.delete(cacheKey)
   }
 
@@ -179,8 +189,9 @@ export async function getFavoriteStatus(
   }
 
   const value = { favorited }
-  pruneFavoriteStatusCache()
-  favoriteStatusCache.set(cacheKey, { value, expiresAt: Date.now() + FAVORITE_STATUS_CACHE_TTL_MS })
+  const now = Date.now()
+  pruneFavoriteStatusCache(now)
+  favoriteStatusCache.set(cacheKey, { value, expiresAt: now + FAVORITE_STATUS_CACHE_TTL_MS })
   return { ...value }
 }
 
