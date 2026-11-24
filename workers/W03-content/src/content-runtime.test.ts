@@ -46,6 +46,12 @@ const makeContentMutationStore = (
   },
   update,
   transition,
+  async delete() {},
+  async moderationTransition() {},
+  async loadRevision() { return null },
+  async rollback() {},
+  async listDueScheduled() { return [] },
+  async publishScheduled() { return 0 },
 })
 
 describe('W03 content contract core', () => {
@@ -92,12 +98,12 @@ describe('W03 content contract core', () => {
       },
     })
     let w07Calls = 0
-    let w07Request: Request | null = null
+    const w07Capture: { request?: Request } = {}
     const env = {
       W07_SUBSCRIPTION: {
         fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
           w07Calls += 1
-          w07Request = input instanceof Request ? input : new Request(input, init)
+          w07Capture.request = input instanceof Request ? input : new Request(input, init)
           return Response.json({
             data: { allowed: true, reason: 'ACTIVE_CREATOR_MEMBERSHIP' },
             requestId: 'req_w07_test',
@@ -136,7 +142,7 @@ describe('W03 content contract core', () => {
     }
 
     matchingRows = [publicPost]
-    const publicResponse = await neonWorker.fetch(request(publicUrl), env, {} as never)
+    const publicResponse = await neonWorker.fetch(request(publicUrl), env)
     expect(publicResponse.status).toBe(200)
     await expect(publicResponse.json()).resolves.toMatchObject({
       data: { isPublic: true, isMemberContent: false, allowed: true },
@@ -151,21 +157,21 @@ describe('W03 content contract core', () => {
       'X-LuckRead-Principal-User-Id': 'user_subscriber',
       'X-LuckRead-Principal-Layer': 'L2',
     })
-    const memberResponse = await neonWorker.fetch(memberRequest, env, {} as never)
+    const memberResponse = await neonWorker.fetch(memberRequest, env)
     expect(memberResponse.status).toBe(200)
     await expect(memberResponse.json()).resolves.toMatchObject({
       data: { isPublic: false, isMemberContent: true, allowed: true },
     })
     expect(w07Calls).toBe(1)
-    expect(w07Request?.url).toContain('/internal/entitlements/check-creator-membership')
-    expect(w07Request?.headers.get('X-LuckRead-Caller')).toBe('W03')
-    expect(w07Request?.headers.get('X-LuckRead-Principal-User-Id')).toBe('user_subscriber')
-    expect(w07Request?.headers.get('Cookie')).toBeNull()
-    expect(await w07Request?.json()).toEqual({ creatorId: 'creator_1' })
+    expect(w07Capture.request?.url).toContain('/internal/entitlements/check-creator-membership')
+    expect(w07Capture.request?.headers.get('X-LuckRead-Caller')).toBe('W03')
+    expect(w07Capture.request?.headers.get('X-LuckRead-Principal-User-Id')).toBe('user_subscriber')
+    expect(w07Capture.request?.headers.get('Cookie')).toBeNull()
+    expect(await w07Capture.request?.json()).toEqual({ creatorId: 'creator_1' })
 
     // Without a logged-in member, a member-only reference must not be exposed as public.
     w07Calls = 0
-    const anonymousMemberResponse = await neonWorker.fetch(request(publicUrl), env, {} as never)
+    const anonymousMemberResponse = await neonWorker.fetch(request(publicUrl), env)
     expect(anonymousMemberResponse.status).toBe(200)
     await expect(anonymousMemberResponse.json()).resolves.toMatchObject({
       data: { isPublic: false, isMemberContent: true, allowed: false },
@@ -175,7 +181,7 @@ describe('W03 content contract core', () => {
     // If a URL appears in both public and member-only content, membership wins:
     // it cannot become anonymous-public through the second reference.
     matchingRows = [publicPost, memberPost]
-    const mixedReferenceResponse = await neonWorker.fetch(request(publicUrl), env, {} as never)
+    const mixedReferenceResponse = await neonWorker.fetch(request(publicUrl), env)
     await expect(mixedReferenceResponse.json()).resolves.toMatchObject({
       data: { isPublic: false, isMemberContent: true, allowed: false },
     })
@@ -184,7 +190,6 @@ describe('W03 content contract core', () => {
     const unpublishedResponse = await neonWorker.fetch(
       request('https://img.luckread.com/media/draft-only.png'),
       env,
-      {} as never,
     )
     expect(unpublishedResponse.status).toBe(200)
     await expect(unpublishedResponse.json()).resolves.toMatchObject({
@@ -194,20 +199,18 @@ describe('W03 content contract core', () => {
     const unsupportedHostResponse = await neonWorker.fetch(
       request('https://attacker.example/media/photo.png'),
       env,
-      {} as never,
     )
     expect(unsupportedHostResponse.status).toBe(200)
     await expect(unsupportedHostResponse.json()).resolves.toMatchObject({
       data: { isPublic: false, isMemberContent: false, allowed: false },
     })
 
-    const untrustedCaller = await neonWorker.fetch(request(publicUrl, 'W04'), env, {} as never)
+    const untrustedCaller = await neonWorker.fetch(request(publicUrl, 'W04'), env)
     expect(untrustedCaller.status).toBe(403)
 
     const forwardedCredential = await neonWorker.fetch(
       request(publicUrl, 'W01', { Cookie: 'session=must-not-cross-service-boundary' }),
       env,
-      {} as never,
     )
     expect(forwardedCredential.status).toBe(403)
   })
@@ -270,7 +273,7 @@ describe('W03 content contract core', () => {
       },
     });
 
-    const denied = await neonWorker.fetch(makeRequest(), env, {} as never);
+    const denied = await neonWorker.fetch(makeRequest(), env);
     expect(denied.status).toBe(200);
     await expect(denied.json()).resolves.toMatchObject({
       id: 'content_member_1',
@@ -285,7 +288,7 @@ describe('W03 content contract core', () => {
     expect(providerCalls).toBe(1);
 
     allowed = true;
-    const entitled = await neonWorker.fetch(makeRequest(), env, {} as never);
+    const entitled = await neonWorker.fetch(makeRequest(), env);
     expect(entitled.status).toBe(200);
     await expect(entitled.json()).resolves.toMatchObject({
       creatorId: 'creator_1',
@@ -298,7 +301,7 @@ describe('W03 content contract core', () => {
     expect(providerCalls).toBe(2);
 
     reasonOverride = 'MEMBERSHIP_REQUIRED';
-    const contradictory = await neonWorker.fetch(makeRequest(), env, {} as never);
+    const contradictory = await neonWorker.fetch(makeRequest(), env);
     expect(contradictory.status).toBe(503);
     await expect(contradictory.json()).resolves.toMatchObject({
       error: { code: 'SERVICE_UNAVAILABLE' },
@@ -307,7 +310,7 @@ describe('W03 content contract core', () => {
 
     reasonOverride = null;
     providerStatus = 503;
-    const unavailable = await neonWorker.fetch(makeRequest(), env, {} as never);
+    const unavailable = await neonWorker.fetch(makeRequest(), env);
     expect(unavailable.status).toBe(503);
     await expect(unavailable.json()).resolves.toMatchObject({
       error: { code: 'SERVICE_UNAVAILABLE' },
@@ -388,7 +391,7 @@ describe('W03 content contract core', () => {
       },
     )
 
-    const denied = await neonWorker.fetch(makeRequest(), env, {} as never)
+    const denied = await neonWorker.fetch(makeRequest(), env)
     expect(denied.status).toBe(200)
     await expect(denied.json()).resolves.toMatchObject({
       contentId: 'content_public_1',
@@ -400,7 +403,7 @@ describe('W03 content contract core', () => {
     expect(contextLookups).toEqual([{ bodyRef, limit: 51 }])
 
     allowed = true
-    const entitled = await neonWorker.fetch(makeRequest(), env, {} as never)
+    const entitled = await neonWorker.fetch(makeRequest(), env)
     expect(entitled.status).toBe(200)
     await expect(entitled.json()).resolves.toMatchObject({
       contentId: 'content_public_1',
@@ -413,7 +416,7 @@ describe('W03 content contract core', () => {
 
   it('serves bookmarked contents only through authenticated W01 transport', async () => {
     const row = {
-      id: 'content_1', content_type: 'post', owner_user_id: 'user_1', creator_id: 'user_1',
+      id: 'content_1', content_type: 'post' as const, owner_user_id: 'user_1', creator_id: 'user_1',
       ip_id: null, state: 'PUBLISHED', scheduled_at: null, version: 1, revision: 1,
       slug: 'post-1', title: 'Post 1', body_ref: 'body_1', media_refs_json: '[]',
       cover_ref: null, etag: 'W/"1"', created_at: '2026-10-02T00:00:00.000Z',
@@ -421,13 +424,13 @@ describe('W03 content contract core', () => {
     }
     let storeCalls = 0
     const neonWorker = createW03ContentWorker({
-      publishedContentsByIdsReadStoreProvider: () => ({
+      publishedContentsByIdsReadStoreProvider: (_env) => ({
         list: async (ids: readonly string[]) => {
           storeCalls += 1
           expect(ids).toEqual(['content_1'])
           return [row]
         },
-      }),
+      } as never),
     })
     const env = {} as never
     const response = await neonWorker.fetch(
@@ -444,7 +447,6 @@ describe('W03 content contract core', () => {
         body: JSON.stringify({ ids: ['content_1'] }),
       }),
       env,
-      {} as never,
     )
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
@@ -462,7 +464,6 @@ describe('W03 content contract core', () => {
         body: JSON.stringify({ ids: ['content_1'] }),
       }),
       env,
-      {} as never,
     )
     expect(denied.status).toBe(403)
     expect(storeCalls).toBe(1)
@@ -1603,7 +1604,6 @@ describe('W03 content contract core', () => {
         },
       }),
       {} as never,
-      {} as never,
     );
 
     expect(response.status).toBe(200);
@@ -1635,7 +1635,6 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Principal-Layer': 'L1',
         },
       }),
-      {} as never,
       {} as never,
     );
     expect(denied.status).toBe(403);
@@ -1680,7 +1679,7 @@ describe('W03 content contract core', () => {
         },
       })
 
-    const response = await neonWorker.fetch(makeRequest(), {} as never, {} as never)
+    const response = await neonWorker.fetch(makeRequest(), {} as never)
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
       data: {
@@ -1703,9 +1702,9 @@ describe('W03 content contract core', () => {
     expect(storeCalls[0]?.slice(0, 4)).toEqual(['creator_owner_123', null, 21, { status: 'SCHEDULED', contentType: 'post' }])
 
     const readsBeforeDeny = storeCalls.length
-    const l2Denied = await neonWorker.fetch(makeRequest('L2'), {} as never, {} as never)
+    const l2Denied = await neonWorker.fetch(makeRequest('L2'), {} as never)
     expect(l2Denied.status).toBe(403)
-    const wrongType = await neonWorker.fetch(makeRequest('L3', '?status=SCHEDULED&type=article'), {} as never, {} as never)
+    const wrongType = await neonWorker.fetch(makeRequest('L3', '?status=SCHEDULED&type=article'), {} as never)
     expect(wrongType.status).toBe(422)
     expect(storeCalls).toHaveLength(readsBeforeDeny)
   })
@@ -1990,7 +1989,7 @@ describe('W03 content contract core', () => {
       state: 'PUBLISHED',
       title: 'Public article',
     })
-  })
+  }, {} as never)
 
   it('resolves a published content request by stable slug through Neon', async () => {
     const slug = '中文文章-1234567890abcdef1234567890abcdef'
@@ -2037,7 +2036,7 @@ describe('W03 content contract core', () => {
       slug,
       title: row.title,
     })
-  })
+  }, {} as never)
 
   it('does not expose non-published content to an anonymous detail request', async () => {
     const neonWorker = createW03ContentWorker({
@@ -2056,7 +2055,7 @@ describe('W03 content contract core', () => {
     )
 
     expect(response.status).toBe(404)
-  })
+  }, {} as never)
 
 })
 
@@ -2570,17 +2569,17 @@ describe('W03 username redirect eligibility', () => {
           ...extra,
         },
       })
-    const response = await neonWorker.fetch(request(), env, {} as never)
+    const response = await neonWorker.fetch(request(), env)
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({ data: { eligible: true } })
     expect(contextCalls).toEqual(['user_123'])
     eligibleValue = false
-    const empty = await neonWorker.fetch(request(), env, {} as never)
+    const empty = await neonWorker.fetch(request(), env)
     await expect(empty.json()).resolves.toMatchObject({ data: { eligible: false } })
     const readsBeforeReject = contextCalls.length
-    const wrongCaller = await neonWorker.fetch(request('W05'), env, {} as never)
+    const wrongCaller = await neonWorker.fetch(request('W05'), env)
     expect(wrongCaller.status).toBe(403)
-    const forwardedCookie = await neonWorker.fetch(request('W01', 'user_123', { Cookie: 'session=secret' }), env, {} as never)
+    const forwardedCookie = await neonWorker.fetch(request('W01', 'user_123', { Cookie: 'session=secret' }), env)
     expect(forwardedCookie.status).toBe(403)
     expect(contextCalls).toHaveLength(readsBeforeReject)
   })
@@ -2650,34 +2649,34 @@ describe('W03 username redirect eligibility', () => {
     })
 
     const authorPath = '/internal/content/contents/content_public_123/public-author-context'
-    const authorResponse = await neonWorker.fetch(makeRequest(authorPath), env, {} as never)
+    const authorResponse = await neonWorker.fetch(makeRequest(authorPath), env)
     expect(authorResponse.status).toBe(200)
     await expect(authorResponse.json()).resolves.toMatchObject({
       data: { contentId: 'content_public_123', ownerUserId: 'w02-user-123' },
     })
     expect(contextReads).toBe(1)
 
-    const publicDetail = await neonWorker.fetch(makeRequest('/internal/content/contents/content_public_123'), env, {} as never)
+    const publicDetail = await neonWorker.fetch(makeRequest('/internal/content/contents/content_public_123'), env)
     expect(publicDetail.status).toBe(200)
     const publicDetailBody = await publicDetail.json() as Record<string, unknown>
     expect(publicDetailBody).not.toHaveProperty('ownerUserId')
     expect(detailReads).toBe(1)
 
     const readsBeforeReject = contextReads
-    const wrongCaller = await neonWorker.fetch(makeRequest(authorPath, 'W05'), env, {} as never)
+    const wrongCaller = await neonWorker.fetch(makeRequest(authorPath, 'W05'), env)
     expect(wrongCaller.status).toBe(403)
     const forwardedCookie = await neonWorker.fetch(
-      makeRequest(authorPath, 'W01', 'GET', { Cookie: 'session=must-not-cross-service-binding' }), env, {} as never)
+      makeRequest(authorPath, 'W01', 'GET', { Cookie: 'session=must-not-cross-service-binding' }), env)
     expect(forwardedCookie.status).toBe(403)
     const forwardedPrincipal = await neonWorker.fetch(
-      makeRequest(authorPath, 'W01', 'GET', { 'X-LuckRead-Principal-User-Id': 'spoofed-user' }), env, {} as never)
+      makeRequest(authorPath, 'W01', 'GET', { 'X-LuckRead-Principal-User-Id': 'spoofed-user' }), env)
     expect(forwardedPrincipal.status).toBe(403)
-    const wrongMethod = await neonWorker.fetch(makeRequest(authorPath, 'W01', 'POST'), env, {} as never)
+    const wrongMethod = await neonWorker.fetch(makeRequest(authorPath, 'W01', 'POST'), env)
     expect(wrongMethod.status).toBe(405)
     expect(contextReads).toBe(readsBeforeReject)
 
     row = null
-    const unpublishedOrMissing = await neonWorker.fetch(makeRequest(authorPath), env, {} as never)
+    const unpublishedOrMissing = await neonWorker.fetch(makeRequest(authorPath), env)
     expect(unpublishedOrMissing.status).toBe(404)
   })
 })
@@ -2719,6 +2718,7 @@ describe('creator-selected sensitive media warning', () => {
       state: 'PUBLISHED',
       revision: 1,
       updatedAt: '2026-11-05T00:00:00.000Z',
+      createdAt: '2026-11-05T00:00:00.000Z',
       scheduledAt: null,
       accessMode: 'MEMBERS_ONLY',
       version: 1,
@@ -2845,7 +2845,7 @@ describe('W03 Neon canonical content detail access behavior', () => {
     )
     expect(response.status).toBe(503)
     expect(prepareCalled).toBe(false)
-  })
+  }, {} as never)
 
   it('keeps anonymous and owner principals explicit at the reader boundary', async () => {
     const principals: Array<string | null> = []

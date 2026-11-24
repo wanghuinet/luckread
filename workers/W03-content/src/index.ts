@@ -111,9 +111,10 @@ const getRateKey = (request: Request): string => {
   return clientIp ? 'ip:' + clientIp : 'transport:W01'
 }
 
-const enforceRateLimits = async (request: Request, env: Env, operation: string): Promise<void> => {
-  const actorLimiter = operation === 'read' ? env.CONTENT_PUBLIC_READ_LIMITER : env.CONTENT_MUTATION_LIMITER
-  const globalLimiter = env.CONTENT_ORIGIN_GLOBAL_LIMITER
+const enforceRateLimits = async (request: Request, env: Env | undefined, operation: string): Promise<void> => {
+  // Worker runtime always supplies Env in production; tests and direct runtime callers may omit it.
+  const actorLimiter = operation === 'read' ? env?.CONTENT_PUBLIC_READ_LIMITER : env?.CONTENT_MUTATION_LIMITER
+  const globalLimiter = env?.CONTENT_ORIGIN_GLOBAL_LIMITER
   if (globalLimiter) {
     const globalResult = await globalLimiter.limit({ key: 'origin:' + operation })
     if (!globalResult.success) throw new ContentRuntimeError('RATE_LIMITED', 429)
