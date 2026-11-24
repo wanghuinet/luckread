@@ -26,6 +26,22 @@ const EMPTY_SNAPSHOT: ContentBookmarkSnapshot = Object.freeze({
 
 const snapshots = new Map<string, ContentBookmarkSnapshot>();
 const listeners = new Map<string, Set<() => void>>();
+const MAX_BOOKMARK_SNAPSHOTS = 1024;
+
+function promoteSnapshot(key: string, value: ContentBookmarkSnapshot): void {
+  snapshots.delete(key);
+  snapshots.set(key, value);
+}
+
+function pruneSnapshots(): void {
+  if (snapshots.size < MAX_BOOKMARK_SNAPSHOTS) return;
+  for (const key of snapshots.keys()) {
+    if (!listeners.has(key)) snapshots.delete(key);
+    if (snapshots.size < MAX_BOOKMARK_SNAPSHOTS) return;
+  }
+  const oldestKey = snapshots.keys().next().value;
+  if (typeof oldestKey === 'string') snapshots.delete(oldestKey);
+}
 
 function normalizeContentId(contentId?: string): string {
   return typeof contentId === 'string' ? contentId.trim() : '';
@@ -49,9 +65,10 @@ export function getContentBookmarkSnapshot(
 
   const key = snapshotKey(viewerId, id);
   const current = snapshots.get(key);
-  if (current) return current;
+  if (current) { promoteSnapshot(key, current); return current; }
 
   const initial = { ...EMPTY_SNAPSHOT };
+  pruneSnapshots();
   snapshots.set(key, initial);
   return initial;
 }
@@ -63,7 +80,7 @@ function publish(
 ): void {
   const key = snapshotKey(viewerId, contentId);
   const current = getContentBookmarkSnapshot(contentId, viewerId);
-  snapshots.set(key, { ...current, ...patch });
+  promoteSnapshot(key, { ...current, ...patch });
   for (const listener of listeners.get(key) ?? []) listener();
 }
 
