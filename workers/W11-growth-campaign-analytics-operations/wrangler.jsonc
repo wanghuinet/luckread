@@ -3,6 +3,7 @@
   "name": "luckread-w11",
   "main": "src/entry.ts",
   "compatibility_date": "2026-10-14",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "observability": {
     "enabled": true,
