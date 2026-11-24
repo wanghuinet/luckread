@@ -91,7 +91,7 @@ jobs:
 
       - name: Install W08 PostgreSQL runtime dependencies
         working-directory: workers/W08-creator
-        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Rehearse W08 creator application, review CAS, role grant and audit on PostgreSQL 18
         working-directory: workers/W08-creator
