@@ -204,7 +204,7 @@ jobs:
       - name: Install W08 CASL runtime dependency before checks
         if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
         working-directory: workers/W08-creator
-        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Run creator authorization runtime and UI contract tests before production changes
         if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
