@@ -1,30 +1,32 @@
 # W01 — Platform / Payload
 
-Role: Payload 二开基座（Platform / Payload Core）。
+Role: Payload-based platform and H5 administration runtime.
 
-Locked boundary:
-- Payload Core / Admin / core runtime
-- Payload configuration and supported extension points
-- Payload D1 adapter integration
-- Payload migration/runtime integration
+## Active runtime baseline
 
-Baseline:
-- Runtime baseline is the official Payload `templates/with-cloudflare-d1` structure.
-- The verified baseline source has been physically materialized under `workers/W01-payload/src/`.
-- The W01 dependency baseline follows the official Cloudflare D1 template structure recorded in `PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md`; the current W01 lock is Payload 3.90.2 per `workers/W01-payload/package.json`; the upstream `v3.90.2` Cloudflare-D1 template observation pins the Payload package family at 3.90.0, while the older 3.82.1 observation remains historical.
-- W01 must not substitute a standard Payload release line for the Cloudflare template baseline.
+- Payload package family: 3.94.1.
+- Next.js: 16.4.6.
+- React / React DOM: 19.3.1.
+- TypeScript: 6.0.3.
+- OpenNext Cloudflare: 1.20.18.
+- Wrangler: 4.167.0.
+- Node.js: 24.22.3 in CI; supported range follows the Payload 3.94.x engine declaration.
+- Database: Neon PostgreSQL through the LuckRead-owned adapter and official `@payloadcms/db-postgres@3.94.1` runtime dependency.
+- Media/object storage: official Payload R2 integration.
 
-Governance:
-- Physical materialization does not by itself make Mapping 0 GREEN.
-- Contract / Mapping / Runtime / Evidence gates remain independently verifiable.
-- Existing LuckRead contracts and business rules must not be overwritten by upstream template content.
-- `payload.config.ts`, D1 adapter semantics, migrationDir behavior, and the locked runtime constraints require explicit reconciliation before implementation is considered closed.
+## Runtime boundaries
 
-Next gate:
-1. Reconcile remaining W01 runtime files and scripts against the official Cloudflare D1 template.
-2. Reconcile Payload app routes, admin runtime, collections, migrations, and generated types.
-3. Run dependency installation plus lint/type/build/test validation where environment permits.
-4. Record runtime/schema evidence and reconcile the AUTH-002 evidence contracts that still encode the former 3.82.1 upstream observation as the current baseline.
-5. Re-capture current-version runtime/schema evidence where the promotion gate requires it.
-6. Perform the Mapping 0 reverse-coverage check.
-7. Only then can the relevant gate be marked GREEN.
+- Payload Core, Admin and official adapters remain upstream packages; do not fork or modify their core implementation.
+- `src/payload.config.ts` selects the Neon adapter.
+- `src/neon-postgres-adapter.ts` keeps `push: false` and uses `src/neon-postgres-migrations/`.
+- `pg` remains the PostgreSQL driver; Hyperdrive is the Cloudflare connection binding.
+- `wrangler.jsonc` and `wrangler.neon.jsonc` are the Worker configurations. Neither declares a Cloudflare D1 database binding.
+- The OpenNext asset binding uses explicit exact-path handling because `run_worker_first` is enabled.
+
+## Historical D1 provenance
+
+The original `templates/with-cloudflare-d1` scaffold and `src/migrations/` SQLite/D1 migrations are retained only for provenance and schema reconciliation. They are not the active database adapter or migration directory and must never be executed against Neon PostgreSQL. See `PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md`.
+
+## Release validation
+
+The W01 upgrade is not accepted until the root npm lockfile and W01 pnpm lockfile are reproducible, dependency audits pass, TypeScript and unit checks pass, Next.js and OpenNext Worker builds pass, and the disposable PostgreSQL 18 schema/runtime rehearsals pass. These checks do not authorize remote Neon DDL, production deployment, or traffic changes.
