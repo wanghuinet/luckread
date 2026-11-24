@@ -41,11 +41,13 @@ const required = {
   payload: '3.94.1',
   '@payloadcms/next': '3.94.1',
   '@payloadcms/richtext-lexical': '3.94.1',
+  '@payloadcms/plugin-redirects': '3.94.1',
   '@payloadcms/storage-r2': '3.94.1',
   '@payloadcms/ui': '3.94.1',
   next: '16.4.6',
   react: '19.3.1',
   'react-dom': '19.3.1',
+  pg: '8.20.0',
   '@opennextjs/cloudflare': '1.20.18',
 }
 
@@ -56,6 +58,8 @@ if (postgresAdapterVersion !== '3.94.1' || pkg.devDependencies?.['@payloadcms/db
 if (pkg.devDependencies?.typescript !== '6.0.3') fail('W01 TypeScript must be exactly 6.0.3')
 if (pkg.devDependencies?.wrangler !== '~4.167.0') fail('W01 Wrangler must be ~4.167.0')
 if (pkg.devDependencies?.['eslint-config-next'] !== '16.4.6') fail('W01 eslint-config-next must be 16.4.6')
+if (pkg.devDependencies?.['@types/react'] !== '19.3.0') fail('W01 @types/react must be 19.3.0')
+if (pkg.devDependencies?.['@types/react-dom'] !== '19.3.0') fail('W01 @types/react-dom must be 19.3.0')
 if (pkg.engines?.node !== '^22.23.5 || ^24.22.3 || >=26.13.1') fail('W01 Node engine range must match the Payload 3.94.x supported runtime')
 for (const [name, expected] of Object.entries(required)) {
   const actual = pkg.dependencies?.[name]
@@ -75,6 +79,10 @@ for (const [name, expected] of Object.entries(rootRequired)) {
   if (actual !== expected) fail(`root ${name} must be ${expected}; found ${actual ?? '<missing>'}`)
 }
 if (rootPackage.devDependencies?.typescript !== '6.0.3') fail('root TypeScript must be exactly 6.0.3')
+if (rootPackage.devDependencies?.['@types/react'] !== '19.3.0' ||
+    rootPackage.devDependencies?.['@types/react-dom'] !== '19.3.0') {
+  fail('root React type packages must be exactly 19.3.0')
+}
 if (rootPackage.devDependencies?.['@cloudflare/workers-types'] !== '5.20261124.1') {
   fail('root @cloudflare/workers-types must be exactly 5.20261124.1')
 }
