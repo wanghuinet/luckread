@@ -106,7 +106,7 @@
         "src/app/(frontend)/styles.css"
       ]
     },
-    "assessment": "Focused review of key files indicates application/template customization through Payload configuration, Collections, hooks, plugins and generated artifacts; no modified Payload Core implementation or private Payload fork was found in the reviewed files. This is not a complete line-by-line semantic audit of every W01-only file.",
+    "assessment": "Historical upstream template comparison is preserved unchanged. The current W01 runtime is Neon/PostgreSQL, does not declare the historical D1 adapter, and now declares @payloadcms/db-postgres 3.94.1 as a runtime dependency. The historical openFinding below is retained as the audit-time observation; current package-placement remediation is implemented and awaits the W01 runtime/build/schema CI evidence.",
     "openFinding": {
       "severity": "review_required",
       "file": "workers/W01-payload/package.json",
@@ -123,5 +123,25 @@
       ],
       "assessment": "Notices preserve MIT attribution and identify reused frontend patterns; full file-by-file copied-source mapping and exact upstream license revision verification remain open."
     }
+  },
+  "followUpReview": {
+    "reviewedAt": "2026-11-24",
+    "branch": "gpt/w01-payload-next-opennext-3.94.1",
+    "status": "IMPLEMENTED_PENDING_RUNTIME_VALIDATION",
+    "currentRuntime": {
+      "database": "Neon PostgreSQL through the LuckRead-owned adapter",
+      "payload": "3.94.1",
+      "postgresAdapter": "@payloadcms/db-postgres 3.94.1 in dependencies",
+      "pg": "8.20.0 in dependencies",
+      "d1Adapter": "absent from package.json and lockfile"
+    },
+    "requiredEvidence": [
+      "W01 Payload runtime rehearsal on disposable PostgreSQL 18",
+      "Next.js 16.4.6 and OpenNext Cloudflare 1.20.18 Worker build",
+      "Payload 3.94.1 migration generation and schema verification",
+      "W01 pnpm lockfile and root npm lockfile reproducibility",
+      "W01 dependency audit and TypeScript 6.0.3 validation"
+    ],
+    "safety": "No production Neon migration, deployment, data import, or traffic change is authorized by this follow-up."
   }
 }
