@@ -233,7 +233,7 @@
       "runId": 45401190374,
       "conclusion": "success",
       "headSha": "ce1e818358d59b5c729e5fc2c9a895274787357d",
-      "validationScope": "D1_03_PARTIAL_REMOTE_RUNNER_VALIDATION_NO_NEON_CREDENTIALS",
+      "validationScope": "D1_03_PARTIAL_SCHEMA_REMOTE_RUNNER_VALIDATION_NO_NEON_CREDENTIALS",
       "url": "https://github.com/wanghuinet/luckread/actions/runs/45401190374",
       "remoteApplyJob": "skipped",
       "artifactId": 14923940782,
