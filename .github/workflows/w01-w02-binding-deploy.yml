@@ -281,15 +281,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ../../artifacts/mapping-0
-          secret_list="$(npx --yes wrangler@4.156.0 secret list --name luckread-w01-payload --config wrangler.neon.jsonc --format json)"
+          secret_list="$(npx --yes wrangler@4.166.0 secret list --name luckread-w01-payload --config wrangler.neon.jsonc --format json)"
           has_payload_secret="$(printf '%s' "$secret_list" | node --input-type=module -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => { const parsed=JSON.parse(data); const names=new Set(Array.isArray(parsed) ? parsed.map(item => item?.name) : []); process.stdout.write(names.has("PAYLOAD_SECRET") ? "true" : "false"); })')"
           if [ "$has_payload_secret" != "true" ]; then
-            openssl rand -hex 32 | npx --yes wrangler@4.156.0 secret put PAYLOAD_SECRET --name luckread-w01-payload --config wrangler.neon.jsonc >/dev/null
+            openssl rand -hex 32 | npx --yes wrangler@4.166.0 secret put PAYLOAD_SECRET --name luckread-w01-payload --config wrangler.neon.jsonc >/dev/null
             action="generated_and_put"
           else
             action="already_present"
           fi
-          verify_list="$(npx --yes wrangler@4.156.0 secret list --name luckread-w01-payload --config wrangler.neon.jsonc --format json)"
+          verify_list="$(npx --yes wrangler@4.166.0 secret list --name luckread-w01-payload --config wrangler.neon.jsonc --format json)"
           verified="$(printf '%s' "$verify_list" | node --input-type=module -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => { const parsed=JSON.parse(data); const names=new Set(Array.isArray(parsed) ? parsed.map(item => item?.name) : []); process.stdout.write(names.has("PAYLOAD_SECRET") ? "true" : "false"); })')"
           test "$verified" = "true"
           ACTION="$action" node -e "const fs=require('fs'); fs.writeFileSync('../../artifacts/mapping-0/w01-payload-secret-provenance.json', JSON.stringify({worker:'luckread-w01-payload',secretName:'PAYLOAD_SECRET',action:process.env.ACTION,verified:true,secretValueExposed:false}, null, 2)+'\\n')"
@@ -314,15 +314,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ../../artifacts/mapping-0
-          npx --yes wrangler@4.156.0 deploy --config wrangler.neon.jsonc 2>&1 | tee ../../artifacts/mapping-0/w02-email-auth-deploy.log
+          npx --yes wrangler@4.166.0 deploy --config wrangler.neon.jsonc 2>&1 | tee ../../artifacts/mapping-0/w02-email-auth-deploy.log
           version_id="$(sed -n 's/.*Current Version ID: //p' ../../artifacts/mapping-0/w02-email-auth-deploy.log | tail -n 1)"
           if [ -z "$version_id" ]; then
             echo "Wrangler did not return a W02 Worker Version ID; refusing to report a deployment."
             exit 1
           fi
           echo "W02_UPLOADED_VERSION_ID=$version_id"
-          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w02 --config wrangler.neon.jsonc --yes
-          npx --yes wrangler@4.156.0 deployments list --name luckread-w02 --config wrangler.neon.jsonc
+          npx --yes wrangler@4.166.0 versions deploy "$version_id@100%" --name luckread-w02 --config wrangler.neon.jsonc --yes
+          npx --yes wrangler@4.166.0 deployments list --name luckread-w02 --config wrangler.neon.jsonc
 
       - name: Deploy W08 Creator Worker
         if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
@@ -333,15 +333,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ../../artifacts/mapping-0
-          npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w08-creator-deploy.log
+          npx --yes wrangler@4.166.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w08-creator-deploy.log
           version_id="$(sed -n 's/.*Current Version ID: //p' ../../artifacts/mapping-0/w08-creator-deploy.log | tail -n 1)"
           if [ -z "$version_id" ]; then
             echo "Wrangler did not return a W08 Worker Version ID; refusing to report a deployment."
             exit 1
           fi
           echo "W08_UPLOADED_VERSION_ID=$version_id"
-          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w08-creator --config wrangler.jsonc --yes
-          npx --yes wrangler@4.156.0 deployments list --name luckread-w08-creator --config wrangler.jsonc
+          npx --yes wrangler@4.166.0 versions deploy "$version_id@100%" --name luckread-w08-creator --config wrangler.jsonc --yes
+          npx --yes wrangler@4.166.0 deployments list --name luckread-w08-creator --config wrangler.jsonc
 
       - name: Deploy W01 application with Service Binding
         working-directory: workers/W01-payload
@@ -351,15 +351,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ../../artifacts/mapping-0
-          npx --yes wrangler@4.156.0 deploy --config wrangler.neon.jsonc 2>&1 | tee ../../artifacts/mapping-0/w01-w02-binding-deploy.log
+          npx --yes wrangler@4.166.0 deploy --config wrangler.neon.jsonc 2>&1 | tee ../../artifacts/mapping-0/w01-w02-binding-deploy.log
           version_id="$(sed -n 's/.*Current Version ID: //p' ../../artifacts/mapping-0/w01-w02-binding-deploy.log | tail -n 1)"
           if [ -z "$version_id" ]; then
             echo "Wrangler did not return a W01 Worker Version ID; refusing to report a deployment."
             exit 1
           fi
           echo "W01_UPLOADED_VERSION_ID=$version_id"
-          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w01-payload --config wrangler.neon.jsonc --yes
-          npx --yes wrangler@4.156.0 deployments list --name luckread-w01-payload --config wrangler.neon.jsonc
+          npx --yes wrangler@4.166.0 versions deploy "$version_id@100%" --name luckread-w01-payload --config wrangler.neon.jsonc --yes
+          npx --yes wrangler@4.166.0 deployments list --name luckread-w01-payload --config wrangler.neon.jsonc
 
       - name: Write deployment provenance
         env:
