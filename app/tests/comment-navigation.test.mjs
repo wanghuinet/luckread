@@ -82,7 +82,7 @@ test('reply sort selection is forwarded to the real paginated API request', () =
   expect(postDetail).toContain('contentId={postId}');
   expect(postDetail).toContain('sort={selectedSort}');
   expect(comments).toContain("params.set('sort', sort)");
-  expect(comments).toContain('}, [contentId, sort]);');
+  expect(comments).toContain('}, [contentId, sort, currentUserId]);');
 });
 
 test('post menus do not advertise unfinished community note, offline, or list actions', () => {
