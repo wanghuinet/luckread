@@ -1,4 +1,18 @@
+import { base32 } from '@better-auth/utils/base32'
 import { createOTP } from '@better-auth/utils/otp'
+
+export type TotpSecret = string | Uint8Array
+
+const BASE32_PREFIX = 'base32:'
+
+/**
+ * Mirror Better Auth's TOTP secret decoding contract. Imported provider
+ * secrets use a base32: prefix; locally generated secrets remain UTF-8 strings.
+ */
+export function decodeTotpSecret(secret: string): TotpSecret {
+  if (!secret.startsWith(BASE32_PREFIX)) return secret
+  return base32.decode(secret.slice(BASE32_PREFIX.length).toUpperCase())
+}
 
 export type TotpStepMatch =
   | { kind: 'invalid' }
@@ -19,15 +33,15 @@ const constantTimeEqual = (provided: string, expected: string): boolean => {
  * Ambiguous collisions fail closed rather than reserving an arbitrary step.
  */
 export async function matchTotpTimeStep(
-  secret: string,
+  secret: TotpSecret,
   code: string,
   nowMs = Date.now(),
   periodSeconds = 30,
   window = 1,
 ): Promise<TotpStepMatch> {
   if (
-    typeof secret !== 'string' ||
-    secret.length < 1 ||
+    !((typeof secret === 'string' && secret.length > 0) ||
+      (secret instanceof Uint8Array && secret.byteLength > 0)) ||
     typeof code !== 'string' ||
     !/^\d{6}$/.test(code) ||
     !Number.isSafeInteger(nowMs) ||
