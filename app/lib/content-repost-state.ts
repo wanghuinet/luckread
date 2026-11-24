@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
-import { apiRequest } from './api-client';
+import { apiRequest, createIdempotencyKey } from './api-client';
 
 export type ContentRepostSnapshot = {
   reposted: boolean;
@@ -177,7 +177,7 @@ export async function toggleContentRepost(contentId?: string): Promise<ContentRe
   try {
     const result = await apiRequest<unknown>(
       '/content/' + encodeURIComponent(id) + '/reposts',
-      { method: nextReposted ? 'POST' : 'DELETE' },
+      { method: nextReposted ? 'POST' : 'DELETE', idempotencyKey: createIdempotencyKey() },
     );
 
     if (!result.response.ok) {
