@@ -26,8 +26,8 @@ jobs:
       - name: Install W02 runtime dependencies
         working-directory: workers/W02-identity
         run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Assert Better Auth is exactly 1.7.8 and imports
+      - name: Assert Better Auth is exactly 1.7.27 and imports
         working-directory: workers/W02-identity
         run: |
-          node --input-type=module -e "import { readFile } from 'node:fs/promises'; const pkg = JSON.parse(await readFile('./node_modules/better-auth/package.json', 'utf8')); if (pkg.version !== '1.7.8') throw new Error('Expected better-auth 1.7.8, got ' + pkg.version); await import('better-auth'); console.log('better-auth ' + pkg.version + ' import: OK')"
+          node --input-type=module -e "import { readFile } from 'node:fs/promises'; const pkg = JSON.parse(await readFile('./node_modules/better-auth/package.json', 'utf8')); if (pkg.version !== '1.7.27') throw new Error('Expected better-auth 1.7.27, got ' + pkg.version); await import('better-auth'); console.log('better-auth ' + pkg.version + ' import: OK')"
           npm ls better-auth --depth=0
