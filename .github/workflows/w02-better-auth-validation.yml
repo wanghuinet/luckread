@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'workers/W02-identity/package.json'
+      - 'workers/W02-identity/package-lock.json'
       - '.github/workflows/w02-deploy.yml'
       - '.github/workflows/w02-better-auth-validation.yml'
 
