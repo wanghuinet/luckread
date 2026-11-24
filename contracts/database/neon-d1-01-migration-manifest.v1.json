@@ -59,9 +59,9 @@
         "packageDirectory": "workers/W02-identity",
         "generatorCommand": "npm run neon:schema:generate",
         "generatorVersions": {
-          "betterAuth": "1.7.8",
-          "betterAuthCli": "1.7.8",
-          "pg": "8.20.0"
+          "betterAuth": "1.7.27",
+          "betterAuthCli": "1.7.27",
+          "pg": "8.23.1"
         },
         "transactionPolicy": "RUNNER_OWNED_DDL_AND_LEDGER_TRANSACTION"
       }
