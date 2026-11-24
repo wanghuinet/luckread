@@ -26,6 +26,22 @@ const EMPTY_SNAPSHOT: UserFollowSnapshot = Object.freeze({
 
 const snapshots = new Map<string, UserFollowSnapshot>();
 const listeners = new Map<string, Set<() => void>>();
+const SNAPSHOT_CACHE_MAX_ENTRIES = 1024;
+
+function promoteSnapshot(key: string, value: UserFollowSnapshot): void {
+  snapshots.delete(key);
+  snapshots.set(key, value);
+}
+
+function pruneSnapshots(): void {
+  if (snapshots.size < SNAPSHOT_CACHE_MAX_ENTRIES) return;
+  for (const key of snapshots.keys()) {
+    if (!listeners.has(key)) snapshots.delete(key);
+    if (snapshots.size < SNAPSHOT_CACHE_MAX_ENTRIES) return;
+  }
+  const oldestKey = snapshots.keys().next().value;
+  if (typeof oldestKey === 'string') snapshots.delete(oldestKey);
+}
 
 function normalizeUserId(targetUserId?: string): string {
   return typeof targetUserId === 'string' ? targetUserId.trim() : '';
@@ -50,8 +66,9 @@ export function getUserFollowSnapshot(targetUserId?: string, viewerId?: string |
 
   const key = followScopeKey(id, viewerId);
   const current = snapshots.get(key);
-  if (current) return current;
+  if (current) { promoteSnapshot(key, current); return current; }
 
+  pruneSnapshots();
   snapshots.set(key, { ...EMPTY_SNAPSHOT });
   return snapshots.get(key)!;
 }
@@ -59,7 +76,7 @@ export function getUserFollowSnapshot(targetUserId?: string, viewerId?: string |
 function publish(targetUserId: string, viewerId: string | null | undefined, patch: Partial<UserFollowSnapshot>): void {
   const key = followScopeKey(targetUserId, viewerId);
   const current = getUserFollowSnapshot(targetUserId, viewerId);
-  snapshots.set(key, { ...current, ...patch });
+  promoteSnapshot(key, { ...current, ...patch });
   for (const listener of listeners.get(key) ?? []) listener();
 }
 
