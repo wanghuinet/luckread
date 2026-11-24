@@ -342,6 +342,7 @@ describe('W03 Neon content relationship mutation store', () => {
     let createInput: Parameters<ContentRelationshipMutationStore['create']>[0] | undefined
     let revokeInput: Parameters<ContentRelationshipMutationStore['revoke']>[0] | undefined
     const store: ContentRelationshipMutationStore = {
+      async list() { return { items: [], hasMore: false, nextCursor: null } },
       async loadCreate(input) {
         expect(input.sourceContentId).toBe('content_source')
         return createSnapshot
@@ -358,13 +359,8 @@ describe('W03 Neon content relationship mutation store', () => {
       async loadAppendStats() { return appendStats },
       async appendThread() {},
     }
-    const d1 = {
-      prepare() { throw new Error('D1 must not be queried in Neon mode') },
-      batch() { throw new Error('D1 must not be written in Neon mode') },
-    }
-
     const created = await createContentRelationship(
-      d1 as never,
+      store,
       'user_123',
       'content_source',
       {
@@ -375,16 +371,14 @@ describe('W03 Neon content relationship mutation store', () => {
       },
       'neon-create-reference-key',
       now,
-      store,
     )
     const revoked = await revokeContentRelationship(
-      d1 as never,
+      store,
       'user_123',
       'content_source',
       created.relationshipId,
       'neon-revoke-reference-key',
       now,
-      store,
     )
 
     expect(created).toMatchObject({
@@ -515,6 +509,7 @@ describe('W03 Neon content relationship mutation store', () => {
   it('routes native post-thread append through Neon without issuing D1 statements', async () => {
     let appendInput: Parameters<ContentRelationshipMutationStore['appendThread']>[0] | undefined
     const store: ContentRelationshipMutationStore = {
+      async list() { return { items: [], hasMore: false, nextCursor: null } },
       async loadCreate() { return createRow },
       async create() {},
       async loadRevoke() {
@@ -531,13 +526,12 @@ describe('W03 Neon content relationship mutation store', () => {
     }
 
     const created = await appendPostThreadNext(
-      d1 as never,
+      store,
       'user_123',
       'content_source',
       'content_target',
       'neon-thread-append-key',
       now,
-      store,
     )
 
     expect(created).toMatchObject({

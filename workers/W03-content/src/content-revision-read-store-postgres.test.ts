@@ -143,14 +143,13 @@ describe('W03 PostgreSQL content revision reader', () => {
 })
 
 describe('W03 revision runtime injection', () => {
-  it('uses the injected reader for pagination and never touches D1', async () => {
+  it('uses the injected reader for pagination', async () => {
     const first = revision({ id: 'revision-2', createdAt: '2026-11-16T12:00:00.000Z' })
     const second = revision({ id: 'revision-1', createdAt: '2026-11-16T11:00:00.000Z' })
     const store: ContentRevisionReadStore = {
       list: vi.fn(async () => [first, second]),
       get: vi.fn(async () => first),
     }
-    const prepare = vi.fn(() => { throw new Error('D1 must not be queried by Neon revision reads') })
     const page = await listContentRevisions(
       store,
       'owner-1',
@@ -159,7 +158,6 @@ describe('W03 revision runtime injection', () => {
       1,
     )
 
-    expect(prepare).not.toHaveBeenCalled()
     expect(store.list).toHaveBeenCalledWith('owner-1', 'content-1', null, 2)
     expect(page.items).toEqual([first])
     expect(page.hasMore).toBe(true)
@@ -172,7 +170,6 @@ describe('W03 revision runtime injection', () => {
       list: vi.fn(async () => []),
       get: vi.fn(async () => null),
     }
-    const prepare = vi.fn(() => { throw new Error('D1 must not be queried by Neon revision reads') })
 
     await expect(getContentRevision(
       store,
@@ -180,13 +177,11 @@ describe('W03 revision runtime injection', () => {
       'content-1',
       'revision-1',
     )).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-    expect(prepare).not.toHaveBeenCalled()
   })
 
   it('fails closed when Neon revision readers or the restore store are unavailable', async () => {
-    const prepare = vi.fn(() => { throw new Error('D1 revision fallback must not be queried') })
     const worker = createW03ContentWorker()
-    const env = { D1_02: { prepare } } as never
+    const env = {} as never
     const headers = {
       'X-LuckRead-Caller': 'W01',
       'X-LuckRead-Transport-Version': '1.0',
@@ -220,20 +215,18 @@ describe('W03 revision runtime injection', () => {
     expect(listResponse.status).toBe(503)
     expect(detailResponse.status).toBe(503)
     expect(rollbackResponse.status).toBe(503)
-    expect(prepare).not.toHaveBeenCalled()
   })
 
-  it('routes both revision endpoints through the injected reader without D1 access', async () => {
+  it('routes both revision endpoints through the injected reader', async () => {
     const item = revision()
     const store: ContentRevisionReadStore = {
       list: vi.fn(async () => [item]),
       get: vi.fn(async () => item),
     }
-    const prepare = vi.fn(() => { throw new Error('D1 must not be queried by Neon revision routes') })
     const worker = createW03ContentWorker({
       contentRevisionReadStoreProvider: () => store,
     })
-    const env = { D1_02: { prepare } } as never
+    const env = {} as never
     const headers = {
       'X-LuckRead-Caller': 'W01',
       'X-LuckRead-Transport-Version': '1.0',
@@ -257,6 +250,5 @@ describe('W03 revision runtime injection', () => {
     expect(await detailResponse.json()).toMatchObject({ data: item })
     expect(store.list).toHaveBeenCalledWith('owner-1', 'content-1', null, 11)
     expect(store.get).toHaveBeenCalledWith('owner-1', 'content-1', 'revision-1')
-    expect(prepare).not.toHaveBeenCalled()
   })
 })

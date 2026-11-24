@@ -1,5 +1,3 @@
-/// <reference types="@cloudflare/workers-types" />
-
 import { contentSlugFor, isContentSlug } from './content-slug.js'
 import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
 import type {
@@ -83,11 +81,6 @@ export interface ContentRevision {
   reason: string | null
   correlationId: string
   createdAt: string
-}
-
-export interface ContentD1 {
-  prepare(query: string): D1PreparedStatement
-  batch(statements: D1PreparedStatement[]): Promise<D1Result<unknown>[]>
 }
 
 export interface ContentRow {
@@ -513,37 +506,6 @@ export async function resolvePublishedMediaReferenceAccess(
   return { isPublic, isMemberContent: false, allowed: isPublic }
 }
 
-export async function isPublishedPublicPostMediaReference(
-  db: ContentD1,
-  mediaUrlValue: string,
-): Promise<boolean> {
-  const candidates = publicPostMediaReferenceCandidates(mediaUrlValue)
-  if (candidates.length === 0) return false
-
-  const placeholders = candidates.map(() => '?').join(', ')
-  const sql = [
-    'SELECT id',
-    'FROM contents',
-    "WHERE state = 'PUBLISHED'",
-    "  AND access_mode = 'PUBLIC'",
-    "  AND content_type = 'post'",
-    '  AND (',
-    '    body_ref IN (' + placeholders + ')',
-    '    OR cover_ref IN (' + placeholders + ')',
-    '    OR EXISTS (',
-    '      SELECT 1',
-    '      FROM json_each(contents.media_refs_json) AS media_ref',
-    '      WHERE media_ref.value IN (' + placeholders + ')',
-    '    )',
-    '  )',
-    'LIMIT 1',
-  ].join('\n')
-  const row = await db.prepare(sql)
-    .bind(...candidates, ...candidates, ...candidates)
-    .first<{ id: string }>()
-  return typeof row?.id === 'string' && row.id.length > 0
-}
-
 const normalizeEtag = (value: string): string => {
   let result = value.trim()
   if (result.startsWith('W/')) result = result.slice(2)
@@ -670,118 +632,6 @@ const emptyIdempotency = (): IdempotencyRow => ({
   idem_expires_at: null,
 })
 
-const loadMutationRow = async (
-  db: ContentD1,
-  contentId: string,
-  operationId: string,
-  idempotencyKey: string,
-  ownerUserId: string,
-): Promise<{ content: ContentRecord | null; idempotency: IdempotencyRow }> => {
-  const row = await db.prepare(
-    `SELECT
-        c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state, c.scheduled_at, c.access_mode, c.version, c.revision,
-        c.slug, c.title, c.body_ref, c.media_refs_json, c.cover_ref, c.media_warning, c.etag, c.created_at, c.updated_at,
-        i.id AS idem_id,
-        i.owner_user_id AS idem_owner_user_id,
-        i.request_hash AS idem_request_hash,
-        i.status AS idem_status,
-        i.response_status AS idem_response_status,
-        i.response_json AS idem_response_json,
-        i.expires_at AS idem_expires_at
-       FROM contents c
-       LEFT JOIN (
-         SELECT id, owner_user_id, request_hash, status, response_status, response_json, expires_at
-         FROM content_mutation_idempotency
-         WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ?
-         ORDER BY created_at DESC
-         LIMIT 1
-       ) i ON 1 = 1
-      WHERE c.id = ?`,
-  ).bind(ownerUserId, operationId, idempotencyKey, contentId).first<ContentWithIdempotencyRow>()
-
-  if (!row) return { content: null, idempotency: emptyIdempotency() }
-
-  return {
-    content: toContent(row),
-    idempotency: {
-      idem_id: row.idem_id,
-      idem_owner_user_id: row.idem_owner_user_id,
-      idem_request_hash: row.idem_request_hash,
-      idem_status: row.idem_status,
-      idem_response_status: row.idem_response_status,
-      idem_response_json: row.idem_response_json,
-      idem_expires_at: row.idem_expires_at,
-    },
-  }
-}
-
-const expireMutationRow = (
-  db: ContentD1,
-  ownerUserId: string,
-  operationId: string,
-  idempotencyKey: string,
-  nowIso: string,
-): D1PreparedStatement =>
-  db.prepare(
-    `DELETE FROM content_mutation_idempotency
-      WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? AND expires_at <= ?`,
-  ).bind(ownerUserId, operationId, idempotencyKey, nowIso)
-
-const insertCompletedIdempotency = (
-  db: ContentD1,
-  ownerUserId: string,
-  operationId: string,
-  idempotencyKey: string,
-  requestHashValue: string,
-  responseStatus: number,
-  responseJson: string,
-  nowIso: string,
-  expiresAt: string,
-): D1PreparedStatement =>
-  db.prepare(
-    `INSERT INTO content_mutation_idempotency
-      (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
-     VALUES (?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?)`,
-  ).bind(
-    crypto.randomUUID(),
-    ownerUserId,
-    operationId,
-    idempotencyKey,
-    requestHashValue,
-    responseStatus,
-    responseJson,
-    nowIso,
-    expiresAt,
-  )
-
-const atomicGuard = (db: ContentD1): D1PreparedStatement =>
-  db.prepare(
-    `INSERT OR REPLACE INTO content_txn_guard(id, successful)
-     VALUES (1, changes())`,
-  )
-
-const errorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error)
-
-const isIdempotencyUniqueConstraint = (error: unknown): boolean =>
-  /unique constraint failed: content_mutation_idempotency\.|UNIQUE constraint failed: content_mutation_idempotency\./i.test(errorMessage(error))
-
-const isContentCasGuardFailure = (error: unknown): boolean =>
-  /CHECK constraint failed: successful|content_txn_guard.*CHECK constraint/i.test(errorMessage(error))
-
-const batchMutation = async (
-  db: ContentD1,
-  statements: D1PreparedStatement[],
-): Promise<void> => {
-  try {
-    await db.batch(statements)
-  } catch (error) {
-    if (isIdempotencyUniqueConstraint(error)) throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
-    if (isContentCasGuardFailure(error)) throw new ContentRuntimeError('PRECONDITION_FAILED', 412)
-    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
-  }
-}
-
 export type CreatorMembershipAccessResolver = (creatorId: string) => Promise<boolean>
 
 export async function getContent(
@@ -821,28 +671,6 @@ export type PublishedContentAuthorContext = Readonly<{
   ownerUserId: string
 }>
 
-/**
- * Resolve the canonical owner of a published content record without returning
- * its body or media. W01 consumes this only over the existing W03 service
- * binding; public content-detail responses continue to redact ownerUserId.
- */
-export async function getPublishedContentAuthorContext(
-  db: ContentD1,
-  contentId: string,
-): Promise<PublishedContentAuthorContext> {
-  assertContentReference(contentId)
-  const row = await db.prepare(
-    `SELECT id, owner_user_id
-       FROM contents
-      WHERE (id = ? OR slug = ?)
-        AND state = 'PUBLISHED'
-      LIMIT 1`,
-  ).bind(contentId, contentId).first<{ id: string; owner_user_id: string }>()
-  if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
-  if (!row.owner_user_id || !row.id) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
-  return { contentId: row.id, ownerUserId: row.owner_user_id }
-}
-
 export type OwnedPostContext = {
   contentId: string
   ownerUserId: string
@@ -851,53 +679,7 @@ export type OwnedPostContext = {
   updatedAt: string
 }
 
-/**
- * W03 is the sole authority for content ownership and lifecycle. W05 uses this
- * owner-scoped context for W05 social actions on the caller's own post.
- */
-export async function getOwnedPostContext(
-  db: ContentD1,
-  contentIdValue: string,
-  principalUserIdValue: string,
-): Promise<OwnedPostContext> {
-  const contentId = contentIdValue.trim()
-  const principalUserId = principalUserIdValue.trim()
-  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(contentId)) {
-    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
-  }
-  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(principalUserId)) {
-    throw new ContentRuntimeError('UNAUTHENTICATED', 401)
-  }
-  const row = await db.prepare(
-    `SELECT id, owner_user_id, content_type, state, updated_at
-       FROM contents
-      WHERE id = ?
-        AND owner_user_id = ?
-        AND content_type = 'post'
-        AND state IN ('DRAFT', 'PUBLISHED', 'UNPUBLISHED')
-      LIMIT 1`,
-  ).bind(contentId, principalUserId).first<{
-    id: string
-    owner_user_id: string
-    content_type: string
-    state: string
-    updated_at: string
-  }>()
-  if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
-  return {
-    contentId: row.id,
-    ownerUserId: row.owner_user_id,
-    contentType: 'post',
-    state: row.state as 'DRAFT' | 'PUBLISHED' | 'UNPUBLISHED',
-    updatedAt: row.updated_at,
-  }
-}
-
-/**
- * W03 validates a public profile pin without treating the requested profile
- * owner as an authenticated principal. Only a published post owned by that
- * profile can be returned through this read-only internal context.
- */
+/** Minimal published content context for W05 social reads and visibility checks. */
 export type PublishedContentSocialContext = {
   contentId: string
   ownerUserId: string | null
@@ -906,129 +688,7 @@ export type PublishedContentSocialContext = {
   updatedAt: string
 }
 
-/**
- * Minimal published-content context for W05 social reads and visibility checks.
- * Includes the canonical timestamp used to preserve poll expiry semantics.
- */
-export async function getPublishedContentSocialContext(
-  db: ContentD1,
-  contentIdValue: string,
-): Promise<PublishedContentSocialContext> {
-  const contentId = contentIdValue.trim()
-  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(contentId)) {
-    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
-  }
-  const row = await db.prepare(
-    `SELECT id, owner_user_id, content_type, updated_at
-       FROM contents
-      WHERE id = ? AND state = 'PUBLISHED'
-      LIMIT 1`,
-  ).bind(contentId).first<{
-    id: string
-    owner_user_id: string | null
-    content_type: string
-    updated_at: string
-  }>()
-  if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
-  if (!['article', 'post', 'video'].includes(row.content_type)) {
-    throw new ContentRuntimeError('INTERNAL_ERROR', 500)
-  }
-  return {
-    contentId: row.id,
-    ownerUserId: row.owner_user_id,
-    contentType: row.content_type as ContentType,
-    state: 'PUBLISHED',
-    updatedAt: row.updated_at,
-  }
-}
-
 export type PublishedContentSocialSummaryContext = PublishedContentSocialContext & { title: string }
-
-export async function getPublishedContentSocialContexts(
-  db: ContentD1,
-  contentIdsValue: string[],
-): Promise<PublishedContentSocialSummaryContext[]> {
-  if (!Array.isArray(contentIdsValue) || contentIdsValue.length > 50) {
-    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
-  }
-  const contentIds = contentIdsValue.map(value => typeof value === 'string' ? value.trim() : '')
-  if (contentIds.some(contentId => !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(contentId))) {
-    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
-  }
-  const uniqueContentIds = [...new Set(contentIds)]
-  if (uniqueContentIds.length === 0) return []
-
-  const placeholders = uniqueContentIds.map(() => '?').join(', ')
-  const rows = await db.prepare(
-    `SELECT id, owner_user_id, content_type, title, updated_at
-       FROM contents
-      WHERE state = 'PUBLISHED'
-        AND id IN (${placeholders})`,
-  ).bind(...uniqueContentIds).all<{
-    id: string
-    owner_user_id: string | null
-    content_type: string
-    title: string
-    updated_at: string
-  }>()
-  const byId = new Map<string, PublishedContentSocialSummaryContext>()
-  for (const row of rows.results ?? []) {
-    if (!uniqueContentIds.includes(row.id)) throw new ContentRuntimeError('INTERNAL_ERROR', 500)
-    if (!['article', 'post', 'video'].includes(row.content_type)) {
-      throw new ContentRuntimeError('INTERNAL_ERROR', 500)
-    }
-    byId.set(row.id, {
-      contentId: row.id,
-      ownerUserId: row.owner_user_id,
-      contentType: row.content_type as ContentType,
-      state: 'PUBLISHED',
-      title: row.title,
-      updatedAt: row.updated_at,
-    })
-  }
-  return uniqueContentIds.flatMap(contentId => {
-    const context = byId.get(contentId)
-    return context ? [context] : []
-  })
-}
-
-export async function getPublishedOwnerPostContext(
-  db: ContentD1,
-  contentIdValue: string,
-  ownerUserIdValue: string,
-): Promise<OwnedPostContext> {
-  const contentId = contentIdValue.trim()
-  const ownerUserId = ownerUserIdValue.trim()
-  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(contentId)) {
-    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
-  }
-  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(ownerUserId)) {
-    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
-  }
-  const row = await db.prepare(
-    `SELECT id, owner_user_id, content_type, state, updated_at
-       FROM contents
-      WHERE id = ?
-        AND owner_user_id = ?
-        AND content_type = 'post'
-        AND state = 'PUBLISHED'
-      LIMIT 1`,
-  ).bind(contentId, ownerUserId).first<{
-    id: string
-    owner_user_id: string
-    content_type: string
-    state: string
-    updated_at: string
-  }>()
-  if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
-  return {
-    contentId: row.id,
-    ownerUserId: row.owner_user_id,
-    contentType: 'post',
-    state: 'PUBLISHED',
-    updatedAt: row.updated_at,
-  }
-}
 
 export async function listContentRevisions(
   readStore: ContentRevisionReadStore,
@@ -1084,12 +744,11 @@ export function validateListFilters(statusValue: string | null, typeValue: strin
 }
 
 export async function listCreatorContents(
-  db: ContentD1,
+  readStore: CreatorContentsReadStore,
   ownerUserId: string,
   cursor: string | null,
   limit: number,
   filters: { status?: ContentState; contentType?: ContentType } = {},
-  readStore?: CreatorContentsReadStore,
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
   assertResourceId(ownerUserId)
   const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
@@ -1100,34 +759,7 @@ export async function listCreatorContents(
     contentType: filters.contentType ?? null,
   })
   const decoded = cursor ? decodeScopedCursor(cursor, cursorScope) : null
-  let rows: readonly ContentRow[]
-  if (readStore) {
-    rows = await readStore.list(ownerUserId, decoded, pageSize + 1, filters)
-  } else {
-    const conditions = ['owner_user_id = ?']
-    const bindings: unknown[] = [ownerUserId]
-    if (filters.status) {
-      conditions.push('state = ?')
-      bindings.push(filters.status)
-    }
-    if (filters.contentType) {
-      conditions.push('content_type = ?')
-      bindings.push(filters.contentType)
-    }
-    if (decoded) {
-      conditions.push('(updated_at < ? OR (updated_at = ? AND id < ?))')
-      bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
-    }
-    const result = await db.prepare(
-      `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
-              slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, created_at, updated_at
-         FROM contents
-        WHERE ${conditions.join(' AND ')}
-        ORDER BY updated_at DESC, id DESC
-        LIMIT ?`,
-    ).bind(...bindings, pageSize + 1).all<ContentRow>()
-    rows = result.results
-  }
+  const rows = await readStore.list(ownerUserId, decoded, pageSize + 1, filters)
   const hasMore = rows.length > pageSize
   const page = rows.slice(0, pageSize).map(toContent)
   const last = page.at(-1)
@@ -1142,9 +774,8 @@ export async function listCreatorContents(
 
 
 export async function listPublishedContentsByIds(
-  db: ContentD1,
+  readStore: PublishedContentsByIdsReadStore,
   contentIds: string[],
-  readStore?: PublishedContentsByIdsReadStore,
 ): Promise<ContentRecord[]> {
   if (!Array.isArray(contentIds) || contentIds.length > 50) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
@@ -1152,31 +783,18 @@ export async function listPublishedContentsByIds(
   const ids = [...new Set(contentIds)]
   for (const id of ids) assertResourceId(id)
   if (ids.length === 0) return []
-
-  const rows = readStore
-    ? await readStore.list(ids)
-    : (await db.prepare(
-        `SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
-                c.scheduled_at, c.access_mode, c.version, c.revision, c.slug, c.title, c.body_ref,
-                c.media_refs_json, c.cover_ref, c.media_warning, c.etag, c.created_at, c.updated_at
-           FROM json_each(?) AS requested
-           INNER JOIN contents AS c ON c.id = requested.value
-          WHERE c.state = 'PUBLISHED'
-          ORDER BY CAST(requested.key AS INTEGER) ASC
-          LIMIT ?`,
-      ).bind(JSON.stringify(ids), ids.length).all<ContentRow>()).results ?? []
-
+  const rows = await readStore.list(ids)
   return rows.map(toContent)
 }
 
+
 export async function listContents(
-  db: ContentD1,
+  readStore: PublicContentListReadStore,
   cursor: string | null,
   limit: number,
   creatorId: string | null = null,
   contentType: ContentType | null = null,
   ownerUserId: string | null = null,
-  readStore?: PublicContentListReadStore,
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
   const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
   if (creatorId) assertResourceId(creatorId)
@@ -1186,66 +804,31 @@ export async function listContents(
   }
 
   const decoded = cursor ? decodeContentListCursor(cursor, creatorId, contentType, ownerUserId) : null
-  const conditions = ["state = 'PUBLISHED'"]
-  const bindings: unknown[] = []
-
-  if (creatorId) {
-    conditions.push('creator_id = ?')
-    bindings.push(creatorId)
-  }
-  if (ownerUserId) {
-    conditions.push('owner_user_id = ?')
-    bindings.push(ownerUserId)
-  }
-  if (contentType) {
-    conditions.push('content_type = ?')
-    bindings.push(contentType)
-  }
-
-  if (decoded) {
-    conditions.push('(created_at < ? OR (created_at = ? AND id < ?))')
-    bindings.push(decoded.createdAt, decoded.createdAt, decoded.id)
-  }
-
-  const rows = readStore
-    ? await readStore.list({
-      cursor: decoded,
-      limit: pageSize + 1,
-      creatorId,
-      ownerUserId,
-      contentType,
-    })
-    : (await db.prepare(
-      `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
-              slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, created_at, updated_at
-         FROM contents
-        WHERE ${conditions.join(' AND ')}
-        ORDER BY created_at DESC, id DESC
-        LIMIT ?`,
-    ).bind(...bindings, pageSize + 1).all<ContentRow>()).results
-
+  const rows = await readStore.list({
+    cursor: decoded,
+    limit: pageSize + 1,
+    creatorId,
+    ownerUserId,
+    contentType,
+  })
   const hasMore = rows.length > pageSize
   const page = rows.slice(0, pageSize).map(toContent)
   const last = page.at(-1)
   return {
     items: page,
     hasMore,
-    nextCursor: hasMore && last ? encodeContentListCursor(last.createdAt, last.id, creatorId, contentType, ownerUserId) : null,
+    nextCursor: hasMore && last
+      ? encodeContentListCursor(last.createdAt, last.id, creatorId, contentType, ownerUserId)
+      : null,
   }
 }
 
-/**
- * Search only published canonical content metadata. The cursor is scoped to the
- * normalized query so it cannot be reused to enumerate a different search.
- * Search is intentionally limited to title/slug until an admitted derived
- * full-text index exists; body references are opaque IDs/URLs, not body text.
- */
+
 export async function searchPublishedContents(
-  db: ContentD1,
+  readStore: PublicContentListReadStore,
   queryValue: string,
   cursorValue: string | null,
   limit: number,
-  readStore?: PublicContentListReadStore,
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
   const query = queryValue.normalize('NFKC').trim()
   if (!query || query.length > 256) {
@@ -1258,30 +841,11 @@ export async function searchPublishedContents(
     query: query.toLowerCase(),
   })
   const decoded = cursorValue ? decodeScopedCursor(cursorValue, scope) : null
-  const cursorClause = decoded
-    ? 'AND (created_at < ? OR (created_at = ? AND id < ?))'
-    : ''
-  const cursorBindings: unknown[] = decoded
-    ? [decoded.updatedAt, decoded.updatedAt, decoded.id]
-    : []
-
-  const rows = readStore
-    ? await readStore.search({
-      query,
-      cursor: decoded ? { createdAt: decoded.updatedAt, id: decoded.id } : null,
-      limit: pageSize + 1,
-    })
-    : (await db.prepare(`
-      SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode,
-             version, revision, slug, title, body_ref, media_refs_json, cover_ref, media_warning,
-             etag, created_at, updated_at
-        FROM contents
-       WHERE state = 'PUBLISHED'
-         AND (instr(lower(title), lower(?)) > 0 OR instr(lower(slug), lower(?)) > 0)
-         ${cursorClause}
-       ORDER BY created_at DESC, id DESC
-       LIMIT ?`).bind(query, query, ...cursorBindings, pageSize + 1).all<ContentRow>()).results
-
+  const rows = await readStore.search({
+    query,
+    cursor: decoded ? { createdAt: decoded.updatedAt, id: decoded.id } : null,
+    limit: pageSize + 1,
+  })
   const hasMore = rows.length > pageSize
   const items = rows.slice(0, pageSize).map(toContent)
   const last = items.at(-1)
@@ -1293,7 +857,6 @@ export async function searchPublishedContents(
       : null,
   }
 }
-
 
 
 type FollowingContentsCursor = {
@@ -1343,12 +906,11 @@ const decodeFollowingContentsCursor = (
 }
 
 export async function listFollowingOwnerContents(
-  db: ContentD1,
+  readStore: FollowingOwnerContentsReadStore,
   viewerUserId: string,
   followedOwnerIdsInput: string[],
   cursorValue: string | null,
   limit: number,
-  readStore?: FollowingOwnerContentsReadStore,
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
   const viewerId = viewerUserId.trim()
   assertResourceId(viewerId)
@@ -1367,22 +929,7 @@ export async function listFollowingOwnerContents(
     ownerIds,
   }))
   const cursor = decodeFollowingContentsCursor(cursorValue, viewerId, scopeHash)
-  const sourceRows = readStore
-    ? [...await readStore.list(ownerIds, cursor, limit + 1)]
-    : ((await db.prepare(`
-        SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
-               c.scheduled_at, c.access_mode, c.version, c.revision, c.slug, c.title, c.body_ref,
-               c.media_refs_json, c.cover_ref, c.media_warning, c.etag, c.created_at, c.updated_at
-          FROM contents c
-         WHERE c.state = 'PUBLISHED'
-           AND c.owner_user_id IN (SELECT value FROM json_each(?))
-           ${cursor ? 'AND (c.created_at < ? OR (c.created_at = ? AND c.id < ?))' : ''}
-         ORDER BY c.created_at DESC, c.id DESC
-         LIMIT ?`).bind(
-           JSON.stringify(ownerIds),
-           ...(cursor ? [cursor.createdAt, cursor.createdAt, cursor.id] : []),
-           limit + 1,
-         ).all<ContentRow>()).results ?? [])
+  const sourceRows = [...await readStore.list(ownerIds, cursor, limit + 1)]
   const hasMore = sourceRows.length > limit
   const items = sourceRows.slice(0, limit).map(toContent)
   const last = items.at(-1)
@@ -1400,6 +947,7 @@ export async function listFollowingOwnerContents(
       : null,
   }
 }
+
 
 export async function createContent(
   ownerUserId: string,

@@ -120,63 +120,6 @@ function createDatabase(options: { duplicateIdempotency?: boolean; updateNoMatch
 }
 
 describe('W03 Neon Collection update', () => {
-  it('preserves the original D1 batch update as the default', async () => {
-    const preparedSql: string[] = []
-    let batchStatements: unknown[] = []
-    const d1Row = {
-      id: existing.id,
-      owner_user_id: existing.ownerUserId,
-      creator_id: existing.creatorId,
-      state: existing.state,
-      version: existing.version,
-      title: existing.title,
-      description: existing.description,
-      cover_ref: existing.coverRef,
-      etag: existing.etag,
-      created_at: existing.createdAt,
-      updated_at: existing.updatedAt,
-      idem_id: null,
-      idem_owner_user_id: null,
-      idem_request_hash: null,
-      idem_status: null,
-      idem_response_status: null,
-      idem_response_json: null,
-      idem_expires_at: null,
-    }
-    const database = {
-      prepare(sql: string) {
-        preparedSql.push(sql)
-        return {
-          bind() {
-            return {
-              async first() { return d1Row },
-            }
-          },
-        }
-      },
-      async batch(statements: unknown[]) {
-        batchStatements = statements
-        return []
-      },
-    }
-
-    const result = await updateCollection(
-      database as never,
-      'creator_1',
-      'collection_1',
-      { title: 'New title', description: 'New description' },
-      'W/"1"',
-      'd1-update-key',
-      new Date('2026-11-16T01:00:00.000Z'),
-    )
-
-    expect(result).toMatchObject({ version: 2, etag: 'W/"2"', title: 'New title' })
-    expect(batchStatements).toHaveLength(4)
-    expect(preparedSql.some(sql => sql.includes('FROM content_collections s'))).toBe(true)
-    expect(preparedSql.some(sql => sql.startsWith('UPDATE content_collections'))).toBe(true)
-    expect(preparedSql.some(sql => sql.includes('content_txn_guard'))).toBe(true)
-  })
-
   it('loads an owner-scoped Collection and idempotency record from PostgreSQL', async () => {
     const fixture = createDatabase()
     const store = createPostgresCollectionUpdateStore(fixture.database)
@@ -296,7 +239,7 @@ describe('W03 Neon Collection update', () => {
         },
         body: JSON.stringify({ title: 'New title', description: 'New description' }),
       }),
-      { D1_02: database } as never,
+      {} as never,
     )
 
     expect(response.status).toBe(200)

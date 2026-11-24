@@ -207,48 +207,6 @@ describe('W03 Neon Series member reorder', () => {
     expect(fixture.transactionQueries.at(-1)?.sql).toBe('ROLLBACK')
   })
 
-  it('preserves the existing D1 batch implementation as the default fallback', async () => {
-    const preparedSql: string[] = []
-    let batchStatements: unknown[] = []
-    const db = {
-      prepare(sql: string) {
-        preparedSql.push(sql)
-        return {
-          bind() {
-            return {
-              async first() { return snapshot },
-              async all() { return { results: [...members] } },
-            }
-          },
-        }
-      },
-      async batch(statements: unknown[]) {
-        batchStatements = statements
-        return []
-      },
-    }
-
-    const result = await reorderSeriesMember(
-      db as never,
-      'creator_1',
-      'series_1',
-      'content_3',
-      0,
-      'W/"4"',
-      'd1-reorder-key',
-      new Date('2026-11-16T02:00:00.000Z'),
-    )
-
-    expect(result).toMatchObject({
-      member: { relationshipId: 'rel_3', contentId: 'content_3', position: 0 },
-      seriesVersion: 5,
-      seriesEtag: 'W/"5"',
-    })
-    expect(preparedSql.length).toBeGreaterThan(2)
-    expect(preparedSql[1]).toContain("target_type = 'series'")
-    expect(batchStatements).toHaveLength(9)
-  })
-
   it('routes the Series member PATCH through Neon without touching D1', async () => {
     const reorder = vi.fn(async () => undefined)
     const store: SeriesMemberReorderStore = {

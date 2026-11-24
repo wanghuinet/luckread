@@ -48,7 +48,7 @@ const rows = [
 describe('W03 Following content projection', () => {
   it('queries published content through the Neon read store with stable pagination', async () => {
     const list = vi.fn(async () => rows)
-    const page = await listFollowingOwnerContents({} as never, 'viewer-1', ['creator-2', 'creator-1'], null, 1, { list })
+    const page = await listFollowingOwnerContents({ list }, 'viewer-1', ['creator-2', 'creator-1'], null, 1)
     expect(page.items).toHaveLength(1)
     expect(page.items[0]).toMatchObject({
       id: 'content-1',
@@ -66,12 +66,11 @@ describe('W03 Following content projection', () => {
     const list = vi.fn(async () => rows)
     const store = { list }
     const page = await listFollowingOwnerContents(
-      {} as never,
+      store,
       'viewer-1',
       ['creator-2', 'creator-1', 'creator-2'],
       null,
       1,
-      store,
     )
     expect(page.items).toHaveLength(1)
     expect(page.items[0]?.id).toBe('content-1')
@@ -80,20 +79,20 @@ describe('W03 Following content projection', () => {
 
   it('binds cursors to the viewer and followed-author scope', async () => {
     const store = { list: async () => rows }
-    const page = await listFollowingOwnerContents({} as never, 'viewer-1', ['creator-1', 'creator-2'], null, 1, store)
+    const page = await listFollowingOwnerContents(store, 'viewer-1', ['creator-1', 'creator-2'], null, 1)
     await expect(
-      listFollowingOwnerContents({} as never, 'viewer-2', ['creator-1', 'creator-2'], page.nextCursor, 1, store),
+      listFollowingOwnerContents(store, 'viewer-2', ['creator-1', 'creator-2'], page.nextCursor, 1),
     ).rejects.toMatchObject({ code: 'INVALID_CURSOR' })
     await expect(
-      listFollowingOwnerContents({} as never, 'viewer-1', ['creator-1'], page.nextCursor, 1, store),
+      listFollowingOwnerContents(store, 'viewer-1', ['creator-1'], page.nextCursor, 1),
     ).rejects.toMatchObject({ code: 'INVALID_CURSOR' })
   })
 
   it('rejects an empty or overlarge author set', async () => {
     const store = { list: async () => rows }
-    await expect(listFollowingOwnerContents({} as never, 'viewer-1', [], null, 6, store))
+    await expect(listFollowingOwnerContents(store, 'viewer-1', [], null, 6))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
-    await expect(listFollowingOwnerContents({} as never, 'viewer-1', Array.from({ length: 501 }, (_, i) => 'creator-' + i), null, 6, store))
+    await expect(listFollowingOwnerContents(store, 'viewer-1', Array.from({ length: 501 }, (_, i) => 'creator-' + i), null, 6))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
   })
 })

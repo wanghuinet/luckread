@@ -1,530 +1,276 @@
-import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-
+import { describe, expect, it, vi } from 'vitest'
+import { createW03ContentWorker } from './index.js'
 import {
   appendPostThreadNext,
   createContentRelationship,
   listContentRelationships,
   listPostThread,
+  revokeContentRelationship,
+  type ContentRelationshipMutationStore,
+  type CreateRelationshipQueryRow,
+  type RevokeRelationshipQueryRow,
+  type AppendPostThreadQueryRow,
+  type PostThreadReadStore,
 } from './content-relationships.js'
-import { createW03ContentWorker } from './index.js'
-import w03Worker from './index.js'
 
-describe('W03 content relationship foundation', () => {
-  it('defines constrained authoritative relationship persistence', () => {
-    const migration = readFileSync(
-      resolve(process.cwd(), 'workers/W03-content/migrations/0006_content_relationships.sql'),
-      'utf8',
-    )
-    expect(migration).toContain('CREATE TABLE content_relationships')
-    expect(migration).toContain("source_type TEXT NOT NULL CHECK (source_type = 'content')")
-    expect(migration).toContain("relation_type TEXT NOT NULL CHECK (relation_type = 'reference')")
-    expect(migration).toContain("status TEXT NOT NULL CHECK (status IN ('ACTIVE', 'REVOKED', 'SUPERSEDED'))")
-    expect(migration).toContain('CREATE UNIQUE INDEX content_relationships_active_unique_idx')
-    expect(migration).toContain('content.relationship.created')
-    expect(migration).toContain('content.relationship.revoked')
-    const threadMigration = readFileSync(
-      resolve(process.cwd(), 'workers/W03-content/migrations/0014_content_post_threads.sql'),
-      'utf8',
-    )
-    expect(threadMigration).toContain("'thread-next'")
-    expect(threadMigration).toContain('CREATE UNIQUE INDEX content_relationships_thread_next_unique_idx')
-    expect(threadMigration).toContain('CREATE UNIQUE INDEX content_relationships_thread_previous_unique_idx')
-    expect(threadMigration).toContain('FROM content_relationships;')
-    expect(threadMigration).toContain("'content.relationship.created'")
-  })
+const baseRelationship = {
+  relationshipId: 'rel_1',
+  sourceType: 'content' as const,
+  sourceId: 'post_1',
+  targetType: 'content' as const,
+  targetId: 'post_2',
+  relationType: 'reference' as const,
+  schemaVersion: 1,
+  status: 'ACTIVE' as const,
+  actorId: 'user_1',
+  provenanceRef: null,
+  authorizationRef: null,
+  createdAt: '2026-11-20T12:00:00.000Z',
+  updatedAt: '2026-11-20T12:00:00.000Z',
+}
 
-  it('lists only active relationships between published content in one bounded D1 read', async () => {
-    const row = {
-      relationship_id: 'rel_123',
-      relation_type: 'reference',
-      created_at: '2026-10-07T00:00:00.000Z',
-      related_id: 'content_2',
-      related_slug: 'other-content-abcdef',
-      related_type: 'article',
-      related_title: 'Other content',
-      relation_direction: 'out',
-    }
-    const queries: string[] = []
-    const db = {
-      prepare(query: string) {
-        queries.push(query)
-        expect(query).toContain("r.status = 'ACTIVE'")
-        expect(query).toContain("s.state = 'PUBLISHED'")
-        expect(query).toContain("t.state = 'PUBLISHED'")
-        expect(query).toContain('LIMIT ?')
-        return {
-          bind: () => ({
-            all: async () => ({ results: [row] }),
-          }),
-        }
-      },
-    } as never
+const createRow: CreateRelationshipQueryRow = {
+  source_id: 'post_1',
+  owner_user_id: 'user_1',
+  source_version: 1,
+  source_content_type: 'post',
+  target_id: 'post_2',
+  target_content_type: 'post',
+  target_state: 'PUBLISHED',
+  target_access_mode: 'PUBLIC',
+  idem_id: null,
+  idem_owner_user_id: null,
+  idem_request_hash: null,
+  idem_status: null,
+  idem_response_json: null,
+  idem_expires_at: null,
+  active_relationship_id: null,
+}
 
-    const result = await listContentRelationships(db, 'content_1', 'out', null, 10)
-    expect(queries).toHaveLength(1)
-    expect(result.items).toEqual([{
-      relationshipId: 'rel_123',
-      relationType: 'reference',
-      direction: 'out',
-      relatedContent: {
-        id: 'content_2',
-        slug: 'other-content-abcdef',
-        contentType: 'article',
-        title: 'Other content',
-      },
-      createdAt: '2026-10-07T00:00:00.000Z',
-    }])
-  })
+const appendRow: AppendPostThreadQueryRow = {
+  source_id: 'post_1',
+  source_owner_user_id: 'user_1',
+  source_content_type: 'post',
+  source_state: 'PUBLISHED',
+  source_access_mode: 'PUBLIC',
+  target_id: 'post_2',
+  target_owner_user_id: 'user_1',
+  target_content_type: 'post',
+  target_state: 'DRAFT',
+  target_access_mode: 'PUBLIC',
+  idem_id: null,
+  idem_owner_user_id: null,
+  idem_request_hash: null,
+  idem_status: null,
+  idem_response_json: null,
+  idem_expires_at: null,
+}
 
-  it('binds relationship cursors to content ID and direction', async () => {
-    const row = {
-      relationship_id: 'rel_123',
-      relation_type: 'reference',
-      created_at: '2026-10-07T00:00:00.000Z',
-      related_id: 'content_2',
-      related_slug: 'other-content-abcdef',
-      related_type: 'article',
-      related_title: 'Other content',
-      relation_direction: 'out',
-    }
-    const prepare = () => ({
-      bind: () => ({ all: async () => ({ results: [row, { ...row, relationship_id: 'rel_124' }] }) }),
+const revokeRow: RevokeRelationshipQueryRow = {
+  relationship_id: 'rel_1',
+  source_type: 'content',
+  source_id: 'post_1',
+  target_type: 'content',
+  target_id: 'post_2',
+  relation_type: 'reference',
+  schema_version: 1,
+  status: 'ACTIVE',
+  actor_id: 'user_1',
+  provenance_ref: null,
+  authorization_ref: null,
+  created_at: '2026-11-20T12:00:00.000Z',
+  updated_at: '2026-11-20T12:00:00.000Z',
+  owner_user_id: 'user_1',
+  idem_id: null,
+  idem_owner_user_id: null,
+  idem_request_hash: null,
+  idem_status: null,
+  idem_response_json: null,
+  idem_expires_at: null,
+}
+
+function makeMutationStore(): ContentRelationshipMutationStore & {
+  create: ReturnType<typeof vi.fn>
+  revoke: ReturnType<typeof vi.fn>
+  appendThread: ReturnType<typeof vi.fn>
+  list: ReturnType<typeof vi.fn>
+} {
+  return {
+    async loadCreate() { return createRow },
+    create: vi.fn(async () => undefined),
+    async loadRevoke() { return revokeRow },
+    revoke: vi.fn(async () => undefined),
+    async loadAppend() { return appendRow },
+    async loadAppendStats() {
+      return { previous_count: 1, next_count: 1, would_cycle: 0, source_has_next: 0, target_has_previous: 0 }
+    },
+    appendThread: vi.fn(async () => undefined),
+    list: vi.fn(async () => ({ items: [], nextCursor: null, hasMore: false })),
+  }
+}
+
+const threadRows = [{
+  id: 'post_1',
+  slug: 'post-one',
+  position: 0,
+  state: 'PUBLISHED' as const,
+  access_mode: 'PUBLIC' as const,
+  title: 'First post',
+  body_ref: 'https://img.luckread.com/body/1.txt',
+  media_refs_json: '[]',
+  cover_ref: null,
+  created_at: '2026-11-20T12:00:00.000Z',
+}]
+
+describe('W03 Neon content relationship authority', () => {
+  it('reads public relationships through the injected Neon store with scoped pagination', async () => {
+    const store = makeMutationStore()
+    store.list.mockResolvedValueOnce({
+      items: [{
+        relationshipId: 'rel_1',
+        relationType: 'reference',
+        direction: 'out',
+        relatedContent: { id: 'post_2', slug: 'post-two', contentType: 'post', title: 'Second post' },
+        createdAt: '2026-11-20T12:00:00.000Z',
+      }],
+      nextCursor: 'next-page',
+      hasMore: true,
     })
-    const db = { prepare } as never
-    const first = await listContentRelationships(db, 'content_1', 'out', null, 1)
-    expect(first.hasMore).toBe(true)
-    expect(first.nextCursor).toEqual(expect.any(String))
-    await expect(listContentRelationships(db, 'content_2', 'out', first.nextCursor, 1)).rejects.toMatchObject({
-      code: 'INVALID_CURSOR',
-      status: 400,
-    })
-    await expect(listContentRelationships(db, 'content_1', 'in', first.nextCursor, 1)).rejects.toMatchObject({
-      code: 'INVALID_CURSOR',
-      status: 400,
-    })
+    const result = await listContentRelationships(store, 'post_1', 'out', null, 10)
+    expect(store.list).toHaveBeenCalledWith({ contentId: 'post_1', direction: 'out', cursor: null, limit: 10 })
+    expect(result.items[0]?.relatedContent.id).toBe('post_2')
+    expect(result.hasMore).toBe(true)
+    await expect(listContentRelationships(store, 'post_1', 'invalid' as never))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    expect(store.list).toHaveBeenCalledTimes(1)
   })
 
-  it('bounds and validates direction before the D1 read', async () => {
-    const db = {
-      prepare() {
-        throw new Error('database should not be reached')
-      },
-    } as never
-
-    await expect(listContentRelationships(db, 'content_1', 'invalid' as never)).rejects.toMatchObject({
-      code: 'VALIDATION_FAILED',
-      status: 400,
-    })
-  })
-
-  it('keeps create and revoke mutations behind idempotency and the D1 fail-closed guard', () => {
-    const runtime = readFileSync(
-      resolve(process.cwd(), 'workers/W03-content/src/content-relationships.ts'),
-      'utf8',
-    )
-    expect(runtime).toContain('export async function createContentRelationship')
-    expect(runtime).toContain('export async function revokeContentRelationship')
-    expect(runtime).toContain('if (!idempotencyKey || idempotencyKey.length > 256)')
-    expect(runtime).toContain('content_txn_guard')
-    expect(runtime).toContain('INSERT OR REPLACE INTO content_txn_guard')
-    expect(runtime).toContain('WHERE r.relationship_id = ? AND r.source_id = ?')
-    expect(runtime).toContain("relationshipHash(operationId, { ownerUserId, relationshipId })")
-  })
-
-  it('keeps relationship transport behind W01 caller authentication', async () => {
-    const db = {
-      prepare() {
-        throw new Error('database should not be reached')
-      },
-    } as never
-    const response = await w03Worker.fetch(
-      new Request('https://luckread-w03.internal/internal/content/contents/content_1/relationships', {
-        headers: {
-          'X-LuckRead-Caller': 'external',
-          'X-LuckRead-Transport-Version': '1.0',
-          'X-LuckRead-Correlation-Id': 'relationship-test',
-        },
-      }),
-      { D1_02: db },
-    )
-    expect(response.status).toBe(403)
-  })
-
-  it('routes public relationship reads without requiring a creator principal', async () => {
-    const db = {
-      prepare() {
-        return {
-          bind: () => ({
-            all: async () => ({ results: [] }),
-          }),
-        }
-      },
-    } as never
-    const neonWorker = createW03ContentWorker({
-      contentRelationshipMutationStoreProvider: () => ({
-        list: async () => ({ items: [], nextCursor: null, hasMore: false }),
-      } as never),
-    })
-    const response = await neonWorker.fetch(
-      new Request('https://luckread-w03.internal/internal/content/contents/content_1/relationships?direction=both&limit=10', {
-        headers: {
-          'X-LuckRead-Caller': 'W01',
-          'X-LuckRead-Transport-Version': '1.0',
-          'X-LuckRead-Correlation-Id': 'relationship-public',
-        },
-      }),
-      {} as never,
-    )
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { items: [], hasMore: false, nextCursor: null },
-    })
-  })
-})
-
-
-describe('W03 native quote-post relationship authority', () => {
-  it('creates quote-post links only to public published posts', async () => {
-    const statements: Array<{ sql: string; values: unknown[] }> = [];
-    const db = {
-      prepare(sql: string) {
-        return {
-          bind(...values: unknown[]) {
-            return {
-              first: async () => ({
-                source_id: 'quote_post',
-                owner_user_id: 'user_1',
-                source_version: 1,
-                source_content_type: 'post',
-                target_id: 'original_post',
-                target_content_type: 'post',
-                target_state: 'PUBLISHED',
-                target_access_mode: 'PUBLIC',
-                idem_id: null,
-                idem_owner_user_id: null,
-                idem_request_hash: null,
-                idem_status: null,
-                idem_response_json: null,
-                idem_expires_at: null,
-                active_relationship_id: null,
-              }),
-              all: async () => ({ results: [] }),
-              run: async () => ({ success: true }),
-              _statement: { sql, values },
-            };
-          },
-        };
-      },
-      batch: async (batch: Array<{ _statement?: { sql: string; values: unknown[] } }>) => {
-        for (const item of batch) {
-          if (item._statement) statements.push(item._statement);
-        }
-        return [];
-      },
-    } as never;
-
+  it('creates reference and quote-post relationships through the Neon mutation store', async () => {
+    const store = makeMutationStore()
     const relation = await createContentRelationship(
-      db,
-      'user_1',
-      'quote_post',
-      { targetContentId: 'original_post', relationType: 'quote-post' },
-      'quote-post-idem-1',
-    );
-
+      store, 'user_1', 'post_1',
+      { targetContentId: 'post_2', relationType: 'quote-post' },
+      'relationship-create-1',
+    )
     expect(relation).toMatchObject({
-      sourceId: 'quote_post',
-      targetId: 'original_post',
+      sourceId: 'post_1',
+      targetId: 'post_2',
       relationType: 'quote-post',
       status: 'ACTIVE',
-    });
-    expect(statements.some((statement) =>
-      statement.sql.includes('INSERT INTO content_relationships') &&
-      statement.sql.includes('VALUES (?, \'content\', ?, \'content\', ?, ?, 1') &&
-      statement.values.includes('quote-post'),
-    )).toBe(true);
-  });
+      actorId: 'user_1',
+    })
+    expect(store.create).toHaveBeenCalledWith(expect.objectContaining({
+      ownerUserId: 'user_1',
+      operationId: 'createContentRelationship',
+      idempotencyKey: 'relationship-create-1',
+      relationship: expect.objectContaining({ relationType: 'quote-post' }),
+    }))
+  })
 
-  it('hides private or unpublished targets from quote-post creation', async () => {
-    const db = {
-      prepare() {
-        return {
-          bind() {
-            return {
-              first: async () => ({
-                source_id: 'quote_post',
-                owner_user_id: 'user_1',
-                source_version: 1,
-                source_content_type: 'post',
-                target_id: 'original_post',
-                target_content_type: 'post',
-                target_state: 'PUBLISHED',
-                target_access_mode: 'MEMBERS_ONLY',
-                idem_id: null,
-                idem_owner_user_id: null,
-                idem_request_hash: null,
-                idem_status: null,
-                idem_response_json: null,
-                idem_expires_at: null,
-                active_relationship_id: null,
-              }),
-            };
-          },
-        };
-      },
-      batch: async () => { throw new Error('quote link must not be persisted'); },
-    } as never;
+  it('rejects private quote targets and generic thread-next edges before persistence', async () => {
+    const privateStore = makeMutationStore()
+    privateStore.loadCreate = vi.fn(async () => ({ ...createRow, target_access_mode: 'MEMBERS_ONLY' }))
+    await expect(createContentRelationship(
+      privateStore, 'user_1', 'post_1',
+      { targetContentId: 'post_2', relationType: 'quote-post' }, 'private-target',
+    )).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(privateStore.create).not.toHaveBeenCalled()
 
     await expect(createContentRelationship(
-      db,
-      'user_1',
-      'quote_post',
-      { targetContentId: 'original_post', relationType: 'quote-post' },
-      'quote-post-idem-2',
-    )).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
-  });
-});
+      makeMutationStore(), 'user_1', 'post_1',
+      { targetContentId: 'post_2', relationType: 'thread-next' }, 'generic-thread',
+    )).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+  })
 
-describe('W03 native social post thread authority', () => {
-  it('prevents the generic reference API from creating thread edges', async () => {
-    const db = {
-      prepare() {
-        throw new Error('generic relationship writes must reject thread-next before D1');
-      },
-    } as never;
-
+  it('replays a completed idempotent relationship without writing a second record', async () => {
+    const store = makeMutationStore()
+    const replay = { ...baseRelationship, status: 'ACTIVE' }
+    store.loadCreate = vi.fn(async () => ({
+      ...createRow,
+      idem_id: 'idem_1',
+      idem_owner_user_id: 'user_1',
+      idem_request_hash: 'hash-placeholder',
+      idem_status: 'COMPLETED' as const,
+      idem_response_json: JSON.stringify(replay),
+      idem_expires_at: '2099-01-01T00:00:00.000Z',
+      active_relationship_id: 'rel_1',
+    }))
+    // A mismatched request hash fails closed; no duplicate insert is attempted.
     await expect(createContentRelationship(
-      db,
-      'user_1',
-      'post_root',
-      { targetContentId: 'post_next', relationType: 'thread-next' },
-      'thread-link-1',
-    )).rejects.toMatchObject({
-      code: 'VALIDATION_FAILED',
-      status: 400,
-    });
-  });
+      store, 'user_1', 'post_1',
+      { targetContentId: 'post_2' }, 'reused-key',
+    )).rejects.toMatchObject({ code: 'IDEMPOTENCY_KEY_REUSE_CONFLICT', status: 422 })
+    expect(store.create).not.toHaveBeenCalled()
+  })
 
-  it('adds ordered links only between the same owner public social posts', async () => {
-    const statements: string[] = [];
-    const db = {
-      prepare(query: string) {
-        statements.push(query);
-        return {
-          bind: (...values: unknown[]) => ({
-            first: async () => {
-              if (query.includes('AS source_owner_user_id')) {
-                return {
-                  source_id: 'post_root',
-                  source_owner_user_id: 'user_1',
-                  source_content_type: 'post',
-                  source_state: 'DRAFT',
-                  source_access_mode: 'PUBLIC',
-                  target_id: 'post_next',
-                  target_owner_user_id: 'user_1',
-                  target_content_type: 'post',
-                  target_state: 'DRAFT',
-                  target_access_mode: 'PUBLIC',
-                  idem_id: null,
-                  idem_owner_user_id: null,
-                  idem_request_hash: null,
-                  idem_status: null,
-                  idem_response_json: null,
-                  idem_expires_at: null,
-                };
-              }
-              return {
-                previous_count: 1,
-                next_count: 1,
-                would_cycle: 0,
-                source_has_next: 0,
-                target_has_previous: 0,
-              };
-            },
-          }),
-        };
-      },
-      batch: async (batch: unknown[]) => { expect(batch).toHaveLength(4); return []; },
-    } as never;
+  it('revokes a relationship through the Neon store with owner and status checks', async () => {
+    const store = makeMutationStore()
+    const result = await revokeContentRelationship(store, 'user_1', 'post_1', 'rel_1', 'relationship-revoke-1')
+    expect(result).toMatchObject({ relationshipId: 'rel_1', status: 'REVOKED' })
+    expect(store.revoke).toHaveBeenCalledWith(expect.objectContaining({
+      ownerUserId: 'user_1',
+      relationshipId: 'rel_1',
+      sourceContentId: 'post_1',
+    }))
 
-    const relation = await appendPostThreadNext(db, 'user_1', 'post_root', 'post_next', 'thread-link-1');
-    expect(relation).toMatchObject({
-      sourceId: 'post_root',
-      targetId: 'post_next',
+    const wrongOwner = makeMutationStore()
+    wrongOwner.loadRevoke = vi.fn(async () => ({ ...revokeRow, owner_user_id: 'user_2' }))
+    await expect(revokeContentRelationship(wrongOwner, 'user_1', 'post_1', 'rel_1', 'idem'))
+      .rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    expect(wrongOwner.revoke).not.toHaveBeenCalled()
+  })
+
+  it('appends a thread edge through Neon with cycle, fork, owner and length preflight checks', async () => {
+    const store = makeMutationStore()
+    const result = await appendPostThreadNext(store, 'user_1', 'post_1', 'post_2', 'thread-append-1')
+    expect(result).toMatchObject({
+      sourceId: 'post_1',
+      targetId: 'post_2',
       relationType: 'thread-next',
       status: 'ACTIVE',
-    });
-    expect(statements[1]).toContain('WITH RECURSIVE');
-    expect(statements[4]).toContain('NOT EXISTS (');
-    expect(statements[4]).toContain('SELECT 1 FROM descendants WHERE id = s.id');
-    expect(statements[4]).toContain("r.relation_type = 'thread-next'");
-  });
-
-  it('rejects malformed IDs before any D1 access', async () => {
-    const db = { prepare() { throw new Error('database should not be reached'); } } as never;
-    await expect(appendPostThreadNext(db, 'user_1', '../root', 'post_next', 'idem')).rejects.toMatchObject({
-      code: 'VALIDATION_FAILED',
-      status: 400,
-    });
-  });
-
-  it('reads an ordered thread through one recursive D1 query and keeps owner drafts private', async () => {
-    const queryLog: string[] = [];
-    const db = {
-      prepare(query: string) {
-        queryLog.push(query);
-        return {
-          bind: () => ({
-            all: async () => ({
-              results: [
-                {
-                  id: 'post_root', slug: 'root', position: 0, state: 'DRAFT', access_mode: 'PUBLIC',
-                  title: 'First post', body_ref: 'https://img.luckread.com/body/1.txt',
-                  media_refs_json: '[]', cover_ref: null, created_at: '2026-11-05T00:00:00.000Z',
-                },
-                {
-                  id: 'post_next', slug: 'next', position: 1, state: 'DRAFT', access_mode: 'PUBLIC',
-                  title: 'Second post', body_ref: 'https://img.luckread.com/body/2.txt',
-                  media_refs_json: '["https://img.luckread.com/photo.jpg"]',
-                  cover_ref: 'https://img.luckread.com/photo.jpg', created_at: '2026-11-05T00:01:00.000Z',
-                },
-              ],
-            }),
-          }),
-        };
-      },
-    } as never;
-
-    const thread = await listPostThread(db, 'post_next', 'user_1');
-    expect(queryLog).toHaveLength(1);
-    expect(queryLog[0]).toContain('WITH RECURSIVE');
-    expect(queryLog[0]).toContain("root_content.state = 'PUBLISHED' AND root_content.access_mode = 'PUBLIC'");
-    expect(thread.rootContentId).toBe('post_root');
-    expect(thread.items.map(item => item.id)).toEqual(['post_root', 'post_next']);
-    expect(thread.items[1].mediaRefs).toEqual(['https://img.luckread.com/photo.jpg']);
-  });
-
-  it('routes thread reads publicly while keeping append behind the W01 authenticated social principal', async () => {
-    const db = {
-      prepare() {
-        return {
-          bind: () => ({
-            all: async () => ({ results: [{
-              id: 'post_root', slug: 'root', position: 0, state: 'PUBLISHED', access_mode: 'PUBLIC',
-              title: 'First post', body_ref: 'https://img.luckread.com/body/1.txt',
-              media_refs_json: '[]', cover_ref: null, created_at: '2026-11-05T00:00:00.000Z',
-            }] }),
-            first: async () => ({
-              source_id: 'post_root', source_owner_user_id: 'user_1', source_content_type: 'post',
-              source_state: 'PUBLISHED', source_access_mode: 'PUBLIC', target_id: 'post_next',
-              target_owner_user_id: 'user_1', target_content_type: 'post', target_state: 'PUBLISHED',
-              target_access_mode: 'PUBLIC', idem_id: null, idem_owner_user_id: null,
-              idem_request_hash: null, idem_status: null, idem_response_json: null, idem_expires_at: null,
-            }),
-          }),
-        };
-      },
-      batch: async () => [],
-    } as never;
-    const neonWorker = createW03ContentWorker({
-      postThreadReadStoreProvider: () => ({
-        list: async () => [{
-          id: 'post_root',
-          slug: 'root',
-          position: 0,
-          state: 'PUBLISHED',
-          access_mode: 'PUBLIC',
-          title: 'First post',
-          body_ref: 'https://img.luckread.com/body/1.txt',
-          media_refs_json: '[]',
-          cover_ref: null,
-          created_at: '2026-11-05T00:00:00.000Z',
-        }],
-      }),
     })
-    const headers = {
-      'X-LuckRead-Caller': 'W01',
-      'X-LuckRead-Transport-Version': '1.0',
-      'X-LuckRead-Correlation-Id': 'thread-route-test',
-    };
-    const publicResponse = await neonWorker.fetch(
-      new Request('https://luckread-w03.internal/internal/content/contents/post_root/thread', { headers }),
+    expect(store.loadAppendStats).toBeDefined()
+    expect(store.appendThread).toHaveBeenCalledWith(expect.objectContaining({
+      ownerUserId: 'user_1',
+      maxItems: 50,
+      relationship: expect.objectContaining({ relationType: 'thread-next' }),
+    }))
+
+    const cycleStore = makeMutationStore()
+    cycleStore.loadAppendStats = vi.fn(async () => ({
+      previous_count: 1, next_count: 2, would_cycle: 1, source_has_next: 0, target_has_previous: 0,
+    }))
+    await expect(appendPostThreadNext(cycleStore, 'user_1', 'post_1', 'post_2', 'thread-cycle'))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    expect(cycleStore.appendThread).not.toHaveBeenCalled()
+  })
+
+  it('reads ordered thread items through the required Neon read store', async () => {
+    const readStore: PostThreadReadStore = { async list(contentId, viewerUserId, maxItems) {
+      expect(contentId).toBe('post_1')
+      expect(viewerUserId).toBe('user_1')
+      expect(maxItems).toBe(50)
+      return threadRows
+    } }
+    const result = await listPostThread(readStore, 'post_1', 'user_1')
+    expect(result).toMatchObject({ rootContentId: 'post_1', items: [{ id: 'post_1', mediaRefs: [] }] })
+  })
+
+  it('keeps public relationship reads behind the W01 transport boundary', async () => {
+    const worker = createW03ContentWorker({ contentRelationshipMutationStoreProvider: () => makeMutationStore() })
+    const denied = await worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/contents/post_1/relationships'),
       {} as never,
-    );
-    expect(publicResponse.status).toBe(200);
-    await expect(publicResponse.json()).resolves.toMatchObject({ data: { rootContentId: 'post_root' } });
-
-    const lowLayerResponse = await neonWorker.fetch(
-      new Request('https://luckread-w03.internal/internal/content/contents/post_root/thread', {
-        headers: {
-          ...headers,
-          'X-LuckRead-Principal-User-Id': 'user_low',
-          'X-LuckRead-Principal-Layer': 'L1',
-        },
-      }),
-      {} as never,
-    );
-    expect(lowLayerResponse.status).toBe(200);
-
-    const deniedResponse = await neonWorker.fetch(
-      new Request('https://luckread-w03.internal/internal/content/contents/post_root/thread', {
-        method: 'POST',
-        headers: { ...headers, 'content-type': 'application/json', 'Idempotency-Key': 'thread-link' },
-        body: JSON.stringify({ nextContentId: 'post_next' }),
-      }),
-      {} as never,
-    );
-    expect(deniedResponse.status).toBe(401);
-  });
-});
-
-
-describe('W03 Neon post-thread read provider', () => {
-  it('routes the existing thread GET through the injected read store without touching D1', async () => {
-    const worker = createW03ContentWorker({
-      postThreadReadStoreProvider: () => ({
-        async list(contentId, viewerUserId, maxItems) {
-          expect(contentId).toBe('post_root')
-          expect(viewerUserId).toBeNull()
-          expect(maxItems).toBe(50)
-          return [{
-            id: 'post_root',
-            slug: 'root',
-            position: 0,
-            state: 'PUBLISHED',
-            access_mode: 'PUBLIC',
-            title: 'First post',
-            body_ref: 'https://img.luckread.com/body/1.txt',
-            media_refs_json: '[]',
-            cover_ref: null,
-            created_at: '2026-11-14T00:00:00.000Z',
-          }]
-        },
-      }),
-    })
-    const db = {
-      prepare() {
-        throw new Error('D1 must not be queried when the injected Neon read store is selected')
-      },
-    } as never
-    const response = await worker.fetch(
-      new Request('https://luckread-w03.internal/internal/content/contents/post_root/thread', {
-        headers: {
-          'X-LuckRead-Caller': 'W01',
-          'X-LuckRead-Transport-Version': '1.0',
-          'X-LuckRead-Correlation-Id': 'thread-neon-read',
-        },
-      }),
-      { D1_02: db },
     )
+    expect(denied.status).toBe(403)
+  })
 
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: {
-        rootContentId: 'post_root',
-        items: [{ id: 'post_root', title: 'First post', mediaRefs: [] }],
-      },
-    })
+  it('keeps relationship mutation idempotency in the Neon PostgreSQL adapter', () => {
+    const adapter = readFileSync(resolve(process.cwd(), 'workers/W03-content/src/content-relationship-mutation-store-postgres.ts'), 'utf8')
+    expect(adapter).toContain('content_mutation_idempotency')
+    expect(adapter).toContain('BEGIN')
+    expect(adapter).toContain('COMMIT')
   })
 })

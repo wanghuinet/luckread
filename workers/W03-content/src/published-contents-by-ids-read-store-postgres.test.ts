@@ -88,14 +88,7 @@ describe('W03 PostgreSQL bookmark-content batch read', () => {
         },
         body: JSON.stringify({ ids: ['content_2', 'content_1'] }),
       }),
-      {
-        D1_02: {
-          prepare() {
-            d1Calls += 1
-            throw new Error('D1 must not be touched when the read store is injected')
-          },
-        },
-      } as never,
+      {} as never,
     )
 
     expect(response.status).toBe(200)
