@@ -51,9 +51,7 @@ export function incrementNativeFeedReplyCount(item: ApiContentRecord, minimumCou
 }
 
 export function nativeFeedQueryKey(kind: NativeFeedKind, viewerId?: string | null) {
-  return kind === 'following'
-    ? (['native-feed', 'following', viewerId || 'anonymous'] as const)
-    : (['native-feed', 'for-you'] as const);
+  return ['native-feed', kind, viewerId || 'anonymous'] as const;
 }
 
 /** Fetch one canonical W01 page. Cursor and viewer scope are owned by TanStack Query. */
