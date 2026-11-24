@@ -11,7 +11,7 @@ Authority: root `package.json` / `package-lock.json` and `workers/W01-payload/pa
 - TypeScript 6.0.3.
 - OpenNext Cloudflare 1.20.18; Wrangler 4.166.0 (latest version admitted by the 24-hour dependency release-age policy).
 - Node supported range: `^22.23.5 || ^24.22.3 || >=26.13.1`; CI uses 24.22.3.
-- PostgreSQL driver remains pg 8.20.0 in this phase.
+- PostgreSQL driver remains pg 8.23.1 in this phase.
 - Active database runtime is Neon PostgreSQL. The historical D1 template and SQLite migrations are provenance only.
 
 ## Purpose
