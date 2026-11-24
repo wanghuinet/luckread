@@ -11,7 +11,7 @@
       "passState": "GATE1_PASS",
       "requires": [
         "all Gate-1 artifact files",
-        "controlled remote D1 environment",
+        "controlled Neon PostgreSQL 18 environment",
         "database identity",
         "commit identity",
         "locked dependency identity",
@@ -33,7 +33,7 @@
       "promotionState": "NOT_EVALUATED_UNTIL_EXECUTED",
       "passState": "GATE2_PASS",
       "requires": [
-        "Payload 3.90.2 runtime identity",
+        "Payload 3.94.1 + @payloadcms/db-postgres 3.94.1 Neon runtime identity",
         "disposable controlled authentication flow",
         "login-to-session-id correlation",
         "native session persistence correlation",
