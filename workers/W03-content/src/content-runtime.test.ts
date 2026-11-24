@@ -389,10 +389,9 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Principal-Layer': 'L2',
         },
       },
-      {} as never,
     )
 
-    const denied = await neonWorker.fetch(makeRequest(), env)
+    const denied = await neonWorker.fetch(makeRequest(), env
     expect(denied.status).toBe(200)
     await expect(denied.json()).resolves.toMatchObject({
       contentId: 'content_public_1',
@@ -425,13 +424,13 @@ describe('W03 content contract core', () => {
     }
     let storeCalls = 0
     const neonWorker = createW03ContentWorker({
-      publishedContentsByIdsReadStoreProvider: () => ({
+      publishedContentsByIdsReadStoreProvider: (_env: never) => ({
         list: async (ids: readonly string[]) => {
           storeCalls += 1
           expect(ids).toEqual(['content_1'])
           return [row]
         },
-      }),
+      } as never),
     })
     const env = {} as never
     const response = await neonWorker.fetch(
@@ -1604,6 +1603,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Principal-Layer': 'L2',
         },
       }),
+      {} as never,
     );
 
     expect(response.status).toBe(200);
@@ -1635,10 +1635,11 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Principal-Layer': 'L1',
         },
       }),
+      {} as never,
     );
     expect(denied.status).toBe(403);
     expect(storeCalls).toHaveLength(1);
-  }, {} as never, {} as never);
+  });
 
   it('lists only the authenticated Creator\'s scheduled social posts and returns edit preconditions', async () => {
     const storeCalls: unknown[][] = []
@@ -1717,6 +1718,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Correlation-Id': 'test-unmatched-route',
         },
       }),
+      {} as never,
     )
     expect(response.status).toBe(404)
     await expect(response.json()).resolves.toMatchObject({
@@ -1977,6 +1979,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Correlation-Id': 'test-correlation-public',
         },
       }),
+      {} as never,
     )
 
     expect(response.status).toBe(200)
