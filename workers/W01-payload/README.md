@@ -11,6 +11,7 @@ Role: Payload-based platform and H5 administration runtime.
 - OpenNext Cloudflare: 1.20.18.
 - Wrangler: 4.166.0 (latest version admitted by the 24-hour dependency release-age policy).
 - Node.js: 24.22.3 in CI; supported range follows the Payload 3.94.x engine declaration.
+- PostgreSQL driver: `pg@8.23.1`.
 - Database: Neon PostgreSQL through the LuckRead-owned adapter and official `@payloadcms/db-postgres@3.94.1` runtime dependency.
 - Media/object storage: official Payload R2 integration.
 
