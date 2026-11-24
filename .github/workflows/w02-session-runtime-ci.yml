@@ -139,7 +139,7 @@ jobs:
         run: node --check scripts/auth-010-session-runtime-e2e.mjs
       - name: Install W02 runtime dependencies for MFA tests
         working-directory: workers/W02-identity
-        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Test W02 Neon-only Hyperdrive runtime selection
         run: npx vitest@3.2.4 run workers/W02-identity/src/neon/runtime.test.ts
       - name: Verify W02 uses Neon-only Worker configurations
