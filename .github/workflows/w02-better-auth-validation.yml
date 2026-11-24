@@ -26,6 +26,13 @@ jobs:
       - name: Install W02 runtime dependencies
         working-directory: workers/W02-identity
         run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Upload generated W02 npm lockfile for deterministic upgrade review
+        uses: actions/upload-artifact@v4
+        with:
+          name: w02-better-auth-package-lock-1.7.27
+          path: workers/W02-identity/package-lock.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Assert Better Auth is exactly 1.7.27 and imports
         working-directory: workers/W02-identity
         run: |
