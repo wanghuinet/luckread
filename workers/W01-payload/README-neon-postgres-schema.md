@@ -1,6 +1,6 @@
 # W01 Neon PostgreSQL Runtime and Schema Migrations
 
-W01's active Payload runtime uses the official `@payloadcms/db-postgres@3.90.2` adapter through the LuckRead-owned Neon adapter. The active runtime has no Cloudflare D1 or SQLite fallback.
+W01's active Payload runtime uses the official `@payloadcms/db-postgres@3.94.1` adapter through the LuckRead-owned Neon adapter. The active runtime has no Cloudflare D1 or SQLite fallback.
 
 - `src/payload.config.ts` selects the Neon PostgreSQL adapter in the Worker runtime.
 - `src/neon-postgres-adapter.ts` uses the official Payload PostgreSQL adapter, `push: false`, and `src/neon-postgres-migrations`.
