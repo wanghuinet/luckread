@@ -38,26 +38,34 @@ if (lockText.includes('@payloadcms/db-d1-sqlite')) fail('Cloudflare D1 Payload a
 // W01 runtime and lockfile are Neon/PostgreSQL-only. The old Cloudflare template
 // is retained solely as historical provenance, not as a dependency baseline.
 const required = {
-  payload: '3.90.2',
-  '@payloadcms/next': '3.90.2',
-  '@payloadcms/richtext-lexical': '3.90.2',
-  '@payloadcms/storage-r2': '3.90.2',
-  '@payloadcms/ui': '3.90.2',
-  next: '16.3.3',
-  react: '19.2.6',
-  'react-dom': '19.2.6',
-  '@opennextjs/cloudflare': '1.20.1',
+  payload: '3.94.1',
+  '@payloadcms/next': '3.94.1',
+  '@payloadcms/plugin-redirects': '3.94.1',
+  '@payloadcms/richtext-lexical': '3.94.1',
+  '@payloadcms/storage-r2': '3.94.1',
+  '@payloadcms/ui': '3.94.1',
+  next: '16.4.6',
+  react: '19.3.1',
+  'react-dom': '19.3.1',
+  '@opennextjs/cloudflare': '1.20.18',
+  'eslint-config-next': '16.4.6',
+  typescript: '6.0.3',
+  wrangler: '~4.167.0',
 }
 
 const postgresAdapterVersion = pkg.dependencies?.['@payloadcms/db-postgres'] ?? pkg.devDependencies?.['@payloadcms/db-postgres']
-if (postgresAdapterVersion !== '3.90.2') fail('W01 official PostgreSQL adapter must resolve to 3.90.2')
+if (postgresAdapterVersion !== '3.94.1') fail('W01 official PostgreSQL adapter must resolve to 3.94.1')
 for (const [name, expected] of Object.entries(required)) {
-  const actual = pkg.dependencies?.[name]
+  const actual = pkg.dependencies?.[name] ?? pkg.devDependencies?.[name]
   if (actual !== expected) fail(`${name} must be ${expected}; found ${actual ?? '<missing>'}`)
 }
 
-const nodeMajor = Number(process.versions.node.split('.')[0])
-if (nodeMajor < 24) fail(`Node 24+ is required for W01; current Node is ${process.versions.node}`)
+const [nodeMajor, nodeMinor, nodePatch] = process.versions.node.split('.').map(Number)
+const supportedNode =
+  (nodeMajor === 22 && (nodeMinor > 23 || (nodeMinor === 23 && nodePatch >= 5))) ||
+  (nodeMajor === 24 && (nodeMinor > 22 || (nodeMinor === 22 && nodePatch >= 3))) ||
+  (nodeMajor > 26 || (nodeMajor === 26 && (nodeMinor > 13 || (nodeMinor === 13 && nodePatch >= 1))))
+if (!supportedNode) fail(`Payload requires Node ^22.23.5 || ^24.22.3 || >=26.13.1; current Node is ${process.versions.node}`)
 
 // Windows exposes Corepack-managed pnpm through pnpm.ps1/pnpm.cmd.
 // execFileSync cannot directly execute .cmd files on Windows, so invoke
