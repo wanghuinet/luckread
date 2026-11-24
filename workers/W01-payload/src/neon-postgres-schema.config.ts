@@ -110,7 +110,7 @@ export default buildConfig({
         ],
       },
     }),
-    // v3.90.2's R2 plugin can insert its schema fields while disabled.
+    // Payload 3.94.1's R2 plugin can insert its schema fields while disabled.
     // It adds prefix and _objectKey without enabling upload/storage handlers.
     r2Storage({
       alwaysInsertFields: true,
