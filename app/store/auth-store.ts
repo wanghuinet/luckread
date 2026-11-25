@@ -283,13 +283,18 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   removeAccount: async (userId) => {
     authLifecycleGeneration += 1;
+    const generation = authLifecycleGeneration;
     const activeAccountId = await getActiveStoredAccountId();
+    if (generation !== authLifecycleGeneration) return;
     if (activeAccountId === userId) {
       // Do not orphan a server-side endpoint after deleting its local session.
       await unregisterPushEndpointForUser(userId);
+      if (generation !== authLifecycleGeneration) return;
     }
     await removeStoredAccount(userId);
+    if (generation !== authLifecycleGeneration) return;
     const accounts = await listStoredAccounts();
+    if (generation !== authLifecycleGeneration) return;
     if (activeAccountId === userId) {
       clearPendingMutationKeys();
       set({ status: 'anonymous', user: null, accounts });
@@ -300,20 +305,29 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   logout: async () => {
     authLifecycleGeneration += 1;
+    const generation = authLifecycleGeneration;
     const currentUserId = get().user?.id;
     try {
       const token = await readSessionToken();
+      if (generation !== authLifecycleGeneration) return;
       if (token) {
         if (currentUserId) {
           await unregisterPushEndpointForUser(currentUserId).catch(() => undefined);
+          if (generation !== authLifecycleGeneration) return;
         }
         await apiRequest<unknown>('/auth/logout', { method: 'POST', idempotencyKey: false });
+        if (generation !== authLifecycleGeneration) return;
       }
     } finally {
+      // A newer login, switch or lifecycle action owns the store now.
+      if (generation !== authLifecycleGeneration) return;
       if (currentUserId) await removeStoredAccount(currentUserId);
       else await clearStoredSession();
+      if (generation !== authLifecycleGeneration) return;
       clearPendingMutationKeys();
-      set({ status: 'anonymous', user: null, accounts: await listStoredAccounts() });
+      const accounts = await listStoredAccounts();
+      if (generation !== authLifecycleGeneration) return;
+      set({ status: 'anonymous', user: null, accounts });
     }
   },
 
