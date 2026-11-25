@@ -132,6 +132,7 @@ mock.module('../lib/api-client.ts', () => ({
   },
 }));
 mock.module('../lib/push-notifications.ts', () => ({
+  syncPushEndpointForAuthenticatedUser: async () => undefined,
   unregisterPushEndpointForUser: async (userId) => {
     pushUnregisterCalls.push({ userId, activeAccountId });
     if (failPushUnregisterFor === userId) {
