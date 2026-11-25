@@ -359,3 +359,11 @@ test('logout and remove-account operations are guarded against stale lifecycle g
   expect(logoutBlock.match(/generation !== authLifecycleGeneration/g)?.length).toBeGreaterThanOrEqual(4);
   expect(logoutBlock).toContain('A newer login, switch or lifecycle action owns the store now.');
 });
+
+
+test('session invalidation guards awaited cleanup and state publication against lifecycle changes', () => {
+  const source = readFileSync(resolve(process.cwd(), 'store/auth-store.ts'), 'utf8');
+  const block = source.slice(source.indexOf('  invalidateSession: async'), source.indexOf('})));'));
+  expect(block.match(/generation !== authLifecycleGeneration/g)?.length).toBeGreaterThanOrEqual(5);
+  expect(block).toContain('const accounts = await listStoredAccounts()');
+});

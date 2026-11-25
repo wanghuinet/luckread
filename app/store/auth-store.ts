@@ -339,15 +339,22 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       if (generation !== authLifecycleGeneration || current.accountId !== snapshot.accountId || current.token !== snapshot.token) return;
       if (snapshot.accountId) await removeStoredAccount(snapshot.accountId);
       else await clearLegacySessionForSnapshot(snapshot);
+      if (generation !== authLifecycleGeneration) return;
       const activeAccountId = await getActiveStoredAccountId();
       if (generation !== authLifecycleGeneration || (activeAccountId !== null && activeAccountId !== snapshot.accountId)) return;
     } else {
+      // Compatibility path: an explicit invalidation must not publish after a newer
+      // login/switch/logout/removal has claimed the lifecycle.
       const activeAccountId = await getActiveStoredAccountId();
+      if (generation !== authLifecycleGeneration) return;
       if (activeAccountId) await removeStoredAccount(activeAccountId);
       else await clearStoredSession();
+      if (generation !== authLifecycleGeneration) return;
     }
     clearPendingMutationKeys();
-    set({ status: 'anonymous', user: null, accounts: await listStoredAccounts() });
+    const accounts = await listStoredAccounts();
+    if (generation !== authLifecycleGeneration) return;
+    set({ status: 'anonymous', user: null, accounts });
   },
 }));
 
