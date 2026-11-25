@@ -92,7 +92,7 @@ export default function RegisterScreen() {
     }
     if (!isValidAuthPassword(password)) {
       setRegistrationState('error');
-      setErrorMessage('密码长度必须为 15–128 个字符。请使用较长且独一无二的密码。');
+      setErrorMessage('密码长度必须为 15–128 个 Unicode 字符（按码点计数）。请使用较长且独一无二的密码。');
       return;
     }
     if (!confirmPassword) {
@@ -234,7 +234,7 @@ export default function RegisterScreen() {
         accessibilityLabel="密码"
         autoCapitalize="none"
         autoComplete="new-password"
-        maxLength={128}
+        maxLength={256}
         onChangeText={setPassword}
         placeholder="15–128 个字符"
         returnKeyType="next"
@@ -248,7 +248,7 @@ export default function RegisterScreen() {
         accessibilityLabel="确认密码"
         autoCapitalize="none"
         autoComplete="new-password"
-        maxLength={128}
+        maxLength={256}
         onChangeText={setConfirmPassword}
         onSubmitEditing={() => void submit()}
         placeholder="再次输入密码"
