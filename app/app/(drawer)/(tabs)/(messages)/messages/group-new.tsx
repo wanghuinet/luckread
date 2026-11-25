@@ -23,7 +23,7 @@ export default function NewGroupScreen() {
     },
     onError: (error) => Alert.alert('群聊创建失败', error instanceof Error ? error.message : '请稍后重试'),
   });
-  const ids = members.split(/[\\s,;]+/).map(v => v.trim()).filter(Boolean);
+  const ids = parseGroupMemberIds(members);
   const canCreate = name.trim().length > 0 && ids.length >= 2 && ids.length <= 49 && !mutation.isPending;
   return <View className="flex-1 bg-white dark:bg-black">
     <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
