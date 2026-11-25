@@ -91,7 +91,9 @@ test('invalid server page fails without returning a fake empty timeline', async 
 });
 
 test('cache keys isolate Following data by viewer while keeping public For You data shared', () => {
-  expect(nativeFeedQueryKey('for-you')).toEqual(['native-feed', 'for-you']);
+  expect(nativeFeedQueryKey('for-you')).toEqual(['native-feed', 'for-you', 'anonymous']);
+  expect(nativeFeedQueryKey('for-you', 'user-a')).toEqual(['native-feed', 'for-you', 'user-a']);
+  expect(nativeFeedQueryKey('for-you', 'user-b')).not.toEqual(nativeFeedQueryKey('for-you', 'user-a'));
   expect(nativeFeedQueryKey('following', 'user-a')).toEqual(['native-feed', 'following', 'user-a']);
   expect(nativeFeedQueryKey('following', 'user-b')).not.toEqual(nativeFeedQueryKey('following', 'user-a'));
 });
