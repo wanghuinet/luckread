@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Linking, Pressable, Text, View } from 'react-native';
 import { useColorScheme } from 'nativewind';
@@ -30,9 +30,12 @@ export default function LoginScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [verificationMessage, setVerificationMessage] = useState('');
   const [needsVerification, setNeedsVerification] = useState(false);
+  const inputRevision = useRef(0);
+  const emailRevision = useRef(0);
 
   const submit = async () => {
     if (submitting) return;
+    const requestRevision = inputRevision.current;
     setErrorMessage('');
     setVerificationMessage('');
     setNeedsVerification(false);
@@ -50,8 +53,9 @@ export default function LoginScreen() {
     setSubmitting(true);
     try {
       await login(normalizedEmail, password);
-      router.replace('/' as never);
+      if (inputRevision.current === requestRevision) router.replace('/' as never);
     } catch (cause) {
+      if (inputRevision.current !== requestRevision) return;
       if (cause instanceof AuthStoreError && cause.code === 'EMAIL_NOT_VERIFIED') {
         setNeedsVerification(true);
         setErrorMessage('这个邮箱还没有完成验证。请检查收件箱，或重新发送验证邮件。');
@@ -70,10 +74,12 @@ export default function LoginScreen() {
       return;
     }
 
+    const requestEmailRevision = emailRevision.current;
     setResending(true);
     setVerificationMessage('');
     try {
       const { response, data } = await requestEmailVerification(normalizedEmail);
+      if (emailRevision.current !== requestEmailRevision) return;
       if (response.ok) {
         setVerificationMessage('如果该邮箱对应尚未验证的账号，系统已受理验证邮件请求。请检查收件箱和垃圾邮件。');
       } else if (response.status === 429) {
@@ -84,7 +90,9 @@ export default function LoginScreen() {
         setVerificationMessage(getApiErrorMessage(data, '验证邮件请求未能完成，请稍后重试。', response.status));
       }
     } catch (cause) {
-      setVerificationMessage(cause instanceof Error ? cause.message : '网络异常，验证邮件请求未能完成。');
+      if (emailRevision.current === requestEmailRevision) {
+        setVerificationMessage(cause instanceof Error ? cause.message : '网络异常，验证邮件请求未能完成。');
+      }
     } finally {
       setResending(false);
     }
@@ -108,6 +116,8 @@ export default function LoginScreen() {
         keyboardType="email-address"
         maxLength={254}
         onChangeText={(value) => {
+          inputRevision.current += 1;
+          emailRevision.current += 1;
           setEmail(value);
           setNeedsVerification(false);
           setVerificationMessage('');
@@ -124,6 +134,7 @@ export default function LoginScreen() {
         autoCapitalize="none"
         autoComplete="current-password"
         onChangeText={(value) => {
+          inputRevision.current += 1;
           setPassword(value);
           setErrorMessage('');
         }}
