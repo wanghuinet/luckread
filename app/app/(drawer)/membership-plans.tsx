@@ -321,10 +321,7 @@ export default function MembershipPlansScreen() {
         currency: string;
       };
 
-      if (!isPurchaseViewerCurrent()) {
-        setPurchaseMessage('账号已切换，订单已创建但未启动支付。请在当前账号下重新检查订阅。');
-        return;
-      }
+      if (!isPurchaseViewerCurrent()) return;
       const intentResult = await createMembershipPaymentIntent(orderData.orderId, { expectedAccountId: purchaseViewerId });
       if (!isPurchaseViewerCurrent()) return;
       if (!intentResult.response.ok) {
