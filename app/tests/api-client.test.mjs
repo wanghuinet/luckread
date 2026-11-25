@@ -15,6 +15,7 @@ const originalXMLHttpRequest = globalThis.XMLHttpRequest;
 
 mock.module('../lib/secure-session.ts', () => ({
   readSessionToken: async () => storedToken,
+  readCachedUser: async () => ({ id: mockActiveAccountId }),
   readSessionCredentialSnapshot: async () => ({ accountId: mockActiveAccountId, token: storedToken }),
   saveSessionTokenForSnapshot: async (token, snapshot) => {
     if (snapshot.accountId !== mockActiveAccountId) return;
