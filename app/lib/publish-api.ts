@@ -202,6 +202,7 @@ export async function uploadMediaFile(
 export async function uploadTextBody(
   text: string,
   idempotencyKey: string = createIdempotencyKey(),
+  expectedAccountId?: string,
 ): Promise<UploadedMedia> {
   if (!text.trim()) throw new Error('Post text cannot be empty.');
   const fileName = 'luckread-post-' + idempotencyKey.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) + '.txt';
@@ -221,6 +222,7 @@ export async function uploadTextBody(
         text,
       ]),
     },
+    expectedAccountId,
   });
   if (!result.response.ok) {
     throw new Error(apiFailureMessage(result, 'Post body upload failed. Please retry.'));
