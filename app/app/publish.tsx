@@ -523,8 +523,11 @@ function PublishScreenContent() {
     void loadExistingContent();
   }, [contentId, draftId, loadExistingContent]);
 
+  const quoteViewerId = user?.id ?? null;
   useEffect(() => {
     let active = true;
+    const isCurrentQuoteViewer = () =>
+      active && (useAuthStore.getState().user?.id ?? null) === quoteViewerId;
     if (!quoteContentId) {
       setQuoteTarget(null);
       setLoadingQuote(false);
@@ -533,7 +536,7 @@ function PublishScreenContent() {
     setLoadingQuote(true);
     void apiRequest<Record<string, unknown>>('/contents/' + encodeURIComponent(quoteContentId), { method: 'GET' })
       .then((result) => {
-        if (!active) return;
+        if (!isCurrentQuoteViewer()) return;
         if (!result.response.ok) throw new Error(apiFailureDiagnostic(result, '无法加载要引用的原帖。'));
         const target = unwrapContent(result.data);
         if (!target || target.id !== quoteContentId || target.contentType !== 'post' || target.state !== 'PUBLISHED' || target.accessMode !== 'PUBLIC') {
@@ -543,13 +546,13 @@ function PublishScreenContent() {
         setErrorMessage('');
       })
       .catch((error) => {
-        if (!active) return;
+        if (!isCurrentQuoteViewer()) return;
         setQuoteTarget(null);
         setErrorMessage(error instanceof Error ? error.message : '无法加载要引用的原帖。');
       })
-      .finally(() => { if (active) setLoadingQuote(false); });
+      .finally(() => { if (isCurrentQuoteViewer()) setLoadingQuote(false); });
     return () => { active = false; };
-  }, [quoteContentId]);
+  }, [quoteContentId, quoteViewerId]);
 
   const uploadAsset = useCallback(async (asset: ComposerAsset) => {
     let uploaded = asset.uploaded;
