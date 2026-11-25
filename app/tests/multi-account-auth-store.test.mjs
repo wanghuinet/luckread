@@ -1,4 +1,4 @@
-import { beforeEach, expect, mock, test } from 'bun:test';
+import { beforeEach, expect, mock, test } from 'bun:test';\nimport { readFileSync } from 'node:fs';\nimport { resolve } from 'node:path';
 
 const storedAccounts = new Map();
 const storedTokens = new Map();
@@ -343,4 +343,17 @@ test('late account-switch response cannot replace a newer login', async () => {
   expect(activeAccountId).toBe('user-latest@example.com');
   expect(useAuthStore.getState().status).toBe('authenticated');
   expect(useAuthStore.getState().user?.id).toBe('user-latest@example.com');
+});
+
+
+test('logout and remove-account operations are guarded against stale lifecycle generations', () => {
+  const source = readFileSync(resolve(process.cwd(), 'app/store/auth-store.ts'), 'utf8');
+  const removeBlock = source.slice(source.indexOf('  removeAccount: async'), source.indexOf('  logout: async'));
+  const logoutBlock = source.slice(source.indexOf('  logout: async'), source.indexOf('  invalidateSession: async'));
+
+  expect(removeBlock).toContain('const generation = authLifecycleGeneration');
+  expect(removeBlock.match(/generation !== authLifecycleGeneration/g)?.length).toBeGreaterThanOrEqual(3);
+  expect(logoutBlock).toContain('const generation = authLifecycleGeneration');
+  expect(logoutBlock.match(/generation !== authLifecycleGeneration/g)?.length).toBeGreaterThanOrEqual(4);
+  expect(logoutBlock).toContain('A newer login, switch or lifecycle action owns the store now.');
 });
