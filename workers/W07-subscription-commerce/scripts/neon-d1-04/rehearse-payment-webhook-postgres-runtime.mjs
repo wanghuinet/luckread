@@ -37,6 +37,8 @@ const checks = {
   nativePaymentAndOrderCommittedTogether: false,
   nativeSamePayloadReplayReturnsDuplicate: false,
   nativePayloadConflictPreservesFirstReceipt: false,
+  concurrentSameEventAppliesExactlyOnce: false,
+  concurrentDistinctEventsPreserveNewestProviderState: false,
   fixtureRowsCleaned: false,
 }
 
@@ -237,6 +239,71 @@ try {
     occurrence_count: 1,
   }])
   checks.nativePayloadConflictPreservesFirstReceipt = true
+
+  // Concurrent delivery of the same signed event must serialize on the
+  // provider/event unique key and produce exactly one payment mutation.
+  const concurrentReplay = await createPaymentFixture('concurrent-replay')
+  const concurrentReplayEventId = marker + '-event-concurrent-replay'
+  const concurrentReplayInput = signedWebhook({
+    eventId: concurrentReplayEventId,
+    paymentId: concurrentReplay.paymentId,
+  })
+  const concurrentReplayResults = await Promise.all([
+    receiveNative(concurrentReplayInput, marker + '-receipt-concurrent-a', marker + '-conflict-concurrent-a'),
+    receiveNative(concurrentReplayInput, marker + '-receipt-concurrent-b', marker + '-conflict-concurrent-b'),
+  ])
+  assert.deepEqual(
+    concurrentReplayResults.map(result => result?.outcome).sort(),
+    ['APPLIED', 'DUPLICATE'],
+  )
+  assert.equal(await count('payment_provider_events', 'event_id', concurrentReplayEventId), 1)
+  const concurrentReplayPayment = await pool.query(
+    'SELECT status, version::int AS version FROM payments WHERE payment_id = $1',
+    [concurrentReplay.paymentId],
+  )
+  assert.deepEqual(concurrentReplayPayment.rows, [{ status: 'succeeded', version: 2 }])
+  checks.concurrentSameEventAppliesExactlyOnce = true
+
+  // Two distinct events for one payment may arrive in either order. The
+  // provider timestamp CAS must leave the newest provider state authoritative.
+  const concurrentState = await createPaymentFixture('concurrent-state')
+  const concurrentStateEventOld = marker + '-event-concurrent-old'
+  const concurrentStateEventNew = marker + '-event-concurrent-new'
+  const olderProviderUpdate = new Date(now.getTime() - 3_000).toISOString()
+  const newerProviderUpdate = new Date(now.getTime() - 1_000).toISOString()
+  const concurrentStateResults = await Promise.all([
+    receiveNative(
+      signedWebhook({
+        eventId: concurrentStateEventOld,
+        paymentId: concurrentState.paymentId,
+        updated: olderProviderUpdate,
+      }),
+      marker + '-receipt-concurrent-old',
+      marker + '-conflict-concurrent-old',
+    ),
+    receiveNative(
+      signedWebhook({
+        eventId: concurrentStateEventNew,
+        paymentId: concurrentState.paymentId,
+        updated: newerProviderUpdate,
+      }),
+      marker + '-receipt-concurrent-new',
+      marker + '-conflict-concurrent-new',
+    ),
+  ])
+  assert.ok(concurrentStateResults.every(result =>
+    result?.state === 'APPLIED' || result?.state === 'RECONCILIATION_REQUIRED',
+  ))
+  const concurrentStatePayment = await pool.query(
+    'SELECT status, version::int AS version, provider_updated_at FROM payments WHERE payment_id = $1',
+    [concurrentState.paymentId],
+  )
+  assert.deepEqual(concurrentStatePayment.rows, [{
+    status: 'succeeded',
+    version: 2 + (concurrentStateResults.filter(result => result?.state === 'APPLIED').length - 1),
+    provider_updated_at: new Date(newerProviderUpdate),
+  }])
+  checks.concurrentDistinctEventsPreserveNewestProviderState = true
 
   // Force an Order-confirmation constraint failure after the Payment update
   // is attempted. The adapter's PostgreSQL batch transaction must roll back
