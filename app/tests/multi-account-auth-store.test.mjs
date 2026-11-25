@@ -1,4 +1,6 @@
-import { beforeEach, expect, mock, test } from 'bun:test';\nimport { readFileSync } from 'node:fs';\nimport { resolve } from 'node:path';
+import { beforeEach, expect, mock, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const storedAccounts = new Map();
 const storedTokens = new Map();
