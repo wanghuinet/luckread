@@ -30,7 +30,7 @@ test('native publisher preserves pending media in app-private storage and restor
   expect(composer).toContain('listPendingMediaRecovery(ownerId, null)');
   expect(composer).toContain('listPendingMediaRecovery(ownerId, targetContentId)');
   expect(composer).toContain('bindPendingMediaRecoveryToDraft(');
-  expect(composer).toContain('markPendingMediaRecoveryUploaded(user.id, asset.localId, uploaded.url)');
+  expect(composer).toContain('markPendingMediaRecoveryUploaded(ownerId, asset.localId, uploaded.url)');
   expect(composer).toContain('asset.uploadedUrl && restoredMediaRefs.includes(asset.uploadedUrl)');
   expect(composer).toContain('deletePendingMediaRecoveryForDraft(user.id, draft.id)');
   expect(composer).toContain('上次上传中断。本机已保留文件，点击重试即可继续。');
@@ -359,7 +359,7 @@ test('native composer inserts only the active @mention or #topic at the caret', 
 
 test('published native posts sync mention and topic tokens through W01 and W05 authorities', () => {
   expect(composer).toContain("'/contents/' + encodeURIComponent(contentIdValue) + '/social'");
-  expect(composer).toContain('syncPublishedSocialTokens(draft.id, trimmedBody)');
+  expect(composer).toContain('syncPublishedSocialTokens(draft.id, trimmedBody, ownerId)');
   expect(w01SocialRoute).toContain('resolveSocialMentionTargets(text)');
   expect(w01SocialRoute).toContain("pathname: '/internal/social/contents/' + encodeURIComponent(contentId) + '/tokens'");
   expect(w01SocialRoute).toContain('mentions = await resolveSocialMentionTargets(text)');
