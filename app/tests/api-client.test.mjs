@@ -1351,3 +1351,6 @@ test('does not write a request renewal into a different account after account sw
   expect(storedToken).toBe('account-b-token');
   expect(savedTokens).toEqual([]);
 });
+
+
+test('does not hydrate repost state from a late previous-viewer response', async () => {\n  const contentId = 'repost-late-viewer-race';\n  let releaseResponse;\n  let markFetchStarted;\n  const fetchStarted = new Promise((resolve) => { markFetchStarted = resolve; });\n  pendingFetch = () => new Promise((resolve) => {\n    releaseResponse = () => resolve(new Response(JSON.stringify({\n      data: { counts: { reposts: 7 }, viewer: { reposted: true } },\n    }), { status: 200 }));\n    markFetchStarted();\n  });\n\n  activeViewerId = 'repost-viewer-a';\n  const pending = refreshContentRepostStatus(contentId, activeViewerId);\n  await fetchStarted;\n  activeViewerId = 'repost-viewer-b';\n  releaseResponse();\n  await pending;\n\n  expect(getContentRepostSnapshot(contentId, 'repost-viewer-a'))\n    .toMatchObject({ reposted: false, repostCount: null, loaded: false, loading: false, pending: false });\n  expect(getContentRepostSnapshot(contentId, 'repost-viewer-b'))\n    .toMatchObject({ reposted: false, repostCount: null, loaded: false, loading: false, pending: false });\n});\n
