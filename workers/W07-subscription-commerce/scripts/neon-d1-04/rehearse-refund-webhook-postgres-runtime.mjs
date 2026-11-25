@@ -139,6 +139,19 @@ try {
   assert.equal(mismatch?.outcome,'RECONCILIATION_REQUIRED')
   checks.amountMismatchRequiresReconciliation = true
 
+  // Force the refund UPDATE to fail after the receipt insert; both must roll back.
+  await pool.query("UPDATE refunds SET status='RECONCILIATION_REQUIRED',provider_updated_at=NULL,version=version+1,updated_at=updated_at+INTERVAL '1 second' WHERE refund_id=$1",[refundId])
+  await pool.query(`CREATE OR REPLACE FUNCTION w07_test_reject_refund_update() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN IF OLD.refund_id='${refundId}' THEN RAISE EXCEPTION 'W07_TEST_REFUND_UPDATE_FAILURE' USING ERRCODE='23514'; END IF; RETURN NEW; END; $$`)
+  await pool.query('CREATE TRIGGER w07_test_reject_refund_update BEFORE UPDATE ON refunds FOR EACH ROW EXECUTE FUNCTION w07_test_reject_refund_update()')
+  rollbackTriggerInstalled = true
+  await assert.rejects(receive(body({eventId:marker+'-rollback',updatedAt:new Date(baseProviderTime.getTime()+8000).toISOString()})),
+    error=>error instanceof PaymentPersistenceError && error.code==='SERVICE_UNAVAILABLE' && error.status===503)
+  assert.equal(await count('payment_provider_events','event_id',marker+'-rollback'),0)
+  const rolled = await pool.query('SELECT status,version::int AS version FROM refunds WHERE refund_id=$1',[refundId])
+  assert.equal(rolled.rows[0]?.status,'RECONCILIATION_REQUIRED')
+  checks.transactionRollbackAndConnectionRelease = true
+
   // REVIEW -> SUCCEEDED, then a later FAILED event must not reverse the terminal fact.
   const terminalTime = new Date(baseProviderTime.getTime()+6000).toISOString()
   const terminal = await receive(body({eventId:marker+'-terminal-success',updatedAt:terminalTime}))
@@ -149,18 +162,7 @@ try {
   assert.equal(terminalState.rows[0]?.status,'SUCCEEDED')
   checks.terminalStateCannotRegress = true
 
-  // Force the refund UPDATE to fail after the receipt insert; both must roll back.
-  await pool.query("UPDATE refunds SET status='PENDING',provider_updated_at=NULL,version=version+1,updated_at=updated_at+INTERVAL '1 second' WHERE refund_id=$1",[refundId])
-  await pool.query(`CREATE OR REPLACE FUNCTION w07_test_reject_refund_update() RETURNS trigger LANGUAGE plpgsql AS $$
-    BEGIN IF OLD.refund_id='${refundId}' THEN RAISE EXCEPTION 'W07_TEST_REFUND_UPDATE_FAILURE' USING ERRCODE='23514'; END IF; RETURN NEW; END; $$`)
-  await pool.query('CREATE TRIGGER w07_test_reject_refund_update BEFORE UPDATE ON refunds FOR EACH ROW EXECUTE FUNCTION w07_test_reject_refund_update()')
-  rollbackTriggerInstalled = true
-  await assert.rejects(receive(body({eventId:marker+'-rollback',updatedAt:new Date(baseProviderTime.getTime()+8000).toISOString()})),
-    error=>error instanceof PaymentPersistenceError && error.code==='SERVICE_UNAVAILABLE' && error.status===503)
-  assert.equal(await count('payment_provider_events','event_id',marker+'-rollback'),0)
-  const rolled = await pool.query('SELECT status,version::int AS version FROM refunds WHERE refund_id=$1',[refundId])
-  assert.equal(rolled.rows[0]?.status,'PENDING')
-  checks.transactionRollbackAndConnectionRelease = true
+
   passed = true
 } catch (error) {
   failure = error
