@@ -2,6 +2,15 @@ import { readFileSync } from 'node:fs';
 import { beforeEach, expect, mock, test } from 'bun:test';
 
 const calls = [];
+let activeViewer = 'comment-like-viewer';
+mock.module('../store/auth-store.ts', () => ({
+  useAuthStore: {
+    getState: () => ({
+      status: activeViewer ? 'authenticated' : 'anonymous',
+      user: activeViewer ? { id: activeViewer } : null,
+    }),
+  },
+}));
 let handler = async () => ({
   response: { ok: true, status: 200 },
   data: { data: { liked: false, likeCount: 0 } },
@@ -21,6 +30,7 @@ const { CommentLikeApiError, toggleCommentLike } = await import('../lib/comment-
 
 beforeEach(() => {
   calls.length = 0;
+  activeViewer = 'comment-like-viewer';
   handler = async () => ({
     response: { ok: true, status: 200 },
     data: { data: { liked: false, likeCount: 0 } },
@@ -116,4 +126,31 @@ test('wires the reply like button to the tested API adapter and authoritative li
   expect(component).toContain('item.likedByViewer === true');
   expect(component).toContain('onPress={() => void toggleCommentLike(comment)}');
   expect(component).toContain("accessibilityLabel={likedComments[comment.id] ? 'Unlike reply' : 'Like reply'}");
+});
+
+
+test('does not mutate a comment like after the viewer changes during status lookup', async () => {
+  handler = async (path) => {
+    if (path.startsWith('/interactions/likes?')) {
+      activeViewer = 'another-account';
+      return {
+        response: { ok: true, status: 200 },
+        data: { data: { liked: false, likeCount: 2 } },
+        error: null,
+      };
+    }
+    return { response: { ok: true, status: 201 }, data: { data: { liked: true } }, error: null };
+  };
+
+  await expect(toggleCommentLike('comment-1')).rejects.toThrow(
+    'Your account changed. Refresh the reply before trying again.',
+  );
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toContain('/interactions/likes?');
+});
+
+test('requires an authenticated viewer before reading or mutating comment likes', async () => {
+  activeViewer = null;
+  await expect(toggleCommentLike('comment-1')).rejects.toThrow('Sign in to like replies.');
+  expect(calls).toHaveLength(0);
 });
