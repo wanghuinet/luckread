@@ -16,3 +16,10 @@ test('feed post action menu trigger exposes an accessible name and purpose', () 
   expect(menu).toContain('accessibilityHint="打开动态操作菜单"');
   expect(menu).toContain('onPressAction={({ nativeEvent }) => runMenuAction(nativeEvent.event)}');
 });
+
+
+test('post edit and delete handlers reject stale account identity after async boundaries', () => {
+  expect(feedItem).toContain('const assertActiveOwner = () =>');
+  expect(feedItem).toContain("useAuthStore.getState().user?.id !== currentUser.id");
+  expect(feedItem).toContain('assertActiveOwner();');
+});

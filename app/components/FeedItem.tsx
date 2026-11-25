@@ -559,6 +559,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                 };
                             };
                             const transition = async (to: 'UNPUBLISHED' | 'DRAFT', etag: string) => {
+                                assertActiveOwner();
                                 const result = await apiRequest<any>('/contents/' + encodeURIComponent(contentId) + '/state', {
                                     method: 'POST',
                                     headers: { 'If-Match': etag },
@@ -568,6 +569,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                 if (!result.response.ok) {
                                     throw new Error(result.error?.message || getApiErrorMessage(result.data, '无法安全切换动态状态。', result.response.status));
                                 }
+                                assertActiveOwner();
                                 const envelope = result.data as any;
                                 const record = envelope?.data ?? envelope;
                                 const nextEtag = typeof record?.etag === 'string' ? record.etag : result.response.headers.get('ETag') || '';
@@ -575,7 +577,9 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                 return { state: typeof record?.to === 'string' ? record.to : to, etag: nextEtag, contentType: 'post' };
                             };
 
+                            assertActiveOwner();
                             let current = await readLatest();
+                            assertActiveOwner();
                             if (current.contentType !== 'post') throw new Error('当前页面只支持编辑普通社交动态。');
                             if (!current.etag) throw new Error('服务器未返回内容版本，无法安全编辑。');
                             if (current.state === 'PUBLISHED') {
@@ -593,6 +597,12 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                 } },
             ],
         );
+    };
+
+    const assertActiveOwner = () => {
+        if (sessionStatus !== 'authenticated' || !currentUser?.id || useAuthStore.getState().user?.id !== currentUser.id) {
+            throw new Error('账号已切换，请重新打开动态后操作。');
+        }
     };
 
     const targetUserId = itemData.creatorId || itemData.ownerUserId || '';
@@ -655,7 +665,9 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                 void (async () => {
                     try {
                         // Always read the current ETag; the timeline version may be stale.
+                        assertActiveOwner();
                         const latest = await apiRequest<any>('/contents/' + encodeURIComponent(contentId), { method: 'GET' });
+                        assertActiveOwner();
                         if (!latest.response.ok) {
                             throw new Error(latest.error?.message || getApiErrorMessage(latest.data, '无法读取动态当前状态。', latest.response.status));
                         }
@@ -670,11 +682,13 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                             ? record.etag
                             : latest.response.headers.get('ETag') || '';
                         if (!etag) throw new Error('服务器未返回内容版本，不能安全删除。请刷新后重试.');
+                        assertActiveOwner();
                         const result = await apiRequest('/contents/' + encodeURIComponent(contentId), {
                             method: 'DELETE',
                             headers: { 'If-Match': etag },
                             idempotencyKey: 'native-content-delete:' + contentId + ':' + etag,
                         });
+                        assertActiveOwner();
                         if (!result.response.ok) {
                             throw new Error(result.error?.message || getApiErrorMessage(result.data, '删除动态失败，请重试。', result.response.status));
                         }
