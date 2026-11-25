@@ -123,12 +123,18 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.1.38"
+          cache: true
+          cache-dependency-path: app/bun.lockb
 
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
 
       - name: Configure Android SDK
         run: |
