@@ -17,5 +17,8 @@ test('profile data reloads when the screen regains focus and aborts stale reques
   expect(profile).toContain('likesRequestRef.current?.abort();');
   expect(profile).toContain('repliesRequestRef.current?.abort();');
   expect(profile).toContain('mediaRequestRef.current?.abort();');
+  expect(profile).toContain('if ((useAuthStore.getState().user?.id ?? null) === requestViewerId) {\n        setRepliesLoading(false);');
+  expect(profile).toContain('if ((useAuthStore.getState().user?.id ?? null) === requestViewerId) {\n        setMediaLoading(false);');
+  expect(profile).toContain('if (useAuthStore.getState().user?.id === requestViewerId) {\n        setLikesLoading(false);');
   expect(profile).not.toContain('useEffect(() => {\n    void loadProfile();');
 });
