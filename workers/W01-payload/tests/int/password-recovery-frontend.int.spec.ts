@@ -29,7 +29,7 @@ describe('password recovery frontend', () => {
     expect(page).toContain('MIN_PASSWORD_LENGTH = 15')
     expect(page).toContain('MAX_PASSWORD_LENGTH = 128')
     expect(page).toContain('重置链接无效、已过期或已使用。请重新申请密码找回邮件。')
-    expect(page).toContain('新密码长度必须为 15–128 个字符。')
+    expect(page).toContain('新密码长度必须为 15–128 个 Unicode 字符（按码点计数）。')
     expect(page).toContain("const searchParams = useSearchParams()")
     expect(page).toContain("useState(searchParams.get('token') || '')")
     expect(page).toContain("url.searchParams.delete('token')")

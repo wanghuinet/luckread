@@ -1,4 +1,5 @@
 import { proxyBetterAuth } from '../../../../../auth/w02-session-client.js'
+import { isValidPasswordCodePointLength } from '../../../../../auth/password-policy.js'
 
 type PasswordResetConfirmRequest = {
   recoveryToken?: unknown
@@ -13,8 +14,7 @@ const jsonError = (status: number, code: string, message: string) =>
 
 const assertPasswordPolicy = (value: unknown): value is string => {
   if (typeof value !== 'string') return false
-  const length = value.length
-  return length >= 15 && length <= 128
+  return isValidPasswordCodePointLength(value)
 }
 
 export async function POST(request: Request): Promise<Response> {

@@ -475,7 +475,9 @@ export const buildLuckReadAuth = (
       requireEmailVerification: true,
       autoSignIn: false,
       minPasswordLength: 15,
-      maxPasswordLength: 128,
+      // Better Auth counts UTF-16 code units; W01 enforces the canonical 128-code-point cap.
+      // Allow two UTF-16 code units per supplementary Unicode code point.
+      maxPasswordLength: 256,
       revokeSessionsOnPasswordReset: true,
       sendResetPassword: async ({ user, url }) => {
         await sendPasswordResetEmail(env, { user, url })

@@ -10,7 +10,7 @@ const MIN_PASSWORD_LENGTH = 15
 const MAX_PASSWORD_LENGTH = 128
 
 function validLength(value: string): boolean {
-  const length = value.length
+  const length = Array.from(value).length
   return length >= MIN_PASSWORD_LENGTH && length <= MAX_PASSWORD_LENGTH
 }
 
@@ -49,7 +49,7 @@ function ResetPasswordForm() {
       return
     }
     if (!validLength(newPassword)) {
-      setError('新密码长度必须为 15–128 个字符。建议使用长句，不要复用其他网站的密码。')
+      setError('新密码长度必须为 15–128 个 Unicode 字符（按码点计数）。建议使用长句，不要复用其他网站的密码。')
       return
     }
     if (!confirmPassword) {
@@ -130,7 +130,7 @@ function ResetPasswordForm() {
             <input className="w-full rounded-xl border border-light-border bg-main-background px-3 py-3 text-base text-light-primary outline-none transition focus:border-main-accent focus:ring-2 focus:ring-main-accent/20 disabled:opacity-50 dark:border-dark-border dark:text-dark-primary"
               autoComplete="new-password"
               disabled={busy}
-              maxLength={MAX_PASSWORD_LENGTH}
+              maxLength={MAX_PASSWORD_LENGTH * 2}
               minLength={MIN_PASSWORD_LENGTH}
               onChange={(event) => setNewPassword(event.target.value)}
               required
@@ -143,7 +143,7 @@ function ResetPasswordForm() {
             <input className="w-full rounded-xl border border-light-border bg-main-background px-3 py-3 text-base text-light-primary outline-none transition focus:border-main-accent focus:ring-2 focus:ring-main-accent/20 disabled:opacity-50 dark:border-dark-border dark:text-dark-primary"
               autoComplete="new-password"
               disabled={busy}
-              maxLength={MAX_PASSWORD_LENGTH}
+              maxLength={MAX_PASSWORD_LENGTH * 2}
               minLength={MIN_PASSWORD_LENGTH}
               onChange={(event) => setConfirmPassword(event.target.value)}
               required
@@ -152,7 +152,7 @@ function ResetPasswordForm() {
             />
           </label>
 
-          <p className="text-sm text-light-secondary dark:text-dark-secondary">密码长度要求：15–128 个字符。请使用较长且独一无二的密码。</p>
+          <p className="text-sm text-light-secondary dark:text-dark-secondary">密码长度要求：15–128 个 Unicode 字符（按码点计数）。请使用较长且独一无二的密码。</p>
 
           {error ? <div className="rounded-xl border border-accent-red/20 bg-accent-red/10 p-3 text-sm text-accent-red" role="alert" aria-live="assertive">{error}</div> : null}
           {message ? <div className="text-sm text-light-secondary dark:text-dark-secondary" role="status" aria-live="polite">{message}</div> : null}

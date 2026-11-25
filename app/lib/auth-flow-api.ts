@@ -36,8 +36,13 @@ export function isValidAuthUsername(value: string): boolean {
   return /^[A-Za-z0-9]{6,32}$/.test(value.trim());
 }
 
+export function countAuthPasswordCodePoints(value: string): number {
+  return Array.from(value).length;
+}
+
 export function isValidAuthPassword(value: string): boolean {
-  return value.length >= 15 && value.length <= 128;
+  const length = countAuthPasswordCodePoints(value);
+  return length >= 15 && length <= 128;
 }
 
 /** Uses the existing W01 registration contract and the canonical consent policy. */

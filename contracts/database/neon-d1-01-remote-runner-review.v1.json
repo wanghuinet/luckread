@@ -95,7 +95,7 @@
       },
       {
         "path": "workers/W01-payload/src/app/auth/register/route.ts",
-        "gitBlobSha1": "bfc5b15c24ed9b69eb78e64f34482acac85d09bd"
+        "gitBlobSha1": "e28cd1c06403641afc05cbfe1df83325de2528cf"
       },
       {
         "path": "workers/W01-payload/src/auth/registration-persistence.ts",
@@ -162,11 +162,11 @@
     ],
     "formalGitHubReviewSubmissions": 0,
     "followUpReview": {
-      "reviewedAt": "2026-11-23",
-      "scope": "Follow-up source audit on main 65f9ed3cad935cb1a77c4b175930c7a379721d0f after W01 AUTH-001 Neon-only runtime cleanup (PR #2116) and subsequent repository integration. Reconciled all 29 reviewed-file Git blob SHA-1 pins against the complete main tree; all 29 match exactly and none are missing. The current registration-persistence implementation is the reviewed b85586869de551121ec5f37e84fa2eed01139452 blob. Reviewed the current D1-01 manifest, shared runner, review validator, W01 registration persistence and route, W02 schema/runtime sources, W07 membership migration and verifier, and W08 creator migration and verifier. The W01 cleanup removes the retired D1/SQLite adapter and D1 runtime selection while retaining the PostgreSQL registration persistence and transaction path. No stale source pins remain. Local disposable PostgreSQL 18 full rehearsal and shared ledger rehearsal must be rerun against this exact PR head; remote Neon DDL remains unexecuted.",
+      "reviewedAt": "2026-11-25",
+      "scope": "Follow-up source audit on the current PR head for the narrowly scoped W01 registration password-length change. Reviewed the exact diff: the route now counts password Unicode code points through the shared password-policy helper; registration persistence, idempotency reservation/commit, rollback, Payload profile projection, W02 identity confirmation, SQL migrations, and D1-01 migration artifacts are unchanged. Reconciled the reviewed registration route pin to its exact current Git blob SHA. This updates the source-integrity pin only after review; it does not alter migration authorization, runner behavior, database schema, business data, or production cutover permissions. Re-run the full disposable PostgreSQL 18 rehearsal and shared migration-ledger CI on this exact PR head; remote Neon DDL remains unexecuted.",
       "result": "NO_NEW_BLOCKING_FINDINGS",
       "formalGitHubReviewSubmissions": 0,
-      "limitations": "GPT-6 source audit and exact Git blob reconciliation, not a human GitHub approval or independent third-party review. This update does not execute remote Neon DDL, import business data, or authorize production cutover. Full local PostgreSQL 18 and shared ledger workflows must pass on the current PR head."
+      "limitations": "Narrow GPT-6 source audit and exact Git blob reconciliation for the registration password-length check, not a human GitHub approval or independent third-party review. No remote Neon DDL, business data import, or production cutover was executed or authorized. Full local PostgreSQL 18 and shared migration-ledger workflows must pass on the current PR head."
     }
   },
   "verificationEvidence": {
@@ -207,11 +207,11 @@
   },
   "findings": [],
   "followUpReview": {
-    "reviewedAt": "2026-11-23",
-    "scope": "Follow-up source audit on main 65f9ed3cad935cb1a77c4b175930c7a379721d0f after W01 AUTH-001 Neon-only runtime cleanup (PR #2116) and subsequent repository integration. Reconciled all 29 reviewed-file Git blob SHA-1 pins against the complete main tree; all 29 match exactly and none are missing. The current registration-persistence implementation is the reviewed b85586869de551121ec5f37e84fa2eed01139452 blob. Reviewed the current D1-01 manifest, shared runner, review validator, W01 registration persistence and route, W02 schema/runtime sources, W07 membership migration and verifier, and W08 creator migration and verifier. The W01 cleanup removes the retired D1/SQLite adapter and D1 runtime selection while retaining the PostgreSQL registration persistence and transaction path. No stale source pins remain. Local disposable PostgreSQL 18 full rehearsal and shared ledger rehearsal must be rerun against this exact PR head; remote Neon DDL remains unexecuted.",
+    "reviewedAt": "2026-11-25",
+    "scope": "Follow-up source audit on the current PR head for the narrowly scoped W01 registration password-length change. Reviewed the exact diff: the route now counts password Unicode code points through the shared password-policy helper; registration persistence, idempotency reservation/commit, rollback, Payload profile projection, W02 identity confirmation, SQL migrations, and D1-01 migration artifacts are unchanged. Reconciled the reviewed registration route pin to its exact current Git blob SHA. This updates the source-integrity pin only after review; it does not alter migration authorization, runner behavior, database schema, business data, or production cutover permissions. Re-run the full disposable PostgreSQL 18 rehearsal and shared migration-ledger CI on this exact PR head; remote Neon DDL remains unexecuted.",
     "result": "NO_NEW_BLOCKING_FINDINGS",
     "formalGitHubReviewSubmissions": 0,
-    "limitations": "GPT-6 source audit and exact Git blob reconciliation, not a human GitHub approval or independent third-party review. This update does not execute remote Neon DDL, import business data, or authorize production cutover. Full local PostgreSQL 18 and shared ledger workflows must pass on the current PR head."
+    "limitations": "Narrow GPT-6 source audit and exact Git blob reconciliation for the registration password-length check, not a human GitHub approval or independent third-party review. No remote Neon DDL, business data import, or production cutover was executed or authorized. Full local PostgreSQL 18 and shared migration-ledger workflows must pass on the current PR head."
   },
   "limitations": [
     "The AUTH-001 PostgreSQL migration is staged in the D1-01 shared manifest and has local PostgreSQL 18 evidence only; remote Neon application and production Worker cutover are not performed by PR validation."
