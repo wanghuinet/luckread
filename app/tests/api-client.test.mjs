@@ -190,7 +190,10 @@ test('classifies recoverable API status codes and honours Retry-After', async ()
     [403, 'check-permissions', false],
     [409, 'refresh-conflict', false],
     [422, 'correct-input', false],
+    [404, 'review-request', false],
     [429, 'wait-and-retry', true],
+    [500, 'retry-later', true],
+    [502, 'retry-later', true],
     [503, 'retry-later', true],
   ];
 
