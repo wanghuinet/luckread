@@ -106,6 +106,9 @@ test('wires edit controls with an author check and a server refresh after save',
   expect(action).toContain('comment.authorUserId !== currentUserId');
   expect(action).toContain('await updateComment(comment.id, normalizedBody, version, key, viewerIdAtStart)');
   expect(action).toContain('await onSaved()');
+  expect(action).toContain('await updateComment(comment.id, normalizedBody, version, key, viewerIdAtStart)');
+  expect(action).toContain('pendingEditRef.current = null;');
+  expect(action).toContain('}, [currentUserId, comment.body]);');
   expect(action).toContain("cause.status === 412");
 });
 
