@@ -32,7 +32,6 @@ test('For You feed uses the public canonical W01 contents endpoint and filters m
   const result = await fetchNativeFeedPage({
     kind: 'for-you',
     cursor: null,
-    invalidateSession: async () => { throw new Error('public feed must not invalidate auth'); },
   });
 
   expect(calls).toHaveLength(1);
@@ -50,7 +49,6 @@ test('Following feed uses the authenticated canonical route and preserves its cu
     kind: 'following',
     cursor: 'next page/2',
     signal: controller.signal,
-    invalidateSession: async () => undefined,
   });
 
   expect(calls).toHaveLength(1);
@@ -60,21 +58,13 @@ test('Following feed uses the authenticated canonical route and preserves its cu
   expect(calls[0].options.signal).toBe(controller.signal);
 });
 
-test('expired Following session is invalidated and returns an empty, non-paginated page', async () => {
+test('expired Following session remains a request failure while the shared API boundary handles auth invalidation', async () => {
   nextResult = {
     response: { ok: false, status: 401 },
     data: { error: { code: 'UNAUTHORIZED', message: 'Session expired' } },
     error: null,
   };
-  let invalidated = 0;
-  const result = await fetchNativeFeedPage({
-    kind: 'following',
-    cursor: null,
-    invalidateSession: async () => { invalidated += 1; },
-  });
-
-  expect(invalidated).toBe(1);
-  expect(result).toEqual({ items: [], nextCursor: null, hasMore: false });
+  await expect(fetchNativeFeedPage({ kind: 'following', cursor: null })).rejects.toThrow('Could not load this timeline');
 });
 
 test('invalid server page fails without returning a fake empty timeline', async () => {
