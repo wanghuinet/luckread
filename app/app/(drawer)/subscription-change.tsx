@@ -190,6 +190,13 @@ export default function SubscriptionChangeScreen() {
   const rawSubscriptionId = Array.isArray(params.subscriptionId) ? params.subscriptionId[0] : params.subscriptionId;
   const subscriptionId = typeof rawSubscriptionId === 'string' ? rawSubscriptionId : '';
   const authStatus = useAuthStore((state) => state.status);
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
+  const viewerIdRef = useRef<string | null>(viewerId);
+  const viewerGenerationRef = useRef(0);
+  if (viewerIdRef.current !== viewerId) {
+    viewerIdRef.current = viewerId;
+    viewerGenerationRef.current += 1;
+  }
 
   const [subscription, setSubscription] = useState<MySubscription | null>(null);
   const [plans, setPlans] = useState<ActiveMembershipPlan[]>([]);
@@ -217,23 +224,34 @@ export default function SubscriptionChangeScreen() {
     plan.priceMinor > 0
   ), [plans, subscription?.creatorId, subscription?.planId]);
 
+  const assertCurrentViewer = useCallback((expectedViewerId: string, generation: number) => {
+    if (!expectedViewerId || viewerIdRef.current !== expectedViewerId || viewerGenerationRef.current !== generation) {
+      throw new Error('账号已切换，请重新打开订阅管理页面。');
+    }
+  }, []);
+
   const readFailure = useCallback((result: { response: Response; data: unknown; error?: { message?: string } | null }, fallback: string) => {
     return result.error?.message || getApiErrorMessage(result.data, fallback, result.response.status);
   }, []);
 
-  const loadSubscription = useCallback(async (signal?: AbortSignal) => {
+  const loadSubscription = useCallback(async (signal?: AbortSignal, expectedViewerId = viewerId, generation = viewerGenerationRef.current) => {
     if (!subscriptionId) throw new Error('订阅 ID 无效，请从“我的订阅”重新进入。');
-    const result = await fetchMySubscription(subscriptionId, { signal });
+    if (!expectedViewerId) throw new Error('请先登录后再管理订阅。');
+    const result = await fetchMySubscription(subscriptionId, { signal, expectedAccountId: expectedViewerId });
+    assertCurrentViewer(expectedViewerId, generation);
+    if (signal?.aborted) return null;
     if (!result.response.ok) throw new Error(readFailure(result, '无法读取订阅详情。'));
     const payload = unwrapApiData<unknown>(result.data);
     if (!isSubscription(payload)) throw new Error('订阅服务返回的数据格式无效。');
     setSubscription(payload);
     return payload;
-  }, [readFailure, subscriptionId]);
+  }, [assertCurrentViewer, readFailure, subscriptionId, viewerId]);
 
-  const loadPlans = useCallback(async (cursor: string | null, append: boolean, signal?: AbortSignal) => {
+  const loadPlans = useCallback(async (cursor: string | null, append: boolean, signal?: AbortSignal, expectedViewerId = viewerId, generation = viewerGenerationRef.current) => {
     if (append) setLoadingPlans(true);
-    const result = await fetchActiveMembershipPlansPage({ limit: PAGE_SIZE, cursor, signal });
+    const result = await fetchActiveMembershipPlansPage({ limit: PAGE_SIZE, cursor, signal, expectedAccountId: expectedViewerId ?? undefined });
+    assertCurrentViewer(expectedViewerId ?? '', generation);
+    if (signal?.aborted) return;
     if (!result.response.ok) throw new Error(readFailure(result, '会员方案读取失败。'));
     const payload = unwrapApiData<unknown>(result.data);
     if (!isPlanPage(payload)) throw new Error('会员方案服务返回的数据格式无效。');
@@ -244,35 +262,48 @@ export default function SubscriptionChangeScreen() {
     });
     setNextCursor(payload.nextCursor);
     setHasMorePlans(payload.hasMore);
-  }, [readFailure]);
+  }, [assertCurrentViewer, readFailure, viewerId]);
 
   const refresh = useCallback(async () => {
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
+    const expectedViewerId = viewerId;
+    const generation = viewerGenerationRef.current;
     setLoading(true);
+    setSubscription(null);
+    setPlans([]);
+    setNextCursor(null);
+    setHasMorePlans(false);
     setError('');
     setMessage('');
     setPreview(null);
     setSelectedPlanId(null);
     try {
       await Promise.all([
-        loadSubscription(controller.signal),
-        loadPlans(null, false, controller.signal),
+        loadSubscription(controller.signal, expectedViewerId, generation),
+        loadPlans(null, false, controller.signal, expectedViewerId, generation),
       ]);
     } catch (cause) {
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '订阅信息读取失败。');
+      if (!controller.signal.aborted && viewerIdRef.current === expectedViewerId && viewerGenerationRef.current === generation) setError(cause instanceof Error ? cause.message : '订阅信息读取失败。');
     } finally {
       if (requestRef.current === controller) requestRef.current = null;
-      if (!controller.signal.aborted) setLoading(false);
+      if (!controller.signal.aborted && viewerIdRef.current === expectedViewerId && viewerGenerationRef.current === generation) setLoading(false);
     }
-  }, [loadPlans, loadSubscription]);
+  }, [loadPlans, loadSubscription, viewerId]);
 
   useEffect(() => {
     if (authStatus === 'loading') return;
-    if (authStatus !== 'authenticated') {
+    if (authStatus !== 'authenticated' || !viewerId) {
+      requestRef.current?.abort();
+      previewRequestRef.current?.abort();
+      setSubscription(null);
+      setPlans([]);
+      setPreview(null);
+      setSelectedPlanId(null);
       setAuthRequired(true);
       setLoading(false);
+      setBusy(false);
       return;
     }
     setAuthRequired(false);
@@ -281,13 +312,15 @@ export default function SubscriptionChangeScreen() {
       requestRef.current?.abort();
       previewRequestRef.current?.abort();
     };
-  }, [authStatus, refresh]);
+  }, [authStatus, refresh, viewerId]);
 
   const selectPlan = useCallback(async (plan: ActiveMembershipPlan) => {
     if (!subscription || busy) return;
     previewRequestRef.current?.abort();
     const controller = new AbortController();
     previewRequestRef.current = controller;
+    const expectedViewerId = viewerId;
+    const generation = viewerGenerationRef.current;
     setSelectedPlanId(plan.planId);
     setPreview(null);
     setMessage('');
@@ -296,7 +329,9 @@ export default function SubscriptionChangeScreen() {
     try {
       const result = await fetchSubscriptionPlanChangePreview(subscription.subscriptionId, plan.planId, {
         signal: controller.signal,
+        expectedAccountId: expectedViewerId ?? undefined,
       });
+      assertCurrentViewer(expectedViewerId ?? '', generation);
       if (controller.signal.aborted) return;
       if (!result.response.ok) throw new Error(readFailure(result, '无法计算套餐变更报价。'));
       const payload = unwrapApiData<unknown>(result.data);
@@ -306,12 +341,12 @@ export default function SubscriptionChangeScreen() {
       }
       setPreview(payload);
     } catch (cause) {
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '套餐报价读取失败。');
+      if (!controller.signal.aborted && viewerIdRef.current === expectedViewerId && viewerGenerationRef.current === generation) setError(cause instanceof Error ? cause.message : '套餐报价读取失败。');
     } finally {
       if (previewRequestRef.current === controller) previewRequestRef.current = null;
-      if (!controller.signal.aborted) setLoadingPreview(false);
+      if (!controller.signal.aborted && viewerIdRef.current === expectedViewerId && viewerGenerationRef.current === generation) setLoadingPreview(false);
     }
-  }, [busy, readFailure, subscription]);
+  }, [assertCurrentViewer, busy, readFailure, subscription, viewerId]);
 
   const getIdempotencyKey = useCallback((kind: string, planId: string, etag: string) => {
     const identity = [subscriptionId, kind, planId, etag].join(':');
@@ -333,6 +368,9 @@ export default function SubscriptionChangeScreen() {
       setError('目标套餐已不在可选目录中，请刷新方案列表。');
       return;
     }
+    const expectedViewerId = viewerId;
+    const generation = viewerGenerationRef.current;
+    if (!expectedViewerId) return;
     setBusy(true);
     setError('');
     setMessage('');
@@ -345,7 +383,9 @@ export default function SubscriptionChangeScreen() {
           targetPlan.planId,
           preview.etag,
           getIdempotencyKey('upgrade', targetPlan.planId, preview.etag),
+          { expectedAccountId: expectedViewerId },
         );
+        assertCurrentViewer(expectedViewerId, generation);
         if (!checkoutResult.response.ok) {
           throw new Error(readFailure(checkoutResult, '升级结账暂时无法启动。'));
         }
@@ -355,11 +395,13 @@ export default function SubscriptionChangeScreen() {
         }
         if (checkout.status === 'APPLIED') {
           setMessage('服务端已确认该次升级完成。会员权益状态以 W07/W03 的最新授权结果为准。');
-          await loadSubscription();
+          await loadSubscription(undefined, expectedViewerId, generation);
           return;
         }
 
-        const intentResult = await createMembershipPaymentIntent(checkout.order.orderId);
+        assertCurrentViewer(expectedViewerId, generation);
+        const intentResult = await createMembershipPaymentIntent(checkout.order.orderId, { expectedAccountId: expectedViewerId });
+        assertCurrentViewer(expectedViewerId, generation);
         if (!intentResult.response.ok) {
           throw new Error(readFailure(intentResult, '升级付款会话创建失败。'));
         }
@@ -367,10 +409,12 @@ export default function SubscriptionChangeScreen() {
         if (!isPaymentIntent(intent, checkout.order.orderId, checkout.order.totalMinor, checkout.order.currency)) {
           throw new Error('支付服务未返回与升级订单匹配的有效 Hyperswitch 会话，支付已停止。');
         }
+        assertCurrentViewer(expectedViewerId, generation);
         const paymentResult = await presentNativeMembershipPayment(intent.sdkAuthorization);
+        assertCurrentViewer(expectedViewerId, generation);
         if (paymentResult.status === 'completed') {
           setMessage('支付表单已提交。LuckRead 正在等待 Hyperswitch 签名 Webhook 与 W07 履约确认；在服务端确认前，当前套餐和会员权益不会被客户端回调修改。');
-          await loadSubscription();
+          await loadSubscription(undefined, expectedViewerId, generation);
         } else if (paymentResult.status === 'canceled') {
           setMessage('你已取消本次升级付款，原订阅和权益保持不变。');
         } else {
@@ -385,7 +429,9 @@ export default function SubscriptionChangeScreen() {
           targetPlan.planId,
           preview.etag,
           getIdempotencyKey('downgrade', targetPlan.planId, preview.etag),
+          { expectedAccountId: expectedViewerId },
         );
+        assertCurrentViewer(expectedViewerId, generation);
         if (!result.response.ok) throw new Error(readFailure(result, '降级排期失败。'));
         const payload = unwrapApiData<unknown>(result.data);
         if (!isScheduledChange(payload) || payload.changeType !== 'DOWNGRADE' ||
@@ -404,7 +450,9 @@ export default function SubscriptionChangeScreen() {
           targetPlan.planId,
           preview.etag,
           getIdempotencyKey('interval', targetPlan.planId, preview.etag),
+          { expectedAccountId: expectedViewerId },
         );
+        assertCurrentViewer(expectedViewerId, generation);
         if (!result.response.ok) throw new Error(readFailure(result, '计费周期变更排期失败。'));
         const payload = unwrapApiData<unknown>(result.data);
         if (!isScheduledChange(payload) || payload.changeType !== 'BILLING_INTERVAL_CHANGE' ||
@@ -419,11 +467,13 @@ export default function SubscriptionChangeScreen() {
 
       setError('当前方案组合暂不支持在线切换。请刷新套餐目录或保持现有订阅。');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '套餐变更失败，请稍后重试。');
+      if (viewerIdRef.current === expectedViewerId && viewerGenerationRef.current === generation) {
+        setError(cause instanceof Error ? cause.message : '套餐变更失败，请稍后重试。');
+      }
     } finally {
-      setBusy(false);
+      if (viewerIdRef.current === expectedViewerId && viewerGenerationRef.current === generation) setBusy(false);
     }
-  }, [availablePlans, busy, getIdempotencyKey, loadSubscription, preview, readFailure, selectedPlanId, subscription]);
+  }, [assertCurrentViewer, availablePlans, busy, getIdempotencyKey, loadSubscription, preview, readFailure, selectedPlanId, subscription, viewerId]);
 
   const selectedPlan = availablePlans.find((plan) => plan.planId === selectedPlanId) ?? null;
   const canSubmit = Boolean(preview && selectedPlan && !busy && !loadingPreview &&
