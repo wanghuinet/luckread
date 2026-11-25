@@ -101,6 +101,9 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
 
   const loadComments = useCallback(async (nextCursor: string | null = null) => {
     const requestId = ++requestIdRef.current;
+    const requestViewerId = currentUserId;
+    const isCurrentViewer = () =>
+      (useAuthStore.getState().user?.id ?? null) === requestViewerId;
     if (nextCursor) setLoadingMore(true);
     else setLoading(true);
     setMessage('');
@@ -117,7 +120,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
       if (!response.ok || !page || !Array.isArray(page.items)) {
         throw new Error(getApiErrorMessage(data, 'Could not load comments. Please retry.'));
       }
-      if (requestId !== requestIdRef.current) return;
+      if (requestId !== requestIdRef.current || !isCurrentViewer()) return;
       setComments((current) => {
         if (!nextCursor) return page.items;
         const known = new Set(current.map((item) => item.id));
@@ -131,10 +134,10 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
       setCursor(page.nextCursor || null);
       setHasMore(page.hasMore === true);
     } catch (error) {
-      if (requestId !== requestIdRef.current) return;
+      if (requestId !== requestIdRef.current || !isCurrentViewer()) return;
       setMessage(error instanceof Error ? error.message : 'Could not load comments. Please retry.');
     } finally {
-      if (requestId === requestIdRef.current) {
+      if (requestId === requestIdRef.current && isCurrentViewer()) {
         setLoading(false);
         setLoadingMore(false);
         setRefreshing(false);
@@ -146,6 +149,13 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
   useEffect(() => {
     if (viewerScopeRef.current === currentUserId) return;
     viewerScopeRef.current = currentUserId;
+    requestIdRef.current += 1;
+    pendingSubmissionRef.current = null;
+    pendingDeleteKeysRef.current = {};
+    setBody('');
+    setSubmitting(false);
+    setDeletingIds(new Set());
+    setLikingCommentId(null);
     setLikedComments({});
     setComments([]);
     setProfiles({});
@@ -258,6 +268,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
         idempotencyKey: key,
       });
 
+      if ((useAuthStore.getState().user?.id ?? null) !== viewerIdAtStart) return;
       if (response.status === 401) {
         router.push('/login' as never);
         return;
@@ -275,9 +286,11 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
       await loadComments();
     } catch (error) {
       // Retain the same idempotency key for a retry of the identical draft.
-      setMessage(error instanceof Error ? error.message : 'Network error. Please retry.');
+      if ((useAuthStore.getState().user?.id ?? null) === viewerIdAtStart) {
+        setMessage(error instanceof Error ? error.message : 'Network error. Please retry.');
+      }
     } finally {
-      setSubmitting(false);
+      if ((useAuthStore.getState().user?.id ?? null) === viewerIdAtStart) setSubmitting(false);
     }
   }, [body, contentId, currentUserId, loadComments, router, submitting]);
 
@@ -316,11 +329,13 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
       }
       setMessage(cause instanceof Error ? cause.message : 'Could not delete this reply. Please retry.');
     } finally {
-      setDeletingIds((current) => {
-        const next = new Set(current);
-        next.delete(comment.id);
-        return next;
-      });
+      if (useAuthStore.getState().user?.id === viewerIdAtStart) {
+        setDeletingIds((current) => {
+          const next = new Set(current);
+          next.delete(comment.id);
+          return next;
+        });
+      }
     }
   }, [currentUserId, deletingIds, router]);
 
@@ -364,18 +379,19 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
     setMessage('');
     try {
       const viewerIdAtStart = currentUserId;
-      const result = await toggleCommentLikeRequest(comment.id);
+      const result = await toggleCommentLikeRequest(comment.id, viewerIdAtStart);
       if (useAuthStore.getState().user?.id === viewerIdAtStart) {
         setLikedComments((current) => ({ ...current, [comment.id]: result.liked }));
       }
     } catch (cause) {
+      if ((useAuthStore.getState().user?.id ?? null) !== viewerIdAtStart) return;
       if (cause instanceof CommentLikeApiError && cause.status === 401) {
         router.push('/login' as never);
         return;
       }
       setMessage(cause instanceof Error ? cause.message : 'Could not update the reply like. Please retry.');
     } finally {
-      setLikingCommentId(null);
+      if ((useAuthStore.getState().user?.id ?? null) === viewerIdAtStart) setLikingCommentId(null);
     }
   }, [currentUserId, likingCommentId, router]);
 
