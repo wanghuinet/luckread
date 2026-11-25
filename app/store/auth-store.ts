@@ -87,6 +87,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   accounts: [],
 
   bootstrap: async () => {
+    const generation = authLifecycleGeneration;
     let token: string | null = null;
     let cachedUser: LuckReadUser | null = null;
     let accounts: StoredLuckReadAccount[] = [];
@@ -97,9 +98,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         listStoredAccounts(),
       ]);
     } catch {
-      set({ status: 'anonymous', user: null, accounts: [] });
+      if (generation === authLifecycleGeneration) set({ status: 'anonymous', user: null, accounts: [] });
       return;
     }
+
+    if (generation !== authLifecycleGeneration) return;
 
     if (!token) {
       clearPendingMutationKeys();
@@ -110,20 +113,24 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     // Migrate installations that still have the former single-session keys.
     // The credential is moved into the account-specific SecureStore slot.
     const activeAccountId = await getActiveStoredAccountId();
+    if (generation !== authLifecycleGeneration) return;
     if (cachedUser && (!activeAccountId || !accounts.some((account) => account.id === activeAccountId))) {
       try {
         await saveAccountSession(cachedUser, token);
+        if (generation !== authLifecycleGeneration) return;
         accounts = await listStoredAccounts();
       } catch {
-        set({ status: 'anonymous', user: null, accounts });
+        if (generation === authLifecycleGeneration) set({ status: 'anonymous', user: null, accounts });
         return;
       }
     }
 
+    if (generation !== authLifecycleGeneration) return;
     set({ status: 'authenticated', user: cachedUser, accounts });
 
     try {
       const { response, data } = await apiRequest<SessionPayload>('/auth/session', { method: 'GET' });
+      if (generation !== authLifecycleGeneration) return;
       if (response.status === 401) {
         // apiRequest has already delivered this 401 with its initiating
         // credential snapshot. Do not inspect/remove the current account here:
@@ -137,11 +144,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           throw new Error('The active session identity did not match its saved account.');
         }
         await saveCachedUser(user);
-        set({ status: 'authenticated', user, accounts: await listStoredAccounts() });
+        if (generation !== authLifecycleGeneration) return;
+        const refreshedAccounts = await listStoredAccounts();
+        if (generation !== authLifecycleGeneration) return;
+        set({ status: 'authenticated', user, accounts: refreshedAccounts });
       }
     } catch {
       // Keep the cached session candidate; protected APIs still enforce server authority.
-      set({ status: 'authenticated', user: cachedUser, accounts: await listStoredAccounts() });
+      if (generation !== authLifecycleGeneration) return;
+      const refreshedAccounts = await listStoredAccounts();
+      if (generation !== authLifecycleGeneration) return;
+      set({ status: 'authenticated', user: cachedUser, accounts: refreshedAccounts });
     }
   },
 
