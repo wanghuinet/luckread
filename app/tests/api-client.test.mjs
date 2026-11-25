@@ -1388,3 +1388,24 @@ test('does not hydrate repost state from a late previous-viewer response', async
   expect(getContentRepostSnapshot(contentId, 'repost-viewer-b'))
     .toMatchObject({ reposted: false, repostCount: null, loaded: false, loading: false, pending: false });
 });
+
+
+test('aborts a stalled API request at its configured timeout and normalizes it as a network error', async () => {
+  pendingFetch = (_input, init) => new Promise((_resolve, reject) => {
+    init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+  });
+
+  await expect(apiRequest('/slow-endpoint', { timeoutMs: 5 })).rejects.toBeInstanceOf(LuckReadNetworkError);
+});
+
+test('allows callers to disable the shared API request timeout', async () => {
+  let capturedSignal;
+  pendingFetch = async (_input, init) => {
+    capturedSignal = init.signal;
+    return new Response(JSON.stringify({ data: { ok: true } }), { status: 200 });
+  };
+
+  await apiRequest('/long-running-endpoint', { timeoutMs: 0 });
+  expect(capturedSignal).toBeInstanceOf(AbortSignal);
+  expect(capturedSignal.aborted).toBe(false);
+});
