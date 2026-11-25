@@ -79,6 +79,7 @@ export default function ForgotPasswordScreen() {
         onSubmitEditing={() => void submit()}
         textContentType="emailAddress"
         value={email}
+        editable={!submitting}
       />
       <AuthMessage message={errorMessage} />
       <AuthMessage message={message} variant="success" />
