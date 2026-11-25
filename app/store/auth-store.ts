@@ -19,7 +19,7 @@ import {
   type StoredLuckReadAccount,
   type SessionCredentialSnapshot,
 } from '../lib/secure-session';
-import { unregisterPushEndpointForUser } from '../lib/push-notifications';
+import { syncPushEndpointForAuthenticatedUser, unregisterPushEndpointForUser } from '../lib/push-notifications';
 
 type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
 
@@ -271,13 +271,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         await clearActiveAccountSelection().catch(() => undefined);
       }
       if (generation !== authLifecycleGeneration) throw cause;
-      clearPendingMutationKeys();
-      set({
-        status: restoredUser ? 'authenticated' : 'anonymous',
-        user: restoredUser,
-        accounts: await listStoredAccounts().catch(() => []),
-      });
-      throw cause;
+      // Best-effort push endpoint recovery for the restored account. This reconciliation never prompts for permission.\n      if (restoredUser && previousAccountId) {\n        await syncPushEndpointForAuthenticatedUser(previousAccountId).catch(() => undefined);\n        if (generation !== authLifecycleGeneration) throw cause;\n      }\n      clearPendingMutationKeys();\n      set({\n        status: restoredUser ? 'authenticated' : 'anonymous',\n        user: restoredUser,\n        accounts: await listStoredAccounts().catch(() => []),\n      });\n      throw cause;
     }
   },
 
