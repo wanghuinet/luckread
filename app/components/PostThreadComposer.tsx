@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -72,11 +72,22 @@ export default function PostThreadComposer({
   const viewerId = useAuthStore((state) => state.user?.id ?? null);
   const itemsRef = useRef(items);
   const startedRef = useRef(false);
+  const previousViewerIdRef = useRef(viewerId);
 
   const updateItems = (next: ThreadDraft[]) => {
     itemsRef.current = next;
     setItems(next);
   };
+
+  useEffect(() => {
+    if (previousViewerIdRef.current === viewerId) return;
+    previousViewerIdRef.current = viewerId;
+    startedRef.current = false;
+    updateItems([createItem(initialText), createItem()]);
+    setBusy(false);
+    setError('');
+    setProgress('');
+  }, [initialText, viewerId]);
 
   const updateBody = (index: number, body: string) => {
     updateItems(itemsRef.current.map((item, itemIndex) => itemIndex === index ? { ...item, body } : item));
