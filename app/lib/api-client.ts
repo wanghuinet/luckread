@@ -1,4 +1,4 @@
-import { readSessionToken, readSessionCredentialSnapshot, saveSessionTokenForSnapshot } from './secure-session';
+import { readSessionToken, readCachedUser, readSessionCredentialSnapshot, saveSessionTokenForSnapshot } from './secure-session';
 
 const DEFAULT_API_BASE_URL = 'https://api.luckread.com';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -536,7 +536,8 @@ export async function apiRequest<T>(
   let credentialSnapshot: Awaited<ReturnType<typeof readSessionCredentialSnapshot>> | null = null;
   if (auth) {
     credentialSnapshot = await readSessionCredentialSnapshot();
-    if (expectedAccountId && credentialSnapshot.accountId !== expectedAccountId) {
+    const credentialAccountId = credentialSnapshot.accountId ?? (await readCachedUser())?.id ?? null;
+    if (expectedAccountId && credentialAccountId !== expectedAccountId) {
       releaseMutationKey(mutationLease, 'definitive');
       mutationLease = null;
       throw new Error('Your account changed. Reopen the composer and try again.');
