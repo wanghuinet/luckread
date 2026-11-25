@@ -41,3 +41,15 @@ test('stale purchase completion cannot overwrite the newly active account UI', a
   assert.match(source, /finally \{\s*if \(isPurchaseViewerCurrent\(\)\) setBusyPlanId\(null\);/);
   assert.match(source, /previousViewerIdRef\.current !== viewerId[\s\S]{0,180}setBusyPlanId\(null\)/);
 });
+
+
+test('an order response arriving after account switch cannot write a stale purchase message', async () => {
+  const source = await readFile(screenPath, 'utf8');
+  const order = source.indexOf('const orderData = order as');
+  const intent = source.indexOf('const intentResult = await createMembershipPaymentIntent', order);
+  assert.ok(order >= 0 && intent > order, 'order response handling must precede intent creation');
+  const between = source.slice(order, intent);
+  assert.match(between, /if \(!isPurchaseViewerCurrent\(\)\) return;/);
+  assert.doesNotMatch(between, /setPurchaseMessage/,
+    'stale order completion must not write into the newly active account UI');
+});
