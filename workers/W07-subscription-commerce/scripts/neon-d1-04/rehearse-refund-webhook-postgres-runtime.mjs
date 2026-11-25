@@ -101,11 +101,11 @@ async function count(table, column, value) {
 try {
   await createFixture()
   const initialTime = new Date(baseProviderTime).toISOString()
-  const first = await receive(body({ eventId: marker + '-success', updatedAt: initialTime }))
+  const first = await receive(body({ eventId: marker + '-success', status: 'review', updatedAt: initialTime }))
   assert.equal(first?.outcome, 'APPLIED')
   assert.equal(first?.state, 'APPLIED')
   const state = await pool.query('SELECT status,version::int AS version,provider_updated_at FROM refunds WHERE refund_id=$1', [refundId])
-  assert.equal(state.rows[0]?.status, 'SUCCEEDED')
+  assert.equal(state.rows[0]?.status, 'REVIEW')
   assert.equal(state.rows[0]?.version, 2)
   checks.signedRefundWebhookApplied = true
 
