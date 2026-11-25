@@ -163,9 +163,13 @@ export function getMessageAttachmentUrl(conversationId: string, mediaId: string)
 }
 
 export async function markConversationRead(conversationId: string, sequence: string) {
-  return apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/read', {
+  const result = await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/read', {
     method: 'POST', body: JSON.stringify({ sequence }), idempotencyKey: false,
   });
+  if (!result.response.ok) {
+    throw new Error(result.error?.message || 'Could not update message read status.');
+  }
+  return result;
 }
 
 export type MessageRequest = {
