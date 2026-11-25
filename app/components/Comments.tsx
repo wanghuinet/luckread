@@ -146,6 +146,14 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
   useEffect(() => {
     if (viewerScopeRef.current === currentUserId) return;
     viewerScopeRef.current = currentUserId;
+    requestIdRef.current += 1;
+    pendingSubmissionRef.current = null;
+    pendingDeleteKeysRef.current = {};
+    setBody('');
+    setSubmitting(false);
+    setDeletingIds(new Set());
+    setLikingCommentId(null);
+    setReportingCommentId(null);
     setLikedComments({});
     setComments([]);
     setProfiles({});
@@ -258,6 +266,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
         idempotencyKey: key,
       });
 
+      if (useAuthStore.getState().user?.id !== viewerIdAtStart) return;
       if (response.status === 401) {
         router.push('/login' as never);
         return;
@@ -274,10 +283,11 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
       setBody('');
       await loadComments();
     } catch (error) {
+      if (useAuthStore.getState().user?.id !== viewerIdAtStart) return;
       // Retain the same idempotency key for a retry of the identical draft.
       setMessage(error instanceof Error ? error.message : 'Network error. Please retry.');
     } finally {
-      setSubmitting(false);
+      if (useAuthStore.getState().user?.id === viewerIdAtStart) setSubmitting(false);
     }
   }, [body, contentId, currentUserId, loadComments, router, submitting]);
 
@@ -369,13 +379,14 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
         setLikedComments((current) => ({ ...current, [comment.id]: result.liked }));
       }
     } catch (cause) {
+      if (useAuthStore.getState().user?.id !== currentUserId) return;
       if (cause instanceof CommentLikeApiError && cause.status === 401) {
         router.push('/login' as never);
         return;
       }
       setMessage(cause instanceof Error ? cause.message : 'Could not update the reply like. Please retry.');
     } finally {
-      setLikingCommentId(null);
+      if (useAuthStore.getState().user?.id === currentUserId) setLikingCommentId(null);
     }
   }, [currentUserId, likingCommentId, router]);
 
