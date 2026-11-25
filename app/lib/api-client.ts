@@ -54,6 +54,8 @@ type ApiRequestOptions = RequestInit & {
   auth?: boolean;
   /** Set false when the caller must assign a newly-issued credential to a specific account slot. */
   persistSessionCredential?: boolean;
+  /** Bind an authenticated request to the account that initiated the operation. */
+  expectedAccountId?: string;
 };
 
 type RecoveryDefaults = {
@@ -470,6 +472,7 @@ export async function apiRequest<T>(
     idempotencyKey,
     onUploadProgress,
     persistSessionCredential = true,
+    expectedAccountId,
     headers: inputHeaders,
     ...init
   } = options;
@@ -533,6 +536,9 @@ export async function apiRequest<T>(
   let credentialSnapshot: Awaited<ReturnType<typeof readSessionCredentialSnapshot>> | null = null;
   if (auth) {
     credentialSnapshot = await readSessionCredentialSnapshot();
+    if (expectedAccountId && credentialSnapshot.accountId !== expectedAccountId) {
+      throw new Error('Your account changed. Reopen the composer and try again.');
+    }
     if (credentialSnapshot.token) headers.set('Authorization', 'Bearer ' + credentialSnapshot.token);
   }
 
