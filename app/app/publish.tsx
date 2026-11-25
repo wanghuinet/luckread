@@ -1439,8 +1439,12 @@ function PublishScreenContent() {
       if (isCurrentRequest()) setDraftInboxError(cause instanceof Error ? cause.message : '暂时无法加载草稿箱。');
     } finally {
       if (draftInboxRequestRef.current === controller) {
+        const stillCurrent =
+          !controller.signal.aborted &&
+          useAuthStore.getState().status === 'authenticated' &&
+          useAuthStore.getState().user?.id === ownerId;
         draftInboxRequestRef.current = null;
-        if (isCurrentRequest()) setDraftInboxLoading(false);
+        if (stillCurrent) setDraftInboxLoading(false);
       }
     }
   }, [authStatus, user?.id]);
@@ -1483,8 +1487,12 @@ function PublishScreenContent() {
       if (isCurrentRequest()) setScheduledInboxError(cause instanceof Error ? cause.message : '暂时无法加载定时发布列表。');
     } finally {
       if (scheduledInboxRequestRef.current === controller) {
+        const stillCurrent =
+          !controller.signal.aborted &&
+          useAuthStore.getState().status === 'authenticated' &&
+          useAuthStore.getState().user?.id === ownerId;
         scheduledInboxRequestRef.current = null;
-        if (isCurrentRequest()) setScheduledInboxLoading(false);
+        if (stillCurrent) setScheduledInboxLoading(false);
       }
     }
   }, [authStatus, user?.id]);
