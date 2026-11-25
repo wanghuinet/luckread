@@ -57,37 +57,40 @@ test('loads the signed-in subscriber list through the canonical W01 route', asyn
 });
 
 test('loads a single subscriber-owned subscription through the canonical W01 route', async () => {
-  await fetchMySubscription('sub_' + 'a'.repeat(64));
+  await fetchMySubscription('sub_' + 'a'.repeat(64), { expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/memberships/subscriptions/sub_' + 'a'.repeat(64));
   expect(calls[0]?.options.method).toBe('GET');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
 });
 
 test('loads the W07 plan-change preview without mutating subscription state', async () => {
   const subscriptionId = 'sub_' + 'a'.repeat(64);
   const planId = 'plan_' + 'b'.repeat(64);
   const controller = new AbortController();
-  await fetchSubscriptionPlanChangePreview(subscriptionId, planId, { signal: controller.signal });
+  await fetchSubscriptionPlanChangePreview(subscriptionId, planId, { signal: controller.signal, expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/memberships/subscriptions/' + subscriptionId +
     '/change-plan-preview?targetPlanId=' + planId);
   expect(calls[0]?.options.method).toBe('GET');
   expect(calls[0]?.options.signal).toBe(controller.signal);
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
 });
 
 test('starts an upgrade checkout using W07 quote ETag and an idempotency key', async () => {
   const subscriptionId = 'sub_' + 'a'.repeat(64);
   const planId = 'plan_' + 'b'.repeat(64);
   const etag = '"lr-v7"';
-  await createSubscriptionPlanUpgradeCheckout(subscriptionId, planId, etag, 'upgrade_attempt_1');
+  await createSubscriptionPlanUpgradeCheckout(subscriptionId, planId, etag, 'upgrade_attempt_1', { expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/memberships/subscriptions/' + subscriptionId + '/change-plan/checkout');
   expect(calls[0]?.options.method).toBe('POST');
   expect(calls[0]?.options.headers).toEqual({ 'If-Match': etag });
   expect(calls[0]?.options.idempotencyKey).toBe('upgrade_attempt_1');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
   expect(JSON.parse(calls[0]?.options.body)).toEqual({ planId });
 });
 
