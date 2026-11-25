@@ -45,8 +45,10 @@ export async function toggleCommentLike(
   expectedViewerId: string | null,
 ): Promise<LikeStatus> {
   const commentId = normalizeCommentId(commentIdValue);
+  if (!expectedViewerId) {
+    throw new CommentLikeApiError('Sign in to like replies.', 401, 'UNAUTHENTICATED');
+  }
   const isCurrentViewer = () =>
-    Boolean(expectedViewerId) &&
     useAuthStore.getState().user?.id === expectedViewerId;
   if (!isCurrentViewer()) {
     throw new CommentLikeApiError(
