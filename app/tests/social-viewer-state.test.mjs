@@ -174,10 +174,9 @@ test('like and follow hooks resubscribe and re-read when the authenticated viewe
 });
 
 
-test('like refresh and mutations guard both sides of awaited requests against viewer switches', () => {
-  const likeSource = readFileSync(new URL('../lib/content-like-state.ts', import.meta.url), 'utf8');
-  expect(likeSource).toContain('if (!id || !isCurrentViewer(viewerId)) return;');
-  expect(likeSource).toContain('if (!isCurrentViewer(viewerId)) {');
-  expect(likeSource).toContain('Your account changed before the like request was sent.');
-  expect(likeSource).toContain('The active account changed while the like was updating.');
+test('follow refresh and mutations guard awaited requests against viewer switches', () => {
+  const source = readFileSync(new URL('../lib/user-follow-state.ts', import.meta.url), 'utf8');
+  expect(source).toContain('if (!id || !isCurrentViewer(viewerId)) return;');
+  expect(source).toContain('Your account changed before the follow request was sent.');
+  expect(source).toContain('The active account changed while follow was updating.');
 });
