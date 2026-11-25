@@ -123,8 +123,15 @@ function LikeButton({ iconColor, textColor, likes, contentId, initialLiked }: { 
     }));
     
     const previousLikedRef = useRef(isLiked);
+    const animationTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+    const scheduleAnimationTimer = (callback: () => void, delay: number) => {
+        const timer = setTimeout(callback, delay);
+        animationTimersRef.current.push(timer);
+    };
 
     useEffect(() => {
+        animationTimersRef.current.forEach(clearTimeout);
+        animationTimersRef.current = [];
         setCurrentIconColor(isLiked ? "#f91880" : iconColor);
 
         if (isLiked && !previousLikedRef.current) {
@@ -133,20 +140,20 @@ function LikeButton({ iconColor, textColor, likes, contentId, initialLiked }: { 
                 easing: Easing.bezier(0.25, 0.1, 0.25, 1)
             });
 
-            setTimeout(() => {
+            scheduleAnimationTimer(() => {
                 redCircleScale.value = withTiming(1.05, {
                     duration: 70,
                     easing: Easing.bezier(0.2, 0.8, 0.2, 1)
                 });
 
-                setTimeout(() => {
+                scheduleAnimationTimer(() => {
                     setShowConfetti(true);
                     whiteCircleScale.value = withTiming(1, {
                         duration: 60,
                         easing: Easing.bezier(0.1, 0.8, 0.2, 1)
                     });
 
-                    setTimeout(() => {
+                    scheduleAnimationTimer(() => {
                         likedIconScale.value = withSequence(
                             withTiming(0.8, { duration: 10 }),
                             withTiming(1, { duration: 150 }),
@@ -155,9 +162,9 @@ function LikeButton({ iconColor, textColor, likes, contentId, initialLiked }: { 
                         );
                     }, 20);
 
-                    setTimeout(() => {
+                    scheduleAnimationTimer(() => {
                         redCircleScale.value = withTiming(0, { duration: 50 });
-                        setTimeout(() => setShowConfetti(false), 140);
+                        scheduleAnimationTimer(() => setShowConfetti(false), 140);
                     }, 105);
                 }, 70);
             }, 35);
@@ -170,6 +177,10 @@ function LikeButton({ iconColor, textColor, likes, contentId, initialLiked }: { 
         }
 
         previousLikedRef.current = isLiked;
+        return () => {
+            animationTimersRef.current.forEach(clearTimeout);
+            animationTimersRef.current = [];
+        };
     }, [isLiked, iconColor, unlikedIconScale, redCircleScale, whiteCircleScale, likedIconScale]);
 
     const handlePress = async () => {
