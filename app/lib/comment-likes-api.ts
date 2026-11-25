@@ -1,4 +1,5 @@
 import { apiRequest, createIdempotencyKey, getApiErrorMessage } from './api-client';
+import { useAuthStore } from '../store/auth-store';
 
 export class CommentLikeApiError extends Error {
   constructor(
@@ -39,8 +40,21 @@ function readLikeStatus(value: unknown): LikeStatus | null {
 }
 
 /** Toggle a comment like using W01/W05 as the authority instead of guessing from UI state. */
-export async function toggleCommentLike(commentIdValue: string): Promise<LikeStatus> {
+export async function toggleCommentLike(
+  commentIdValue: string,
+  expectedViewerId: string | null,
+): Promise<LikeStatus> {
   const commentId = normalizeCommentId(commentIdValue);
+  const isCurrentViewer = () =>
+    Boolean(expectedViewerId) &&
+    useAuthStore.getState().user?.id === expectedViewerId;
+  if (!isCurrentViewer()) {
+    throw new CommentLikeApiError(
+      'Your account changed before the reply like could be updated.',
+      undefined,
+      'VIEWER_CHANGED',
+    );
+  }
   const encodedId = encodeURIComponent(commentId);
   const statusResult = await apiRequest<unknown>(
     '/interactions/likes?targetType=comment&targetId=' + encodedId,
@@ -59,9 +73,25 @@ export async function toggleCommentLike(commentIdValue: string): Promise<LikeSta
     );
   }
 
+  if (!isCurrentViewer()) {
+    throw new CommentLikeApiError(
+      'Your account changed before the reply like could be updated.',
+      undefined,
+      'VIEWER_CHANGED',
+    );
+  }
+
   const status = readLikeStatus(statusResult.data);
   if (!status) {
     throw new CommentLikeApiError('The comment like status response was invalid.');
+  }
+
+  if (!isCurrentViewer()) {
+    throw new CommentLikeApiError(
+      'Your account changed before the reply like could be updated.',
+      undefined,
+      'VIEWER_CHANGED',
+    );
   }
 
   const nextLiked = !status.liked;
