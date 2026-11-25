@@ -10,6 +10,8 @@ const pushUnregisterCalls = [];
 let failPushUnregisterFor = null;
 let unauthorizedHandler = null;
 let removeAccountCalls = 0;
+let deferNextSessionResponse = false;
+let resolveDeferredSessionResponse = null;
 
 const userFromEmail = (email) => ({
   id: 'user-' + email.toLowerCase(),
@@ -92,14 +94,25 @@ mock.module('../lib/api-client.ts', () => ({
       };
     }
     if (path === '/auth/session') {
-      sessionRequests.push({ accountId: activeAccountId, token: storedTokens.get(activeAccountId) });
-      if (activeAccountId === rejectSessionFor) {
-        const data = { error: { code: 'SESSION_EXPIRED', message: 'Session expired' } };
-        return { response: new Response(JSON.stringify(data), { status: 401 }), data, error: { status: 401 } };
+      const requestSnapshot = { accountId: activeAccountId, token: storedTokens.get(activeAccountId) };
+      sessionRequests.push(requestSnapshot);
+      const respond = async () => {
+        if (requestSnapshot.accountId === rejectSessionFor) {
+          await unauthorizedHandler?.(requestSnapshot);
+          const data = { error: { code: 'SESSION_EXPIRED', message: 'Session expired' } };
+          return { response: new Response(JSON.stringify(data), { status: 401 }), data, error: { status: 401 } };
+        }
+        const user = storedAccounts.get(requestSnapshot.accountId);
+        const data = { data: { user } };
+        return { response: new Response(JSON.stringify(data), { status: 200 }), data, error: null };
+      };
+      if (deferNextSessionResponse) {
+        deferNextSessionResponse = false;
+        return new Promise((resolve, reject) => {
+          resolveDeferredSessionResponse = () => { void respond().then(resolve, reject); };
+        });
       }
-      const user = storedAccounts.get(activeAccountId);
-      const data = { data: { user } };
-      return { response: new Response(JSON.stringify(data), { status: 200 }), data, error: null };
+      return respond();
     }
     if (path === '/auth/logout') {
       return { response: new Response(null, { status: 204 }), data: null, error: null };
@@ -128,6 +141,8 @@ beforeEach(() => {
   pushUnregisterCalls.length = 0;
   failPushUnregisterFor = null;
   removeAccountCalls = 0;
+  deferNextSessionResponse = false;
+  resolveDeferredSessionResponse = null;
   useAuthStore.setState({ status: 'anonymous', user: null, accounts: [] });
 });
 
@@ -199,6 +214,23 @@ test('failed account validation restores the previously active account and its c
   expect(useAuthStore.getState().status).toBe('authenticated');
   expect(useAuthStore.getState().user?.email).toBe('first@example.com');
   expect(storedTokens.get('user-first@example.com')).toBe('token-first@example.com');
+});
+
+test('late bootstrap 401 cannot invalidate an account activated while session validation was pending', async () => {
+  await useAuthStore.getState().login('first@example.com', 'password-one');
+  rejectSessionFor = 'user-first@example.com';
+  deferNextSessionResponse = true;
+  const bootstrapPromise = useAuthStore.getState().bootstrap();
+  for (let attempt = 0; attempt < 5 && !resolveDeferredSessionResponse; attempt += 1) await Promise.resolve();
+  expect(resolveDeferredSessionResponse).toBeTypeOf('function');
+  await useAuthStore.getState().login('second@example.com', 'password-two');
+  resolveDeferredSessionResponse?.();
+  await bootstrapPromise;
+  expect(activeAccountId).toBe('user-second@example.com');
+  expect(useAuthStore.getState().status).toBe('authenticated');
+  expect(useAuthStore.getState().user?.id).toBe('user-second@example.com');
+  expect(storedTokens.has('user-first@example.com')).toBe(true);
+  expect(storedTokens.has('user-second@example.com')).toBe(true);
 });
 
 test('late 401 from a previous account cannot invalidate the newly active account', async () => {
