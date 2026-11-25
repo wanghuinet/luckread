@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
 import { apiRequest, createIdempotencyKey, getApiErrorMessage } from './api-client';
+import { useAuthStore } from '../store/auth-store';
 
 export type ProfilePinSnapshot = {
   userId: string | null;
@@ -45,7 +46,7 @@ export function getProfilePinSnapshot(): ProfilePinSnapshot {
   return snapshot;
 }
 
-function normalizeId(value: string | null | undefined): string {
+function isCurrentViewer(userId: string): boolean {\n  return (useAuthStore.getState().user?.id ?? null) === userId;\n}\n\nfunction normalizeId(value: string | null | undefined): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
