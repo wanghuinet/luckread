@@ -158,6 +158,7 @@ export async function uploadMediaFile(
   file: LocalMediaFile,
   idempotencyKey: string = createIdempotencyKey(),
   onUploadProgress?: (progress: ApiUploadProgress) => void,
+  expectedAccountId?: string,
 ): Promise<UploadedMedia> {
   if (!file.uri || !file.name || !file.mimeType) {
     throw new Error('The selected media file is missing its URI or file information.');
@@ -187,6 +188,7 @@ export async function uploadMediaFile(
       ]),
     },
     onUploadProgress,
+    expectedAccountId,
   });
   if (!result.response.ok) {
     throw new Error(apiFailureMessage(result, 'Media upload failed. Please retry.'));
