@@ -465,22 +465,24 @@ test('keeps the public For You feed independent of stale native session credenti
 
 test('lists only the authenticated account draft posts through W01 with cursor pagination', async () => {
   const controller = new AbortController();
-  await fetchOwnPostDraftsPage({ cursor: 'draft-next', limit: 15, signal: controller.signal });
+  await fetchOwnPostDraftsPage({ cursor: 'draft-next', limit: 15, signal: controller.signal, expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/contents?status=DRAFT&type=post&limit=15&cursor=draft-next');
   expect(calls[0].options.method).toBe('GET');
   expect(calls[0].options.signal).toBe(controller.signal);
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
 });
 
 test('lists only the authenticated Creator\'s scheduled social posts with cursor pagination', async () => {
   const controller = new AbortController();
-  await fetchOwnScheduledPostsPage({ cursor: 'scheduled-next', limit: 15, signal: controller.signal });
+  await fetchOwnScheduledPostsPage({ cursor: 'scheduled-next', limit: 15, signal: controller.signal, expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/contents?status=SCHEDULED&type=post&limit=15&cursor=scheduled-next');
   expect(calls[0].options.method).toBe('GET');
   expect(calls[0].options.signal).toBe(controller.signal);
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
 });
 
 test('cancels an owned scheduled post through the existing ETag-guarded state operation', async () => {
@@ -491,7 +493,7 @@ test('cancels an owned scheduled post through the existing ETag-guarded state op
     coverRef: 'https://img.luckread.com/photo.jpg', scheduledAt: '2026-11-08T18:30:00.000Z',
     updatedAt: '2026-11-05T10:00:00.000Z',
   };
-  await transitionOwnScheduledPostState(item, 'DRAFT');
+  await transitionOwnScheduledPostState(item, 'DRAFT', undefined, 'viewer-a');
 
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/contents/scheduled_123/state');
@@ -499,6 +501,7 @@ test('cancels an owned scheduled post through the existing ETag-guarded state op
   expect(calls[0].options.headers).toEqual({ 'If-Match': 'W/"4"' });
   expect(JSON.parse(calls[0].options.body)).toEqual({ to: 'DRAFT' });
   expect(calls[0].options.idempotencyKey).toMatch(/^native-scheduled-post-draft:scheduled_123:/);
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
 });
 
 test('reschedules through the existing draft-to-scheduled transition with stored-post preflight', async () => {
@@ -552,12 +555,13 @@ test('rejects invalid draft delete preconditions before calling the API', () => 
 });
 
 test('deletes a selected own draft with the W03 ETag and unique idempotency key', async () => {
-  await deleteOwnPostDraft('draft_123', 'W/"4"');
+  await deleteOwnPostDraft('draft_123', 'W/"4"', 'viewer-a');
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/contents/draft_123');
   expect(calls[0].options.method).toBe('DELETE');
   expect(calls[0].options.headers).toEqual({ 'If-Match': 'W/"4"' });
   expect(calls[0].options.idempotencyKey).toBe('native-draft-delete:draft_123:test-key-1');
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
 });
 
 

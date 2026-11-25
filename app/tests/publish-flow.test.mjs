@@ -63,9 +63,10 @@ test('native composer uses the existing Expo UI date-time picker for future sche
 });
 
 test('native composer lists, reschedules and cancels only owner-scoped scheduled posts', () => {
-  expect(composer).toContain('fetchOwnScheduledPostsPage({ cursor, limit: 20 })');
-  expect(composer).toContain('transitionOwnScheduledPostState(item, \'DRAFT\')');
-  expect(composer).toContain('transitionOwnScheduledPostState(updatedDraft, \'SCHEDULED\', scheduledAt)');
+  expect(composer).toContain('fetchOwnScheduledPostsPage({');
+  expect(composer).toContain('scheduledInboxRequestRef.current?.abort()');
+  expect(composer).toContain("transitionOwnScheduledPostState(item, 'DRAFT', undefined, ownerId)");
+  expect(composer).toContain("transitionOwnScheduledPostState(updatedDraft, 'SCHEDULED', scheduledAt, ownerId)");
   expect(composer).toContain('setScheduledInboxVisible(true)');
   expect(composer).toContain('setScheduledInboxItems((current) => current.filter((candidate) => candidate.id !== item.id))');
   expect(composer).toContain('openScheduleEditPicker(item)');
@@ -332,8 +333,11 @@ test('native draft fingerprints are stable and change when persisted content cha
 });
 
 test('native publisher lists, restores, paginates and deletes the owner-only draft inbox', () => {
-  expect(composer).toContain('fetchOwnPostDraftsPage({ cursor, limit: 20 })');
-  expect(composer).toContain('deleteOwnPostDraft(draft.id, draft.etag)');
+  expect(composer).toContain('fetchOwnPostDraftsPage({');
+  expect(composer).toContain('expectedAccountId: ownerId');
+  expect(composer).toContain('draftInboxRequestRef.current?.abort()');
+  expect(composer).toContain('previousInboxViewerIdRef.current === viewerId');
+  expect(composer).toContain('deleteOwnPostDraft(draft.id, draft.etag, ownerId)');
   expect(composer).toContain('restoreDraftFromInbox(item)');
   expect(composer).toContain('setDraftInboxCursor(page.nextCursor || null)');
   expect(composer).toContain('draftInboxHasMore && !draftInboxLoading && draftInboxCursor');

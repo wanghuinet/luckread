@@ -272,6 +272,9 @@ function PublishScreenContent() {
   const [scheduledInboxError, setScheduledInboxError] = useState('');
   const [scheduledActionId, setScheduledActionId] = useState<string | null>(null);
   const scheduledActionInFlightRef = useRef(false);
+  const draftInboxRequestRef = useRef<AbortController | null>(null);
+  const scheduledInboxRequestRef = useRef<AbortController | null>(null);
+  const previousInboxViewerIdRef = useRef<string | null>(user?.id ?? null);
   const [textSelection, setTextSelection] = useState({ start: 0, end: 0 });
   const [topicSuggestions, setTopicSuggestions] = useState<DiscoveryTopicOption[]>([]);
   const [topicSuggestionsLoading, setTopicSuggestionsLoading] = useState(false);
@@ -1403,32 +1406,67 @@ function PublishScreenContent() {
   ]);
 
   const loadDraftInbox = useCallback(async (cursor: string | null = null, append = false) => {
+    const ownerId = authStatus === 'authenticated' ? user?.id : null;
+    if (!ownerId) return;
+    draftInboxRequestRef.current?.abort();
+    const controller = new AbortController();
+    draftInboxRequestRef.current = controller;
+    const isCurrentRequest = () =>
+      draftInboxRequestRef.current === controller &&
+      !controller.signal.aborted &&
+      useAuthStore.getState().status === 'authenticated' &&
+      useAuthStore.getState().user?.id === ownerId;
     setDraftInboxLoading(true);
     setDraftInboxError('');
     try {
-      const result = await fetchOwnPostDraftsPage({ cursor, limit: 20 });
+      const result = await fetchOwnPostDraftsPage({
+        cursor, limit: 20, signal: controller.signal, expectedAccountId: ownerId,
+      });
+      if (!isCurrentRequest()) return;
       if (!result.response.ok) throw new Error(apiFailureDiagnostic(result, '暂时无法加载草稿箱。'));
       const page = result.data && 'data' in result.data ? result.data.data : undefined;
       if (!page || !Array.isArray(page.items)) throw new Error('草稿箱返回的数据格式无效。');
       setDraftInboxItems((current) => {
+        if (!isCurrentRequest()) return current;
         if (!append) return page.items;
         const known = new Set(current.map((item) => item.id));
         return [...current, ...page.items.filter((item) => !known.has(item.id))];
       });
+      if (!isCurrentRequest()) return;
       setDraftInboxCursor(page.nextCursor || null);
       setDraftInboxHasMore(page.hasMore === true);
     } catch (cause) {
-      setDraftInboxError(cause instanceof Error ? cause.message : '暂时无法加载草稿箱。');
+      if (isCurrentRequest()) setDraftInboxError(cause instanceof Error ? cause.message : '暂时无法加载草稿箱。');
     } finally {
-      setDraftInboxLoading(false);
+      if (draftInboxRequestRef.current === controller) {
+        const stillCurrent =
+          !controller.signal.aborted &&
+          useAuthStore.getState().status === 'authenticated' &&
+          useAuthStore.getState().user?.id === ownerId;
+        draftInboxRequestRef.current = null;
+        if (stillCurrent) setDraftInboxLoading(false);
+      }
     }
-  }, []);
+  }, [authStatus, user?.id]);
 
   const loadScheduledInbox = useCallback(async (cursor: string | null = null, append = false) => {
+    const ownerId = authStatus === 'authenticated' ? user?.id : null;
+    if (!ownerId) return;
+    scheduledInboxRequestRef.current?.abort();
+    const controller = new AbortController();
+    scheduledInboxRequestRef.current = controller;
+    const isCurrentRequest = () =>
+      scheduledInboxRequestRef.current === controller &&
+      !controller.signal.aborted &&
+      useAuthStore.getState().status === 'authenticated' &&
+      useAuthStore.getState().user?.id === ownerId;
     setScheduledInboxLoading(true);
     setScheduledInboxError('');
     try {
-      const result = await fetchOwnScheduledPostsPage({ cursor, limit: 20 });
+      const result = await fetchOwnScheduledPostsPage({
+        cursor, limit: 20, signal: controller.signal, expectedAccountId: ownerId,
+      });
+      if (!isCurrentRequest()) return;
       if (!result.response.ok) {
         throw new Error(apiFailureDiagnostic(result, '暂时无法加载定时发布列表。'));
       }
@@ -1437,17 +1475,55 @@ function PublishScreenContent() {
         throw new Error('定时发布列表返回的数据格式无效。');
       }
       setScheduledInboxItems((current) => {
+        if (!isCurrentRequest()) return current;
         if (!append) return page.items;
         const known = new Set(current.map((item) => item.id));
         return [...current, ...page.items.filter((item) => !known.has(item.id))];
       });
+      if (!isCurrentRequest()) return;
       setScheduledInboxCursor(page.nextCursor || null);
       setScheduledInboxHasMore(page.hasMore === true);
     } catch (cause) {
-      setScheduledInboxError(cause instanceof Error ? cause.message : '暂时无法加载定时发布列表。');
+      if (isCurrentRequest()) setScheduledInboxError(cause instanceof Error ? cause.message : '暂时无法加载定时发布列表。');
     } finally {
-      setScheduledInboxLoading(false);
+      if (scheduledInboxRequestRef.current === controller) {
+        const stillCurrent =
+          !controller.signal.aborted &&
+          useAuthStore.getState().status === 'authenticated' &&
+          useAuthStore.getState().user?.id === ownerId;
+        scheduledInboxRequestRef.current = null;
+        if (stillCurrent) setScheduledInboxLoading(false);
+      }
     }
+  }, [authStatus, user?.id]);
+
+  useEffect(() => {
+    const viewerId = authStatus === 'authenticated' ? user?.id ?? null : null;
+    if (previousInboxViewerIdRef.current === viewerId) return;
+    previousInboxViewerIdRef.current = viewerId;
+    draftInboxRequestRef.current?.abort();
+    draftInboxRequestRef.current = null;
+    scheduledInboxRequestRef.current?.abort();
+    scheduledInboxRequestRef.current = null;
+    setDraftInboxItems([]);
+    setDraftInboxCursor(null);
+    setDraftInboxHasMore(false);
+    setDraftInboxLoading(false);
+    setDraftInboxError('');
+    setDraftInboxVisible(false);
+    setScheduledInboxItems([]);
+    setScheduledInboxCursor(null);
+    setScheduledInboxHasMore(false);
+    setScheduledInboxLoading(false);
+    setScheduledInboxError('');
+    setScheduledInboxVisible(false);
+    setScheduledActionId(null);
+    scheduledActionInFlightRef.current = false;
+  }, [authStatus, user?.id]);
+
+  useEffect(() => () => {
+    draftInboxRequestRef.current?.abort();
+    scheduledInboxRequestRef.current?.abort();
   }, []);
 
   const openScheduledInbox = useCallback(async () => {
@@ -1497,7 +1573,10 @@ function PublishScreenContent() {
               setScheduledActionId(item.id);
               setScheduledInboxError('');
               try {
-                const result = await transitionOwnScheduledPostState(item, 'DRAFT');
+                const ownerId = useAuthStore.getState().user?.id;
+                if (!ownerId) return;
+                const result = await transitionOwnScheduledPostState(item, 'DRAFT', undefined, ownerId);
+                if (useAuthStore.getState().user?.id !== ownerId) return;
                 if (!result.response.ok) {
                   throw new Error(apiFailureDiagnostic(result, '取消定时发布失败。'));
                 }
@@ -1525,7 +1604,10 @@ function PublishScreenContent() {
     let movedToDraft = false;
     try {
       // Use the existing lifecycle state machine rather than adding a self-transition.
-      const unscheduled = await transitionOwnScheduledPostState(item, 'DRAFT');
+      const ownerId = useAuthStore.getState().user?.id;
+      if (!ownerId) return;
+      const unscheduled = await transitionOwnScheduledPostState(item, 'DRAFT', undefined, ownerId);
+      if (useAuthStore.getState().user?.id !== ownerId) return;
       if (!unscheduled.response.ok) {
         throw new Error(apiFailureDiagnostic(unscheduled, '原定时未能取消，内容状态未改变。'));
       }
@@ -1541,7 +1623,8 @@ function PublishScreenContent() {
       }
 
       const updatedDraft = { ...item, etag: nextEtag };
-      const scheduled = await transitionOwnScheduledPostState(updatedDraft, 'SCHEDULED', scheduledAt);
+      const scheduled = await transitionOwnScheduledPostState(updatedDraft, 'SCHEDULED', scheduledAt, ownerId);
+      if (useAuthStore.getState().user?.id !== ownerId) return;
       if (!scheduled.response.ok) {
         throw new Error(
           '原定时已取消，内容已安全转为草稿；重新安排失败：' +
@@ -1634,7 +1717,10 @@ function PublishScreenContent() {
             setDeletingDraftId(draft.id);
             setDraftInboxError('');
             try {
-              const result = await deleteOwnPostDraft(draft.id, draft.etag);
+              const ownerId = useAuthStore.getState().user?.id;
+              if (!ownerId) return;
+              const result = await deleteOwnPostDraft(draft.id, draft.etag, ownerId);
+              if (useAuthStore.getState().user?.id !== ownerId) return;
               if (!result.response.ok) throw new Error(apiFailureDiagnostic(result, '删除草稿失败。'));
               if (user?.id) {
                 await deletePendingMediaRecoveryForDraft(user.id, draft.id).catch(() => undefined);
