@@ -125,11 +125,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       const { response, data } = await apiRequest<SessionPayload>('/auth/session', { method: 'GET' });
       if (response.status === 401) {
-        const currentAccountId = await getActiveStoredAccountId();
-        if (currentAccountId) await removeStoredAccount(currentAccountId);
-        else await clearStoredSession();
-        clearPendingMutationKeys();
-        set({ status: 'anonymous', user: null, accounts: await listStoredAccounts() });
+        // apiRequest has already delivered this 401 with its initiating
+        // credential snapshot. Do not inspect/remove the current account here:
+        // the user may have switched accounts while bootstrap was in flight.
         return;
       }
 
