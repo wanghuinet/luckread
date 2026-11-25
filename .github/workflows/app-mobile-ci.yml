@@ -52,10 +52,15 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.1.38"
+          cache: true
+          cache-dependency-path: app/bun.lockb
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
       - name: Install Expo app dependencies
         run: bun install
       - name: Export generated Bun lockfile for the reviewed PR
@@ -168,7 +173,7 @@ jobs:
           cd android
           echo "Starting Hyperswitch React Native Codegen (30-minute hard limit)."
           timeout --signal=TERM --kill-after=60s 30m \
-            ./gradlew generateCodegenArtifactsFromSchema --no-daemon --console=plain --stacktrace --info
+            ./gradlew generateCodegenArtifactsFromSchema --daemon --console=plain --stacktrace --info
           cd ..
           SPEC_ROOT="node_modules/@juspay-tech/react-native-hyperswitch/android/build/generated/source/codegen"
           MODULE_SPEC="$(find "$SPEC_ROOT" -type f -name 'NativeHyperswitchModuleSpec.java' -print -quit)"
@@ -279,10 +284,15 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.1.38"
+          cache: true
+          cache-dependency-path: app/bun.lockb
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
       - name: Configure preinstalled Android SDK and install required components
         run: |
           SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
@@ -331,6 +341,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.1.38"
+          cache: true
+          cache-dependency-path: app/bun.lockb
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
       - name: Install Expo app dependencies
         run: bun install
       - name: Apply and verify Hyperswitch React Native 0.88 compatibility
