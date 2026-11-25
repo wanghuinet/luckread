@@ -537,6 +537,8 @@ export async function apiRequest<T>(
   if (auth) {
     credentialSnapshot = await readSessionCredentialSnapshot();
     if (expectedAccountId && credentialSnapshot.accountId !== expectedAccountId) {
+      releaseMutationKey(mutationLease, 'definitive');
+      mutationLease = null;
       throw new Error('Your account changed. Reopen the composer and try again.');
     }
     if (credentialSnapshot.token) headers.set('Authorization', 'Bearer ' + credentialSnapshot.token);
