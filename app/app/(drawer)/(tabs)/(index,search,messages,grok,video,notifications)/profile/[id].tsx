@@ -941,7 +941,7 @@ export default function UserProfileScreen() {
       setLikesError(cause instanceof Error ? cause.message : 'Could not load liked posts. Please retry.');
     } finally {
       if (likesRequestRef.current === controller) likesRequestRef.current = null;
-      if (!controller.signal.aborted && isCurrentViewer()) {
+      if (useAuthStore.getState().user?.id === requestViewerId) {
         setLikesLoading(false);
         setLikesLoadingMore(false);
         if (showRefreshIndicator) setRefreshing(false);
@@ -1051,7 +1051,7 @@ export default function UserProfileScreen() {
       }
     } finally {
       if (repliesRequestRef.current === controller) repliesRequestRef.current = null;
-      if (isCurrentRequest()) {
+      if ((useAuthStore.getState().user?.id ?? null) === requestViewerId) {
         setRepliesLoading(false);
         setRepliesLoadingMore(false);
         if (showRefreshIndicator) setRefreshing(false);
@@ -1137,7 +1137,7 @@ export default function UserProfileScreen() {
       }
     } finally {
       if (mediaRequestRef.current === controller) mediaRequestRef.current = null;
-      if (isCurrentRequest()) {
+      if ((useAuthStore.getState().user?.id ?? null) === requestViewerId) {
         setMediaLoading(false);
         setMediaLoadingMore(false);
         if (showRefreshIndicator) setRefreshing(false);
