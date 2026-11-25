@@ -122,7 +122,6 @@ beforeEach(() => {
   loginRequests.length = 0;
   pushUnregisterCalls.length = 0;
   failPushUnregisterFor = null;
-  unauthorizedHandler = null;
   useAuthStore.setState({ status: 'anonymous', user: null, accounts: [] });
 });
 
