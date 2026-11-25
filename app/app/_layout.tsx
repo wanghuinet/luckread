@@ -52,7 +52,7 @@ export default function RootLayout() {
   const hydrateThemePreference = useThemePreferenceStore((state) => state.hydrate);
   const isDark = colorScheme === 'dark';
   const segments = useSegments();
-  const searchParams = useGlobalSearchParams<{ addAccount?: string }>();
+  const searchParams = useGlobalSearchParams<{ addAccount?: string; returnTo?: string | string[] }>();
   const router = useRouter();
   const navigationState = useRootNavigationState();
   const lastNotificationResponse = Notifications.useLastNotificationResponse();
@@ -164,7 +164,9 @@ export default function RootLayout() {
     if (!navigationState?.key || !isLoaded || status === 'loading') return;
     const isAuthEntryRoute = ['login', 'register', 'forgot-password', 'verify-email'].includes(String(segments[0] ?? ''));
     const isAddingAccount = segments[0] === 'login' && searchParams.addAccount === '1';
-    if (status === 'authenticated' && isAuthEntryRoute && !isAddingAccount) {
+    const hasSafeReturnTo = (Array.isArray(searchParams.returnTo) ? searchParams.returnTo[0] : searchParams.returnTo)
+      ?.startsWith('/') && !(Array.isArray(searchParams.returnTo) ? searchParams.returnTo[0] : searchParams.returnTo)?.startsWith('//');
+    if (status === 'authenticated' && isAuthEntryRoute && !isAddingAccount && !hasSafeReturnTo) {
       router.replace('/' as never);
     }
   }, [isLoaded, navigationState?.key, router, searchParams.addAccount, segments, status]);
