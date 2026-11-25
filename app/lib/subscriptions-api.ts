@@ -35,6 +35,7 @@ type PageOptions = {
   page?: number;
   limit?: number;
   signal?: AbortSignal;
+  expectedAccountId?: string;
 };
 
 /** Read only the signed-in user's subscription records from W01 -> W07. */
@@ -52,6 +53,7 @@ export function fetchMySubscriptionsPage(options: PageOptions = {}) {
   return apiRequest<unknown>('/memberships/subscriptions?' + query.toString(), {
     method: 'GET',
     signal: options.signal,
+    expectedAccountId: options.expectedAccountId,
   });
 }
 
@@ -82,6 +84,7 @@ type PlanPageOptions = {
   cursor?: string | null;
   creatorId?: string;
   signal?: AbortSignal;
+  expectedAccountId?: string;
 };
 
 /** Read only active/public plans from W01 -> W07; the client never supplies price or owner data. */
@@ -111,6 +114,7 @@ export function fetchActiveMembershipPlansPage(options: PlanPageOptions = {}) {
   return apiRequest<unknown>('/plans?' + query.toString(), {
     method: 'GET',
     signal: options.signal,
+    expectedAccountId: options.expectedAccountId,
   });
 }
 
@@ -174,13 +178,14 @@ export function createMembershipOrder(planId: string) {
 }
 
 /** Create an unconfirmed Hyperswitch intent for an existing customer-owned order. */
-export function createMembershipPaymentIntent(orderId: string) {
+export function createMembershipPaymentIntent(orderId: string, options: { expectedAccountId?: string } = {}) {
   if (typeof orderId !== 'string' || !/^ord_[A-Za-z0-9_-]{1,90}$/.test(orderId)) {
     throw new TypeError('A valid membership order ID is required.');
   }
   return apiRequest<unknown>('/payments/intents', {
     method: 'POST',
     body: JSON.stringify({ orderId }),
+    expectedAccountId: options.expectedAccountId,
   });
 }
 
@@ -279,11 +284,12 @@ function validatePlanChangeInput(planId: string, etag: string, idempotencyKey: s
 }
 
 /** Read one subscriber-owned subscription through W01 -> W07. */
-export function fetchMySubscription(subscriptionId: string, options: { signal?: AbortSignal } = {}) {
+export function fetchMySubscription(subscriptionId: string, options: { signal?: AbortSignal; expectedAccountId?: string } = {}) {
   const id = validateSubscriptionId(subscriptionId);
   return apiRequest<unknown>('/memberships/subscriptions/' + encodeURIComponent(id), {
     method: 'GET',
     signal: options.signal,
+    expectedAccountId: options.expectedAccountId,
   });
 }
 
@@ -291,7 +297,7 @@ export function fetchMySubscription(subscriptionId: string, options: { signal?: 
 export function fetchSubscriptionPlanChangePreview(
   subscriptionId: string,
   targetPlanId: string,
-  options: { signal?: AbortSignal } = {},
+  options: { signal?: AbortSignal; expectedAccountId?: string } = {},
 ) {
   const id = validateSubscriptionId(subscriptionId);
   if (typeof targetPlanId !== 'string' || !PLAN_ID_PATTERN.test(targetPlanId)) {
@@ -300,7 +306,7 @@ export function fetchSubscriptionPlanChangePreview(
   const query = new URLSearchParams({ targetPlanId });
   return apiRequest<unknown>(
     '/memberships/subscriptions/' + encodeURIComponent(id) + '/change-plan-preview?' + query.toString(),
-    { method: 'GET', signal: options.signal },
+    { method: 'GET', signal: options.signal, expectedAccountId: options.expectedAccountId },
   );
 }
 
@@ -310,6 +316,7 @@ export function createSubscriptionPlanUpgradeCheckout(
   planId: string,
   etag: string,
   idempotencyKey: string,
+  options: { expectedAccountId?: string } = {},
 ) {
   const id = validateSubscriptionId(subscriptionId);
   validatePlanChangeInput(planId, etag, idempotencyKey);
@@ -320,6 +327,7 @@ export function createSubscriptionPlanUpgradeCheckout(
       headers: { 'If-Match': etag },
       idempotencyKey,
       body: JSON.stringify({ planId }),
+      expectedAccountId: options.expectedAccountId,
     },
   );
 }
@@ -330,6 +338,7 @@ export function scheduleSubscriptionPlanDowngrade(
   planId: string,
   etag: string,
   idempotencyKey: string,
+  options: { expectedAccountId?: string } = {},
 ) {
   const id = validateSubscriptionId(subscriptionId);
   validatePlanChangeInput(planId, etag, idempotencyKey);
@@ -340,6 +349,7 @@ export function scheduleSubscriptionPlanDowngrade(
       headers: { 'If-Match': etag },
       idempotencyKey,
       body: JSON.stringify({ planId }),
+      expectedAccountId: options.expectedAccountId,
     },
   );
 }
@@ -350,6 +360,7 @@ export function scheduleSubscriptionBillingIntervalChange(
   planId: string,
   etag: string,
   idempotencyKey: string,
+  options: { expectedAccountId?: string } = {},
 ) {
   const id = validateSubscriptionId(subscriptionId);
   validatePlanChangeInput(planId, etag, idempotencyKey);
@@ -360,6 +371,7 @@ export function scheduleSubscriptionBillingIntervalChange(
       headers: { 'If-Match': etag },
       idempotencyKey,
       body: JSON.stringify({ planId }),
+      expectedAccountId: options.expectedAccountId,
     },
   );
 }
