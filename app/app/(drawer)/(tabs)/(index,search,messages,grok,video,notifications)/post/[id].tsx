@@ -352,6 +352,7 @@ const handleSelectSort = useCallback((sortType: SortType) => {
                     itemData={findPost}
                     detailView
                     replyDisabled={membershipRequired}
+                    onDeleted={() => router.back()}
                     onReplySubmitted={() => setFindPost((current) => current
                         ? { ...current, reply_count: (current.reply_count ?? 0) + 1 }
                         : current)}
