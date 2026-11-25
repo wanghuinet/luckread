@@ -18,6 +18,7 @@ test('comment list requests and local interaction state reset on viewer changes'
 
 test('comment submit, delete, and like completions cannot update a different viewer UI', () => {
   expect(comments).toContain('if ((useAuthStore.getState().user?.id ?? null) !== viewerIdAtStart) return;');
+  expect(comments).toContain('expectedViewerId: viewerIdAtStart');
   expect(comments).toContain('toggleCommentLikeRequest(comment.id, viewerIdAtStart)');
   expect(comments).toContain('if ((useAuthStore.getState().user?.id ?? null) === viewerIdAtStart) setLikingCommentId(null);');
   expect(comments).toContain('if (useAuthStore.getState().user?.id === viewerIdAtStart)');
