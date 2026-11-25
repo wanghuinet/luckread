@@ -83,7 +83,9 @@ export default function PostThreadComposer({
     if (previousViewerIdRef.current === viewerId) return;
     previousViewerIdRef.current = viewerId;
     startedRef.current = false;
-    updateItems([createItem(initialText), createItem()]);
+    const nextItems = [createItem(initialText), createItem()];
+    itemsRef.current = nextItems;
+    setItems(nextItems);
     setBusy(false);
     setError('');
     setProgress('');
