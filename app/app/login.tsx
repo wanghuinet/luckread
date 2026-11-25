@@ -127,6 +127,7 @@ export default function LoginScreen() {
         returnKeyType="next"
         textContentType="emailAddress"
         value={email}
+        editable={!submitting}
       />
       <AuthInput
         label="密码"
@@ -144,6 +145,7 @@ export default function LoginScreen() {
         secureTextEntry
         textContentType="password"
         value={password}
+        editable={!submitting}
       />
 
       <View style={{ alignItems: 'flex-end', marginTop: -12, marginBottom: 8 }}>
