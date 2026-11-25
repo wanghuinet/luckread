@@ -862,7 +862,7 @@ export default function UserProfileScreen() {
     setMediaLoadingMore(false);
     setMediaLoadedForUserId(null);
     mediaRequestRef.current?.abort();
-  }, [userHandle]);
+  }, [userHandle, currentUserId]);
 
   const loadLikedPosts = useCallback(async (
     profileUserId: string,
@@ -1067,7 +1067,7 @@ export default function UserProfileScreen() {
         if (showRefreshIndicator) setRefreshing(false);
       }
     }
-  }, []);
+  }, [currentUserId]);
 
   const loadProfileMedia = useCallback(async (
     profileUserId: string,
@@ -1153,7 +1153,7 @@ export default function UserProfileScreen() {
         if (showRefreshIndicator) setRefreshing(false);
       }
     }
-  }, []);
+  }, [currentUserId]);
 
   const isOwnProfile = Boolean(user?.id && currentUserId && user.id === currentUserId);
   const showingReplies = selectedTabIndex === 1;
