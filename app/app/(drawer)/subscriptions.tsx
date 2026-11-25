@@ -355,7 +355,7 @@ export default function MySubscriptionsScreen() {
                   ? unwrapApiData<{ replayed?: boolean }>(result.data)
                   : null;
                 if (result.response.status === 202 && firstStage?.replayed === false) {
-                  result = await revokeSavedPaymentMethod(method.savedPaymentMethodId, idempotencyKey);
+                  result = await revokeSavedPaymentMethod(method.savedPaymentMethodId, idempotencyKey, { expectedAccountId: requestViewerId });
                   if (viewerIdRef.current !== requestViewerId) return;
                 }
                 if (!result.response.ok) {
