@@ -1,4 +1,10 @@
 import { proxyBetterAuth } from '../../../../../auth/w02-session-client.js'
+import {
+  enforceW01WriteEndpointRateLimit,
+  enforceW01WriteRateLimit,
+  TrafficLimitError,
+  rateLimitResponse,
+} from '../../../../../auth/traffic-limit.js'
 
 type PasswordResetRequest = { identifier?: unknown }
 
@@ -9,6 +15,24 @@ const jsonError = (status: number, code: string, message: string) =>
   })
 
 export async function POST(request: Request): Promise<Response> {
+  const cfRay = request.headers.get('cf-ray') ?? null
+  try {
+    // Password recovery is an anonymous credential mutation. Apply both the
+    // shared W01 origin/IP write guard and a fixed operation-specific bucket
+    // before parsing or forwarding any user-controlled identity.
+    await enforceW01WriteRateLimit(request)
+    await enforceW01WriteEndpointRateLimit('authPasswordResetRequest')
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    console.error(JSON.stringify({
+      event: 'auth.password_reset.request_rate_limit_failure',
+      diagnosticCode: 'AUTH_PASSWORD_RESET_REQUEST_RATE_LIMIT_FAILURE',
+      cfRay,
+      errorName: error instanceof Error ? error.name : typeof error,
+    }))
+    return jsonError(503, 'SERVICE_UNAVAILABLE', '密码找回服务暂时不可用，请稍后重试。')
+  }
+
   let body: unknown
   try { body = await request.json() } catch {
     return jsonError(422, 'VALIDATION_FAILED', '请求数据格式无效，请刷新页面后重试。')
