@@ -9,7 +9,8 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { apiRequest, createIdempotencyKey } from '~/lib/api-client';
+import { apiRequest, createIdempotencyKey, type ApiRequestOptions } from '~/lib/api-client';
+import { useAuthStore } from '~/store/auth-store';
 import { apiFailureDiagnostic, uploadTextBody } from '~/lib/publish-api';
 
 type ThreadDraft = {
@@ -68,6 +69,7 @@ export default function PostThreadComposer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState('');
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
   const itemsRef = useRef(items);
   const startedRef = useRef(false);
 
@@ -82,6 +84,12 @@ export default function PostThreadComposer({
   };
 
   const submit = async () => {
+    if (!viewerId) {
+      setError('请先登录后再发布线程。');
+      return;
+    }
+    const requestAsViewer = <T,>(path: string, options: ApiRequestOptions = {}) =>
+      apiRequest<T>(path, { ...options, expectedAccountId: viewerId });
     const working = itemsRef.current.map(item => ({ ...item }));
     if (working.length < 2 || working.length > MAX_ITEMS ||
         working.some(item => !item.body.trim() || item.body.trim().length > MAX_TEXT)) {
@@ -101,12 +109,12 @@ export default function PostThreadComposer({
         const item = working[index];
         const body = item.body.trim();
         if (!item.bodyRef) {
-          const uploaded = await uploadTextBody(body, item.key);
+          const uploaded = await uploadTextBody(body, item.key, viewerId);
           item.bodyRef = uploaded.url;
           updateItems(working);
         }
         if (!item.contentId) {
-          const created = await apiRequest<unknown>('/contents', {
+          const created = await requestAsViewer<unknown>('/contents', {
             method: 'POST',
             body: JSON.stringify({
               contentType: 'post',
@@ -126,14 +134,14 @@ export default function PostThreadComposer({
         }
         if (!item.published) {
           if (!item.etag || item.etag === '*') {
-            const detail = await apiRequest<unknown>('/contents/' + encodeURIComponent(item.contentId), { method: 'GET' });
+            const detail = await requestAsViewer<unknown>('/contents/' + encodeURIComponent(item.contentId), { method: 'GET' });
             if (detail.response.ok) {
               const record = unwrap(detail.data);
               item.etag = record?.etag || detail.response.headers.get('ETag') || undefined;
             }
           }
           if (!item.etag || item.etag === '*') throw new Error('帖子已创建，但缺少版本号。重试会继续使用原帖子，不会重复创建。');
-          const transitioned = await apiRequest<unknown>(
+          const transitioned = await requestAsViewer<unknown>(
             '/contents/' + encodeURIComponent(item.contentId) + '/state',
             {
               method: 'POST',
@@ -162,7 +170,7 @@ export default function PostThreadComposer({
         const item = working[index];
         const next = working[index + 1];
         if (item.linked) continue;
-        const linked = await apiRequest<unknown>(
+        const linked = await requestAsViewer<unknown>(
           '/contents/' + encodeURIComponent(item.contentId as string) + '/thread',
           {
             method: 'POST',
