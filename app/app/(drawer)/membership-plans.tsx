@@ -265,6 +265,16 @@ export default function MembershipPlansScreen() {
     }
     if (item.priceMinor <= 0 || busyPlanId !== null) return;
 
+    const purchaseViewerId = useAuthStore.getState().user?.id;
+    if (!purchaseViewerId) {
+      openLogin();
+      return;
+    }
+    const isPurchaseViewerCurrent = () => {
+      const current = useAuthStore.getState();
+      return current.status === 'authenticated' && current.user?.id === purchaseViewerId;
+    };
+
     setBusyPlanId(item.planId);
     setPurchaseMessage('');
     try {
@@ -272,6 +282,10 @@ export default function MembershipPlansScreen() {
       assertNativeHyperswitchConfigured();
 
       const orderResult = await createMembershipOrder(item.planId);
+      if (!isPurchaseViewerCurrent()) {
+        setPurchaseMessage('账号已切换，本次支付已停止。请在当前账号下重新发起订阅。');
+        return;
+      }
       if (!orderResult.response.ok) {
         throw new Error(orderResult.error?.message || getApiErrorMessage(
           orderResult.data,
@@ -299,7 +313,15 @@ export default function MembershipPlansScreen() {
         currency: string;
       };
 
+      if (!isPurchaseViewerCurrent()) {
+        setPurchaseMessage('账号已切换，订单已创建但未启动支付。请在当前账号下重新检查订阅。');
+        return;
+      }
       const intentResult = await createMembershipPaymentIntent(orderData.orderId);
+      if (!isPurchaseViewerCurrent()) {
+        setPurchaseMessage('账号已切换，支付流程已停止。请在当前账号下重新检查订阅。');
+        return;
+      }
       if (!intentResult.response.ok) {
         throw new Error(intentResult.error?.message || getApiErrorMessage(
           intentResult.data,
@@ -330,7 +352,12 @@ export default function MembershipPlansScreen() {
         throw new Error('支付服务没有返回与当前订单匹配的有效支付会话，支付已停止。');
       }
 
+      if (!isPurchaseViewerCurrent()) {
+        setPurchaseMessage('账号已切换，支付表单未启动。请在当前账号下重新检查订阅。');
+        return;
+      }
       const result = await presentNativeMembershipPayment((intent as Record<string, unknown>).sdkAuthorization as string);
+      if (!isPurchaseViewerCurrent()) return;
       if (result.status === 'completed') {
         setPurchaseMessage('支付表单已完成提交。LuckRead 正在等待服务端验证 Hyperswitch 支付 Webhook 并完成订阅开通；此状态不代表会员权益已经生效。');
         await loadPage(null, false);
