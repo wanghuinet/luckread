@@ -641,6 +641,7 @@ function PublishScreenContent() {
       });
       return true;
     } catch (error) {
+      if (useAuthStore.getState().user?.id !== ownerId) return false;
       updateAsset(asset.localId, {
         uploaded,
         serverUrl: uploaded?.url || asset.serverUrl,
@@ -2255,10 +2256,12 @@ function PublishScreenContent() {
         },
       ]);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Publishing failed. Please retry.');
-      setStatusMessage('');
+      if (useAuthStore.getState().user?.id === ownerId) {
+        setErrorMessage(error instanceof Error ? error.message : 'Publishing failed. Please retry.');
+        setStatusMessage('');
+      }
     } finally {
-      setBusy(false);
+      if (useAuthStore.getState().user?.id === ownerId) setBusy(false);
     }
   }, [accessMode, assets, body, contentId, coverRef, loadingQuote, mediaWarning, pollDurationMinutes, pollEnabled, pollOptions, publishPending, quoteContentId, quoteTarget, replyAudience, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens, user?.id]);
 
