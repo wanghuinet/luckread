@@ -252,9 +252,13 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
   const submitComment = useCallback(async () => {
     const trimmed = body.trim();
     if (!trimmed || submitting || trimmed.length > 10000) return;
+    const viewerIdAtStart = currentUserId;
+    if (!viewerIdAtStart || useAuthStore.getState().user?.id !== viewerIdAtStart) {
+      if (!viewerIdAtStart) router.push('/login' as never);
+      return;
+    }
     setSubmitting(true);
     setMessage('');
-    const viewerIdAtStart = currentUserId;
 
     const existing = pendingSubmissionRef.current;
     const key = existing && existing.body === trimmed ? existing.key : createIdempotencyKey();
@@ -264,6 +268,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
       const { response, data } = await createComment<{ data?: ApiComment; error?: { message?: string } }>({
         contentId,
         body: trimmed,
+        expectedViewerId: viewerIdAtStart,
         parentId: null,
         idempotencyKey: key,
       });
