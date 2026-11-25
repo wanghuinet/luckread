@@ -34,3 +34,13 @@ test('email recovery screens ignore responses for an email that has since change
     expect(source).toContain('if (emailRevision.current !== requestRevision) return;');
   }
 });
+
+test('login inputs are locked while authentication can mutate the active session', () => {
+  expect(login).toContain('value={email}\n        editable={!submitting}');
+  expect(login).toContain('value={password}\n        editable={!submitting}');
+});
+
+test('recovery and verification inputs are locked while their requests are pending', () => {
+  expect(forgotPassword).toContain('value={email}\n        editable={!submitting}');
+  expect(verifyEmail).toContain('value={email}\n        editable={!submitting}');
+});
