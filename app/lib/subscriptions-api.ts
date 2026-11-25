@@ -142,10 +142,11 @@ export type SavedPaymentMethod = {
 };
 
 /** Read only verified saved methods owned by the current W02 principal. */
-export function fetchSavedPaymentMethods(options: { signal?: AbortSignal } = {}) {
+export function fetchSavedPaymentMethods(options: { signal?: AbortSignal; expectedAccountId?: string } = {}) {
   return apiRequest<unknown>('/payment-methods', {
     method: 'GET',
     signal: options.signal,
+    expectedAccountId: options.expectedAccountId,
   });
 }
 
@@ -153,6 +154,7 @@ export function fetchSavedPaymentMethods(options: { signal?: AbortSignal } = {})
 export function revokeSavedPaymentMethod(
   savedPaymentMethodId: string,
   idempotencyKey: string = 'remove_' + savedPaymentMethodId,
+  options: { expectedAccountId?: string } = {},
 ) {
   if (!/^spm_[A-Za-z0-9]{26}$/.test(savedPaymentMethodId)) {
     throw new TypeError('Saved payment method ID is invalid.');
@@ -163,6 +165,7 @@ export function revokeSavedPaymentMethod(
   return apiRequest<unknown>('/payment-methods/' + encodeURIComponent(savedPaymentMethodId), {
     method: 'DELETE',
     idempotencyKey,
+    expectedAccountId: options.expectedAccountId,
   });
 }
 
