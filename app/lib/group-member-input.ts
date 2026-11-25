@@ -1,6 +1,6 @@
 export function parseGroupMemberIds(input: string): string[] {
   return input
-    .split(/[\\s,;]+/)
+    .split(/[\s,;]+/)
     .map((value) => value.trim())
     .filter(Boolean);
 }
