@@ -6,6 +6,7 @@ import {
   assertStoredAccountCapacity,
   clearActiveAccountSelection,
   clearStoredSession,
+  clearLegacySessionForSnapshot,
   getActiveStoredAccountId,
   listStoredAccounts,
   readCachedUser,
@@ -294,7 +295,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       const current = await readSessionCredentialSnapshot();
       if (generation !== authLifecycleGeneration || current.accountId !== snapshot.accountId || current.token !== snapshot.token) return;
       if (snapshot.accountId) await removeStoredAccount(snapshot.accountId);
-      else await clearStoredSession();
+      else await clearLegacySessionForSnapshot(snapshot);
       const activeAccountId = await getActiveStoredAccountId();
       if (generation !== authLifecycleGeneration || (activeAccountId !== null && activeAccountId !== snapshot.accountId)) return;
     } else {
