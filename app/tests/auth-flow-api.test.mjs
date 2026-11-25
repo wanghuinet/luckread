@@ -50,6 +50,10 @@ test('normalizes and validates email, username and password against W01 registra
   expect(isValidAuthPassword('a'.repeat(15))).toBe(true);
   expect(isValidAuthPassword('short')).toBe(false);
   expect(isValidAuthPassword('a'.repeat(129))).toBe(false);
+  expect(isValidAuthPassword('😀'.repeat(14))).toBe(false);
+  expect(isValidAuthPassword('😀'.repeat(15))).toBe(true);
+  expect(isValidAuthPassword('😀'.repeat(128))).toBe(true);
+  expect(isValidAuthPassword('😀'.repeat(129))).toBe(false);
 });
 
 test('registers by email with the canonical consent policy and a stable idempotency key', async () => {
