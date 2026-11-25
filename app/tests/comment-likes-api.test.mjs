@@ -154,7 +154,8 @@ test('rejects comment likes when no authenticated viewer was captured', async ()
   activeViewerId = null;
   await expect(toggleCommentLike('comment-anonymous', null)).rejects.toMatchObject({
     name: 'CommentLikeApiError',
-    code: 'VIEWER_CHANGED',
+    status: 401,
+    code: 'UNAUTHENTICATED',
   });
   expect(calls).toHaveLength(0);
 });
