@@ -15,7 +15,7 @@ const socialScreenApiSource = readFileSync(new URL('../lib/social-screen-api.ts'
 test('native publisher uses the shared media API helpers and existing W01 state endpoint', () => {
   expect(composer).toContain('prepareImageForUpload(file)');
   expect(composer).toContain('uploadMediaFile(uploadFile, asset.uploadKey, (progress) => {');
-  expect(composer).toContain('getMediaPlayback(uploaded.id)');
+  expect(composer).toContain('getMediaPlayback(uploaded.id, undefined, ownerId)');
   expect(composer).toContain('uploadTextBody(');
   expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id) + '/state'");
   expect(composer).toContain("to: scheduleEnabled ? 'SCHEDULED' : 'PUBLISHED'");
@@ -285,7 +285,7 @@ test('native composer reuses Gorhom bottom sheet for camera and photo-library me
 test('native publisher auto-saves server drafts, restores them by draft ID, and flushes before close or publish', () => {
   expect(composer).toContain("draftId?: string | string[]");
   expect(composer).toContain("fetchContentBodyReference(record.bodyRef)");
-  expect(composer).toContain("apiRequest<Record<string, unknown>>('/contents'");
+  expect(composer).toContain("requestAsOwner<Record<string, unknown>>('/contents'");
   expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id)");
   expect(composer).toContain("headers: { 'If-Match': draft.etag }");
   expect(composer).toContain("router.setParams({ draftId: draft.id } as never)");
