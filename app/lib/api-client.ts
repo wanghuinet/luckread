@@ -45,7 +45,7 @@ export type ApiUploadProgress = {
   percent: number | null;
 };
 
-type ApiRequestOptions = RequestInit & {
+export type ApiRequestOptions = RequestInit & {
   /** Called with native multipart upload progress; uses the shared auth/idempotency boundary. */
   onUploadProgress?: (progress: ApiUploadProgress) => void;
   /** Set false only where the API contract does not use idempotency keys. */
