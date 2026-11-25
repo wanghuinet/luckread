@@ -113,7 +113,7 @@ try {
   assert.equal(state.rows[0]?.version, 2)
   checks.signedRefundWebhookApplied = true
 
-  const replayInput = body({ eventId: marker + '-same-event', updatedAt: new Date(baseProviderTime.getTime()+1000).toISOString() })
+  const replayInput = body({ eventId: marker + '-same-event', status: 'review', updatedAt: new Date(baseProviderTime.getTime()+1000).toISOString() })
   const same = await Promise.all([receive(replayInput), receive(replayInput)])
   assert.deepEqual(same.map(x => x?.outcome).sort(), ['APPLIED','DUPLICATE'])
   assert.equal(await count('payment_provider_events','event_id',marker+'-same-event'),1)
