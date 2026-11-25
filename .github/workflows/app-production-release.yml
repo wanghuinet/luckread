@@ -197,7 +197,9 @@ jobs:
           [[ "$PROFILE_APP_ID" == "$IOS_TEAM_ID.com.luckread.app" ]] || { echo "Provisioning profile must target $IOS_TEAM_ID.com.luckread.app" >&2; exit 1; }
           EXPORT_METHOD="$(/usr/libexec/PlistBuddy -c 'Print :method' "$EXPORT_PATH")"
           EXPORT_TEAM="$(/usr/libexec/PlistBuddy -c 'Print :teamID' "$EXPORT_PATH")"
-          [[ "$EXPORT_METHOD" == "app-store-connect" && "$EXPORT_TEAM" == "$IOS_TEAM_ID" ]] || { echo "ExportOptions.plist must use app-store-connect and the configured Team ID" >&2; exit 1; }
+          EXPORT_STYLE="$(/usr/libexec/PlistBuddy -c 'Print :signingStyle' "$EXPORT_PATH")"
+          EXPORT_PROFILE="$(/usr/libexec/PlistBuddy -c 'Print :provisioningProfiles:com.luckread.app' "$EXPORT_PATH")"
+          [[ "$EXPORT_METHOD" == "app-store-connect" && "$EXPORT_TEAM" == "$IOS_TEAM_ID" && "$EXPORT_STYLE" == "manual" && "$EXPORT_PROFILE" == "$PROFILE_NAME" ]] || { echo "ExportOptions.plist must use app-store-connect, manual signing, the configured Team ID and the matching com.luckread.app profile" >&2; exit 1; }
           {
             echo "IOS_KEYCHAIN_PATH=$KEYCHAIN_PATH"
             echo "IOS_KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD"
