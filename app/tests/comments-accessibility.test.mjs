@@ -11,3 +11,14 @@ test('reply actions expose accessible labels, hints, and state', () => {
   expect(comments).toContain('selected: likedComments[comment.id] === true');
   expect(comments).toContain('accessibilityLabel={loadingMore ? "Loading more replies" : "Load more replies"}');
 });
+
+
+test('comment composer clears viewer-owned retry state and ignores stale async results after account changes', () => {
+  expect(source).toContain('pendingSubmissionRef.current = null;');
+  expect(source).toContain('pendingDeleteKeysRef.current = {};');
+  expect(source).toContain('requestIdRef.current += 1;');
+  expect(source).toContain('setBody(\'\');');
+  expect(source).toContain('if (useAuthStore.getState().user?.id !== viewerIdAtStart) return;');
+  expect(source).toContain('if (useAuthStore.getState().user?.id === viewerIdAtStart) setSubmitting(false);');
+  expect(source).toContain('if (useAuthStore.getState().user?.id === currentUserId) setLikingCommentId(null);');
+});
