@@ -70,8 +70,10 @@ function contentScopeKey(contentId: string, viewerId?: string | null): string {
 }
 
 function isCurrentViewer(viewerId?: string | null): boolean {
+  const normalizedViewerId = normalizeViewerId(viewerId);
+  if (!normalizedViewerId) return false;
   const currentViewerId = useAuthStore.getState().user?.id ?? null;
-  return currentViewerId === (normalizeViewerId(viewerId) || null);
+  return currentViewerId === normalizedViewerId;
 }
 
 function normalizeCount(value: unknown): number | null {
@@ -145,7 +147,7 @@ function failureMessage(cause: unknown): string {
 /** Re-read authoritative state on mount/re-entry, scoped to the active viewer. */
 export async function refreshContentLikeStatus(contentId?: string, viewerId?: string | null): Promise<void> {
   const id = normalizeContentId(contentId);
-  if (!id || !isCurrentViewer(viewerId)) return;
+  if (!id || !normalizeViewerId(viewerId) || !isCurrentViewer(viewerId)) return;
 
   const current = getContentLikeSnapshot(id, {}, viewerId);
   if (current.loading || current.pending) return;
@@ -182,6 +184,7 @@ export async function refreshContentLikeStatus(contentId?: string, viewerId?: st
 export async function toggleContentLike(contentId?: string, viewerId?: string | null): Promise<ContentLikeOperationResult> {
   const id = normalizeContentId(contentId);
   if (!id) return { ok: false, message: 'This item is not connected to a LuckRead content ID.' };
+  if (!normalizeViewerId(viewerId)) return { ok: false, status: 401, message: 'Sign in to like this post.' };
   if (!isCurrentViewer(viewerId)) return { ok: false, message: 'Your account changed. Refresh the post before trying again.' };
 
   const current = getContentLikeSnapshot(id, {}, viewerId);
