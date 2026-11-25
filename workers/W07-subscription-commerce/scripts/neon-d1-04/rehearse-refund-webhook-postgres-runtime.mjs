@@ -148,8 +148,17 @@ try {
     BEGIN IF OLD.refund_id='${refundId}' THEN RAISE EXCEPTION 'W07_TEST_REFUND_UPDATE_FAILURE' USING ERRCODE='23514'; END IF; RETURN NEW; END; $$`)
   await pool.query('CREATE TRIGGER w07_test_reject_refund_update BEFORE UPDATE ON refunds FOR EACH ROW EXECUTE FUNCTION w07_test_reject_refund_update()')
   rollbackTriggerInstalled = true
-  await assert.rejects(receive(body({eventId:marker+'-rollback',updatedAt:new Date(baseProviderTime.getTime()+8000).toISOString()})),
-    error=>error?.code==='SERVICE_UNAVAILABLE' && error?.status===503)
+  let rollbackError
+  try {
+    await receive(body({eventId:marker+'-rollback',updatedAt:new Date(baseProviderTime.getTime()+8000).toISOString()}))
+  } catch (error) {
+    rollbackError = error
+  }
+  assert.equal(rollbackError?.code,'SERVICE_UNAVAILABLE')
+  assert.equal(rollbackError?.status,503)
+  // The persistence adapter must release its checked-out client even on rollback.
+  assert.equal(pool.waitingCount,0)
+  assert.ok(pool.idleCount >= 1)
   assert.equal(await count('payment_provider_events','event_id',marker+'-rollback'),0)
   const rolled = await pool.query('SELECT status,version::int AS version FROM refunds WHERE refund_id=$1',[refundId])
   assert.equal(rolled.rows[0]?.status,'RECONCILIATION_REQUIRED')
