@@ -1055,7 +1055,9 @@ function PublishScreenContent() {
 
   const saveDraftSnapshot = useCallback(async () => {
     const ownerId = user?.id;
-    if (contentId || loadingEdit || publishPending || authStatus !== 'authenticated' || !ownerId) return;
+    if (!ownerId || contentId || loadingEdit || publishPending || authStatus !== 'authenticated' || !ownerId) return;
+    const requestAsOwner = <T,>(path: string, options: ApiRequestOptions = {}) =>
+      apiRequest<T>(path, { ...options, expectedAccountId: ownerId });
     const trimmedBody = body.trim();
     if (!trimmedBody || trimmedBody.length > MAX_TEXT_LENGTH) return;
     if (pollEnabled) {
@@ -1119,7 +1121,7 @@ function PublishScreenContent() {
         bodyUploadRef.current = { text: trimmedBody, key: createIdempotencyKey() };
       }
       const bodyAttempt = bodyUploadRef.current;
-      const uploadedBody = await uploadTextBody(trimmedBody, bodyAttempt.key);
+      const uploadedBody = await uploadTextBody(trimmedBody, bodyAttempt.key, ownerId);
       bodyAttempt.uploaded = uploadedBody;
       bodyRef = uploadedBody.url;
     }
@@ -1149,7 +1151,7 @@ function PublishScreenContent() {
       draftCreateKeyRef.current = createKey;
       let created;
       try {
-        created = await apiRequest<Record<string, unknown>>('/contents', {
+        created = await requestAsOwner<Record<string, unknown>>('/contents', {
           method: 'POST',
           body: createPayload,
           idempotencyKey: createKey,
@@ -1207,7 +1209,7 @@ function PublishScreenContent() {
     if (!draft?.id) throw new Error('The draft could not be identified after saving.');
     if (!createdThisCall && draftSavedFingerprintRef.current !== fingerprint) {
       if (!draft.etag || draft.etag === '*') {
-        const detail = await apiRequest<Record<string, unknown>>(
+        const detail = await requestAsOwner<Record<string, unknown>>(
           '/contents/' + encodeURIComponent(draft.id),
           { method: 'GET' },
         );
@@ -1218,7 +1220,7 @@ function PublishScreenContent() {
         }
       }
       if (!draft.etag || draft.etag === '*') throw new Error('The saved draft is missing its version. Reload it before saving again.');
-      const updated = await apiRequest<Record<string, unknown>>(
+      const updated = await requestAsOwner<Record<string, unknown>>(
         '/contents/' + encodeURIComponent(draft.id),
         {
           method: 'PATCH',
@@ -1250,7 +1252,7 @@ function PublishScreenContent() {
         cleanOptions.every((option) => option.length > 0 && [...option].length <= MAX_POLL_OPTION_LENGTH) &&
         new Set(optionKeys).size === optionKeys.length;
       if (validPoll) {
-        const pollResult = await apiRequest<unknown>(
+        const pollResult = await requestAsOwner<unknown>(
           '/contents/' + encodeURIComponent(draft.id) + '/poll',
           {
             method: 'POST',
@@ -1264,7 +1266,7 @@ function PublishScreenContent() {
         pollConfiguredRef.current = true;
       }
     } else if (pollConfiguredRef.current) {
-      const pollResult = await apiRequest<unknown>(
+      const pollResult = await requestAsOwner<unknown>(
         '/contents/' + encodeURIComponent(draft.id) + '/poll',
         { method: 'DELETE', idempotencyKey: createIdempotencyKey() },
       );
@@ -1275,7 +1277,7 @@ function PublishScreenContent() {
     }
     // The owner policy is persisted in W05; W01 resolves @mentions to canonical IDs.
     if (replyAudienceSavedFingerprintRef.current !== replyAudienceFingerprint) {
-      const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody);
+      const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody, ownerId);
       if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
         throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Unable to save who can reply to this post.'));
       }
