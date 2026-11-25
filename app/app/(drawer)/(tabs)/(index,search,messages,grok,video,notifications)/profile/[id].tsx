@@ -858,13 +858,29 @@ export default function UserProfileScreen() {
     mediaRequestRef.current?.abort();
   }, [userHandle]);
 
+  useEffect(() => {
+    setLikedPosts([]);
+    setLikesCursor(null);
+    setLikesHasMore(false);
+    setLikesLoadedForUserId(null);
+    setLikesError('');
+    setLikesLoading(false);
+    setLikesLoadingMore(false);
+    likesRequestRef.current?.abort();
+    likesRequestRef.current = null;
+  }, [currentUserId]);
+
   const loadLikedPosts = useCallback(async (
     profileUserId: string,
     nextCursor: string | null,
     append: boolean,
     showRefreshIndicator = false,
   ) => {
-    if (!currentUserId || profileUserId !== currentUserId) {
+    const requestViewerId = currentUserId;
+    const isCurrentViewer = () =>
+      Boolean(requestViewerId) &&
+      useAuthStore.getState().user?.id === requestViewerId;
+    if (!requestViewerId || profileUserId !== requestViewerId || !isCurrentViewer()) {
       setLikesError('Sign in to view your Likes.');
       return;
     }
@@ -888,6 +904,7 @@ export default function UserProfileScreen() {
         limit: 20,
         signal: controller.signal,
       });
+      if (controller.signal.aborted || !isCurrentViewer()) return;
       const page = result.response.ok
         ? unwrapApiData<ProfileLikedContentPage>(result.data)
         : null;
@@ -896,7 +913,7 @@ export default function UserProfileScreen() {
       }
 
       const sessionToken = await readSessionToken().catch(() => null);
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || !isCurrentViewer()) return;
       const mappedItems = await Promise.all(page.items.map(async (likedItem): Promise<FeedContent | null> => {
         const contentId = typeof likedItem?.contentId === 'string' ? likedItem.contentId.trim() : '';
         if (!contentId) return null;
@@ -924,7 +941,7 @@ export default function UserProfileScreen() {
         return mapContentToFeedContent(record, body, social, author, sessionToken);
       }));
 
-      if (controller.signal.aborted || profileUserId !== currentUserId) return;
+      if (controller.signal.aborted || profileUserId !== requestViewerId || !isCurrentViewer()) return;
       const mapped = mappedItems.filter((item): item is FeedContent => item !== null);
       setLikedPosts((current) => {
         if (!append) return mapped;
@@ -935,11 +952,11 @@ export default function UserProfileScreen() {
       setLikesHasMore(page.hasMore === true);
       setLikesLoadedForUserId(profileUserId);
     } catch (cause) {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || !isCurrentViewer()) return;
       setLikesError(cause instanceof Error ? cause.message : 'Could not load liked posts. Please retry.');
     } finally {
       if (likesRequestRef.current === controller) likesRequestRef.current = null;
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && isCurrentViewer()) {
         setLikesLoading(false);
         setLikesLoadingMore(false);
         if (showRefreshIndicator) setRefreshing(false);
