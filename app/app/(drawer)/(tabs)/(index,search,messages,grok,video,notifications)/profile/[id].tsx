@@ -1334,7 +1334,7 @@ export default function UserProfileScreen() {
                   <Text className="text-base leading-6 text-neutral-900 dark:text-neutral-100">{reply.body}</Text>
                 </TouchableOpacity>
               ) : null}
-              <FeedItem itemData={item} onPress={() => handleItemPress(item.contentId || '')} />
+              <FeedItem itemData={item} onDeleted={(contentId) => {\n                setUserPosts((current) => current.filter((post) => post.contentId !== contentId));\n                setLikedPosts((current) => current.filter((post) => post.contentId !== contentId));\n                setMediaPosts((current) => current.filter((post) => post.contentId !== contentId));\n                setProfileReplies((current) => current.filter((post) => post.contentId !== contentId));\n              }} onPress={() => handleItemPress(item.contentId || '')} />
             </View>
           );
         }}
