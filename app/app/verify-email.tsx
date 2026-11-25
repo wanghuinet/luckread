@@ -63,7 +63,11 @@ export default function VerifyEmailScreen() {
         autoCorrect={false}
         keyboardType="email-address"
         maxLength={254}
-        onChangeText={setEmail}
+        onChangeText={(value) => {
+          setEmail(value);
+          setMessage('');
+          setErrorMessage('');
+        }}
         onSubmitEditing={() => void submit()}
         placeholder="name@example.com"
         returnKeyType="go"
