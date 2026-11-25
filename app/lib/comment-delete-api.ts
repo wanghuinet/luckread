@@ -1,4 +1,5 @@
 import { apiRequest, createIdempotencyKey, getApiErrorMessage } from './api-client';
+import { useAuthStore } from '../store/auth-store';
 
 export class CommentDeleteApiError extends Error {
   constructor(
@@ -25,11 +26,15 @@ function readErrorCode(value: unknown): string | undefined {
  */
 export async function deleteComment(
   commentId: string,
+  expectedViewerId: string,
   idempotencyKey = createIdempotencyKey(),
 ): Promise<void> {
   const normalizedId = commentId.trim();
   const normalizedKey = idempotencyKey.trim();
   if (!normalizedId) throw new TypeError('Comment ID is required.');
+  if (!expectedViewerId || useAuthStore.getState().user?.id !== expectedViewerId) {
+    throw new CommentDeleteApiError('Your account changed before this reply could be deleted.', undefined, 'VIEWER_CHANGED');
+  }
   if (!normalizedKey || normalizedKey.length > 256) {
     throw new TypeError('A valid idempotency key is required.');
   }
