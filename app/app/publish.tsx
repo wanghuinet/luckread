@@ -609,7 +609,7 @@ function PublishScreenContent() {
             uploadLoadedBytes: progress.loaded,
             uploadTotalBytes: progress.total || undefined,
           });
-        });
+        }, user?.id);
         if (user?.id) {
           await markPendingMediaRecoveryUploaded(user.id, asset.localId, uploaded.url).catch(() => undefined);
         }
@@ -848,7 +848,7 @@ function PublishScreenContent() {
     }
     const result = await apiRequest<Record<string, unknown>>(
       '/media/' + encodeURIComponent(media.id),
-      { method: 'PATCH', body: JSON.stringify({ alt }) },
+      { method: 'PATCH', body: JSON.stringify({ alt }), expectedAccountId: user?.id },
     );
     if (!result.response.ok) {
       throw new Error(apiFailureDiagnostic(result, '图片替代文本保存失败。'));
@@ -857,7 +857,7 @@ function PublishScreenContent() {
       altText: alt,
       uploaded: { ...media, alt },
     });
-  }, [updateAsset]);
+  }, [updateAsset, user?.id]);
 
   const savePendingAssetAltText = useCallback(async () => {
     for (const asset of assets) {
