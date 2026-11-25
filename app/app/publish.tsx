@@ -597,6 +597,7 @@ function PublishScreenContent() {
         }
         // Upload from the app-private persistent URI. The same URI, bytes,
         // fingerprint and idempotency key survive a process restart.
+        if (useAuthStore.getState().user?.id !== ownerId) throw new Error('Your account changed. Reopen the composer and try again.');
         updateAsset(asset.localId, {
           uri: uploadFile.uri,
           filename: uploadFile.name,
@@ -606,6 +607,7 @@ function PublishScreenContent() {
           height: uploadFile.height,
         });
         uploaded = await uploadMediaFile(uploadFile, asset.uploadKey, (progress) => {
+          if (useAuthStore.getState().user?.id !== ownerId) return;
           updateAsset(asset.localId, {
             uploadProgress: progress.percent,
             uploadLoadedBytes: progress.loaded,
