@@ -163,6 +163,10 @@ try {
   const rolled = await pool.query('SELECT status,version::int AS version FROM refunds WHERE refund_id=$1',[refundId])
   assert.equal(rolled.rows[0]?.status,'RECONCILIATION_REQUIRED')
   checks.transactionRollbackAndConnectionRelease = true
+  // Remove the injected failure before continuing the terminal-state scenarios.
+  await pool.query('DROP TRIGGER IF EXISTS w07_test_reject_refund_update ON refunds')
+  await pool.query('DROP FUNCTION IF EXISTS w07_test_reject_refund_update()')
+  rollbackTriggerInstalled = false
 
   // REVIEW -> SUCCEEDED, then a later FAILED event must not reverse the terminal fact.
   const terminalTime = new Date(baseProviderTime.getTime()+6000).toISOString()
