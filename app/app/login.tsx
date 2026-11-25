@@ -111,6 +111,7 @@ export default function LoginScreen() {
           setEmail(value);
           setNeedsVerification(false);
           setVerificationMessage('');
+          setErrorMessage('');
         }}
         placeholder="name@example.com"
         returnKeyType="next"
@@ -122,7 +123,10 @@ export default function LoginScreen() {
         accessibilityLabel="密码"
         autoCapitalize="none"
         autoComplete="current-password"
-        onChangeText={setPassword}
+        onChangeText={(value) => {
+          setPassword(value);
+          setErrorMessage('');
+        }}
         onSubmitEditing={() => void submit()}
         placeholder="输入密码"
         returnKeyType="go"
