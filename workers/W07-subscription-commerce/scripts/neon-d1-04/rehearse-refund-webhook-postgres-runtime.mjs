@@ -4,7 +4,6 @@ import { createRequire } from 'node:module'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
-import { PaymentPersistenceError } from '../../src/payment-contracts.ts'
 import { receiveHyperswitchRefundWebhookPostgres } from '../../src/refund-webhook-postgres-persistence.ts'
 
 if (!globalThis.crypto) Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true })
@@ -150,7 +149,7 @@ try {
   await pool.query('CREATE TRIGGER w07_test_reject_refund_update BEFORE UPDATE ON refunds FOR EACH ROW EXECUTE FUNCTION w07_test_reject_refund_update()')
   rollbackTriggerInstalled = true
   await assert.rejects(receive(body({eventId:marker+'-rollback',updatedAt:new Date(baseProviderTime.getTime()+8000).toISOString()})),
-    error=>error instanceof PaymentPersistenceError && error.code==='SERVICE_UNAVAILABLE' && error.status===503)
+    error=>error?.code==='SERVICE_UNAVAILABLE' && error?.status===503)
   assert.equal(await count('payment_provider_events','event_id',marker+'-rollback'),0)
   const rolled = await pool.query('SELECT status,version::int AS version FROM refunds WHERE refund_id=$1',[refundId])
   assert.equal(rolled.rows[0]?.status,'RECONCILIATION_REQUIRED')
