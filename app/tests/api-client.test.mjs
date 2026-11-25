@@ -226,7 +226,8 @@ test('preserves intentional fetch cancellation instead of converting it to a net
   const controller = new AbortController();
   const cancellation = new Error('cancelled by caller');
   pendingFetch = async (_input, init) => {
-    expect(init.signal).toBe(controller.signal);
+    expect(init.signal).not.toBe(controller.signal);
+    expect(init.signal.aborted).toBe(true);
     throw cancellation;
   };
   controller.abort();
