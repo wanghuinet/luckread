@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createGroupConversation } from '~/lib/messaging-api';
+import { parseGroupMemberIds } from '~/lib/group-member-input';
 import { useColorScheme } from 'nativewind';
 
 export default function NewGroupScreen() {
@@ -13,7 +14,7 @@ export default function NewGroupScreen() {
   const queryClient = useQueryClient();
   const { colorScheme } = useColorScheme();
   const mutation = useMutation({
-    mutationFn: () => createGroupConversation(name.trim(), members.split(/[\\s,;]+/).map(v => v.trim()).filter(Boolean)),
+    mutationFn: () => createGroupConversation(name.trim(), parseGroupMemberIds(members)),
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
       router.replace({ pathname: '/messages/[conversationId]', params: {
@@ -22,7 +23,7 @@ export default function NewGroupScreen() {
     },
     onError: (error) => Alert.alert('群聊创建失败', error instanceof Error ? error.message : '请稍后重试'),
   });
-  const ids = members.split(/[\\s,;]+/).map(v => v.trim()).filter(Boolean);
+  const ids = parseGroupMemberIds(members);
   const canCreate = name.trim().length > 0 && ids.length >= 2 && ids.length <= 49 && !mutation.isPending;
   return <View className="flex-1 bg-white dark:bg-black">
     <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
