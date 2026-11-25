@@ -170,13 +170,14 @@ export function revokeSavedPaymentMethod(
 }
 
 /** Create a customer-owned order for one immutable membership plan version. Price and tax remain server-resolved. */
-export function createMembershipOrder(planId: string) {
+export function createMembershipOrder(planId: string, options: { expectedAccountId?: string } = {}) {
   if (typeof planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(planId)) {
     throw new TypeError('A valid published membership plan ID is required.');
   }
   return apiRequest<unknown>('/commerce/orders', {
     method: 'POST',
     body: JSON.stringify({ items: [{ itemRef: planId, quantity: 1 }] }),
+    expectedAccountId: options.expectedAccountId,
   });
 }
 
