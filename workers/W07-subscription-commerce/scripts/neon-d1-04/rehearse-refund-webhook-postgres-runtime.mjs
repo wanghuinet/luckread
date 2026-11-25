@@ -78,7 +78,7 @@ async function createFixture() {
   )
   await pool.query(
     `INSERT INTO orders(order_id,customer_id,status,version,currency,subtotal_minor,discount_minor,tax_minor,total_minor,created_at,updated_at)
-     VALUES($1,$2,'CONFIRMED',2,'USD',2500,0,0,2500,$3::timestamptz,$4::timestamptz)`,
+     VALUES($1,$2,'CREATED',1,'USD',2500,0,0,2500,$3::timestamptz,$4::timestamptz)`,
     [orderId, customerId, priorIso, priorIso],
   )
   await pool.query(
@@ -86,6 +86,10 @@ async function createFixture() {
       idempotency_key,request_hash,provider_updated_at,failure_code,created_at,updated_at)
      VALUES($1,$2,$3,'hyperswitch',$4,2500,'USD','succeeded',2,$5,$6,$7::timestamptz,NULL,$8::timestamptz,$8::timestamptz)`,
     [paymentId, orderId, customerId, merchantId, marker + '-payment-key', 'b'.repeat(64), priorIso, priorIso],
+  )
+  await pool.query(
+    `UPDATE orders SET status='CONFIRMED',version=version+1,updated_at=updated_at+INTERVAL '1 second' WHERE order_id=$1`,
+    [orderId],
   )
   await pool.query(
     `INSERT INTO refunds(refund_id,provider,merchant_id,customer_id,order_id,payment_id,amount_minor,captured_amount_minor,
