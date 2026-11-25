@@ -83,7 +83,7 @@ test('does not mutate when the authoritative status cannot be loaded', async () 
     error: { status: 401, code: 'UNAUTHENTICATED', message: 'Sign in to like replies.' },
   });
 
-  await expect(toggleCommentLike('comment-1')).rejects.toMatchObject({
+  await expect(toggleCommentLike('comment-1', 'viewer-a')).rejects.toMatchObject({
     name: 'CommentLikeApiError',
     status: 401,
     code: 'UNAUTHENTICATED',
@@ -105,7 +105,7 @@ test('does not report a failed mutation as a successful like', async () => {
         error: { status: 403, message: 'This action is not allowed.' },
       };
 
-  await expect(toggleCommentLike('comment-1')).rejects.toThrow('This action is not allowed.');
+  await expect(toggleCommentLike('comment-1', 'viewer-a')).rejects.toThrow('This action is not allowed.');
   expect(calls).toHaveLength(2);
   expect(calls[1].options.method).toBe('POST');
 });
