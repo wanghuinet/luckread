@@ -1056,8 +1056,16 @@ function PublishScreenContent() {
   const saveDraftSnapshot = useCallback(async () => {
     const ownerId = user?.id;
     if (!ownerId || contentId || loadingEdit || publishPending || authStatus !== 'authenticated' || !ownerId) return;
-    const requestAsOwner = <T,>(path: string, options: ApiRequestOptions = {}) =>
-      apiRequest<T>(path, { ...options, expectedAccountId: ownerId });
+    const assertCurrentOwner = () => {
+      if (useAuthStore.getState().user?.id !== ownerId) {
+        throw new Error('Your account changed. Reopen the composer and try again.');
+      }
+    };
+    const requestAsOwner = async <T,>(path: string, options: ApiRequestOptions = {}) => {
+      const result = await apiRequest<T>(path, { ...options, expectedAccountId: ownerId });
+      assertCurrentOwner();
+      return result;
+    };
     const trimmedBody = body.trim();
     if (!trimmedBody || trimmedBody.length > MAX_TEXT_LENGTH) return;
     if (pollEnabled) {
@@ -1122,6 +1130,7 @@ function PublishScreenContent() {
       }
       const bodyAttempt = bodyUploadRef.current;
       const uploadedBody = await uploadTextBody(trimmedBody, bodyAttempt.key, ownerId);
+      assertCurrentOwner();
       bodyAttempt.uploaded = uploadedBody;
       bodyRef = uploadedBody.url;
     }
@@ -1278,6 +1287,7 @@ function PublishScreenContent() {
     // The owner policy is persisted in W05; W01 resolves @mentions to canonical IDs.
     if (replyAudienceSavedFingerprintRef.current !== replyAudienceFingerprint) {
       const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody, ownerId);
+      assertCurrentOwner();
       if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
         throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Unable to save who can reply to this post.'));
       }
@@ -1992,6 +2002,7 @@ function PublishScreenContent() {
         }
         const replyAudienceFingerprint = createReplyAudienceFingerprint(trimmedBody, replyAudience);
         const replyPolicyResult = await saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody, ownerId);
+        assertCurrentOwner();
         if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
           throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Post changes were saved, but reply permissions could not be updated.'));
         }
@@ -2006,6 +2017,7 @@ function PublishScreenContent() {
         const socialSyncWarning = recordRef.current?.state === 'PUBLISHED'
           ? await syncPublishedSocialTokens(contentId, trimmedBody, ownerId)
           : null;
+        assertCurrentOwner();
         Alert.alert('保存成功', socialSyncWarning
           ? '你的动态已保存，但 @提及和 #话题同步暂时失败，可稍后再次编辑重试。'
           : '你的动态修改已保存。', [
@@ -2217,6 +2229,7 @@ function PublishScreenContent() {
 
       // W01 resolves @handles to canonical W02 identities; W05 persists mention/topic edges.
       const socialSyncWarning = await syncPublishedSocialTokens(draft.id, trimmedBody, ownerId);
+      assertCurrentOwner();
       submitAttemptRef.current = null;
       recordRef.current = null;
       draftWasPublishedRef.current = true;
