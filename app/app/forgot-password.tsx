@@ -63,7 +63,11 @@ export default function ForgotPasswordScreen() {
         autoCorrect={false}
         keyboardType="email-address"
         maxLength={254}
-        onChangeText={setEmail}
+        onChangeText={(value) => {
+          setEmail(value);
+          setMessage('');
+          setErrorMessage('');
+        }}
         placeholder="name@example.com"
         returnKeyType="go"
         onSubmitEditing={() => void submit()}
