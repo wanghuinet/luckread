@@ -180,6 +180,13 @@ jobs:
           EXPORT_PATH="$SIGNING_DIR/ExportOptions.plist"
           KEYCHAIN_PATH="$SIGNING_DIR/release.keychain-db"
           KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          PROFILE_INSTALL_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_INSTALL_PATH=""
+          {
+            echo "IOS_KEYCHAIN_PATH=$KEYCHAIN_PATH"
+            echo "IOS_KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD"
+            echo "IOS_PROFILE_INSTALL_DIR=$PROFILE_INSTALL_DIR"
+          } >> "$GITHUB_ENV"
           printf '%s' "$IOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$CERT_PATH"
           printf '%s' "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
           printf '%s' "$IOS_EXPORT_OPTIONS_PLIST_BASE64" | base64 --decode > "$EXPORT_PATH"
@@ -196,8 +203,8 @@ jobs:
           PROFILE_TEAM="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$PROFILE_PLIST")"
           PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$PROFILE_PLIST")"
           PROFILE_UUID="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$PROFILE_PLIST")"
-          PROFILE_INSTALL_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           PROFILE_INSTALL_PATH="$PROFILE_INSTALL_DIR/$PROFILE_UUID.mobileprovision"
+          echo "IOS_PROFILE_INSTALL_PATH=$PROFILE_INSTALL_PATH" >> "$GITHUB_ENV"
           mkdir -p "$PROFILE_INSTALL_DIR"
           install -m 600 "$PROFILE_PATH" "$PROFILE_INSTALL_PATH"
           PROFILE_APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$PROFILE_PLIST")"
@@ -209,10 +216,7 @@ jobs:
           EXPORT_PROFILE="$(/usr/libexec/PlistBuddy -c 'Print :provisioningProfiles:com.luckread.app' "$EXPORT_PATH")"
           [[ "$EXPORT_METHOD" == "app-store-connect" && "$EXPORT_TEAM" == "$IOS_TEAM_ID" && "$EXPORT_STYLE" == "manual" && "$EXPORT_PROFILE" == "$PROFILE_NAME" ]] || { echo "ExportOptions.plist must use app-store-connect, manual signing, the configured Team ID and the matching com.luckread.app profile" >&2; exit 1; }
           {
-            echo "IOS_KEYCHAIN_PATH=$KEYCHAIN_PATH"
-            echo "IOS_KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD"
             echo "IOS_PROFILE_NAME=$PROFILE_NAME"
-            echo "IOS_PROFILE_INSTALL_PATH=$PROFILE_INSTALL_PATH"
             echo "IOS_EXPORT_OPTIONS_PATH=$EXPORT_PATH"
           } >> "$GITHUB_ENV"
       - name: Install CocoaPods dependencies
@@ -261,5 +265,8 @@ jobs:
           fi
           if [ -n "${IOS_PROFILE_INSTALL_PATH:-}" ]; then
             rm -f "$IOS_PROFILE_INSTALL_PATH"
+          fi
+          if [ -n "${IOS_PROFILE_INSTALL_DIR:-}" ] && [ -d "$IOS_PROFILE_INSTALL_DIR" ]; then
+            rmdir "$IOS_PROFILE_INSTALL_DIR" 2>/dev/null || true
           fi
           rm -rf "${RUNNER_TEMP}/luckread-ios-signing"
