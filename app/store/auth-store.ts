@@ -252,6 +252,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   removeAccount: async (userId) => {
+    authLifecycleGeneration += 1;
     const activeAccountId = await getActiveStoredAccountId();
     if (activeAccountId === userId) {
       // Do not orphan a server-side endpoint after deleting its local session.
