@@ -126,4 +126,8 @@ test('renders video list projections immediately and hydrates only the visible v
   expect(videoScreen).toContain('key={item.contentId +');
   expect(videoScreen).toContain('setItems((current) =>');
   expect(videoScreen).toContain('Video unavailable');
+  expect(videoScreen).toContain('useWindowDimensions()');
+  expect(videoScreen).toContain('snapToInterval={screenHeight}');
+  expect(videoScreen).toContain('pageWidth={screenWidth}');
+  expect(videoScreen).not.toContain("Dimensions.get('window')");
 });

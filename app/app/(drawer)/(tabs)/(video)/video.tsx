@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
+  useWindowDimensions,
   Image,
   Pressable,
   StyleSheet,
@@ -46,7 +46,6 @@ import { readVideoFeedAutoplayEnabled } from '~/lib/video-feed-autoplay-preferen
 import { useAuthStore } from '~/store/auth-store';
 import type { FeedContent } from '~/components/FeedItem';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PAGE_SIZE = 12;
 const PRIMARY = '#1d9bf0';
 
@@ -205,6 +204,8 @@ function VideoItem({
   onToggleMute,
   onOpenPost,
   onRetry,
+  pageWidth,
+  pageHeight,
 }: {
   item: VideoFeedItem;
   isVisible: boolean;
@@ -214,6 +215,8 @@ function VideoItem({
   onToggleMute: () => void;
   onOpenPost: () => void;
   onRetry: () => void;
+  pageWidth: number;
+  pageHeight: number;
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -229,7 +232,7 @@ function VideoItem({
   }, [item.authorHandle, item.poster_id, router]);
 
   return (
-    <View style={styles.videoContainer}>
+    <View style={[styles.videoContainer, { width: pageWidth, height: pageHeight }]}>
       {item.videoSource ? (
         <VideoPlayerSurface
           key={item.contentId + ':' + String(item.mediaSourceVersion ?? 0)}
@@ -346,6 +349,7 @@ function VideoItem({
 }
 
 export default function VideoFeed() {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
@@ -631,11 +635,13 @@ export default function VideoFeed() {
             onToggleMute={() => setMuted((value) => !value)}
             onOpenPost={() => openPost(item.contentId)}
             onRetry={retry}
+            pageWidth={screenWidth}
+            pageHeight={screenHeight}
           />
         )}
         keyExtractor={(item, index) => item.contentId || 'video-' + index}
         pagingEnabled
-        snapToInterval={SCREEN_HEIGHT}
+        snapToInterval={screenHeight}
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
         onViewableItemsChanged={onViewableItemsChanged}
@@ -658,8 +664,6 @@ export default function VideoFeed() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000' },
   videoContainer: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
     backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
