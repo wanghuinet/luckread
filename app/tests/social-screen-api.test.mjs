@@ -571,11 +571,12 @@ test('reads the signed-in owner post reply policy through the existing W01 route
 });
 
 test('saves reply audience with post text so W01 resolves mention identities server-side', async () => {
-  await saveOwnPostReplyAudience('post_123', 'mentioned', 'Hello @alice');
+  await saveOwnPostReplyAudience('post_123', 'mentioned', 'Hello @alice', 'viewer-a');
 
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/contents/post_123/reply-audience');
   expect(calls[0].options.method).toBe('PUT');
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
   expect(JSON.parse(calls[0].options.body)).toEqual({
     replyAudience: 'mentioned',
     text: 'Hello @alice',

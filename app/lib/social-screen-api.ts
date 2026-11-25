@@ -37,6 +37,7 @@ export function saveOwnPostReplyAudience(
   contentIdValue: string,
   replyAudience: NativeReplyAudience,
   text: string,
+  expectedAccountId?: string,
 ) {
   const contentId = contentIdValue.trim();
   if (!isValidContentId(contentId)) {
@@ -54,6 +55,7 @@ export function saveOwnPostReplyAudience(
       method: 'PUT',
       body: JSON.stringify({ replyAudience, text }),
       idempotencyKey: 'native-reply-audience:' + contentId + ':' + createIdempotencyKey(),
+      expectedAccountId,
     },
   );
 }

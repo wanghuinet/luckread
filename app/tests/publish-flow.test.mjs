@@ -15,7 +15,7 @@ const socialScreenApiSource = readFileSync(new URL('../lib/social-screen-api.ts'
 test('native publisher uses the shared media API helpers and existing W01 state endpoint', () => {
   expect(composer).toContain('prepareImageForUpload(file)');
   expect(composer).toContain('uploadMediaFile(uploadFile, asset.uploadKey, (progress) => {');
-  expect(composer).toContain('getMediaPlayback(uploaded.id)');
+  expect(composer).toContain('getMediaPlayback(uploaded.id, undefined, ownerId)');
   expect(composer).toContain('uploadTextBody(');
   expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id) + '/state'");
   expect(composer).toContain("to: scheduleEnabled ? 'SCHEDULED' : 'PUBLISHED'");
@@ -30,7 +30,7 @@ test('native publisher preserves pending media in app-private storage and restor
   expect(composer).toContain('listPendingMediaRecovery(ownerId, null)');
   expect(composer).toContain('listPendingMediaRecovery(ownerId, targetContentId)');
   expect(composer).toContain('bindPendingMediaRecoveryToDraft(');
-  expect(composer).toContain('markPendingMediaRecoveryUploaded(user.id, asset.localId, uploaded.url)');
+  expect(composer).toContain('markPendingMediaRecoveryUploaded(ownerId, asset.localId, uploaded.url)');
   expect(composer).toContain('asset.uploadedUrl && restoredMediaRefs.includes(asset.uploadedUrl)');
   expect(composer).toContain('deletePendingMediaRecoveryForDraft(user.id, draft.id)');
   expect(composer).toContain('上次上传中断。本机已保留文件，点击重试即可继续。');
@@ -285,7 +285,7 @@ test('native composer reuses Gorhom bottom sheet for camera and photo-library me
 test('native publisher auto-saves server drafts, restores them by draft ID, and flushes before close or publish', () => {
   expect(composer).toContain("draftId?: string | string[]");
   expect(composer).toContain("fetchContentBodyReference(record.bodyRef)");
-  expect(composer).toContain("apiRequest<Record<string, unknown>>('/contents'");
+  expect(composer).toContain("requestAsOwner<Record<string, unknown>>('/contents'");
   expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id)");
   expect(composer).toContain("headers: { 'If-Match': draft.etag }");
   expect(composer).toContain("router.setParams({ draftId: draft.id } as never)");
@@ -359,7 +359,7 @@ test('native composer inserts only the active @mention or #topic at the caret', 
 
 test('published native posts sync mention and topic tokens through W01 and W05 authorities', () => {
   expect(composer).toContain("'/contents/' + encodeURIComponent(contentIdValue) + '/social'");
-  expect(composer).toContain('syncPublishedSocialTokens(draft.id, trimmedBody)');
+  expect(composer).toContain('syncPublishedSocialTokens(draft.id, trimmedBody, ownerId)');
   expect(w01SocialRoute).toContain('resolveSocialMentionTargets(text)');
   expect(w01SocialRoute).toContain("pathname: '/internal/social/contents/' + encodeURIComponent(contentId) + '/tokens'");
   expect(w01SocialRoute).toContain('mentions = await resolveSocialMentionTargets(text)');
@@ -378,8 +378,8 @@ test('native publisher lets authors choose an uploaded image as the post cover',
 test('native publisher uses the existing W01/W05 reply-audience policy for create, edit, autosave and restore', () => {
   expect(composer).toContain("useState<NativeReplyAudience>('everyone')");
   expect(composer).toContain('fetchOwnPostReplyAudience(targetContentId)');
-  expect(composer).toContain('saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody)');
-  expect(composer).toContain('saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody)');
+  expect(composer).toContain('saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody, ownerId)');
+  expect(composer).toContain('saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody, ownerId)');
   expect(composer).toContain('replyAudienceSavedFingerprintRef.current');
   expect(composer).toContain('谁可以回复？');
   expect(composer).toContain('followingNetwork');
@@ -431,7 +431,7 @@ test('native thread composer creates a bounded text-only thread through existing
   expect(threadComposer).toContain("'/contents/' + encodeURIComponent(item.contentId as string) + '/thread'");
   expect(threadComposer).toContain('nextContentId: next.contentId');
   expect(threadComposer).toContain("to: 'PUBLISHED'");
-  expect(threadComposer).toContain('uploadTextBody(body, item.key)');
+  expect(threadComposer).toContain('uploadTextBody(body, item.key, viewerId)');
   expect(threadComposer).toContain('idempotencyKey: item.createKey');
   expect(threadComposer).toContain('idempotencyKey: item.stateKey');
   expect(threadComposer).toContain('idempotencyKey: item.linkKey');

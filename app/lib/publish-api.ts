@@ -158,6 +158,7 @@ export async function uploadMediaFile(
   file: LocalMediaFile,
   idempotencyKey: string = createIdempotencyKey(),
   onUploadProgress?: (progress: ApiUploadProgress) => void,
+  expectedAccountId?: string,
 ): Promise<UploadedMedia> {
   if (!file.uri || !file.name || !file.mimeType) {
     throw new Error('The selected media file is missing its URI or file information.');
@@ -187,6 +188,7 @@ export async function uploadMediaFile(
       ]),
     },
     onUploadProgress,
+    expectedAccountId,
   });
   if (!result.response.ok) {
     throw new Error(apiFailureMessage(result, 'Media upload failed. Please retry.'));
@@ -202,6 +204,7 @@ export async function uploadMediaFile(
 export async function uploadTextBody(
   text: string,
   idempotencyKey: string = createIdempotencyKey(),
+  expectedAccountId?: string,
 ): Promise<UploadedMedia> {
   if (!text.trim()) throw new Error('Post text cannot be empty.');
   const fileName = 'luckread-post-' + idempotencyKey.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) + '.txt';
@@ -221,6 +224,7 @@ export async function uploadTextBody(
         text,
       ]),
     },
+    expectedAccountId,
   });
   if (!result.response.ok) {
     throw new Error(apiFailureMessage(result, 'Post body upload failed. Please retry.'));
@@ -233,11 +237,11 @@ export async function uploadTextBody(
   return media;
 }
 
-export async function getMediaPlayback(mediaId: string, signal?: AbortSignal): Promise<MediaPlayback> {
+export async function getMediaPlayback(mediaId: string, signal?: AbortSignal, expectedAccountId?: string): Promise<MediaPlayback> {
   if (!mediaId.trim()) throw new Error('A server media ID is required to resolve playback.');
   const result = await apiRequest<MediaEnvelope>(
     '/media/' + encodeURIComponent(mediaId) + '/playback',
-    { method: 'GET', signal },
+    { method: 'GET', signal, expectedAccountId },
   );
   if (!result.response.ok) {
     throw new Error(apiFailureMessage(result, 'The server could not authorize media playback.'));

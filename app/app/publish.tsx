@@ -25,7 +25,7 @@ import Sortable from 'react-native-sortables';
 import PublishMediaActionSheet from '~/components/PublishMediaActionSheet';
 import PostThreadComposer from '~/components/PostThreadComposer';
 
-import { apiRequest, createIdempotencyKey, fetchContentBodyReference } from '~/lib/api-client';
+import { apiRequest, createIdempotencyKey, fetchContentBodyReference, type ApiRequestOptions } from '~/lib/api-client';
 import { computeAutoSaveDelay, createPublishDraftFingerprint, createReplyAudienceFingerprint } from '~/lib/publish-draft-autosave';
 import { getDefaultScheduledPublishDate, MIN_SCHEDULE_LEAD_TIME_MS, toScheduledPublishISO } from '~/lib/publish-schedule';
 import { DEFAULT_POLL_DURATION_MINUTES, getPollDurationMinutes, getPollDurationParts, type PollDurationParts } from '~/lib/poll-duration';
@@ -555,6 +555,8 @@ function PublishScreenContent() {
   }, [quoteContentId, quoteViewerId]);
 
   const uploadAsset = useCallback(async (asset: ComposerAsset) => {
+    const ownerId = user?.id;
+    if (!ownerId) return false;
     let uploaded = asset.uploaded;
     try {
       if (!uploaded) {
@@ -595,6 +597,7 @@ function PublishScreenContent() {
         }
         // Upload from the app-private persistent URI. The same URI, bytes,
         // fingerprint and idempotency key survive a process restart.
+        if (useAuthStore.getState().user?.id !== ownerId) throw new Error('Your account changed. Reopen the composer and try again.');
         updateAsset(asset.localId, {
           uri: uploadFile.uri,
           filename: uploadFile.name,
@@ -604,15 +607,15 @@ function PublishScreenContent() {
           height: uploadFile.height,
         });
         uploaded = await uploadMediaFile(uploadFile, asset.uploadKey, (progress) => {
+          if (useAuthStore.getState().user?.id !== ownerId) return;
           updateAsset(asset.localId, {
             uploadProgress: progress.percent,
             uploadLoadedBytes: progress.loaded,
             uploadTotalBytes: progress.total || undefined,
           });
-        });
-        if (user?.id) {
-          await markPendingMediaRecoveryUploaded(user.id, asset.localId, uploaded.url).catch(() => undefined);
-        }
+        }, ownerId);
+        if (useAuthStore.getState().user?.id !== ownerId) throw new Error('Your account changed. Reopen the composer and try again.');
+        await markPendingMediaRecoveryUploaded(ownerId, asset.localId, uploaded.url).catch(() => undefined);
         updateAsset(asset.localId, {
           uploaded,
           altText: uploaded.alt || asset.altText || asset.filename,
@@ -627,7 +630,8 @@ function PublishScreenContent() {
 
       let deliveryUrl = uploaded.url;
       if (isVideoAsset(asset)) {
-        const playback = await getMediaPlayback(uploaded.id);
+        const playback = await getMediaPlayback(uploaded.id, undefined, ownerId);
+        if (useAuthStore.getState().user?.id !== ownerId) throw new Error('Your account changed. Reopen the composer and try again.');
         deliveryUrl = playback.url;
       }
       updateAsset(asset.localId, {
@@ -639,6 +643,7 @@ function PublishScreenContent() {
       });
       return true;
     } catch (error) {
+      if (useAuthStore.getState().user?.id !== ownerId) return false;
       updateAsset(asset.localId, {
         uploaded,
         serverUrl: uploaded?.url || asset.serverUrl,
@@ -649,7 +654,7 @@ function PublishScreenContent() {
       });
       return false;
     }
-  }, [persistPendingAsset, updateAsset]);
+  }, [persistPendingAsset, updateAsset, user?.id]);
 
   const addCapturedPhoto = useCallback(async (photo: CapturedCameraPhoto) => {
     if (busy || loadingEdit || publishPending) return;
@@ -838,6 +843,8 @@ function PublishScreenContent() {
   }, [busy, publishPending]);
 
   const saveAssetAltText = useCallback(async (asset: ComposerAsset, value: string) => {
+    const ownerId = user?.id;
+    if (!ownerId) throw new Error('请先登录后再保存图片替代文本。');
     const media = asset.uploaded;
     if (!media?.id) throw new Error('只有当前账号拥有的已上传图片才能保存替代文本。');
     const alt = value.normalize('NFKC').trim();
@@ -848,8 +855,9 @@ function PublishScreenContent() {
     }
     const result = await apiRequest<Record<string, unknown>>(
       '/media/' + encodeURIComponent(media.id),
-      { method: 'PATCH', body: JSON.stringify({ alt }) },
+      { method: 'PATCH', body: JSON.stringify({ alt }), expectedAccountId: ownerId },
     );
+    if (useAuthStore.getState().user?.id !== ownerId) throw new Error('Your account changed. Reopen the composer and try again.');
     if (!result.response.ok) {
       throw new Error(apiFailureDiagnostic(result, '图片替代文本保存失败。'));
     }
@@ -857,7 +865,7 @@ function PublishScreenContent() {
       altText: alt,
       uploaded: { ...media, alt },
     });
-  }, [updateAsset]);
+  }, [updateAsset, user?.id]);
 
   const savePendingAssetAltText = useCallback(async () => {
     for (const asset of assets) {
@@ -1055,7 +1063,17 @@ function PublishScreenContent() {
 
   const saveDraftSnapshot = useCallback(async () => {
     const ownerId = user?.id;
-    if (contentId || loadingEdit || publishPending || authStatus !== 'authenticated' || !ownerId) return;
+    if (!ownerId || contentId || loadingEdit || publishPending || authStatus !== 'authenticated' || !ownerId) return;
+    const assertCurrentOwner = () => {
+      if (useAuthStore.getState().user?.id !== ownerId) {
+        throw new Error('Your account changed. Reopen the composer and try again.');
+      }
+    };
+    const requestAsOwner = async <T,>(path: string, options: ApiRequestOptions = {}) => {
+      const result = await apiRequest<T>(path, { ...options, expectedAccountId: ownerId });
+      assertCurrentOwner();
+      return result;
+    };
     const trimmedBody = body.trim();
     if (!trimmedBody || trimmedBody.length > MAX_TEXT_LENGTH) return;
     if (pollEnabled) {
@@ -1119,7 +1137,8 @@ function PublishScreenContent() {
         bodyUploadRef.current = { text: trimmedBody, key: createIdempotencyKey() };
       }
       const bodyAttempt = bodyUploadRef.current;
-      const uploadedBody = await uploadTextBody(trimmedBody, bodyAttempt.key);
+      const uploadedBody = await uploadTextBody(trimmedBody, bodyAttempt.key, ownerId);
+      assertCurrentOwner();
       bodyAttempt.uploaded = uploadedBody;
       bodyRef = uploadedBody.url;
     }
@@ -1149,7 +1168,7 @@ function PublishScreenContent() {
       draftCreateKeyRef.current = createKey;
       let created;
       try {
-        created = await apiRequest<Record<string, unknown>>('/contents', {
+        created = await requestAsOwner<Record<string, unknown>>('/contents', {
           method: 'POST',
           body: createPayload,
           idempotencyKey: createKey,
@@ -1207,7 +1226,7 @@ function PublishScreenContent() {
     if (!draft?.id) throw new Error('The draft could not be identified after saving.');
     if (!createdThisCall && draftSavedFingerprintRef.current !== fingerprint) {
       if (!draft.etag || draft.etag === '*') {
-        const detail = await apiRequest<Record<string, unknown>>(
+        const detail = await requestAsOwner<Record<string, unknown>>(
           '/contents/' + encodeURIComponent(draft.id),
           { method: 'GET' },
         );
@@ -1218,7 +1237,7 @@ function PublishScreenContent() {
         }
       }
       if (!draft.etag || draft.etag === '*') throw new Error('The saved draft is missing its version. Reload it before saving again.');
-      const updated = await apiRequest<Record<string, unknown>>(
+      const updated = await requestAsOwner<Record<string, unknown>>(
         '/contents/' + encodeURIComponent(draft.id),
         {
           method: 'PATCH',
@@ -1250,7 +1269,7 @@ function PublishScreenContent() {
         cleanOptions.every((option) => option.length > 0 && [...option].length <= MAX_POLL_OPTION_LENGTH) &&
         new Set(optionKeys).size === optionKeys.length;
       if (validPoll) {
-        const pollResult = await apiRequest<unknown>(
+        const pollResult = await requestAsOwner<unknown>(
           '/contents/' + encodeURIComponent(draft.id) + '/poll',
           {
             method: 'POST',
@@ -1264,7 +1283,7 @@ function PublishScreenContent() {
         pollConfiguredRef.current = true;
       }
     } else if (pollConfiguredRef.current) {
-      const pollResult = await apiRequest<unknown>(
+      const pollResult = await requestAsOwner<unknown>(
         '/contents/' + encodeURIComponent(draft.id) + '/poll',
         { method: 'DELETE', idempotencyKey: createIdempotencyKey() },
       );
@@ -1275,7 +1294,8 @@ function PublishScreenContent() {
     }
     // The owner policy is persisted in W05; W01 resolves @mentions to canonical IDs.
     if (replyAudienceSavedFingerprintRef.current !== replyAudienceFingerprint) {
-      const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody);
+      const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody, ownerId);
+      assertCurrentOwner();
       if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
         throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Unable to save who can reply to this post.'));
       }
@@ -1663,11 +1683,11 @@ function PublishScreenContent() {
     }
   }, [body, textSelection.start]);
 
-  const syncPublishedSocialTokens = useCallback(async (contentIdValue: string, textValue: string): Promise<string | null> => {
+  const syncPublishedSocialTokens = useCallback(async (contentIdValue: string, textValue: string, expectedAccountId: string): Promise<string | null> => {
     try {
       const result = await apiRequest<unknown>(
         '/contents/' + encodeURIComponent(contentIdValue) + '/social',
-        { method: 'POST', body: JSON.stringify({ text: textValue }) },
+        { method: 'POST', body: JSON.stringify({ text: textValue }), expectedAccountId },
       );
       return result.response.ok
         ? null
@@ -1822,6 +1842,21 @@ function PublishScreenContent() {
   usePreventRemove(shouldPreventRemove, handlePreventRemove);
 
   const submit = useCallback(async () => {
+    const ownerId = user?.id;
+    if (authStatus !== 'authenticated' || !ownerId) {
+      setErrorMessage('请先登录后再发布。');
+      return;
+    }
+    const assertCurrentOwner = () => {
+      if (useAuthStore.getState().user?.id !== ownerId) {
+        throw new Error('Your account changed. Reopen the composer and try again.');
+      }
+    };
+    const requestAsOwner = async <T,>(path: string, options: ApiRequestOptions = {}) => {
+      const result = await apiRequest<T>(path, { ...options, expectedAccountId: ownerId });
+      assertCurrentOwner();
+      return result;
+    };
     const trimmedBody = body.trim();
     if (quoteContentId && (!quoteTarget || quoteTarget.id !== quoteContentId || loadingQuote)) {
       setErrorMessage('请先加载并确认可引用的原帖。');
@@ -1942,7 +1977,8 @@ function PublishScreenContent() {
           bodyUploadRef.current = { text: trimmedBody, key: createIdempotencyKey() };
         }
         const bodyAttempt = bodyUploadRef.current;
-        const uploadedBody = await uploadTextBody(trimmedBody, bodyAttempt.key);
+        const uploadedBody = await uploadTextBody(trimmedBody, bodyAttempt.key, ownerId);
+        assertCurrentOwner();
         bodyAttempt.uploaded = uploadedBody;
         bodyRef = uploadedBody.url;
       }
@@ -1964,7 +2000,7 @@ function PublishScreenContent() {
       if (contentId) {
         const record = recordRef.current;
         if (!record?.etag) throw new Error('Reload the post before editing because its server version is missing.');
-        const result = await apiRequest<Record<string, unknown>>(
+        const result = await requestAsOwner<Record<string, unknown>>(
           '/contents/' + encodeURIComponent(contentId),
           {
             method: 'PATCH',
@@ -1982,7 +2018,9 @@ function PublishScreenContent() {
           recordRef.current = { ...(recordRef.current ?? record), ...updatedRecord, etag: updatedEtag };
         }
         const replyAudienceFingerprint = createReplyAudienceFingerprint(trimmedBody, replyAudience);
-        const replyPolicyResult = await saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody);
+        const replyPolicyResult = await saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody, ownerId);
+        assertCurrentOwner();
+        assertCurrentOwner();
         if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
           throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Post changes were saved, but reply permissions could not be updated.'));
         }
@@ -1995,8 +2033,9 @@ function PublishScreenContent() {
           );
         }
         const socialSyncWarning = recordRef.current?.state === 'PUBLISHED'
-          ? await syncPublishedSocialTokens(contentId, trimmedBody)
+          ? await syncPublishedSocialTokens(contentId, trimmedBody, ownerId)
           : null;
+        assertCurrentOwner();
         Alert.alert('保存成功', socialSyncWarning
           ? '你的动态已保存，但 @提及和 #话题同步暂时失败，可稍后再次编辑重试。'
           : '你的动态修改已保存。', [
@@ -2025,7 +2064,7 @@ function PublishScreenContent() {
       });
       if (draft?.id && draftSavedFingerprintRef.current !== currentDraftFingerprint) {
         if (!draft.etag || draft.etag === '*') {
-          const detail = await apiRequest<Record<string, unknown>>(
+          const detail = await requestAsOwner<Record<string, unknown>>(
             '/contents/' + encodeURIComponent(draft.id),
             { method: 'GET' },
           );
@@ -2036,7 +2075,7 @@ function PublishScreenContent() {
           }
         }
         if (!draft.etag || draft.etag === '*') throw new Error('Reload the draft before publishing because its server version is missing.');
-        const updated = await apiRequest<Record<string, unknown>>(
+        const updated = await requestAsOwner<Record<string, unknown>>(
           '/contents/' + encodeURIComponent(draft.id),
           {
             method: 'PATCH',
@@ -2057,7 +2096,7 @@ function PublishScreenContent() {
       if (!draft?.id) {
         let created;
         try {
-          created = await apiRequest<Record<string, unknown>>('/contents', {
+          created = await requestAsOwner<Record<string, unknown>>('/contents', {
             method: 'POST',
             body: JSON.stringify(payload),
             idempotencyKey: attempt.contentKey,
@@ -2085,7 +2124,7 @@ function PublishScreenContent() {
       }
 
       if (!draft.etag || draft.etag === '*') {
-        const detail = await apiRequest<Record<string, unknown>>(
+        const detail = await requestAsOwner<Record<string, unknown>>(
           '/contents/' + encodeURIComponent(draft.id),
           { method: 'GET' },
         );
@@ -2106,7 +2145,7 @@ function PublishScreenContent() {
       if (pollEnabled && !contentId && !pollConfiguredRef.current) {
         let pollResult: { response: Response; data: unknown };
         try {
-          pollResult = await apiRequest<unknown>(
+          pollResult = await requestAsOwner<unknown>(
             '/contents/' + encodeURIComponent(draft.id) + '/poll',
             {
               method: 'POST',
@@ -2136,7 +2175,7 @@ function PublishScreenContent() {
 
       const replyAudienceFingerprint = createReplyAudienceFingerprint(trimmedBody, replyAudience);
       if (replyAudienceSavedFingerprintRef.current !== replyAudienceFingerprint) {
-        const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody);
+        const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody, ownerId);
         if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
           setPublishPending(true);
           throw new Error(apiFailureDiagnostic(replyPolicyResult, 'The post draft exists, but reply permissions could not be saved. Retry to finish the same post.'));
@@ -2144,7 +2183,7 @@ function PublishScreenContent() {
         replyAudienceSavedFingerprintRef.current = replyAudienceFingerprint;
       }
 
-      const transitioned = await apiRequest<Record<string, unknown>>(
+      const transitioned = await requestAsOwner<Record<string, unknown>>(
         '/contents/' + encodeURIComponent(draft.id) + '/state',
         {
           method: 'POST',
@@ -2174,7 +2213,7 @@ function PublishScreenContent() {
       if (quoteContentId) {
         const relationshipKey = quoteRelationshipKeyRef.current || createIdempotencyKey();
         quoteRelationshipKeyRef.current = relationshipKey;
-        const relationship = await apiRequest<Record<string, unknown>>(
+        const relationship = await requestAsOwner<Record<string, unknown>>(
           '/contents/' + encodeURIComponent(draft.id) + '/relationships',
           {
             method: 'POST',
@@ -2207,7 +2246,8 @@ function PublishScreenContent() {
       }
 
       // W01 resolves @handles to canonical W02 identities; W05 persists mention/topic edges.
-      const socialSyncWarning = await syncPublishedSocialTokens(draft.id, trimmedBody);
+      const socialSyncWarning = await syncPublishedSocialTokens(draft.id, trimmedBody, ownerId);
+      assertCurrentOwner();
       submitAttemptRef.current = null;
       recordRef.current = null;
       draftWasPublishedRef.current = true;
@@ -2228,12 +2268,14 @@ function PublishScreenContent() {
         },
       ]);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Publishing failed. Please retry.');
-      setStatusMessage('');
+      if (useAuthStore.getState().user?.id === ownerId) {
+        setErrorMessage(error instanceof Error ? error.message : 'Publishing failed. Please retry.');
+        setStatusMessage('');
+      }
     } finally {
-      setBusy(false);
+      if (useAuthStore.getState().user?.id === ownerId) setBusy(false);
     }
-  }, [accessMode, assets, body, contentId, coverRef, loadingQuote, mediaWarning, pollDurationMinutes, pollEnabled, pollOptions, publishPending, quoteContentId, quoteTarget, replyAudience, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens, user?.id]);
+  }, [accessMode, assets, authStatus, body, contentId, coverRef, loadingQuote, mediaWarning, pollDurationMinutes, pollEnabled, pollOptions, publishPending, quoteContentId, quoteTarget, replyAudience, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens, user?.id]);
 
   if (authStatus !== 'authenticated') {
     return (

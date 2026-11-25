@@ -1,4 +1,4 @@
-import { readSessionToken, readSessionCredentialSnapshot, saveSessionTokenForSnapshot } from './secure-session';
+import { readSessionToken, readCachedUser, readSessionCredentialSnapshot, saveSessionTokenForSnapshot } from './secure-session';
 
 const DEFAULT_API_BASE_URL = 'https://api.luckread.com';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -45,7 +45,7 @@ export type ApiUploadProgress = {
   percent: number | null;
 };
 
-type ApiRequestOptions = RequestInit & {
+export type ApiRequestOptions = RequestInit & {
   /** Called with native multipart upload progress; uses the shared auth/idempotency boundary. */
   onUploadProgress?: (progress: ApiUploadProgress) => void;
   /** Set false only where the API contract does not use idempotency keys. */
@@ -54,6 +54,8 @@ type ApiRequestOptions = RequestInit & {
   auth?: boolean;
   /** Set false when the caller must assign a newly-issued credential to a specific account slot. */
   persistSessionCredential?: boolean;
+  /** Bind an authenticated request to the account that initiated the operation. */
+  expectedAccountId?: string;
 };
 
 type RecoveryDefaults = {
@@ -470,6 +472,7 @@ export async function apiRequest<T>(
     idempotencyKey,
     onUploadProgress,
     persistSessionCredential = true,
+    expectedAccountId,
     headers: inputHeaders,
     ...init
   } = options;
@@ -533,6 +536,12 @@ export async function apiRequest<T>(
   let credentialSnapshot: Awaited<ReturnType<typeof readSessionCredentialSnapshot>> | null = null;
   if (auth) {
     credentialSnapshot = await readSessionCredentialSnapshot();
+    const credentialAccountId = credentialSnapshot.accountId ?? (await readCachedUser())?.id ?? null;
+    if (expectedAccountId && credentialAccountId !== expectedAccountId) {
+      releaseMutationKey(mutationLease, 'definitive');
+      mutationLease = null;
+      throw new Error('Your account changed. Reopen the composer and try again.');
+    }
     if (credentialSnapshot.token) headers.set('Authorization', 'Bearer ' + credentialSnapshot.token);
   }
 
