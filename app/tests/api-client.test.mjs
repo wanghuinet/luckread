@@ -98,6 +98,30 @@ test('adds the secure bearer session and an idempotency key to JSON writes at th
   expect(capturedInit.cache).toBe('no-store');
 });
 
+test('binds authenticated requests to the account that initiated the operation', async () => {
+  let fetchCalls = 0;
+  pendingFetch = async (_input, init) => {
+    fetchCalls += 1;
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer secure-test-token');
+    return new Response(JSON.stringify({ data: { ok: true } }), { status: 200 });
+  };
+
+  await apiRequest('/account-scoped-write', {
+    method: 'POST',
+    expectedAccountId: 'account-a',
+    body: JSON.stringify({ value: true }),
+  });
+  expect(fetchCalls).toBe(1);
+
+  mockActiveAccountId = 'account-b';
+  await expect(apiRequest('/account-scoped-write', {
+    method: 'POST',
+    expectedAccountId: 'account-a',
+    body: JSON.stringify({ value: true }),
+  })).rejects.toThrow('Your account changed');
+  expect(fetchCalls).toBe(1);
+});
+
 test('removes Content-Type for FormData so fetch can set the multipart boundary', async () => {
   let capturedInit;
   pendingFetch = async (_input, init) => {
