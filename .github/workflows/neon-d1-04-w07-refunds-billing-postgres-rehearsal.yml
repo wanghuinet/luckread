@@ -106,6 +106,14 @@ jobs:
         run: |
           node --check ../../workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-w07-billing-read-entry-postgres-runtime.mjs
           node --import=tsx/esm ../../workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-w07-billing-read-entry-postgres-runtime.mjs
+      - name: Rehearse signed refund webhook concurrency and rollback on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W07_REFUND_WEBHOOK_POSTGRES_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/luckread_finance_schema
+          W07_REFUND_WEBHOOK_POSTGRES_REPORT: ../../artifacts/neon/w07-refund-webhook-postgres-runtime-postflight.json
+        run: |
+          node --check ../../workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-refund-webhook-postgres-runtime.mjs
+          node --import=tsx/esm ../../workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-refund-webhook-postgres-runtime.mjs
       - name: Upload exact local rehearsal sources
         if: always()
         uses: actions/upload-artifact@v4
@@ -125,5 +133,7 @@ jobs:
             workers/W07-subscription-commerce/src/billing-read-http-runtime.ts
             workers/W07-subscription-commerce/src/billing-read-http-runtime.test.ts
             artifacts/neon/w07-billing-read-entry-postgres-runtime-postflight.json
+            artifacts/neon/w07-refund-webhook-postgres-runtime-postflight.json
+            workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-refund-webhook-postgres-runtime.mjs
           if-no-files-found: error
           retention-days: 30
