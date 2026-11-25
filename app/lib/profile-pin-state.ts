@@ -46,7 +46,11 @@ export function getProfilePinSnapshot(): ProfilePinSnapshot {
   return snapshot;
 }
 
-function isCurrentViewer(userId: string): boolean {\n  return (useAuthStore.getState().user?.id ?? null) === userId;\n}\n\nfunction normalizeId(value: string | null | undefined): string {
+function isCurrentViewer(userId: string): boolean {
+  return (useAuthStore.getState().user?.id ?? null) === userId;
+}
+
+function normalizeId(value: string | null | undefined): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
