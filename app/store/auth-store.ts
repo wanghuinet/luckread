@@ -160,12 +160,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   login: async (identity, credential) => {
     authLifecycleGeneration += 1;
+    const generation = authLifecycleGeneration;
     const normalizedIdentity = identity.trim().toLowerCase();
     if (!normalizedIdentity || !credential) {
       throw new Error('Enter your email and password.');
     }
 
     await assertStoredAccountCapacity(normalizedIdentity);
+    if (generation !== authLifecycleGeneration) return;
 
     const { response, data } = await apiRequest<LoginPayload>('/auth/login', {
       method: 'POST',
@@ -175,6 +177,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       persistSessionCredential: false,
       body: JSON.stringify({ identity: normalizedIdentity, credential }),
     });
+    if (generation !== authLifecycleGeneration) return;
 
     const payload = data as LoginPayload | null;
     const user = payload?.data?.user;
@@ -197,18 +200,25 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     // Only the active account owns this device's Expo token. Release the old
     // endpoint while its credential is still active before activating a new account.
     const previousAccountId = await getActiveStoredAccountId();
+    if (generation !== authLifecycleGeneration) return;
     if (previousAccountId && previousAccountId !== user.id) {
       await unregisterPushEndpointForUser(previousAccountId);
+      if (generation !== authLifecycleGeneration) return;
     }
 
     await saveAccountSession(user, token);
+    if (generation !== authLifecycleGeneration) return;
     clearPendingMutationKeys();
-    set({ status: 'authenticated', user, accounts: await listStoredAccounts() });
+    const accounts = await listStoredAccounts();
+    if (generation !== authLifecycleGeneration) return;
+    set({ status: 'authenticated', user, accounts });
   },
 
   switchAccount: async (userId) => {
     authLifecycleGeneration += 1;
+    const generation = authLifecycleGeneration;
     const previousAccountId = await getActiveStoredAccountId();
+    if (generation !== authLifecycleGeneration) return;
     const previousUser = get().user;
     if (previousAccountId === userId && previousUser?.id === userId) return;
 
@@ -216,14 +226,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     // account's endpoint before the next account registers the same device token.
     if (previousAccountId) {
       await unregisterPushEndpointForUser(previousAccountId);
+      if (generation !== authLifecycleGeneration) return;
     }
 
     set({ status: 'loading', user: null });
     try {
       await activateStoredAccount(userId);
+      if (generation !== authLifecycleGeneration) return;
       clearPendingMutationKeys();
 
       const { response, data } = await apiRequest<SessionPayload>('/auth/session', { method: 'GET' });
+      if (generation !== authLifecycleGeneration) return;
       const user = (data as SessionPayload | null)?.data?.user;
       if (response.status === 401) {
         throw new AuthStoreError('这个账号的登录状态已失效，请重新登录。', 401, 'SESSION_EXPIRED');
@@ -240,8 +253,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       }
 
       await saveCachedUser(user);
-      set({ status: 'authenticated', user, accounts: await listStoredAccounts() });
+      if (generation !== authLifecycleGeneration) return;
+      const accounts = await listStoredAccounts();
+      if (generation !== authLifecycleGeneration) return;
+      set({ status: 'authenticated', user, accounts });
     } catch (cause) {
+      if (generation !== authLifecycleGeneration) throw cause;
       let restoredUser: LuckReadUser | null = null;
       if (previousAccountId) {
         try {
@@ -253,6 +270,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       } else {
         await clearActiveAccountSelection().catch(() => undefined);
       }
+      if (generation !== authLifecycleGeneration) throw cause;
       clearPendingMutationKeys();
       set({
         status: restoredUser ? 'authenticated' : 'anonymous',
