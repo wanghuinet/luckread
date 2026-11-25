@@ -304,7 +304,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
     pendingDeleteKeysRef.current[comment.id] = key;
 
     try {
-      await deleteCommentRequest(comment.id, key);
+      await deleteCommentRequest(comment.id, viewerIdAtStart, key);
       if (useAuthStore.getState().user?.id !== viewerIdAtStart) return;
       delete pendingDeleteKeysRef.current[comment.id];
       setComments((current) => current.filter((candidate) => candidate.id !== comment.id));
