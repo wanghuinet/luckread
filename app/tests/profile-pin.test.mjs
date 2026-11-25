@@ -2,8 +2,13 @@ import { beforeEach, expect, mock, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
 const calls = [];
+let activeViewer = 'pin-owner-load';
 let responseStatus = 200;
 let responseData = { data: null };
+
+mock.module('../store/auth-store.ts', () => ({
+  useAuthStore: { getState: () => ({ user: { id: activeViewer } }) },
+}));
 
 mock.module('../lib/api-client.ts', () => ({
   apiRequest: async (path, options) => {
@@ -22,6 +27,7 @@ const { getProfilePinSnapshot, refreshProfilePin, setProfilePin } = await import
 
 beforeEach(() => {
   calls.length = 0;
+  activeViewer = 'pin-owner-load';
   responseStatus = 200;
   responseData = { data: null };
 });
@@ -42,6 +48,7 @@ test('loads the current profile pin through the public W01 route once', async ()
 });
 
 test('pins and unpins using the canonical W01 endpoint and idempotency key', async () => {
+  activeViewer = 'pin-owner-write';
   const pinned = await setProfilePin('pin-owner-write', 'post-123', true);
   expect(pinned.ok).toBe(true);
   expect(calls[0].path).toBe('/content/post-123/pin');
@@ -66,6 +73,7 @@ test('pins and unpins using the canonical W01 endpoint and idempotency key', asy
 });
 
 test('preserves the existing pin when a pin write fails', async () => {
+  activeViewer = 'pin-owner-fail';
   responseData = { data: { userId: 'pin-owner-fail', contentId: 'existing-post', pinnedAt: '2026-10-21T10:00:00.000Z' } };
   await refreshProfilePin('pin-owner-fail');
   responseStatus = 403;
@@ -93,4 +101,11 @@ test('native profile and post menus expose the pin state and use the shared boun
   expect(profile).toContain('isProfilePinned: true');
   expect(profile).toContain('pinnedPost');
   expect(pinState).not.toMatch(/\bfetch\s*\(/);
+});
+
+test('profile pin requests are guarded against stale account reads and mutations', () => {
+  const source = readFileSync(new URL('../lib/profile-pin-state.ts', import.meta.url), 'utf8');
+  expect(source).toContain('if (!userId || !isCurrentViewer(userId)) return;');
+  expect(source).toContain('Your account changed. Refresh profile pin status before trying again.');
+  expect(source).toContain('generation !== loadGeneration || !isCurrentViewer(userId)');
 });

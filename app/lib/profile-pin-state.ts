@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
 import { apiRequest, createIdempotencyKey, getApiErrorMessage } from './api-client';
+import { useAuthStore } from '../store/auth-store';
 
 export type ProfilePinSnapshot = {
   userId: string | null;
@@ -45,6 +46,10 @@ export function getProfilePinSnapshot(): ProfilePinSnapshot {
   return snapshot;
 }
 
+function isCurrentViewer(userId: string): boolean {
+  return (useAuthStore.getState().user?.id ?? null) === userId;
+}
+
 function normalizeId(value: string | null | undefined): string {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -60,7 +65,7 @@ function readPinnedContentId(value: unknown): string | null {
 /** Load the signed-in user's single profile pin once for all mounted feed cards. */
 export async function refreshProfilePin(userIdValue: string | null | undefined): Promise<void> {
   const userId = normalizeId(userIdValue);
-  if (!userId) return;
+  if (!userId || !isCurrentViewer(userId)) return;
   if (snapshot.userId === userId && (snapshot.loaded || snapshot.loading || snapshot.pending)) return;
   if (activeLoad?.userId === userId) return activeLoad.promise;
 
@@ -79,7 +84,7 @@ export async function refreshProfilePin(userIdValue: string | null | undefined):
         '/users/' + encodeURIComponent(userId) + '/pinned-content',
         { method: 'GET', auth: false },
       );
-      if (generation !== loadGeneration) return;
+      if (generation !== loadGeneration || !isCurrentViewer(userId)) return;
       if (!result.response.ok) {
         publish({
           userId,
@@ -132,6 +137,7 @@ export async function setProfilePin(
   if (!userId || !contentId) {
     return { ok: false, message: 'This post or account is not connected to a LuckRead ID.' };
   }
+  if (!userId || !isCurrentViewer(userId)) return { ok: false, message: 'Your account changed. Refresh profile pin status before trying again.' };
   if (snapshot.userId === userId && (snapshot.loading || snapshot.pending)) {
     return { ok: false, message: 'Profile pin status is still syncing. Please try again.' };
   }
@@ -156,7 +162,7 @@ export async function setProfilePin(
         idempotencyKey: createIdempotencyKey(),
       },
     );
-    if (generation !== loadGeneration) {
+    if (generation !== loadGeneration || !isCurrentViewer(userId)) {
       return { ok: false, message: 'Profile pin state changed during this request. Refresh and try again.' };
     }
     if (!result.response.ok) {
