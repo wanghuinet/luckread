@@ -19,7 +19,7 @@ import {
   type StoredLuckReadAccount,
   type SessionCredentialSnapshot,
 } from '../lib/secure-session';
-import { unregisterPushEndpointForUser } from '../lib/push-notifications';
+import { syncPushEndpointForAuthenticatedUser, unregisterPushEndpointForUser } from '../lib/push-notifications';
 
 type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
 
@@ -271,6 +271,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         await clearActiveAccountSelection().catch(() => undefined);
       }
       if (generation !== authLifecycleGeneration) throw cause;
+      if (restoredUser && previousAccountId) {
+        await syncPushEndpointForAuthenticatedUser(previousAccountId).catch(() => undefined);
+        if (generation !== authLifecycleGeneration) throw cause;
+      }
       clearPendingMutationKeys();
       set({
         status: restoredUser ? 'authenticated' : 'anonymous',
