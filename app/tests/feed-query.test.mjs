@@ -76,7 +76,6 @@ test('invalid server page fails without returning a fake empty timeline', async 
   await expect(fetchNativeFeedPage({
     kind: 'for-you',
     cursor: null,
-    invalidateSession: async () => undefined,
   })).rejects.toThrow('Could not load this timeline');
 });
 
