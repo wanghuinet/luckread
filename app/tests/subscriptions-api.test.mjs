@@ -98,13 +98,14 @@ test('schedules a downgrade at the end of the current subscription period', asyn
   const subscriptionId = 'sub_' + 'a'.repeat(64);
   const planId = 'plan_' + 'b'.repeat(64);
   const etag = '"lr-v2"';
-  await scheduleSubscriptionPlanDowngrade(subscriptionId, planId, etag, 'downgrade_attempt_1');
+  await scheduleSubscriptionPlanDowngrade(subscriptionId, planId, etag, 'downgrade_attempt_1', { expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/memberships/subscriptions/' + subscriptionId + '/change-plan/schedule');
   expect(calls[0]?.options.method).toBe('POST');
   expect(calls[0]?.options.headers).toEqual({ 'If-Match': etag });
   expect(calls[0]?.options.idempotencyKey).toBe('downgrade_attempt_1');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
   expect(JSON.parse(calls[0]?.options.body)).toEqual({ planId });
 });
 
@@ -112,13 +113,14 @@ test('schedules a billing interval change through the existing W07 operation', a
   const subscriptionId = 'sub_' + 'a'.repeat(64);
   const planId = 'plan_' + 'b'.repeat(64);
   const etag = '"lr-v4"';
-  await scheduleSubscriptionBillingIntervalChange(subscriptionId, planId, etag, 'interval_attempt_1');
+  await scheduleSubscriptionBillingIntervalChange(subscriptionId, planId, etag, 'interval_attempt_1', { expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/memberships/subscriptions/' + subscriptionId + '/change-plan/interval-schedule');
   expect(calls[0]?.options.method).toBe('POST');
   expect(calls[0]?.options.headers).toEqual({ 'If-Match': etag });
   expect(calls[0]?.options.idempotencyKey).toBe('interval_attempt_1');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
   expect(JSON.parse(calls[0]?.options.body)).toEqual({ planId });
 });
 
@@ -165,11 +167,12 @@ test('creates a server-priced membership order using only the selected plan refe
 });
 
 test('creates a customer-owned payment intent using only the server-created order ID', async () => {
-  await createMembershipPaymentIntent('ord_checkout_001');
+  await createMembershipPaymentIntent('ord_checkout_001', { expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/payments/intents');
   expect(calls[0]?.options.method).toBe('POST');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
   expect(JSON.parse(calls[0]?.options.body)).toEqual({ orderId: 'ord_checkout_001' });
 });
 
@@ -236,6 +239,9 @@ test('connects supported plan changes and keeps unverified subscription lifecycl
   expect(subscriptionsScreen).toContain('管理套餐');
   expect(subscriptionsScreen).toContain('/subscription-change?subscriptionId=');
   expect(planChangeScreen).toContain('fetchSubscriptionPlanChangePreview');
+  expect(planChangeScreen).toContain('viewerGenerationRef');
+  expect(planChangeScreen).toContain('assertCurrentViewer(expectedViewerId, generation)');
+  expect(planChangeScreen).toContain('expectedAccountId: expectedViewerId');
   expect(planChangeScreen).toContain('createSubscriptionPlanUpgradeCheckout');
   expect(planChangeScreen).toContain('scheduleSubscriptionPlanDowngrade');
   expect(planChangeScreen).toContain('scheduleSubscriptionBillingIntervalChange');
