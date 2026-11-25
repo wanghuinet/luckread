@@ -632,6 +632,10 @@ export default function UserProfileScreen() {
   const loadProfile = useCallback(async () => {
     requestRef.current?.abort();
     const controller = new AbortController();
+    const requestViewerId = currentUserId;
+    const isCurrentRequest = () =>
+      !controller.signal.aborted &&
+      (useAuthStore.getState().user?.id ?? null) === requestViewerId;
     requestRef.current = controller;
     setProfileLoading(true);
     setRefreshing(true);
@@ -664,10 +668,10 @@ export default function UserProfileScreen() {
       const canonicalProfileId = typeof profile.identityId === 'string' && profile.identityId.trim()
         ? profile.identityId.trim()
         : profile.id;
-      if (controller.signal.aborted) return;
+      if (!isCurrentRequest()) return;
 
       const sessionToken = await readSessionToken().catch(() => null);
-      if (controller.signal.aborted) return;
+      if (!isCurrentRequest()) return;
 
       let posts: FeedContent[] = [];
       let hasMorePosts = false;
@@ -698,7 +702,7 @@ export default function UserProfileScreen() {
             }),
         );
       }
-      if (controller.signal.aborted) return;
+      if (!isCurrentRequest()) return;
 
       // The pin is a reference to canonical W03 content; never copy body/media into W05.
       const pinResult = await pinResultPromise;
@@ -759,7 +763,7 @@ export default function UserProfileScreen() {
         ];
       }
 
-      if (controller.signal.aborted) return;
+      if (!isCurrentRequest()) return;
 
       const [followersResult, followingResult] = await Promise.all([
         apiRequest<unknown>(
@@ -777,7 +781,7 @@ export default function UserProfileScreen() {
       const followingPage = followingResult?.response.ok
         ? unwrapApiData<{ totalCount?: number }>(followingResult.data)
         : null;
-      if (controller.signal.aborted) return;
+      if (!isCurrentRequest()) return;
 
       const profileAvatarSource = resolveNativeMediaSource(profile.avatar, sessionToken);
       const profileHeaderSource = resolveNativeMediaSource(profile.headerImage || profile.coverImage, sessionToken);
@@ -808,16 +812,18 @@ export default function UserProfileScreen() {
       });
       setUserPosts(posts);
     } catch (error) {
-      if (controller.signal.aborted) return;
+      if (!isCurrentRequest()) return;
       setProfileError(error instanceof Error ? error.message : 'Could not load this profile.');
     } finally {
       if (requestRef.current === controller) {
         requestRef.current = null;
-        setProfileLoading(false);
-        setRefreshing(false);
+        if (isCurrentRequest()) {
+          setProfileLoading(false);
+          setRefreshing(false);
+        }
       }
     }
-  }, [userHandle]);
+  }, [userHandle, currentUserId]);
 
   useEffect(() => {
     void loadProfile();
@@ -856,7 +862,7 @@ export default function UserProfileScreen() {
     setMediaLoadingMore(false);
     setMediaLoadedForUserId(null);
     mediaRequestRef.current?.abort();
-  }, [userHandle]);
+  }, [userHandle, currentUserId]);
 
   const loadLikedPosts = useCallback(async (
     profileUserId: string,
@@ -864,10 +870,15 @@ export default function UserProfileScreen() {
     append: boolean,
     showRefreshIndicator = false,
   ) => {
-    if (!currentUserId || profileUserId !== currentUserId) {
+    const requestViewerId = currentUserId;
+    const isCurrentViewer = () =>
+      Boolean(requestViewerId) &&
+      useAuthStore.getState().user?.id === requestViewerId;
+    if (!requestViewerId || profileUserId !== requestViewerId) {
       setLikesError('Sign in to view your Likes.');
       return;
     }
+    if (!isCurrentViewer()) return;
 
     likesRequestRef.current?.abort();
     const controller = new AbortController();
@@ -888,6 +899,7 @@ export default function UserProfileScreen() {
         limit: 20,
         signal: controller.signal,
       });
+      if (controller.signal.aborted || !isCurrentViewer()) return;
       const page = result.response.ok
         ? unwrapApiData<ProfileLikedContentPage>(result.data)
         : null;
@@ -896,7 +908,7 @@ export default function UserProfileScreen() {
       }
 
       const sessionToken = await readSessionToken().catch(() => null);
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || !isCurrentViewer()) return;
       const mappedItems = await Promise.all(page.items.map(async (likedItem): Promise<FeedContent | null> => {
         const contentId = typeof likedItem?.contentId === 'string' ? likedItem.contentId.trim() : '';
         if (!contentId) return null;
@@ -924,7 +936,7 @@ export default function UserProfileScreen() {
         return mapContentToFeedContent(record, body, social, author, sessionToken);
       }));
 
-      if (controller.signal.aborted || profileUserId !== currentUserId) return;
+      if (controller.signal.aborted || profileUserId !== requestViewerId || !isCurrentViewer()) return;
       const mapped = mappedItems.filter((item): item is FeedContent => item !== null);
       setLikedPosts((current) => {
         if (!append) return mapped;
@@ -935,11 +947,11 @@ export default function UserProfileScreen() {
       setLikesHasMore(page.hasMore === true);
       setLikesLoadedForUserId(profileUserId);
     } catch (cause) {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || !isCurrentViewer()) return;
       setLikesError(cause instanceof Error ? cause.message : 'Could not load liked posts. Please retry.');
     } finally {
       if (likesRequestRef.current === controller) likesRequestRef.current = null;
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && isCurrentViewer()) {
         setLikesLoading(false);
         setLikesLoadingMore(false);
         if (showRefreshIndicator) setRefreshing(false);
@@ -955,6 +967,10 @@ export default function UserProfileScreen() {
   ) => {
     repliesRequestRef.current?.abort();
     const controller = new AbortController();
+    const requestViewerId = currentUserId;
+    const isCurrentRequest = () =>
+      !controller.signal.aborted &&
+      (useAuthStore.getState().user?.id ?? null) === requestViewerId;
     repliesRequestRef.current = controller;
     if (append) setRepliesLoadingMore(true);
     else {
@@ -988,7 +1004,7 @@ export default function UserProfileScreen() {
       }
 
       const sessionToken = await readSessionToken().catch(() => null);
-      if (controller.signal.aborted) return;
+      if (!isCurrentRequest()) return;
       const mappedItems = await Promise.all(page.items.map(async (reply): Promise<ProfileReplyDisplay | null> => {
         const replyId = typeof reply?.id === 'string' ? reply.id.trim() : '';
         const contentId = typeof reply?.contentId === 'string' ? reply.contentId.trim() : '';
@@ -1029,7 +1045,7 @@ export default function UserProfileScreen() {
         };
       }));
 
-      if (controller.signal.aborted) return;
+      if (!isCurrentRequest()) return;
       const mapped = mappedItems.filter((item): item is ProfileReplyDisplay => item !== null);
       setProfileReplies((current) => {
         if (!append) return mapped;
@@ -1040,18 +1056,18 @@ export default function UserProfileScreen() {
       setRepliesHasMore(page.hasMore);
       setRepliesLoadedForUserId(profileUserId);
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (isCurrentRequest()) {
         setRepliesError(cause instanceof Error ? cause.message : 'Could not load replies. Please retry.');
       }
     } finally {
       if (repliesRequestRef.current === controller) repliesRequestRef.current = null;
-      if (!controller.signal.aborted) {
+      if (isCurrentRequest()) {
         setRepliesLoading(false);
         setRepliesLoadingMore(false);
         if (showRefreshIndicator) setRefreshing(false);
       }
     }
-  }, []);
+  }, [currentUserId]);
 
   const loadProfileMedia = useCallback(async (
     profileUserId: string,
@@ -1061,6 +1077,10 @@ export default function UserProfileScreen() {
   ) => {
     mediaRequestRef.current?.abort();
     const controller = new AbortController();
+    const requestViewerId = currentUserId;
+    const isCurrentRequest = () =>
+      !controller.signal.aborted &&
+      (useAuthStore.getState().user?.id ?? null) === requestViewerId;
     mediaRequestRef.current = controller;
     if (append) setMediaLoadingMore(true);
     else {
@@ -1094,7 +1114,7 @@ export default function UserProfileScreen() {
       }
 
       const sessionToken = await readSessionToken().catch(() => null);
-      if (controller.signal.aborted) return;
+      if (!isCurrentRequest()) return;
       const mappedItems = await Promise.all(page.items.map(async (item): Promise<FeedContent | null> => {
         if (!item || typeof item.id !== 'string' || !item.id.trim()) return null;
         const hasMediaReference = item.contentType === 'video' ||
@@ -1111,7 +1131,7 @@ export default function UserProfileScreen() {
         return mapped.media_items?.length ? mapped : null;
       }));
 
-      if (controller.signal.aborted) return;
+      if (!isCurrentRequest()) return;
       const mapped = mappedItems.filter((item): item is FeedContent => item !== null);
       setMediaPosts((current) => {
         if (!append) return mapped;
@@ -1122,18 +1142,18 @@ export default function UserProfileScreen() {
       setMediaHasMore(page.hasMore);
       setMediaLoadedForUserId(profileUserId);
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (isCurrentRequest()) {
         setMediaError(cause instanceof Error ? cause.message : 'Could not load profile media. Please retry.');
       }
     } finally {
       if (mediaRequestRef.current === controller) mediaRequestRef.current = null;
-      if (!controller.signal.aborted) {
+      if (isCurrentRequest()) {
         setMediaLoading(false);
         setMediaLoadingMore(false);
         if (showRefreshIndicator) setRefreshing(false);
       }
     }
-  }, []);
+  }, [currentUserId]);
 
   const isOwnProfile = Boolean(user?.id && currentUserId && user.id === currentUserId);
   const showingReplies = selectedTabIndex === 1;
