@@ -266,6 +266,7 @@ export default function SubscriptionChangeScreen() {
 
   const refresh = useCallback(async () => {
     requestRef.current?.abort();
+    previewRequestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
     const expectedViewerId = viewerId;
@@ -275,6 +276,8 @@ export default function SubscriptionChangeScreen() {
     setPlans([]);
     setNextCursor(null);
     setHasMorePlans(false);
+    setLoadingPlans(false);
+    setLoadingPreview(false);
     setError('');
     setMessage('');
     setPreview(null);
@@ -301,6 +304,8 @@ export default function SubscriptionChangeScreen() {
       setPlans([]);
       setPreview(null);
       setSelectedPlanId(null);
+      setLoadingPlans(false);
+      setLoadingPreview(false);
       setAuthRequired(true);
       setLoading(false);
       setBusy(false);
