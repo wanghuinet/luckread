@@ -349,7 +349,7 @@ test('late account-switch response cannot replace a newer login', async () => {
 
 
 test('logout and remove-account operations are guarded against stale lifecycle generations', () => {
-  const source = readFileSync(resolve(process.cwd(), 'app/store/auth-store.ts'), 'utf8');
+  const source = readFileSync(resolve(process.cwd(), 'store/auth-store.ts'), 'utf8');
   const removeBlock = source.slice(source.indexOf('  removeAccount: async'), source.indexOf('  logout: async'));
   const logoutBlock = source.slice(source.indexOf('  logout: async'), source.indexOf('  invalidateSession: async'));
 
