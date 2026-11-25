@@ -27,8 +27,8 @@ test('native publisher uses the shared media API helpers and existing W01 state 
 test('native publisher preserves pending media in app-private storage and restores by user and draft', () => {
   expect(composer).toContain("from '~/lib/publish-pending-media-recovery'");
   expect(composer).toContain('persistPendingMediaRecovery(');
-  expect(composer).toContain('listPendingMediaRecovery(user.id, null)');
-  expect(composer).toContain('listPendingMediaRecovery(user.id, targetContentId)');
+  expect(composer).toContain('listPendingMediaRecovery(ownerId, null)');
+  expect(composer).toContain('listPendingMediaRecovery(ownerId, targetContentId)');
   expect(composer).toContain('bindPendingMediaRecoveryToDraft(');
   expect(composer).toContain('markPendingMediaRecoveryUploaded(user.id, asset.localId, uploaded.url)');
   expect(composer).toContain('asset.uploadedUrl && restoredMediaRefs.includes(asset.uploadedUrl)');
