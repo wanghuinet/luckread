@@ -296,7 +296,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       if (snapshot.accountId) await removeStoredAccount(snapshot.accountId);
       else await clearStoredSession();
       const activeAccountId = await getActiveStoredAccountId();
-      if (generation !== authLifecycleGeneration || activeAccountId !== snapshot.accountId) return;
+      if (generation !== authLifecycleGeneration || (activeAccountId !== null && activeAccountId !== snapshot.accountId)) return;
     } else {
       const activeAccountId = await getActiveStoredAccountId();
       if (activeAccountId) await removeStoredAccount(activeAccountId);
