@@ -385,8 +385,8 @@ function PublishScreenContent() {
       }
       // W03 exposes ownerUserId only to the authenticated owner. Creator identity
       // may differ from the login user ID; W03 remains the final mutation authority.
-      const ownerId = record.ownerUserId;
-      if (ownerId && user?.id && ownerId !== user.id) {
+      const recordOwnerId = record.ownerUserId;
+      if (recordOwnerId && user?.id && recordOwnerId !== user.id) {
         throw new Error('You can edit only your own post.');
       }
       const etag = record.etag || result.response.headers.get('ETag') || undefined;
