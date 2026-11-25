@@ -222,6 +222,17 @@ test('persists renewed session credentials from the response header only', async
   expect(storedToken).toBe('renewed-secure-token');
 });
 
+test('preserves intentional fetch cancellation instead of converting it to a network error', async () => {
+  const controller = new AbortController();
+  const cancellation = new Error('cancelled by caller');
+  pendingFetch = async (_input, init) => {
+    expect(init.signal).toBe(controller.signal);
+    throw cancellation;
+  };
+  controller.abort();
+  await expect(apiRequest('/contents', { signal: controller.signal })).rejects.toBe(cancellation);
+});
+
 test('normalizes transport failures into a retryable network error', async () => {
   pendingFetch = async () => {
     throw new TypeError('raw transport implementation detail');

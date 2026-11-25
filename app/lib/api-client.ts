@@ -560,8 +560,11 @@ export async function apiRequest<T>(
           onUploadProgress,
         )
       : await fetch(requestUrl, requestInit);
-  } catch {
+  } catch (error) {
     releaseMutationKey(mutationLease, 'transient');
+    // Preserve intentional cancellation so query/navigation code can distinguish
+    // it from a transport failure and avoid showing a noisy offline message.
+    if (init.signal?.aborted) throw error;
     // Do not surface transport internals (which may include request details).
     throw new LuckReadNetworkError();
   }
