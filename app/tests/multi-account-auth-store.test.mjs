@@ -8,6 +8,7 @@ const sessionRequests = [];
 const loginRequests = [];
 const pushUnregisterCalls = [];
 let failPushUnregisterFor = null;
+let unauthorizedHandler = null;
 
 const userFromEmail = (email) => ({
   id: 'user-' + email.toLowerCase(),
@@ -21,6 +22,7 @@ const secureSessionMock = {
   MAX_STORED_ACCOUNTS: 5,
   listStoredAccounts: async () => [...storedAccounts.values()].sort((a, b) => b.lastUsedAt - a.lastUsedAt),
   getActiveStoredAccountId: async () => activeAccountId,
+  readSessionCredentialSnapshot: async () => ({ accountId: activeAccountId, token: activeAccountId ? storedTokens.get(activeAccountId) ?? null : null }),
   readSessionToken: async () => activeAccountId ? storedTokens.get(activeAccountId) ?? null : null,
   readCachedUser: async () => activeAccountId ? storedAccounts.get(activeAccountId) ?? null : null,
   assertStoredAccountCapacity: async (identity) => {
@@ -68,6 +70,7 @@ const secureSessionMock = {
 mock.module('../lib/secure-session.ts', () => secureSessionMock);
 mock.module('../lib/api-client.ts', () => ({
   clearPendingMutationKeys: () => undefined,
+  registerUnauthorizedSessionHandler: (handler) => { unauthorizedHandler = handler; },
   getApiErrorMessage: (data, fallback) => data?.error?.message || fallback,
   apiRequest: async (path, options = {}) => {
     if (path === '/auth/login') {
@@ -119,6 +122,7 @@ beforeEach(() => {
   loginRequests.length = 0;
   pushUnregisterCalls.length = 0;
   failPushUnregisterFor = null;
+  unauthorizedHandler = null;
   useAuthStore.setState({ status: 'anonymous', user: null, accounts: [] });
 });
 
@@ -190,6 +194,27 @@ test('failed account validation restores the previously active account and its c
   expect(useAuthStore.getState().status).toBe('authenticated');
   expect(useAuthStore.getState().user?.email).toBe('first@example.com');
   expect(storedTokens.get('user-first@example.com')).toBe('token-first@example.com');
+});
+
+test('late 401 from a previous account cannot invalidate the newly active account', async () => {
+  await useAuthStore.getState().login('first@example.com', 'password-one');
+  const staleSnapshot = { accountId: activeAccountId, token: storedTokens.get(activeAccountId) };
+  await useAuthStore.getState().login('second@example.com', 'password-two');
+  await unauthorizedHandler(staleSnapshot);
+  expect(activeAccountId).toBe('user-second@example.com');
+  expect(useAuthStore.getState().status).toBe('authenticated');
+  expect(useAuthStore.getState().user?.id).toBe('user-second@example.com');
+  expect(storedTokens.has('user-first@example.com')).toBe(true);
+  expect(storedTokens.has('user-second@example.com')).toBe(true);
+});
+
+test('401 for the currently active credential invalidates only that account', async () => {
+  await useAuthStore.getState().login('first@example.com', 'password-one');
+  const snapshot = { accountId: activeAccountId, token: storedTokens.get(activeAccountId) };
+  await unauthorizedHandler(snapshot);
+  expect(activeAccountId).toBeNull();
+  expect(useAuthStore.getState().status).toBe('anonymous');
+  expect(storedTokens.has('user-first@example.com')).toBe(false);
 });
 
 test('removing the active account leaves other saved accounts intact and signs out only the active slot', async () => {
