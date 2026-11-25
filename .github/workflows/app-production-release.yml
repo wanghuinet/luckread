@@ -121,6 +121,9 @@ jobs:
             ${{ runner.temp }}/aab-certificate.txt
           if-no-files-found: error
           retention-days: 14
+      - name: Remove temporary Android signing material
+        if: always()
+        run: rm -rf "${RUNNER_TEMP}/luckread-production-signing"
 
   ios-release:
     name: Signed iOS production IPA
