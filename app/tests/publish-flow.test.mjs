@@ -378,8 +378,8 @@ test('native publisher lets authors choose an uploaded image as the post cover',
 test('native publisher uses the existing W01/W05 reply-audience policy for create, edit, autosave and restore', () => {
   expect(composer).toContain("useState<NativeReplyAudience>('everyone')");
   expect(composer).toContain('fetchOwnPostReplyAudience(targetContentId)');
-  expect(composer).toContain('saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody)');
-  expect(composer).toContain('saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody)');
+  expect(composer).toContain('saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody, ownerId)');
+  expect(composer).toContain('saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody, ownerId)');
   expect(composer).toContain('replyAudienceSavedFingerprintRef.current');
   expect(composer).toContain('谁可以回复？');
   expect(composer).toContain('followingNetwork');
@@ -431,7 +431,7 @@ test('native thread composer creates a bounded text-only thread through existing
   expect(threadComposer).toContain("'/contents/' + encodeURIComponent(item.contentId as string) + '/thread'");
   expect(threadComposer).toContain('nextContentId: next.contentId');
   expect(threadComposer).toContain("to: 'PUBLISHED'");
-  expect(threadComposer).toContain('uploadTextBody(body, item.key)');
+  expect(threadComposer).toContain('uploadTextBody(body, item.key, viewerId)');
   expect(threadComposer).toContain('idempotencyKey: item.createKey');
   expect(threadComposer).toContain('idempotencyKey: item.stateKey');
   expect(threadComposer).toContain('idempotencyKey: item.linkKey');
