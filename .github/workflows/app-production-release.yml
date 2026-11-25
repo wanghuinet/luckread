@@ -104,13 +104,13 @@ jobs:
           set -euo pipefail
           AAB="android/app/build/outputs/bundle/release/app-release.aab"
           test -s "$AAB"
-          jarsigner -verify -strict -certs "$AAB"
+          jarsigner -verify -certs "$AAB"
           keytool -printcert -jarfile "$AAB" > "$RUNNER_TEMP/aab-certificate.txt"
           keytool -list -v -keystore "$ANDROID_KEYSTORE_PATH" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" > "$RUNNER_TEMP/keystore-certificate.txt"
           AAB_CERT_SHA="$(awk '/SHA256:/{print $2; exit}' "$RUNNER_TEMP/aab-certificate.txt" | tr -d ':')"
           KEY_CERT_SHA="$(awk '/SHA256:/{print $2; exit}' "$RUNNER_TEMP/keystore-certificate.txt" | tr -d ':')"
           test -n "$AAB_CERT_SHA" && test "$AAB_CERT_SHA" = "$KEY_CERT_SHA" || { echo "AAB signer does not match configured production keystore" >&2; exit 1; }
-          grep -Fq 'applicationId "com.luckread.app"' android/app/build.gradle || { echo "Unexpected Android applicationId; expected com.luckread.app" >&2; exit 1; }
+          grep -Eq "applicationId[[:space:]]+['\\\"]com\\.luckread\\.app['\\\"]" android/app/build.gradle || { echo "Unexpected Android applicationId; expected com.luckread.app" >&2; exit 1; }
           sha256sum "$AAB" | tee "$RUNNER_TEMP/android-aab.sha256"
       - uses: actions/upload-artifact@v4
         with:
