@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createGroupConversation } from '~/lib/messaging-api';
+import { parseGroupMemberIds } from '~/lib/group-member-input';
 import { useColorScheme } from 'nativewind';
 
 export default function NewGroupScreen() {
@@ -13,7 +14,7 @@ export default function NewGroupScreen() {
   const queryClient = useQueryClient();
   const { colorScheme } = useColorScheme();
   const mutation = useMutation({
-    mutationFn: () => createGroupConversation(name.trim(), members.split(/[\\s,;]+/).map(v => v.trim()).filter(Boolean)),
+    mutationFn: () => createGroupConversation(name.trim(), parseGroupMemberIds(members)),
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
       router.replace({ pathname: '/messages/[conversationId]', params: {
