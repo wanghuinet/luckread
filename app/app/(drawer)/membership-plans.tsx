@@ -161,6 +161,7 @@ export default function MembershipPlansScreen() {
   const routeSearch = routeQuery.toString();
   const membershipPlansPath = '/membership-plans' + (routeSearch ? '?' + routeSearch : '');
   const authStatus = useAuthStore((state) => state.status);
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
   const [items, setItems] = useState<ActiveMembershipPlan[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -172,6 +173,15 @@ export default function MembershipPlansScreen() {
   const [purchaseMessage, setPurchaseMessage] = useState('');
   const [busyPlanId, setBusyPlanId] = useState<string | null>(null);
   const requestRef = useRef<AbortController | null>(null);
+  const previousViewerIdRef = useRef<string | null>(viewerId);
+
+  useEffect(() => {
+    if (previousViewerIdRef.current !== viewerId) {
+      previousViewerIdRef.current = viewerId;
+      setBusyPlanId(null);
+      setPurchaseMessage('');
+    }
+  }, [viewerId]);
 
   const loadPage = useCallback(async (cursor: string | null, append: boolean, pullRefresh = false) => {
     if (invalidCreatorFilter) {
@@ -280,12 +290,10 @@ export default function MembershipPlansScreen() {
     try {
       // Fail before creating an order if the native provider SDK is not configured.
       assertNativeHyperswitchConfigured();
+      if (!isPurchaseViewerCurrent()) return;
 
-      const orderResult = await createMembershipOrder(item.planId);
-      if (!isPurchaseViewerCurrent()) {
-        setPurchaseMessage('账号已切换，本次支付已停止。请在当前账号下重新发起订阅。');
-        return;
-      }
+      const orderResult = await createMembershipOrder(item.planId, { expectedAccountId: purchaseViewerId });
+      if (!isPurchaseViewerCurrent()) return;
       if (!orderResult.response.ok) {
         throw new Error(orderResult.error?.message || getApiErrorMessage(
           orderResult.data,
@@ -317,11 +325,8 @@ export default function MembershipPlansScreen() {
         setPurchaseMessage('账号已切换，订单已创建但未启动支付。请在当前账号下重新检查订阅。');
         return;
       }
-      const intentResult = await createMembershipPaymentIntent(orderData.orderId);
-      if (!isPurchaseViewerCurrent()) {
-        setPurchaseMessage('账号已切换，支付流程已停止。请在当前账号下重新检查订阅。');
-        return;
-      }
+      const intentResult = await createMembershipPaymentIntent(orderData.orderId, { expectedAccountId: purchaseViewerId });
+      if (!isPurchaseViewerCurrent()) return;
       if (!intentResult.response.ok) {
         throw new Error(intentResult.error?.message || getApiErrorMessage(
           intentResult.data,
@@ -352,10 +357,7 @@ export default function MembershipPlansScreen() {
         throw new Error('支付服务没有返回与当前订单匹配的有效支付会话，支付已停止。');
       }
 
-      if (!isPurchaseViewerCurrent()) {
-        setPurchaseMessage('账号已切换，支付表单未启动。请在当前账号下重新检查订阅。');
-        return;
-      }
+      if (!isPurchaseViewerCurrent()) return;
       const result = await presentNativeMembershipPayment((intent as Record<string, unknown>).sdkAuthorization as string);
       if (!isPurchaseViewerCurrent()) return;
       if (result.status === 'completed') {
@@ -367,9 +369,11 @@ export default function MembershipPlansScreen() {
         setPurchaseMessage('支付未完成。请核对支付方式或稍后重试；订阅权益不会因客户端回调自动开通。');
       }
     } catch (cause) {
-      setPurchaseMessage(cause instanceof Error ? cause.message : '无法启动会员支付，请稍后重试。');
+      if (isPurchaseViewerCurrent()) {
+        setPurchaseMessage(cause instanceof Error ? cause.message : '无法启动会员支付，请稍后重试。');
+      }
     } finally {
-      setBusyPlanId(null);
+      if (isPurchaseViewerCurrent()) setBusyPlanId(null);
     }
   }, [authStatus, busyPlanId, loadPage, openLogin]);
 
