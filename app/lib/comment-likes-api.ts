@@ -1,4 +1,5 @@
 import { apiRequest, createIdempotencyKey, getApiErrorMessage } from './api-client';
+import { useAuthStore } from '../store/auth-store';
 
 export class CommentLikeApiError extends Error {
   constructor(
@@ -41,6 +42,13 @@ function readLikeStatus(value: unknown): LikeStatus | null {
 /** Toggle a comment like using W01/W05 as the authority instead of guessing from UI state. */
 export async function toggleCommentLike(commentIdValue: string): Promise<LikeStatus> {
   const commentId = normalizeCommentId(commentIdValue);
+  const viewerId = useAuthStore.getState().user?.id ?? null;
+  if (!viewerId || useAuthStore.getState().status !== 'authenticated') {
+    throw new CommentLikeApiError('Sign in to like replies.');
+  }
+  const isCurrentViewer = () =>
+    useAuthStore.getState().status === 'authenticated' &&
+    useAuthStore.getState().user?.id === viewerId;
   const encodedId = encodeURIComponent(commentId);
   const statusResult = await apiRequest<unknown>(
     '/interactions/likes?targetType=comment&targetId=' + encodedId,
@@ -59,6 +67,10 @@ export async function toggleCommentLike(commentIdValue: string): Promise<LikeSta
     );
   }
 
+  if (!isCurrentViewer()) {
+    throw new CommentLikeApiError('Your account changed. Refresh the reply before trying again.');
+  }
+
   const status = readLikeStatus(statusResult.data);
   if (!status) {
     throw new CommentLikeApiError('The comment like status response was invalid.');
@@ -66,6 +78,10 @@ export async function toggleCommentLike(commentIdValue: string): Promise<LikeSta
 
   const nextLiked = !status.liked;
   const method = nextLiked ? 'POST' : 'DELETE';
+  if (!isCurrentViewer()) {
+    throw new CommentLikeApiError('Your account changed. Refresh the reply before trying again.');
+  }
+
   const mutationResult = await apiRequest<unknown>(
     '/comments/' + encodedId + '/likes',
     {
@@ -85,6 +101,10 @@ export async function toggleCommentLike(commentIdValue: string): Promise<LikeSta
       mutationResult.response.status,
       mutationResult.error?.code,
     );
+  }
+
+  if (!isCurrentViewer()) {
+    throw new CommentLikeApiError('The active account changed while the reply like was updating.');
   }
 
   return { liked: nextLiked };
