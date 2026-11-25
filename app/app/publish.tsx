@@ -25,7 +25,7 @@ import Sortable from 'react-native-sortables';
 import PublishMediaActionSheet from '~/components/PublishMediaActionSheet';
 import PostThreadComposer from '~/components/PostThreadComposer';
 
-import { apiRequest, createIdempotencyKey, fetchContentBodyReference } from '~/lib/api-client';
+import { apiRequest, createIdempotencyKey, fetchContentBodyReference, type ApiRequestOptions } from '~/lib/api-client';
 import { computeAutoSaveDelay, createPublishDraftFingerprint, createReplyAudienceFingerprint } from '~/lib/publish-draft-autosave';
 import { getDefaultScheduledPublishDate, MIN_SCHEDULE_LEAD_TIME_MS, toScheduledPublishISO } from '~/lib/publish-schedule';
 import { DEFAULT_POLL_DURATION_MINUTES, getPollDurationMinutes, getPollDurationParts, type PollDurationParts } from '~/lib/poll-duration';
@@ -1663,11 +1663,11 @@ function PublishScreenContent() {
     }
   }, [body, textSelection.start]);
 
-  const syncPublishedSocialTokens = useCallback(async (contentIdValue: string, textValue: string): Promise<string | null> => {
+  const syncPublishedSocialTokens = useCallback(async (contentIdValue: string, textValue: string, expectedAccountId: string): Promise<string | null> => {
     try {
       const result = await apiRequest<unknown>(
         '/contents/' + encodeURIComponent(contentIdValue) + '/social',
-        { method: 'POST', body: JSON.stringify({ text: textValue }) },
+        { method: 'POST', body: JSON.stringify({ text: textValue }), expectedAccountId },
       );
       return result.response.ok
         ? null
@@ -1822,6 +1822,13 @@ function PublishScreenContent() {
   usePreventRemove(shouldPreventRemove, handlePreventRemove);
 
   const submit = useCallback(async () => {
+    const ownerId = user?.id;
+    if (authStatus !== 'authenticated' || !ownerId) {
+      setErrorMessage('请先登录后再发布。');
+      return;
+    }
+    const requestAsOwner = <T,>(path: string, options: ApiRequestOptions = {}) =>
+      apiRequest<T>(path, { ...options, expectedAccountId: ownerId });
     const trimmedBody = body.trim();
     if (quoteContentId && (!quoteTarget || quoteTarget.id !== quoteContentId || loadingQuote)) {
       setErrorMessage('请先加载并确认可引用的原帖。');
@@ -1942,7 +1949,7 @@ function PublishScreenContent() {
           bodyUploadRef.current = { text: trimmedBody, key: createIdempotencyKey() };
         }
         const bodyAttempt = bodyUploadRef.current;
-        const uploadedBody = await uploadTextBody(trimmedBody, bodyAttempt.key);
+        const uploadedBody = await uploadTextBody(trimmedBody, bodyAttempt.key, ownerId);
         bodyAttempt.uploaded = uploadedBody;
         bodyRef = uploadedBody.url;
       }
@@ -1964,7 +1971,7 @@ function PublishScreenContent() {
       if (contentId) {
         const record = recordRef.current;
         if (!record?.etag) throw new Error('Reload the post before editing because its server version is missing.');
-        const result = await apiRequest<Record<string, unknown>>(
+        const result = await requestAsOwner<Record<string, unknown>>(
           '/contents/' + encodeURIComponent(contentId),
           {
             method: 'PATCH',
@@ -1982,7 +1989,7 @@ function PublishScreenContent() {
           recordRef.current = { ...(recordRef.current ?? record), ...updatedRecord, etag: updatedEtag };
         }
         const replyAudienceFingerprint = createReplyAudienceFingerprint(trimmedBody, replyAudience);
-        const replyPolicyResult = await saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody);
+        const replyPolicyResult = await saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody, ownerId);
         if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
           throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Post changes were saved, but reply permissions could not be updated.'));
         }
@@ -1995,7 +2002,7 @@ function PublishScreenContent() {
           );
         }
         const socialSyncWarning = recordRef.current?.state === 'PUBLISHED'
-          ? await syncPublishedSocialTokens(contentId, trimmedBody)
+          ? await syncPublishedSocialTokens(contentId, trimmedBody, ownerId)
           : null;
         Alert.alert('保存成功', socialSyncWarning
           ? '你的动态已保存，但 @提及和 #话题同步暂时失败，可稍后再次编辑重试。'
@@ -2106,7 +2113,7 @@ function PublishScreenContent() {
       if (pollEnabled && !contentId && !pollConfiguredRef.current) {
         let pollResult: { response: Response; data: unknown };
         try {
-          pollResult = await apiRequest<unknown>(
+          pollResult = await requestAsOwner<unknown>(
             '/contents/' + encodeURIComponent(draft.id) + '/poll',
             {
               method: 'POST',
@@ -2136,7 +2143,7 @@ function PublishScreenContent() {
 
       const replyAudienceFingerprint = createReplyAudienceFingerprint(trimmedBody, replyAudience);
       if (replyAudienceSavedFingerprintRef.current !== replyAudienceFingerprint) {
-        const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody);
+        const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody, ownerId);
         if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
           setPublishPending(true);
           throw new Error(apiFailureDiagnostic(replyPolicyResult, 'The post draft exists, but reply permissions could not be saved. Retry to finish the same post.'));
@@ -2207,7 +2214,7 @@ function PublishScreenContent() {
       }
 
       // W01 resolves @handles to canonical W02 identities; W05 persists mention/topic edges.
-      const socialSyncWarning = await syncPublishedSocialTokens(draft.id, trimmedBody);
+      const socialSyncWarning = await syncPublishedSocialTokens(draft.id, trimmedBody, ownerId);
       submitAttemptRef.current = null;
       recordRef.current = null;
       draftWasPublishedRef.current = true;
