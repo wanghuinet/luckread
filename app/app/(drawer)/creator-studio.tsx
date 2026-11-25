@@ -60,6 +60,11 @@ export default function CreatorStudioScreen() {
   const authStatus = useAuthStore(s => s.status);
   const viewerId = useAuthStore(s => s.user?.id ?? null);
   const viewerRef = useRef<string | null>(viewerId);
+  viewerRef.current = viewerId;
+  const isCurrentViewer = (owner: string) =>
+    viewerRef.current === owner &&
+    useAuthStore.getState().status === 'authenticated' &&
+    useAuthStore.getState().user?.id === owner;
   const [application, setApplication] = useState<CreatorApplication | null>(null);
   const [plans, setPlans] = useState<CreatorPlan[]>([]);
   const [creatorType, setCreatorType] = useState<string>('PERSONAL');
@@ -77,7 +82,6 @@ export default function CreatorStudioScreen() {
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  useEffect(() => { viewerRef.current = viewerId; }, [viewerId]);
 
   const load = useCallback(async (refresh = false) => {
     if (authStatus === 'loading') return;
@@ -112,15 +116,18 @@ export default function CreatorStudioScreen() {
 
   const submitApplication = useCallback(async () => {
     if (saving) return;
+    const owner = viewerId;
+    if (!owner || !isCurrentViewer(owner)) return;
     setSaving(true); setError(''); setNotice('');
     try {
       const r = await submitCreatorApplication(creatorType, statement.trim(), makeKey('creator_apply'));
+      if (!isCurrentViewer(owner)) return;
       if (!r.response.ok) throw new Error(message(r, '申请提交失败。'));
       setNotice('申请已提交，审核状态已刷新。');
       await load();
-    } catch (e) { setError(e instanceof Error ? e.message : '申请提交失败。'); }
-    finally { setSaving(false); }
-  }, [creatorType, load, saving, statement]);
+    } catch (e) { if (isCurrentViewer(owner)) setError(e instanceof Error ? e.message : '申请提交失败。'); }
+    finally { if (isCurrentViewer(owner)) setSaving(false); }
+  }, [creatorType, load, saving, statement, viewerId]);
 
   const clearEditor = () => { setEditing(null); setName(''); setTier('supporter'); setInterval('MONTHLY'); setPrice('900'); setCurrency('USD'); setBenefits('会员专属内容'); };
   const editPlan = (p: CreatorPlan) => { setEditing(p); setName(p.name); setTier(p.tier); setInterval(p.billingInterval); setPrice(String(p.priceMinor)); setCurrency(p.currency); setBenefits(p.benefits.join('\n')); };
@@ -131,32 +138,38 @@ export default function CreatorStudioScreen() {
       priceMinor: Number(price), currency: currency.trim().toUpperCase(),
       benefits: benefits.split('\n').map(x => x.trim()).filter(Boolean),
     };
+    const owner = viewerId;
+    if (!owner || !isCurrentViewer(owner)) return;
     setSaving(true); setError(''); setNotice('');
     try {
       const r = editing
         ? await updateMyCreatorPlan(editing.planId, editing.etag, terms, makeKey('plan_update'))
         : await createMyCreatorPlan(terms, makeKey('plan_create'));
+      if (!isCurrentViewer(owner)) return;
       if (!r.response.ok) throw new Error(message(r, '会员方案保存失败。'));
       setNotice(editing ? '会员方案已更新。' : '会员方案草稿已创建。');
       clearEditor(); await load();
-    } catch (e) { setError(e instanceof Error ? e.message : '会员方案保存失败。'); }
-    finally { setSaving(false); }
+    } catch (e) { if (isCurrentViewer(owner)) setError(e instanceof Error ? e.message : '会员方案保存失败。'); }
+    finally { if (isCurrentViewer(owner)) setSaving(false); }
   };
 
   const planAction = (p: CreatorPlan, action: 'publish'|'pause'|'resume'|'retire') => {
     const label = { publish: '发布', pause: '暂停销售', resume: '恢复销售', retire: '退役' }[action];
     Alert.alert(label + '方案？', action === 'retire' ? '退役后不可恢复，现有订阅权益不会被更改。' : '此操作只影响新订阅，不会自动更改已有订阅。',
       [{ text: '取消', style: 'cancel' }, { text: '确认', onPress: () => {
+        const owner = viewerId;
+        if (!owner || !isCurrentViewer(owner)) return;
         setBusyPlan(p.planId);
         void (async () => {
           try {
             const r = action === 'publish'
               ? await publishMyCreatorPlan(p.planId, p.etag)
               : await changeMyCreatorPlanLifecycle(p.planId, p.etag, action);
+            if (!isCurrentViewer(owner)) return;
             if (!r.response.ok) throw new Error(message(r, label + '失败。'));
             setNotice('方案状态已更新。'); await load();
-          } catch (e) { setError(e instanceof Error ? e.message : label + '失败。'); await load(); }
-          finally { setBusyPlan(null); }
+          } catch (e) { if (isCurrentViewer(owner)) { setError(e instanceof Error ? e.message : label + '失败。'); await load(); } }
+          finally { if (isCurrentViewer(owner)) setBusyPlan(null); }
         })();
       }}]);
   };
