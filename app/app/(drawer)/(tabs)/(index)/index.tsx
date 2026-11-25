@@ -100,7 +100,6 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
   const isDark = colorScheme === 'dark';
   const authStatus = useAuthStore((state) => state.status);
   const viewerId = useAuthStore((state) => state.user?.id ?? null);
-  const invalidateSession = useAuthStore((state) => state.invalidateSession);
   const queryClient = useQueryClient();
   const queryKey = useMemo(() => nativeFeedQueryKey(kind, viewerId), [kind, viewerId]);
   const hydrationScope = kind + ':' + (viewerId || 'anonymous');
@@ -113,7 +112,6 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
       kind,
       cursor: pageParam,
       signal,
-      invalidateSession,
     }),
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
     staleTime: 30_000,

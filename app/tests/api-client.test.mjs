@@ -30,6 +30,7 @@ const {
   createIdempotencyKey,
   fetchContentBodyReference,
   LuckReadNetworkError,
+  registerUnauthorizedSessionHandler,
 } = await import('../lib/api-client.ts');
 
 const {
@@ -182,6 +183,18 @@ test('allows contract-defined auth requests to opt out of mutation keys', async 
   const headers = new Headers(capturedInit.headers);
   expect(headers.has('Authorization')).toBe(false);
   expect(headers.has('Idempotency-Key')).toBe(false);
+});
+
+test('dispatches authenticated 401 responses to the shared handler with the initiating credential snapshot', async () => {
+  let received = null;
+  registerUnauthorizedSessionHandler(async (snapshot) => { received = snapshot; });
+  pendingFetch = async () => new Response(JSON.stringify({ error: { code: 'SESSION_EXPIRED' } }), { status: 401 });
+  await apiRequest('/protected-resource');
+  expect(received).toEqual({ accountId: 'account-a', token: 'secure-test-token' });
+  received = null;
+  await apiRequest('/public-auth-resource', { auth: false });
+  expect(received).toBeNull();
+  registerUnauthorizedSessionHandler(null);
 });
 
 test('classifies recoverable API status codes and honours Retry-After', async () => {

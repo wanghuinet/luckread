@@ -8,6 +8,10 @@ const sessionRequests = [];
 const loginRequests = [];
 const pushUnregisterCalls = [];
 let failPushUnregisterFor = null;
+let unauthorizedHandler = null;
+let removeAccountCalls = 0;
+let deferNextSessionResponse = false;
+let resolveDeferredSessionResponse = null;
 
 const userFromEmail = (email) => ({
   id: 'user-' + email.toLowerCase(),
@@ -21,6 +25,7 @@ const secureSessionMock = {
   MAX_STORED_ACCOUNTS: 5,
   listStoredAccounts: async () => [...storedAccounts.values()].sort((a, b) => b.lastUsedAt - a.lastUsedAt),
   getActiveStoredAccountId: async () => activeAccountId,
+  readSessionCredentialSnapshot: async () => ({ accountId: activeAccountId, token: activeAccountId ? storedTokens.get(activeAccountId) ?? null : null }),
   readSessionToken: async () => activeAccountId ? storedTokens.get(activeAccountId) ?? null : null,
   readCachedUser: async () => activeAccountId ? storedAccounts.get(activeAccountId) ?? null : null,
   assertStoredAccountCapacity: async (identity) => {
@@ -48,11 +53,15 @@ const secureSessionMock = {
     return account;
   },
   removeStoredAccount: async (userId) => {
+    removeAccountCalls += 1;
     storedAccounts.delete(userId);
     storedTokens.delete(userId);
     if (activeAccountId === userId) activeAccountId = null;
   },
   clearActiveAccountSelection: async () => { activeAccountId = null; },
+  clearLegacySessionForSnapshot: async (snapshot) => {
+    if (snapshot.accountId === null && activeAccountId === null && storedTokens.get('legacy') === snapshot.token) storedTokens.delete('legacy');
+  },
   clearStoredSession: async () => {
     if (activeAccountId) {
       storedAccounts.delete(activeAccountId);
@@ -68,6 +77,7 @@ const secureSessionMock = {
 mock.module('../lib/secure-session.ts', () => secureSessionMock);
 mock.module('../lib/api-client.ts', () => ({
   clearPendingMutationKeys: () => undefined,
+  registerUnauthorizedSessionHandler: (handler) => { unauthorizedHandler = handler; },
   getApiErrorMessage: (data, fallback) => data?.error?.message || fallback,
   apiRequest: async (path, options = {}) => {
     if (path === '/auth/login') {
@@ -84,14 +94,25 @@ mock.module('../lib/api-client.ts', () => ({
       };
     }
     if (path === '/auth/session') {
-      sessionRequests.push({ accountId: activeAccountId, token: storedTokens.get(activeAccountId) });
-      if (activeAccountId === rejectSessionFor) {
-        const data = { error: { code: 'SESSION_EXPIRED', message: 'Session expired' } };
-        return { response: new Response(JSON.stringify(data), { status: 401 }), data, error: { status: 401 } };
+      const requestSnapshot = { accountId: activeAccountId, token: storedTokens.get(activeAccountId) };
+      sessionRequests.push(requestSnapshot);
+      const respond = async () => {
+        if (requestSnapshot.accountId === rejectSessionFor) {
+          await unauthorizedHandler?.(requestSnapshot);
+          const data = { error: { code: 'SESSION_EXPIRED', message: 'Session expired' } };
+          return { response: new Response(JSON.stringify(data), { status: 401 }), data, error: { status: 401 } };
+        }
+        const user = storedAccounts.get(requestSnapshot.accountId);
+        const data = { data: { user } };
+        return { response: new Response(JSON.stringify(data), { status: 200 }), data, error: null };
+      };
+      if (deferNextSessionResponse) {
+        deferNextSessionResponse = false;
+        return new Promise((resolve, reject) => {
+          resolveDeferredSessionResponse = () => { void respond().then(resolve, reject); };
+        });
       }
-      const user = storedAccounts.get(activeAccountId);
-      const data = { data: { user } };
-      return { response: new Response(JSON.stringify(data), { status: 200 }), data, error: null };
+      return respond();
     }
     if (path === '/auth/logout') {
       return { response: new Response(null, { status: 204 }), data: null, error: null };
@@ -119,6 +140,9 @@ beforeEach(() => {
   loginRequests.length = 0;
   pushUnregisterCalls.length = 0;
   failPushUnregisterFor = null;
+  removeAccountCalls = 0;
+  deferNextSessionResponse = false;
+  resolveDeferredSessionResponse = null;
   useAuthStore.setState({ status: 'anonymous', user: null, accounts: [] });
 });
 
@@ -190,6 +214,53 @@ test('failed account validation restores the previously active account and its c
   expect(useAuthStore.getState().status).toBe('authenticated');
   expect(useAuthStore.getState().user?.email).toBe('first@example.com');
   expect(storedTokens.get('user-first@example.com')).toBe('token-first@example.com');
+});
+
+test('late bootstrap 401 cannot invalidate an account activated while session validation was pending', async () => {
+  await useAuthStore.getState().login('first@example.com', 'password-one');
+  rejectSessionFor = 'user-first@example.com';
+  deferNextSessionResponse = true;
+  const bootstrapPromise = useAuthStore.getState().bootstrap();
+  for (let attempt = 0; attempt < 5 && !resolveDeferredSessionResponse; attempt += 1) await Promise.resolve();
+  expect(resolveDeferredSessionResponse).toBeTypeOf('function');
+  await useAuthStore.getState().login('second@example.com', 'password-two');
+  resolveDeferredSessionResponse?.();
+  await bootstrapPromise;
+  expect(activeAccountId).toBe('user-second@example.com');
+  expect(useAuthStore.getState().status).toBe('authenticated');
+  expect(useAuthStore.getState().user?.id).toBe('user-second@example.com');
+  expect(storedTokens.has('user-first@example.com')).toBe(true);
+  expect(storedTokens.has('user-second@example.com')).toBe(true);
+});
+
+test('late 401 from a previous account cannot invalidate the newly active account', async () => {
+  await useAuthStore.getState().login('first@example.com', 'password-one');
+  const staleSnapshot = { accountId: activeAccountId, token: storedTokens.get(activeAccountId) };
+  await useAuthStore.getState().login('second@example.com', 'password-two');
+  await unauthorizedHandler(staleSnapshot);
+  expect(activeAccountId).toBe('user-second@example.com');
+  expect(useAuthStore.getState().status).toBe('authenticated');
+  expect(useAuthStore.getState().user?.id).toBe('user-second@example.com');
+  expect(storedTokens.has('user-first@example.com')).toBe(true);
+  expect(storedTokens.has('user-second@example.com')).toBe(true);
+});
+
+test('401 for the currently active credential invalidates only that account', async () => {
+  await useAuthStore.getState().login('first@example.com', 'password-one');
+  const snapshot = { accountId: activeAccountId, token: storedTokens.get(activeAccountId) };
+  await unauthorizedHandler(snapshot);
+  expect(activeAccountId).toBeNull();
+  expect(useAuthStore.getState().status).toBe('anonymous');
+  expect(storedTokens.has('user-first@example.com')).toBe(false);
+});
+
+test('concurrent 401 responses for one credential share a single invalidation', async () => {
+  await useAuthStore.getState().login('first@example.com', 'password-one');
+  const snapshot = { accountId: activeAccountId, token: storedTokens.get(activeAccountId) };
+  await Promise.all([unauthorizedHandler(snapshot), unauthorizedHandler(snapshot), unauthorizedHandler(snapshot)]);
+  expect(removeAccountCalls).toBe(1);
+  expect(activeAccountId).toBeNull();
+  expect(useAuthStore.getState().status).toBe('anonymous');
 });
 
 test('removing the active account leaves other saved accounts intact and signs out only the active slot', async () => {

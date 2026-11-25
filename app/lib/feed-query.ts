@@ -59,7 +59,6 @@ export async function fetchNativeFeedPage(input: {
   kind: NativeFeedKind;
   cursor: string | null;
   signal?: AbortSignal;
-  invalidateSession: () => Promise<void>;
 }): Promise<NativeFeedPage> {
   const params = new URLSearchParams({ limit: '20' });
   if (input.cursor) params.set('cursor', input.cursor);
@@ -75,10 +74,6 @@ export async function fetchNativeFeedPage(input: {
     },
   );
 
-  if (response.status === 401 && input.kind === 'following') {
-    await input.invalidateSession();
-    return { items: [], nextCursor: null, hasMore: false };
-  }
 
   const payload = data as ContentPageResponse | null;
   const page = payload?.data;

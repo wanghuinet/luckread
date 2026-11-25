@@ -1,4 +1,4 @@
-import { readSessionToken, readCachedUser, readSessionCredentialSnapshot, saveSessionTokenForSnapshot } from './secure-session';
+import { readSessionToken, readCachedUser, readSessionCredentialSnapshot, saveSessionTokenForSnapshot, type SessionCredentialSnapshot } from './secure-session';
 
 const DEFAULT_API_BASE_URL = 'https://api.luckread.com';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -44,6 +44,15 @@ export type ApiUploadProgress = {
   total: number;
   percent: number | null;
 };
+
+export type UnauthorizedSessionHandler = (snapshot: SessionCredentialSnapshot) => Promise<void>;
+
+let unauthorizedSessionHandler: UnauthorizedSessionHandler | null = null;
+
+/** Register the app auth-store boundary without introducing an import cycle. */
+export function registerUnauthorizedSessionHandler(handler: UnauthorizedSessionHandler | null): void {
+  unauthorizedSessionHandler = handler;
+}
 
 export type ApiRequestOptions = RequestInit & {
   /** Called with native multipart upload progress; uses the shared auth/idempotency boundary. */
@@ -581,6 +590,10 @@ export async function apiRequest<T>(
       data = (await response.json()) as T | ApiErrorBody;
     } catch {
       // Logout and other no-content responses intentionally have no JSON body.
+    }
+
+    if (auth && response.status === 401 && credentialSnapshot && unauthorizedSessionHandler) {
+      await unauthorizedSessionHandler(credentialSnapshot).catch(() => undefined);
     }
 
     outcome = isAmbiguousMutationStatus(response.status)

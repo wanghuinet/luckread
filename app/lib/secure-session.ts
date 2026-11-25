@@ -292,6 +292,17 @@ export async function saveCachedUser(userValue: LuckReadUser): Promise<void> {
 }
 
 /** Backward-compatible cleanup for the legacy single-session auth store. */
+export async function clearLegacySessionForSnapshot(snapshot: SessionCredentialSnapshot): Promise<void> {
+  if (snapshot.accountId !== null || await getActiveStoredAccountId() !== null) return;
+  if (await SecureStore.getItemAsync(LEGACY_TOKEN_KEY) !== snapshot.token) return;
+  // Delete only legacy slots; never clear ACTIVE_ACCOUNT_KEY, which may now
+  // belong to an account activated while this old request was in flight.
+  await Promise.all([
+    SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY),
+    SecureStore.deleteItemAsync(LEGACY_USER_KEY),
+  ]);
+}
+
 export async function clearStoredSession(): Promise<void> {
   const activeAccountId = await getActiveStoredAccountId();
   if (activeAccountId) await removeStoredAccount(activeAccountId);
