@@ -167,11 +167,11 @@ export default function RootLayout() {
     const requestedReturnTo = Array.isArray(searchParams.returnTo) ? searchParams.returnTo[0] : searchParams.returnTo;
     const hasSafeReturnTo = Boolean(requestedReturnTo?.startsWith('/') &&
       !requestedReturnTo.startsWith('//') && !requestedReturnTo.includes('\\') &&
-      !/[\\u0000-\\u001f\\u007f]/.test(requestedReturnTo));
+      !/[\u0000-\u001f\u007f]/.test(requestedReturnTo));
     if (status === 'authenticated' && isAuthEntryRoute && !isAddingAccount && !hasSafeReturnTo) {
       router.replace('/' as never);
     }
-  }, [isLoaded, navigationState?.key, router, searchParams.addAccount, segments, status]);
+  }, [isLoaded, navigationState?.key, router, searchParams.addAccount, searchParams.returnTo, segments, status]);
 
   return (
     <PostHogDiagnosticsProvider>
