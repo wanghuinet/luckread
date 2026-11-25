@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getApiErrorMessage } from '../lib/api-client';
@@ -23,6 +23,7 @@ export default function ForgotPasswordScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const emailRevision = useRef(0);
 
   const submit = async () => {
     if (submitting) return;
@@ -34,9 +35,11 @@ export default function ForgotPasswordScreen() {
       return;
     }
 
+    const requestRevision = emailRevision.current;
     setSubmitting(true);
     try {
       const { response, data } = await requestPasswordRecovery(normalizedEmail);
+      if (emailRevision.current !== requestRevision) return;
       if (response.ok) {
         setMessage('如果该邮箱对应 LuckRead 账号，系统会发送密码找回邮件。请检查收件箱和垃圾邮件。邮件中的安全链接将在网页中打开。');
       } else if (response.status === 429) {
@@ -47,7 +50,9 @@ export default function ForgotPasswordScreen() {
         setErrorMessage(getApiErrorMessage(data, '找回请求未能处理，请检查邮箱格式后重试。', response.status));
       }
     } catch (cause) {
-      setErrorMessage(cause instanceof Error ? cause.message : '网络异常，找回请求未能完成。');
+      if (emailRevision.current === requestRevision) {
+        setErrorMessage(cause instanceof Error ? cause.message : '网络异常，找回请求未能完成。');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -64,6 +69,7 @@ export default function ForgotPasswordScreen() {
         keyboardType="email-address"
         maxLength={254}
         onChangeText={(value) => {
+          emailRevision.current += 1;
           setEmail(value);
           setMessage('');
           setErrorMessage('');
