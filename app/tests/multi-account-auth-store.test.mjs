@@ -12,6 +12,8 @@ let unauthorizedHandler = null;
 let removeAccountCalls = 0;
 let deferNextSessionResponse = false;
 let resolveDeferredSessionResponse = null;
+let deferNextLoginResponse = false;
+let resolveDeferredLoginResponse = null;
 
 const userFromEmail = (email) => ({
   id: 'user-' + email.toLowerCase(),
@@ -84,7 +86,7 @@ mock.module('../lib/api-client.ts', () => ({
       const email = JSON.parse(options.body).identity.toLowerCase();
       loginRequests.push(email);
       const user = userFromEmail(email);
-      return {
+      const result = {
         response: new Response(null, {
           status: 200,
           headers: { 'X-LuckRead-Session-Token': 'token-' + email },
@@ -92,6 +94,13 @@ mock.module('../lib/api-client.ts', () => ({
         data: { data: { user } },
         error: null,
       };
+      if (deferNextLoginResponse) {
+        deferNextLoginResponse = false;
+        return new Promise((resolve) => {
+          resolveDeferredLoginResponse = () => resolve(result);
+        });
+      }
+      return result;
     }
     if (path === '/auth/session') {
       const requestSnapshot = { accountId: activeAccountId, token: storedTokens.get(activeAccountId) };
@@ -143,6 +152,8 @@ beforeEach(() => {
   removeAccountCalls = 0;
   deferNextSessionResponse = false;
   resolveDeferredSessionResponse = null;
+  deferNextLoginResponse = false;
+  resolveDeferredLoginResponse = null;
   useAuthStore.setState({ status: 'anonymous', user: null, accounts: [] });
 });
 
@@ -297,4 +308,39 @@ test('late successful bootstrap cannot overwrite an account logged in while vali
   expect(useAuthStore.getState().status).toBe('authenticated');
   expect(useAuthStore.getState().user?.id).toBe('user-second@example.com');
   expect(storedTokens.get('user-second@example.com')).toBe('token-second@example.com');
+});
+
+
+test('late login response cannot replace a newer login', async () => {
+  await useAuthStore.getState().login('first@example.com', 'password-one');
+  deferNextLoginResponse = true;
+  const staleLogin = useAuthStore.getState().login('stale@example.com', 'password-stale');
+  for (let attempt = 0; attempt < 5 && !resolveDeferredLoginResponse; attempt += 1) await Promise.resolve();
+  expect(resolveDeferredLoginResponse).toBeTypeOf('function');
+
+  await useAuthStore.getState().login('latest@example.com', 'password-latest');
+  resolveDeferredLoginResponse?.();
+  await staleLogin;
+
+  expect(activeAccountId).toBe('user-latest@example.com');
+  expect(useAuthStore.getState().status).toBe('authenticated');
+  expect(useAuthStore.getState().user?.id).toBe('user-latest@example.com');
+  expect(storedTokens.has('user-stale@example.com')).toBe(false);
+});
+
+test('late account-switch response cannot replace a newer login', async () => {
+  await useAuthStore.getState().login('first@example.com', 'password-one');
+  await useAuthStore.getState().login('second@example.com', 'password-two');
+  deferNextSessionResponse = true;
+  const staleSwitch = useAuthStore.getState().switchAccount('user-first@example.com');
+  for (let attempt = 0; attempt < 5 && !resolveDeferredSessionResponse; attempt += 1) await Promise.resolve();
+  expect(resolveDeferredSessionResponse).toBeTypeOf('function');
+
+  await useAuthStore.getState().login('latest@example.com', 'password-latest');
+  resolveDeferredSessionResponse?.();
+  await staleSwitch;
+
+  expect(activeAccountId).toBe('user-latest@example.com');
+  expect(useAuthStore.getState().status).toBe('authenticated');
+  expect(useAuthStore.getState().user?.id).toBe('user-latest@example.com');
 });
