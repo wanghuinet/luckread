@@ -880,10 +880,11 @@ export default function UserProfileScreen() {
     const isCurrentViewer = () =>
       Boolean(requestViewerId) &&
       useAuthStore.getState().user?.id === requestViewerId;
-    if (!requestViewerId || profileUserId !== requestViewerId || !isCurrentViewer()) {
+    if (!requestViewerId || profileUserId !== requestViewerId) {
       setLikesError('Sign in to view your Likes.');
       return;
     }
+    if (!isCurrentViewer()) return;
 
     likesRequestRef.current?.abort();
     const controller = new AbortController();
