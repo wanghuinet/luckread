@@ -192,14 +192,15 @@ test('rejects invalid order and plan identifiers before making a mutation', () =
 });
 
 test('loads saved payment methods using the payment-method collection endpoint', async () => {
-  await fetchSavedPaymentMethods();
+  await fetchSavedPaymentMethods({ expectedAccountId: 'viewer-a' });
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/payment-methods');
   expect(calls[0]?.options.method).toBe('GET');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
 });
 
 test('revokes a saved payment method through the dedicated payment-method resource', async () => {
-  await revokeSavedPaymentMethod('spm_' + 'a'.repeat(26), 'revoke_attempt_1');
+  await revokeSavedPaymentMethod('spm_' + 'a'.repeat(26), 'revoke_attempt_1', { expectedAccountId: 'viewer-a' });
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/payment-methods/' + 'spm_' + 'a'.repeat(26));
   expect(calls[0]?.options.method).toBe('DELETE');
