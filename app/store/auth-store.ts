@@ -310,4 +310,16 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
 
 // All authenticated native API calls share the same account-scoped 401 boundary.
-registerUnauthorizedSessionHandler((snapshot) => useAuthStore.getState().invalidateSession(snapshot));
+const pendingSessionInvalidations = new Map<string, Promise<void>>();
+
+registerUnauthorizedSessionHandler((snapshot) => {
+  const key = (snapshot.accountId ?? 'legacy') + '\u0000' + (snapshot.token ?? '');
+  const existing = pendingSessionInvalidations.get(key);
+  if (existing) return existing;
+  const pending = Promise.resolve().then(() => useAuthStore.getState().invalidateSession(snapshot));
+  const tracked = pending.finally(() => {
+    if (pendingSessionInvalidations.get(key) === tracked) pendingSessionInvalidations.delete(key);
+  });
+  pendingSessionInvalidations.set(key, tracked);
+  return tracked;
+});
