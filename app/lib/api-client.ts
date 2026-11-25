@@ -65,6 +65,8 @@ export type ApiRequestOptions = RequestInit & {
   persistSessionCredential?: boolean;
   /** Bind an authenticated request to the account that initiated the operation. */
   expectedAccountId?: string;
+  /** Abort stalled API requests after this duration; set 0 to disable. Defaults to 30 seconds. */
+  timeoutMs?: number;
 };
 
 type RecoveryDefaults = {
@@ -482,6 +484,7 @@ export async function apiRequest<T>(
     onUploadProgress,
     persistSessionCredential = true,
     expectedAccountId,
+    timeoutMs = 30_000,
     headers: inputHeaders,
     ...init
   } = options;
@@ -555,11 +558,20 @@ export async function apiRequest<T>(
   }
 
   let response: Response;
+  const requestController = new AbortController();
+  const callerSignal = init.signal;
+  const forwardCallerAbort = () => requestController.abort(callerSignal?.reason);
+  if (callerSignal?.aborted) forwardCallerAbort();
+  else callerSignal?.addEventListener('abort', forwardCallerAbort, { once: true });
+  const timeoutHandle = timeoutMs > 0
+    ? setTimeout(() => requestController.abort(new Error('API request timed out.')), timeoutMs)
+    : undefined;
   try {
     const requestInit = {
       ...init,
       method,
       headers,
+      signal: requestController.signal,
       cache: 'no-store' as const,
     };
     response = onUploadProgress && isFormDataBody(init.body)
@@ -573,9 +585,12 @@ export async function apiRequest<T>(
     releaseMutationKey(mutationLease, 'transient');
     // Preserve intentional cancellation so query/navigation code can distinguish
     // it from a transport failure and avoid showing a noisy offline message.
-    if (init.signal?.aborted) throw error;
+    if (callerSignal?.aborted) throw error;
     // Do not surface transport internals (which may include request details).
     throw new LuckReadNetworkError();
+  } finally {
+    if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+    callerSignal?.removeEventListener('abort', forwardCallerAbort);
   }
 
   let outcome: MutationOutcome = 'transient';
