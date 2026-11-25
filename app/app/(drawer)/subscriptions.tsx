@@ -216,7 +216,7 @@ export default function MySubscriptionsScreen() {
     setError('');
 
     try {
-      const result = await fetchMySubscriptionsPage({ page, limit: 20, signal: controller.signal });
+      const result = await fetchMySubscriptionsPage({ page, limit: 20, signal: controller.signal, expectedAccountId: requestViewerId });
       if (!isCurrent()) return;
       if (result.response.status === 401) {
         setAuthRequired(true);
@@ -281,7 +281,7 @@ export default function MySubscriptionsScreen() {
       viewerIdRef.current === requestViewerId;
     setPaymentMethodsLoading(true);
     try {
-      const result = await fetchSavedPaymentMethods({ signal: controller.signal });
+      const result = await fetchSavedPaymentMethods({ signal: controller.signal, expectedAccountId: requestViewerId });
       if (!isCurrent()) return;
       if (result.response.status === 401) {
         setAuthRequired(true);
@@ -346,7 +346,7 @@ export default function MySubscriptionsScreen() {
                 const idempotencyKey = paymentMethodIdempotencyKeys.current.get(method.savedPaymentMethodId) ??
                   'remove_' + method.savedPaymentMethodId;
                 paymentMethodIdempotencyKeys.current.set(method.savedPaymentMethodId, idempotencyKey);
-                let result = await revokeSavedPaymentMethod(method.savedPaymentMethodId, idempotencyKey);
+                let result = await revokeSavedPaymentMethod(method.savedPaymentMethodId, idempotencyKey, { expectedAccountId: requestViewerId });
                 if (viewerIdRef.current !== requestViewerId) return;
                 // The first response confirms the D1-04 MIT block. Replay the
                 // same idempotent command once to perform provider-side revocation
