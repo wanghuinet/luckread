@@ -51,7 +51,7 @@ import { useTabBarVisibilityOnAnimatedScroll } from '~/components/TabBarScroll';
 
 import { FeedItem, FeedContent, ProfileImage, PROFILE_IMAGE_SIZE_MAP } from '~/components/FeedItem';
 import FollowButton from '~/components/FollowButton';
-import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, resolveNativeMediaSource, resolvePublicProfileById, unwrapApiData, type ApiContentPage, type ApiContentRecord } from '~/lib/content-adapter';
 import { buildPublicProfileUrl } from '~/lib/public-profile-url';
@@ -826,16 +826,6 @@ export default function UserProfileScreen() {
   }, [userHandle, currentUserId]);
 
   useEffect(() => {
-    void loadProfile();
-    return () => {
-      requestRef.current?.abort();
-      likesRequestRef.current?.abort();
-      repliesRequestRef.current?.abort();
-      mediaRequestRef.current?.abort();
-    };
-  }, [loadProfile]);
-
-  useEffect(() => {
     setSelectedTabIndex(0);
     setRefreshing(false);
     setLikesError('');
@@ -951,7 +941,7 @@ export default function UserProfileScreen() {
       setLikesError(cause instanceof Error ? cause.message : 'Could not load liked posts. Please retry.');
     } finally {
       if (likesRequestRef.current === controller) likesRequestRef.current = null;
-      if (!controller.signal.aborted && isCurrentViewer()) {
+      if (useAuthStore.getState().user?.id === requestViewerId) {
         setLikesLoading(false);
         setLikesLoadingMore(false);
         if (showRefreshIndicator) setRefreshing(false);
@@ -1061,7 +1051,7 @@ export default function UserProfileScreen() {
       }
     } finally {
       if (repliesRequestRef.current === controller) repliesRequestRef.current = null;
-      if (isCurrentRequest()) {
+      if ((useAuthStore.getState().user?.id ?? null) === requestViewerId) {
         setRepliesLoading(false);
         setRepliesLoadingMore(false);
         if (showRefreshIndicator) setRefreshing(false);
@@ -1147,7 +1137,7 @@ export default function UserProfileScreen() {
       }
     } finally {
       if (mediaRequestRef.current === controller) mediaRequestRef.current = null;
-      if (isCurrentRequest()) {
+      if ((useAuthStore.getState().user?.id ?? null) === requestViewerId) {
         setMediaLoading(false);
         setMediaLoadingMore(false);
         if (showRefreshIndicator) setRefreshing(false);
@@ -1202,6 +1192,23 @@ export default function UserProfileScreen() {
       void loadLikedPosts(user.id, null, false);
     }
   }, [showingLikes, user?.id, likesLoadedForUserId, likesLoading, likesError, loadLikedPosts]);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Re-fetch the profile whenever this screen becomes visible again (e.g. after editing a post).
+      setRepliesLoadedForUserId(null);
+      setMediaLoadedForUserId(null);
+      setLikesLoadedForUserId(null);
+      void loadProfile();
+
+      return () => {
+        requestRef.current?.abort();
+        likesRequestRef.current?.abort();
+        repliesRequestRef.current?.abort();
+        mediaRequestRef.current?.abort();
+      };
+    }, [loadProfile]),
+  );
 
   const displayedPosts: FeedContent[] = showingReplies
     ? profileReplies

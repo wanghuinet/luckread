@@ -79,7 +79,7 @@ test('keeps Expo Router tab scenes inside their native navigation context', () =
 test('uses Expo Router navigation context for composer and profile screens', () => {
   expect(publishScreenSource).toContain("import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';");
   expect(publishScreenSource).not.toContain("import { useNavigation, usePreventRemove");
-  expect(profileScreenSource).toContain("import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';");
+  expect(profileScreenSource).toContain("import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';");
   expect(profileScreenSource).not.toContain("from '@react-navigation/native'");
 });
 
