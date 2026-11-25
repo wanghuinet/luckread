@@ -55,6 +55,9 @@ const secureSessionMock = {
     if (activeAccountId === userId) activeAccountId = null;
   },
   clearActiveAccountSelection: async () => { activeAccountId = null; },
+  clearLegacySessionForSnapshot: async (snapshot) => {
+    if (snapshot.accountId === null && activeAccountId === null && storedTokens.get('legacy') === snapshot.token) storedTokens.delete('legacy');
+  },
   clearStoredSession: async () => {
     if (activeAccountId) {
       storedAccounts.delete(activeAccountId);
