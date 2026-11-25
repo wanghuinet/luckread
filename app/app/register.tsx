@@ -206,7 +206,10 @@ export default function RegisterScreen() {
         autoCorrect={false}
         keyboardType="email-address"
         maxLength={254}
-        onChangeText={setEmail}
+        onChangeText={(value) => {
+          idempotencyKeyRef.current = null;
+          setEmail(value);
+        }}
         placeholder="name@example.com"
         returnKeyType="next"
         textContentType="emailAddress"
@@ -220,7 +223,10 @@ export default function RegisterScreen() {
         autoComplete="username"
         autoCorrect={false}
         maxLength={32}
-        onChangeText={setUsername}
+        onChangeText={(value) => {
+          idempotencyKeyRef.current = null;
+          setUsername(value);
+        }}
         placeholder="6–32 位英文字母或数字"
         returnKeyType="next"
         value={username}
@@ -235,7 +241,10 @@ export default function RegisterScreen() {
         autoCapitalize="none"
         autoComplete="new-password"
         maxLength={256}
-        onChangeText={setPassword}
+        onChangeText={(value) => {
+          idempotencyKeyRef.current = null;
+          setPassword(value);
+        }}
         placeholder="15–128 个字符"
         returnKeyType="next"
         secureTextEntry
@@ -249,7 +258,10 @@ export default function RegisterScreen() {
         autoCapitalize="none"
         autoComplete="new-password"
         maxLength={256}
-        onChangeText={setConfirmPassword}
+        onChangeText={(value) => {
+          idempotencyKeyRef.current = null;
+          setConfirmPassword(value);
+        }}
         onSubmitEditing={() => void submit()}
         placeholder="再次输入密码"
         returnKeyType="go"
