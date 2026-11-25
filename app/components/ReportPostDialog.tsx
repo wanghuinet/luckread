@@ -51,8 +51,15 @@ export default function ReportPostDialog({ visible, contentId, onClose }: Report
       return;
     }
     setSubmitting(true);
-    const result = await submitContentReport(contentId, reasonCode, description);
-    setSubmitting(false);
+    let result: Awaited<ReturnType<typeof submitContentReport>>;
+    try {
+      result = await submitContentReport(contentId, reasonCode, description);
+    } catch {
+      Alert.alert('Report failed', 'Could not submit this report. Please check your connection and try again.');
+      return;
+    } finally {
+      setSubmitting(false);
+    }
     if (!result.ok) {
       Alert.alert('Report failed', result.message || 'Could not submit this report. Please try again.');
       return;
