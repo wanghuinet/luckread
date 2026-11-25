@@ -459,7 +459,8 @@ test('keeps the public For You feed independent of stale native session credenti
   expect(feedQuerySource).toContain("const endpoint = input.kind === 'following' ? '/feed/following' : '/contents';");
   expect(feedQuerySource).toContain("auth: input.kind === 'following',");
   expect(feedQuerySource).toContain("if (input.kind === 'for-you') params.set('type', 'post');");
-  expect(feedQuerySource).toContain("if (response.status === 401 && input.kind === 'following')");
+  expect(feedQuerySource).not.toContain("if (response.status === 401 && input.kind === 'following')");
+  expect(feedQuerySource).toContain("if (!response.ok || !page || !Array.isArray(page.items))");
 });
 
 test('lists only the authenticated account draft posts through W01 with cursor pagination', async () => {
