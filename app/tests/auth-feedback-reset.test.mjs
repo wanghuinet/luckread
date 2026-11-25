@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const login = read('../app/login.tsx');
+const register = read('../app/register.tsx');
 const forgotPassword = read('../app/forgot-password.tsx');
 const verifyEmail = read('../app/verify-email.tsx');
 
@@ -43,4 +44,11 @@ test('login inputs are locked while authentication can mutate the active session
 test('recovery and verification inputs are locked while their requests are pending', () => {
   expect(forgotPassword).toContain('value={email}\n        editable={!submitting}');
   expect(verifyEmail).toContain('value={email}\n        editable={!submitting}');
+});
+
+
+test('registration edits rotate an idempotency key after an uncertain submission', () => {
+  for (const setter of ['setEmail(value)', 'setUsername(value)', 'setPassword(value)', 'setConfirmPassword(value)']) {
+    expect(register).toContain(`idempotencyKeyRef.current = null;\n          ${setter}`);
+  }
 });
