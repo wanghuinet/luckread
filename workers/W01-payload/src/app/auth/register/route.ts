@@ -8,6 +8,7 @@ import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../.
 import { getW01RegistrationPersistenceStore } from '../../../auth/registration-persistence.js'
 import { confirmRegistrationIdentity, proxyBetterAuth, rollbackRegistrationUser } from '../../../auth/w02-session-client.js'
 import type { User as PayloadUser } from '../../../payload-types'
+import { countPasswordCodePoints } from '../../../auth/password-policy.js'
 
 const ACCOUNT_STATE = 'PENDING_VERIFICATION'
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
@@ -212,7 +213,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   if (typeof credential !== 'string' || credential.length === 0) {
     return errorResponse(422, 'PASSWORD_REQUIRED', '请输入登录密码。')
   }
-  const credentialLength = credential.length
+  const credentialLength = countPasswordCodePoints(credential)
   if (credentialLength < 15 || credentialLength > 128) {
     return errorResponse(422, 'PASSWORD_LENGTH_INVALID', '密码长度必须为 15–128 个字符。')
   }
