@@ -63,6 +63,7 @@ export function saveOwnPostReplyAudience(
 type PageRequestOptions = {
   cursor?: string | null;
   signal?: AbortSignal;
+  expectedAccountId?: string;
   limit?: number | string;
   notificationId?: string | null;
 };
@@ -161,7 +162,7 @@ export function fetchOwnPostDraftsPage(options: PageRequestOptions = {}) {
   if (options.cursor) query.set('cursor', options.cursor);
   return apiRequest<{ data?: NativePostDraftPage; error?: { code?: string; message?: string } }>(
     '/contents?' + query.toString(),
-    { method: 'GET', signal: options.signal },
+    { method: 'GET', signal: options.signal, expectedAccountId: options.expectedAccountId },
   );
 }
 
@@ -193,7 +194,7 @@ export function fetchOwnScheduledPostsPage(options: PageRequestOptions = {}) {
   if (options.cursor) query.set('cursor', options.cursor);
   return apiRequest<{ data?: NativeScheduledPostPage; error?: { code?: string; message?: string } }>(
     '/contents?' + query.toString(),
-    { method: 'GET', signal: options.signal },
+    { method: 'GET', signal: options.signal, expectedAccountId: options.expectedAccountId },
   );
 }
 
@@ -206,6 +207,7 @@ export function transitionOwnScheduledPostState(
   item: NativeScheduledPost,
   to: 'DRAFT' | 'SCHEDULED',
   scheduledAt?: string,
+  expectedAccountId?: string,
 ) {
   const contentId = item.id.trim();
   const etag = item.etag.trim();
@@ -243,11 +245,12 @@ export function transitionOwnScheduledPostState(
     headers: { 'If-Match': etag },
     body: JSON.stringify(body),
     idempotencyKey: 'native-scheduled-post-' + to.toLowerCase() + ':' + contentId + ':' + createIdempotencyKey(),
+    expectedAccountId,
   });
 }
 
 /** Soft-delete an owner draft with the current W03 ETag and a unique operation key. */
-export function deleteOwnPostDraft(contentIdValue: string, etagValue: string) {
+export function deleteOwnPostDraft(contentIdValue: string, etagValue: string, expectedAccountId?: string) {
   const contentId = contentIdValue.trim();
   const etag = etagValue.trim();
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(contentId)) {
@@ -260,6 +263,7 @@ export function deleteOwnPostDraft(contentIdValue: string, etagValue: string) {
     method: 'DELETE',
     headers: { 'If-Match': etag },
     idempotencyKey: 'native-draft-delete:' + contentId + ':' + createIdempotencyKey(),
+    expectedAccountId,
   });
 }
 
