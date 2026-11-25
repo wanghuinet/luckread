@@ -2032,7 +2032,7 @@ function PublishScreenContent() {
       });
       if (draft?.id && draftSavedFingerprintRef.current !== currentDraftFingerprint) {
         if (!draft.etag || draft.etag === '*') {
-          const detail = await apiRequest<Record<string, unknown>>(
+          const detail = await requestAsOwner<Record<string, unknown>>(
             '/contents/' + encodeURIComponent(draft.id),
             { method: 'GET' },
           );
@@ -2043,7 +2043,7 @@ function PublishScreenContent() {
           }
         }
         if (!draft.etag || draft.etag === '*') throw new Error('Reload the draft before publishing because its server version is missing.');
-        const updated = await apiRequest<Record<string, unknown>>(
+        const updated = await requestAsOwner<Record<string, unknown>>(
           '/contents/' + encodeURIComponent(draft.id),
           {
             method: 'PATCH',
@@ -2064,7 +2064,7 @@ function PublishScreenContent() {
       if (!draft?.id) {
         let created;
         try {
-          created = await apiRequest<Record<string, unknown>>('/contents', {
+          created = await requestAsOwner<Record<string, unknown>>('/contents', {
             method: 'POST',
             body: JSON.stringify(payload),
             idempotencyKey: attempt.contentKey,
@@ -2092,7 +2092,7 @@ function PublishScreenContent() {
       }
 
       if (!draft.etag || draft.etag === '*') {
-        const detail = await apiRequest<Record<string, unknown>>(
+        const detail = await requestAsOwner<Record<string, unknown>>(
           '/contents/' + encodeURIComponent(draft.id),
           { method: 'GET' },
         );
@@ -2151,7 +2151,7 @@ function PublishScreenContent() {
         replyAudienceSavedFingerprintRef.current = replyAudienceFingerprint;
       }
 
-      const transitioned = await apiRequest<Record<string, unknown>>(
+      const transitioned = await requestAsOwner<Record<string, unknown>>(
         '/contents/' + encodeURIComponent(draft.id) + '/state',
         {
           method: 'POST',
@@ -2181,7 +2181,7 @@ function PublishScreenContent() {
       if (quoteContentId) {
         const relationshipKey = quoteRelationshipKeyRef.current || createIdempotencyKey();
         quoteRelationshipKeyRef.current = relationshipKey;
-        const relationship = await apiRequest<Record<string, unknown>>(
+        const relationship = await requestAsOwner<Record<string, unknown>>(
           '/contents/' + encodeURIComponent(draft.id) + '/relationships',
           {
             method: 'POST',
