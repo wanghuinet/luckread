@@ -329,7 +329,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
       }
       setMessage(cause instanceof Error ? cause.message : 'Could not delete this reply. Please retry.');
     } finally {
-      if (useAuthStore.getState().user?.id === viewerIdAtStart) {
+      if ((useAuthStore.getState().user?.id ?? null) === viewerIdAtStart) {
         setDeletingIds((current) => {
           const next = new Set(current);
           next.delete(comment.id);
@@ -375,10 +375,10 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
 
   const toggleCommentLike = useCallback(async (comment: ApiComment) => {
     if (likingCommentId) return;
+    const viewerIdAtStart = currentUserId;
     setLikingCommentId(comment.id);
     setMessage('');
     try {
-      const viewerIdAtStart = currentUserId;
       const result = await toggleCommentLikeRequest(comment.id, viewerIdAtStart);
       if (useAuthStore.getState().user?.id === viewerIdAtStart) {
         setLikedComments((current) => ({ ...current, [comment.id]: result.liked }));
