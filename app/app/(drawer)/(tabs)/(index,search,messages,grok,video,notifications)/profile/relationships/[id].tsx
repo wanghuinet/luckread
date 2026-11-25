@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
@@ -64,11 +64,17 @@ export default function ProfileRelationships() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const requestIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   const loadPage = useCallback(async (nextCursor: string | null, append: boolean) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const requestId = ++requestIdRef.current;
+    const isCurrent = () => requestId === requestIdRef.current && !controller.signal.aborted;
     if (!ownerId) {
-      setError('缺少用户 ID。');
-      setLoading(false);
+      if (isCurrent()) { setError('缺少用户 ID。'); setLoading(false); }
       return;
     }
     if (append) setLoadingMore(true);
@@ -76,8 +82,9 @@ export default function ProfileRelationships() {
     setError('');
     try {
       const result = await fetchUserRelationshipsPage(ownerId, relationType, {
-        cursor: nextCursor,
+        cursor: nextCursor, signal: controller.signal,
       });
+      if (!isCurrent()) return;
       if (!result.response.ok) {
         throw new Error(getApiErrorMessage(result.data, '无法读取关注列表。', result.response.status));
       }
@@ -85,10 +92,10 @@ export default function ProfileRelationships() {
       if (!page || !Array.isArray(page.items)) throw new Error('关注列表返回的数据格式无效。');
 
       const profileRows = await Promise.all(page.items.map(async (relation): Promise<FollowListRow> => {
-        const profile = await resolvePublicProfileById(relation.userId);
+        const profile = await resolvePublicProfileById(relation.userId, controller.signal);
         return { relation, profile: profile as PublicUser | null };
       }));
-
+      if (!isCurrent()) return;
       setRows((current) => {
         if (!append) return profileRows;
         const known = new Set(current.map((item) => item.relation.relationshipId));
@@ -98,16 +105,19 @@ export default function ProfileRelationships() {
       setCursor(page.nextCursor || null);
       setHasMore(page.hasMore === true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '无法读取关注列表。');
+      if (isCurrent()) setError(cause instanceof Error ? cause.message : '无法读取关注列表。');
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
-      setRefreshing(false);
+      if (isCurrent()) {
+        setLoading(false); setLoadingMore(false); setRefreshing(false);
+        if (abortRef.current === controller) abortRef.current = null;
+      }
     }
   }, [ownerId, relationType]);
 
-  useEffect(() => {
-    void loadPage(null, false);
+  useEffect(() => () => {
+    requestIdRef.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = null;
   }, [loadPage]);
 
   const renderItem = useCallback(({ item }: { item: FollowListRow }) => {
