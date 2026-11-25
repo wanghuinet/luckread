@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 
 import { getApiErrorMessage } from '~/lib/api-client';
@@ -390,7 +390,7 @@ export default function MySubscriptionsScreen() {
     );
   }, [currentPaymentMethods, isCurrentPaymentMethodData, loadPaymentMethods, viewerId]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (previousViewerIdRef.current !== viewerId) {
       previousViewerIdRef.current = viewerId;
       requestRef.current?.abort();
@@ -421,7 +421,7 @@ export default function MySubscriptionsScreen() {
       requestRef.current?.abort();
       paymentMethodRequestRef.current?.abort();
     };
-  }, [authStatus, loadPage, loadPaymentMethods, viewerId]);
+  }, [authStatus, loadPage, loadPaymentMethods, viewerId]));
 
   if (authStatus === 'loading' || (authStatus === 'authenticated' && !viewerId)) {
     return (
