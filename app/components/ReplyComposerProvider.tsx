@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import {
@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyledExpoImage as Image } from '~/components/Image';
 import { createComment } from '~/lib/comment-create-api';
 import { createIdempotencyKey, getApiErrorMessage } from '~/lib/api-client';
+import { useAuthStore } from '~/store/auth-store';
 
 export type ReplyComposerTarget = {
   contentId: string;
@@ -46,6 +47,7 @@ export function ReplyComposerProvider({ children }: { children: React.ReactNode 
   const insets = useSafeAreaInsets();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const foreground = isDark ? '#f9fafb' : '#0f1419';
   const muted = isDark ? '#9ca3af' : '#536471';
   const border = isDark ? '#303030' : '#e5e7eb';
@@ -56,12 +58,24 @@ export function ReplyComposerProvider({ children }: { children: React.ReactNode 
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  const viewerScopeRef = useRef<string | null>(currentUserId);
   const pendingSubmissionRef = useRef<{
     contentId: string;
     parentId: string | null;
     body: string;
     key: string;
   } | null>(null);
+  useEffect(() => {
+    if (viewerScopeRef.current === currentUserId) return;
+    viewerScopeRef.current = currentUserId;
+    pendingSubmissionRef.current = null;
+    setTarget(null);
+    setDraft('');
+    setSubmitting(false);
+    setMessage('');
+    sheetRef.current?.dismiss();
+  }, [currentUserId]);
+
   const snapPoints = useMemo(() => ['68%'], []);
 
   const openReplyComposer = useCallback((nextTarget: ReplyComposerTarget) => {
@@ -85,6 +99,11 @@ export function ReplyComposerProvider({ children }: { children: React.ReactNode 
     const body = draft.trim();
     if (!activeTarget || !body || submitting || body.length > 10000) return;
 
+    const viewerIdAtStart = currentUserId;
+    if (!viewerIdAtStart || useAuthStore.getState().user?.id !== viewerIdAtStart) {
+      if (!viewerIdAtStart) router.push('/login' as never);
+      return;
+    }
     setSubmitting(true);
     setMessage('');
     const parentId = activeTarget.parentId?.trim() || null;
@@ -106,9 +125,11 @@ export function ReplyComposerProvider({ children }: { children: React.ReactNode 
       const result = await createComment<{ data?: unknown; error?: { message?: string } }>({
         contentId: activeTarget.contentId,
         body,
+        expectedViewerId: viewerIdAtStart,
         parentId,
         idempotencyKey: key,
       });
+      if (useAuthStore.getState().user?.id !== viewerIdAtStart) return;
       if (result.response.status === 401) {
         sheetRef.current?.dismiss();
         router.push('/login' as never);
@@ -127,11 +148,13 @@ export function ReplyComposerProvider({ children }: { children: React.ReactNode 
       activeTarget.onSubmitted?.();
       sheetRef.current?.dismiss();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Network error. Please retry.');
+      if (useAuthStore.getState().user?.id === viewerIdAtStart) {
+        setMessage(error instanceof Error ? error.message : 'Network error. Please retry.');
+      }
     } finally {
-      setSubmitting(false);
+      if (useAuthStore.getState().user?.id === viewerIdAtStart) setSubmitting(false);
     }
-  }, [draft, router, submitting, target]);
+  }, [currentUserId, draft, router, submitting, target]);
 
   const handleDismiss = useCallback(() => {
     setTarget(null);
