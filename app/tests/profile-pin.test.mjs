@@ -1,11 +1,11 @@
 import { beforeEach, expect, mock, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
-const calls = [];
+const calls = [];\nlet activeViewer = 'pin-owner-load';
 let responseStatus = 200;
 let responseData = { data: null };
 
-mock.module('../lib/api-client.ts', () => ({
+mock.module('../store/auth-store.ts', () => ({\n  useAuthStore: { getState: () => ({ user: { id: activeViewer } }) },\n}));\n\nmock.module('../lib/api-client.ts', () => ({
   apiRequest: async (path, options) => {
     calls.push({ path, options });
     return {
@@ -21,7 +21,7 @@ mock.module('../lib/api-client.ts', () => ({
 const { getProfilePinSnapshot, refreshProfilePin, setProfilePin } = await import('../lib/profile-pin-state.ts');
 
 beforeEach(() => {
-  calls.length = 0;
+  calls.length = 0;\n  activeViewer = 'pin-owner-load';
   responseStatus = 200;
   responseData = { data: null };
 });
@@ -41,7 +41,7 @@ test('loads the current profile pin through the public W01 route once', async ()
   });
 });
 
-test('pins and unpins using the canonical W01 endpoint and idempotency key', async () => {
+test('pins and unpins using the canonical W01 endpoint and idempotency key', async () => {\n  activeViewer = 'pin-owner-write';
   const pinned = await setProfilePin('pin-owner-write', 'post-123', true);
   expect(pinned.ok).toBe(true);
   expect(calls[0].path).toBe('/content/post-123/pin');
@@ -65,7 +65,7 @@ test('pins and unpins using the canonical W01 endpoint and idempotency key', asy
   });
 });
 
-test('preserves the existing pin when a pin write fails', async () => {
+test('preserves the existing pin when a pin write fails', async () => {\n  activeViewer = 'pin-owner-fail';
   responseData = { data: { userId: 'pin-owner-fail', contentId: 'existing-post', pinnedAt: '2026-10-21T10:00:00.000Z' } };
   await refreshProfilePin('pin-owner-fail');
   responseStatus = 403;
