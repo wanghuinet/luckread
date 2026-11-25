@@ -545,6 +545,7 @@ export default function Search() {
             <FeedItem
               key={item.contentId}
               itemData={item}
+              onDeleted={(contentId) => setContentResults((current) => current.filter((result) => result.contentId !== contentId))}
               onPress={() => {
                 if (item.contentId) router.push(('/post/' + encodeURIComponent(item.contentId)) as never);
               }}
