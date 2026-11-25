@@ -30,7 +30,7 @@ test('removing the active account switches to a remaining saved account before d
 
 test('adding another account opens a login mode that is not redirected away', () => {
   expect(drawer).toContain("'/login?addAccount=1'");
-  expect(rootLayout).toContain('useGlobalSearchParams<{ addAccount?: string }>()');
+  expect(rootLayout).toContain('useGlobalSearchParams<{ addAccount?: string; returnTo?: string | string[] }>()');
   expect(rootLayout).toContain("segments[0] === 'login' && searchParams.addAccount === '1'");
   expect(rootLayout).toContain('!isAddingAccount');
   expect(login).toContain("params.addAccount === '1'");
