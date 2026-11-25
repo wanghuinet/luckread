@@ -49,7 +49,7 @@ type AuthStore = {
   switchAccount: (userId: string) => Promise<void>;
   removeAccount: (userId: string) => Promise<void>;
   logout: () => Promise<void>;
-  invalidateSession: () => Promise<void>;
+  invalidateSession: (snapshot?: SessionCredentialSnapshot) => Promise<void>;
 };
 
 type LoginPayload = {
