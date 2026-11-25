@@ -1,4 +1,5 @@
 import { apiRequest, getApiErrorMessage } from './api-client';
+import { useAuthStore } from '../store/auth-store';
 
 export class CommentEditApiError extends Error {
   constructor(
@@ -28,6 +29,7 @@ export async function updateComment(
   body: string,
   updatedAt: string,
   idempotencyKey: string,
+  expectedViewerId: string,
 ): Promise<void> {
   const normalizedId = commentId.trim();
   const normalizedBody = body.trim();
@@ -35,6 +37,9 @@ export async function updateComment(
   const normalizedKey = idempotencyKey.trim();
 
   if (!normalizedId) throw new TypeError('Comment ID is required.');
+  if (!expectedViewerId || useAuthStore.getState().user?.id !== expectedViewerId) {
+    throw new CommentEditApiError('Your account changed before this reply could be edited.', undefined, 'VIEWER_CHANGED');
+  }
   if (!normalizedBody || normalizedBody.length > 10000) {
     throw new TypeError('Comment text must contain 1–10,000 characters.');
   }
