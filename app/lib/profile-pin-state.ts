@@ -137,7 +137,8 @@ export async function setProfilePin(
   if (!userId || !contentId) {
     return { ok: false, message: 'This post or account is not connected to a LuckRead ID.' };
   }
-  if (!userId || !isCurrentViewer(userId)) return { ok: false, message: 'Your account changed. Refresh profile pin status before trying again.' };\n  if (snapshot.userId === userId && (snapshot.loading || snapshot.pending)) {
+  if (!userId || !isCurrentViewer(userId)) return { ok: false, message: 'Your account changed. Refresh profile pin status before trying again.' };
+  if (snapshot.userId === userId && (snapshot.loading || snapshot.pending)) {
     return { ok: false, message: 'Profile pin status is still syncing. Please try again.' };
   }
 
