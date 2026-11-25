@@ -48,12 +48,13 @@ test('pins Android Kotlin to the Hyperswitch and Expo SDK 58 compatible version'
 
 test('loads the signed-in subscriber list through the canonical W01 route', async () => {
   const controller = new AbortController();
-  await fetchMySubscriptionsPage({ page: 2, limit: 15, signal: controller.signal });
+  await fetchMySubscriptionsPage({ page: 2, limit: 15, signal: controller.signal, expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/memberships/subscriptions?limit=15&page=2');
   expect(calls[0]?.options.method).toBe('GET');
   expect(calls[0]?.options.signal).toBe(controller.signal);
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
 });
 
 test('loads a single subscriber-owned subscription through the canonical W01 route', async () => {
@@ -203,6 +204,7 @@ test('revokes a saved payment method through the dedicated payment-method resour
   expect(calls[0]?.path).toBe('/payment-methods/' + 'spm_' + 'a'.repeat(26));
   expect(calls[0]?.options.method).toBe('DELETE');
   expect(calls[0]?.options.idempotencyKey).toBe('revoke_attempt_1');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
 });
 
 test('rejects invalid payment-method IDs and revocation keys before transport', () => {
