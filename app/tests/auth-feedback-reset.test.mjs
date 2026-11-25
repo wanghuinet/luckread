@@ -19,3 +19,18 @@ test('forgot-password clears old success and error feedback when the email chang
 test('verify-email clears old success and error feedback when the email changes', () => {
   expect(verifyEmail).toContain("setEmail(value);\n          setMessage('');\n          setErrorMessage('');");
 });
+
+test('login ignores responses from an earlier email or password revision', () => {
+  expect(login).toContain('const inputRevision = useRef(0);');
+  expect(login).toContain('const requestRevision = inputRevision.current;');
+  expect(login).toContain('if (inputRevision.current !== requestRevision) return;');
+  expect(login).toContain('if (inputRevision.current === requestRevision) router.replace');
+});
+
+test('email recovery screens ignore responses for an email that has since changed', () => {
+  for (const source of [forgotPassword, verifyEmail]) {
+    expect(source).toContain('const emailRevision = useRef(0);');
+    expect(source).toContain('const requestRevision = emailRevision.current;');
+    expect(source).toContain('if (emailRevision.current !== requestRevision) return;');
+  }
+});
