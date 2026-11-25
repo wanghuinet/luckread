@@ -8,7 +8,7 @@ let activeAccountId = null;
 let rejectSessionFor = null;
 const sessionRequests = [];
 const loginRequests = [];
-const pushUnregisterCalls = [];
+const pushUnregisterCalls = [];\nconst pushRestoreCalls = [];
 let failPushUnregisterFor = null;
 let unauthorizedHandler = null;
 let removeAccountCalls = 0;
@@ -131,7 +131,7 @@ mock.module('../lib/api-client.ts', () => ({
     throw new Error('Unexpected API request: ' + path);
   },
 }));
-mock.module('../lib/push-notifications.ts', () => ({
+mock.module('../lib/push-notifications.ts', () => ({\n  syncPushEndpointForAuthenticatedUser: async (userId) => { pushRestoreCalls.push(userId); return 'enabled'; },
   unregisterPushEndpointForUser: async (userId) => {
     pushUnregisterCalls.push({ userId, activeAccountId });
     if (failPushUnregisterFor === userId) {
@@ -149,7 +149,7 @@ beforeEach(() => {
   rejectSessionFor = null;
   sessionRequests.length = 0;
   loginRequests.length = 0;
-  pushUnregisterCalls.length = 0;
+  pushUnregisterCalls.length = 0;\n  pushRestoreCalls.length = 0;
   failPushUnregisterFor = null;
   removeAccountCalls = 0;
   deferNextSessionResponse = false;
