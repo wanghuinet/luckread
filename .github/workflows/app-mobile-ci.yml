@@ -5,6 +5,7 @@ on:
     paths:
       - "app/**"
       - ".github/workflows/app-mobile-ci.yml"
+      - ".github/workflows/app-production-release.yml"
   push:
     branches:
       - main
