@@ -6,12 +6,15 @@ const profile = readFileSync(
   'utf8',
 );
 
-test('profile liked-post requests are invalidated when the active viewer changes', () => {
+test('all profile tab reads and liked-post requests are isolated across viewer changes', () => {
   expect(profile).toContain('const requestViewerId = currentUserId;');
   expect(profile).toContain('useAuthStore.getState().user?.id === requestViewerId');
   expect(profile).toContain('profileUserId !== requestViewerId || !isCurrentViewer()');
   expect(profile).toContain('if (controller.signal.aborted || !isCurrentViewer()) return;');
   expect(profile).toContain('if (!controller.signal.aborted && isCurrentViewer())');
   expect(profile).toContain('likesRequestRef.current?.abort();');
+  expect(profile).toContain('}, [userHandle, currentUserId]);');
   expect(profile).toContain('}, [currentUserId]);');
+  expect(profile).toContain('(useAuthStore.getState().user?.id ?? null) === requestViewerId');
+  expect(profile).toContain('if (!isCurrentRequest()) return;');
 });
