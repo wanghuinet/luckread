@@ -53,12 +53,13 @@ test('loads customer-owned refund history through the canonical W01 route', asyn
 
 test('requests refunds with the payment-owned resource, amount, currency and stable idempotency key', async () => {
   const paymentId = 'pay_' + 'a'.repeat(26);
-  await requestPaymentRefund(paymentId, 1299, 'USD', 'refund_attempt_1');
+  await requestPaymentRefund(paymentId, 1299, 'USD', 'refund_attempt_1', undefined, 'viewer_123');
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/payments/refunds');
   expect(calls[0]?.options.method).toBe('POST');
   expect(calls[0]?.options.idempotencyKey).toBe('refund_attempt_1');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer_123');
   expect(JSON.parse(String(calls[0]?.options.body))).toEqual({
     paymentId,
     amountMinor: 1299,
