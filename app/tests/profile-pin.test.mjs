@@ -94,3 +94,10 @@ test('native profile and post menus expose the pin state and use the shared boun
   expect(profile).toContain('pinnedPost');
   expect(pinState).not.toMatch(/\bfetch\s*\(/);
 });
+
+test('profile pin requests are guarded against stale account reads and mutations', () => {
+  const source = readFileSync(new URL('../lib/profile-pin-state.ts', import.meta.url), 'utf8');
+  expect(source).toContain('if (!userId || !isCurrentViewer(userId)) return;');
+  expect(source).toContain('Your account changed. Refresh profile pin status before trying again.');
+  expect(source).toContain('generation !== loadGeneration || !isCurrentViewer(userId)');
+});
