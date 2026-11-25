@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { apiRequest, clearPendingMutationKeys, getApiErrorMessage } from '../lib/api-client';
+import { apiRequest, clearPendingMutationKeys, getApiErrorMessage, registerUnauthorizedSessionHandler } from '../lib/api-client';
 import {
   activateStoredAccount,
   assertStoredAccountCapacity,
@@ -10,11 +10,13 @@ import {
   listStoredAccounts,
   readCachedUser,
   readSessionToken,
+  readSessionCredentialSnapshot,
   removeStoredAccount,
   saveAccountSession,
   saveCachedUser,
   type LuckReadUser,
   type StoredLuckReadAccount,
+  type SessionCredentialSnapshot,
 } from '../lib/secure-session';
 import { unregisterPushEndpointForUser } from '../lib/push-notifications';
 
@@ -65,6 +67,8 @@ type SessionPayload = {
     user?: LuckReadUser;
   };
 };
+
+let authLifecycleGeneration = 0;
 
 const validUser = (value: unknown): value is LuckReadUser => {
   if (!value || typeof value !== 'object') return false;
@@ -143,6 +147,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   login: async (identity, credential) => {
+    authLifecycleGeneration += 1;
     const normalizedIdentity = identity.trim().toLowerCase();
     if (!normalizedIdentity || !credential) {
       throw new Error('Enter your email and password.');
@@ -190,6 +195,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   switchAccount: async (userId) => {
+    authLifecycleGeneration += 1;
     const previousAccountId = await getActiveStoredAccountId();
     const previousUser = get().user;
     if (previousAccountId === userId && previousUser?.id === userId) return;
@@ -262,6 +268,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   logout: async () => {
+    authLifecycleGeneration += 1;
     const currentUserId = get().user?.id;
     try {
       const token = await readSessionToken();
@@ -279,11 +286,26 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  invalidateSession: async () => {
-    const activeAccountId = await getActiveStoredAccountId();
-    if (activeAccountId) await removeStoredAccount(activeAccountId);
-    else await clearStoredSession();
+  invalidateSession: async (snapshot?: SessionCredentialSnapshot) => {
+    const generation = authLifecycleGeneration;
+    if (snapshot) {
+      // A delayed 401 may only invalidate the exact credential that initiated it.
+      const current = await readSessionCredentialSnapshot();
+      if (generation !== authLifecycleGeneration || current.accountId !== snapshot.accountId || current.token !== snapshot.token) return;
+      if (snapshot.accountId) await removeStoredAccount(snapshot.accountId);
+      else await clearStoredSession();
+      const activeAccountId = await getActiveStoredAccountId();
+      if (generation !== authLifecycleGeneration || activeAccountId !== snapshot.accountId) return;
+    } else {
+      const activeAccountId = await getActiveStoredAccountId();
+      if (activeAccountId) await removeStoredAccount(activeAccountId);
+      else await clearStoredSession();
+    }
     clearPendingMutationKeys();
     set({ status: 'anonymous', user: null, accounts: await listStoredAccounts() });
   },
 }));
+
+
+// All authenticated native API calls share the same account-scoped 401 boundary.
+registerUnauthorizedSessionHandler((snapshot) => useAuthStore.getState().invalidateSession(snapshot));
