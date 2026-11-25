@@ -32,7 +32,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
     <View style={[styles.errorContainer, isDark && { backgroundColor: '#000000' }]}>
       <Text style={[styles.errorTitle, isDark && { color: "#f9fafb" }]}>LuckRead 页面暂时无法显示</Text>
       <Text style={[styles.errorDescription, isDark && { color: "#9ca3af" }]}>
-        {error.message || '页面发生异常，请重新加载。'}
+        页面发生异常，可能是网络波动或服务暂时不可用。请重新加载页面。
       </Text>
       <Pressable accessibilityRole="button" onPress={retry} style={styles.errorButton}>
         <Text style={styles.errorButtonText}>重新加载页面</Text>
