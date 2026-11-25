@@ -15,7 +15,7 @@ test('account identity is rechecked before creating a payment intent and opening
   const source = await readFile(screenPath, 'utf8');
   const intent = source.indexOf('const intentResult = await createMembershipPaymentIntent');
   const intentGuard = source.lastIndexOf('if (!isPurchaseViewerCurrent())', intent);
-  const present = source.indexOf('presentNativeMembershipPayment');
+  const present = source.indexOf('const result = await presentNativeMembershipPayment');
   const presentGuard = source.lastIndexOf('if (!isPurchaseViewerCurrent())', present);
   assert.ok(intentGuard >= 0 && intentGuard < intent, 'account must be checked before payment intent creation');
   assert.ok(presentGuard >= 0 && presentGuard < present, 'account must be checked before presenting payment');
