@@ -103,7 +103,14 @@ export default function GroupInfoScreen() {
       <Text className="text-xl font-bold text-neutral-900 dark:text-white">{params.groupName || '群聊'}</Text>
       <Text className="mt-1 text-sm text-neutral-500">{members.data?.length ?? 0}/50 位成员</Text>
       <Text className="mt-5 mb-2 font-semibold text-neutral-900 dark:text-white">成员</Text>
-      {members.isLoading ? <ActivityIndicator color="#1d9bf0" /> : members.data?.map(member => <View key={member.user_id} className="flex-row items-center border-b border-neutral-100 py-3 dark:border-neutral-800">
+      {members.isLoading ? <ActivityIndicator color="#1d9bf0" /> : members.isError ? (
+        <View className="items-center rounded-xl bg-red-50 px-4 py-4 dark:bg-red-950/30">
+          <Text className="text-sm text-red-600 dark:text-red-300">无法加载群聊成员，请检查网络后重试。</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="重试加载群聊成员" onPress={() => void members.refetch()} className="mt-3 rounded-full bg-sky-500 px-5 py-2">
+            <Text className="font-semibold text-white">重试</Text>
+          </Pressable>
+        </View>
+      ) : members.data?.map(member => <View key={member.user_id} className="flex-row items-center border-b border-neutral-100 py-3 dark:border-neutral-800">
         <View className="h-9 w-9 items-center justify-center rounded-full bg-sky-50 dark:bg-sky-950/40">{profileById.get(member.user_id)?.avatar ? <Image source={{ uri: profileById.get(member.user_id)?.avatar as string }} className="h-9 w-9 rounded-full" /> : <Feather name="user" size={18} color="#1d9bf0" />}</View>
         <View className="ml-3 flex-1"><Text className="text-neutral-900 dark:text-white" numberOfLines={1}>{display(profileById.get(member.user_id), member.user_id)}</Text><Text className="text-xs text-neutral-500">{member.member_role === 'owner' ? '群主' : '成员'} · @{profileById.get(member.user_id)?.username || member.user_id}</Text></View>
         {owner && member.member_role !== 'owner' ? <View className="flex-row"><Pressable disabled={transferMutation.isPending} onPress={() => Alert.alert('移交群主', '确定将群主身份移交给此成员？移交后你将成为普通成员。', [{text:'取消',style:'cancel'},{text:'移交',onPress:()=>transferMutation.mutate(member.user_id)}])} className="p-2"><Feather name="award" size={18} color="#1d9bf0" /></Pressable><Pressable disabled={removeMutation.isPending} onPress={() => Alert.alert('移除成员', '确定从群聊移除此成员？', [{text:'取消',style:'cancel'},{text:'移除',style:'destructive',onPress:()=>removeMutation.mutate(member.user_id)}])} className="p-2"><Feather name="user-minus" size={18} color="#dc2626" /></Pressable></View> : null}
@@ -112,7 +119,17 @@ export default function GroupInfoScreen() {
         <Text className="mb-2 font-semibold text-neutral-900 dark:text-white">添加关注的人</Text>
         <TextInput value={search} onChangeText={setSearch} placeholder="搜索姓名或用户名" placeholderTextColor="#9ca3af" className="rounded-full border border-neutral-200 px-4 py-3 text-neutral-900 dark:border-neutral-800 dark:text-white" />
         {following.isLoading || candidates.isLoading ? <ActivityIndicator className="py-4" color="#1d9bf0" /> : null}
-        {following.isError || candidates.isError ? <Text className="py-3 text-sm text-red-500">关注列表暂时不可用，请稍后重试。</Text> : null}
+        {following.isError || candidates.isError ? (
+          <View className="py-3">
+            <Text className="text-sm text-red-500">关注列表暂时不可用，请稍后重试。</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="重试加载关注列表" onPress={() => {
+              if (following.isError) void following.refetch();
+              if (candidates.isError) void candidates.refetch();
+            }} className="mt-2 self-start rounded-full bg-sky-500 px-4 py-2">
+              <Text className="font-semibold text-white">重试</Text>
+            </Pressable>
+          </View>
+        ) : null}
         {filteredCandidates.map(profile => <Pressable key={profile.id} onPress={() => toggle(profile.id)} className="flex-row items-center border-b border-neutral-100 py-3 dark:border-neutral-800">
           {profile.avatar ? <Image source={{ uri: profile.avatar }} className="h-10 w-10 rounded-full" /> : <View className="h-10 w-10 items-center justify-center rounded-full bg-neutral-200 dark:bg-neutral-700"><Feather name="user" size={18} color="#6b7280" /></View>}
           <View className="ml-3 flex-1"><Text className="font-semibold text-neutral-900 dark:text-white">{display(profile)}</Text><Text className="text-xs text-neutral-500">@{profile.username || profile.id}</Text></View>
