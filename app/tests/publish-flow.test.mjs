@@ -27,8 +27,8 @@ test('native publisher uses the shared media API helpers and existing W01 state 
 test('native publisher preserves pending media in app-private storage and restores by user and draft', () => {
   expect(composer).toContain("from '~/lib/publish-pending-media-recovery'");
   expect(composer).toContain('persistPendingMediaRecovery(');
-  expect(composer).toContain('listPendingMediaRecovery(user.id, null)');
-  expect(composer).toContain('listPendingMediaRecovery(user.id, targetContentId)');
+  expect(composer).toContain('listPendingMediaRecovery(ownerId, null)');
+  expect(composer).toContain('listPendingMediaRecovery(ownerId, targetContentId)');
   expect(composer).toContain('bindPendingMediaRecoveryToDraft(');
   expect(composer).toContain('markPendingMediaRecoveryUploaded(user.id, asset.localId, uploaded.url)');
   expect(composer).toContain('asset.uploadedUrl && restoredMediaRefs.includes(asset.uploadedUrl)');
@@ -444,4 +444,17 @@ test('native thread composer creates a bounded text-only thread through existing
   expect(composer).toContain('<PostThreadComposer');
   expect(composer).toContain('{threadComposerVisible ? (');
   expect(composer).toContain('initialText={body}');
+});
+
+
+test('composer restore and quote preview are isolated from account switching', () => {
+  expect(composer).toContain('const ownerId = user.id;');
+  expect(composer).toContain('const isCurrentOwner = () =>');
+  expect(composer).toContain("useAuthStore.getState().user?.id === ownerId");
+  expect(composer).toContain("const loadKey = ownerId + ':' + (targetContentId || '__new-composer__');");
+  expect(composer).toContain('if (!isCurrentOwner()) return;');
+  expect(composer).toContain('listPendingMediaRecovery(ownerId, targetContentId)');
+  expect(composer).toContain('const quoteViewerId = user?.id ?? null;');
+  expect(composer).toContain('const isCurrentQuoteViewer = () =>');
+  expect(composer).toContain('}, [quoteContentId, quoteViewerId]);');
 });

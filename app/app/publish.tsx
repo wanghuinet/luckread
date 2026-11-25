@@ -334,14 +334,20 @@ function PublishScreenContent() {
     const targetContentId = draftId || contentId;
     const restoringDraft = Boolean(draftId && !contentId);
     if (authStatus !== 'authenticated' || !user?.id) return;
+    const ownerId = user.id;
+    const isCurrentOwner = () =>
+      useAuthStore.getState().status === 'authenticated' &&
+      useAuthStore.getState().user?.id === ownerId;
+    const loadKey = ownerId + ':' + (targetContentId || '__new-composer__');
     if (!targetContentId) {
-      if (editLoadKeyRef.current === '__new-composer__') {
+      if (editLoadKeyRef.current === loadKey) {
         draftSaveRestoreCompleteRef.current = true;
         return;
       }
-      editLoadKeyRef.current = '__new-composer__';
+      editLoadKeyRef.current = loadKey;
       try {
-        const pending = await listPendingMediaRecovery(user.id, null);
+        const pending = await listPendingMediaRecovery(ownerId, null);
+        if (!isCurrentOwner()) return;
         if (pending.length > 0) {
           setAssets(pending.map((asset) => ({
             ...asset,
@@ -352,14 +358,14 @@ function PublishScreenContent() {
           setStatusMessage('已恢复上次未完成的媒体上传。');
         }
       } catch {
-        setErrorMessage('无法读取本机保存的待上传媒体，请重新选择文件。');
+        if (isCurrentOwner()) setErrorMessage('无法读取本机保存的待上传媒体，请重新选择文件。');
       } finally {
-        draftSaveRestoreCompleteRef.current = true;
+        if (isCurrentOwner()) draftSaveRestoreCompleteRef.current = true;
       }
       return;
     }
-    if (editLoadKeyRef.current === targetContentId) return;
-    editLoadKeyRef.current = targetContentId;
+    if (editLoadKeyRef.current === loadKey) return;
+    editLoadKeyRef.current = loadKey;
     setLoadingEdit(true);
     setErrorMessage('');
     try {
@@ -367,6 +373,7 @@ function PublishScreenContent() {
         '/contents/' + encodeURIComponent(targetContentId),
         { method: 'GET' },
       );
+      if (!isCurrentOwner()) return;
       if (!result.response.ok) {
         throw new Error(apiFailureDiagnostic(result, restoringDraft ? 'Unable to restore this draft.' : 'Unable to load this post for editing.'));
       }
@@ -378,8 +385,8 @@ function PublishScreenContent() {
       }
       // W03 exposes ownerUserId only to the authenticated owner. Creator identity
       // may differ from the login user ID; W03 remains the final mutation authority.
-      const ownerId = record.ownerUserId;
-      if (ownerId && user?.id && ownerId !== user.id) {
+      const recordOwnerId = record.ownerUserId;
+      if (recordOwnerId && user?.id && recordOwnerId !== user.id) {
         throw new Error('You can edit only your own post.');
       }
       const etag = record.etag || result.response.headers.get('ETag') || undefined;
@@ -388,6 +395,7 @@ function PublishScreenContent() {
       }
 
       const replyPolicyResult = await fetchOwnPostReplyAudience(targetContentId);
+      if (!isCurrentOwner()) return;
       const restoredReplyAudience = readReplyAudienceFromResult(replyPolicyResult.data);
       if (!replyPolicyResult.response.ok || !isNativeReplyAudience(restoredReplyAudience)) {
         throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Unable to restore reply permissions for this post.'));
@@ -396,8 +404,10 @@ function PublishScreenContent() {
       let restoredBody = record.title || '';
       if (restoringDraft && record.bodyRef) {
         const bodyResponse = await fetchContentBodyReference(record.bodyRef);
+        if (!isCurrentOwner()) return;
         if (!bodyResponse.ok) throw new Error('The saved draft text could not be restored. Your server draft was left unchanged.');
         restoredBody = await bodyResponse.text();
+        if (!isCurrentOwner()) return;
       }
 
       let restoredPoll: { options: Array<{ text: string }>; durationMinutes: number } | null = null;
@@ -406,6 +416,7 @@ function PublishScreenContent() {
           '/contents/' + encodeURIComponent(targetContentId) + '/poll',
           { method: 'GET' },
         );
+        if (!isCurrentOwner()) return;
         const pollEnvelope = pollResult.data as { data?: { poll?: { options?: Array<{ text?: string }>; durationMinutes?: number; durationHours?: number } | null } } | null;
         const poll = pollResult.response.ok ? pollEnvelope?.data?.poll : null;
         const options = Array.isArray(poll?.options)
@@ -431,6 +442,7 @@ function PublishScreenContent() {
       const ownedMedia = restoredMediaRefs.length > 0
         ? await getOwnedMediaMetadata(restoredMediaRefs).catch(() => [])
         : [];
+      if (!isCurrentOwner()) return;
       const ownedMediaByUrl = new Map(ownedMedia.map((media) => [media.url, media]));
       const restoredAssets: ComposerAsset[] = restoredMediaRefs.map((url, index) => {
         const filename = url.split('/').pop() || 'Existing media';
@@ -446,15 +458,17 @@ function PublishScreenContent() {
           existing: true,
         };
       });
-      const pendingRecoveries = await listPendingMediaRecovery(user.id, targetContentId).catch(() => []);
+      const pendingRecoveries = await listPendingMediaRecovery(ownerId, targetContentId).catch(() => []);
+      if (!isCurrentOwner()) return;
       const alreadyAttachedRecoveries = pendingRecoveries.filter((asset) =>
         Boolean(asset.uploadedUrl && restoredMediaRefs.includes(asset.uploadedUrl)),
       );
       await Promise.all(
         alreadyAttachedRecoveries.map((asset) =>
-          deletePendingMediaRecovery(user.id, asset.localId).catch(() => undefined),
+          deletePendingMediaRecovery(ownerId, asset.localId).catch(() => undefined),
         ),
       );
+      if (!isCurrentOwner()) return;
       const recoveredPendingAssets: ComposerAsset[] = pendingRecoveries
         .filter((asset) => !alreadyAttachedRecoveries.some((attached) => attached.localId === asset.localId))
         .map((asset) => ({
@@ -496,10 +510,11 @@ function PublishScreenContent() {
       }
       draftSaveRestoreCompleteRef.current = true;
     } catch (error) {
+      if (!isCurrentOwner()) return;
       editLoadKeyRef.current = '';
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load this post.');
     } finally {
-      setLoadingEdit(false);
+      if (isCurrentOwner()) setLoadingEdit(false);
     }
   }, [authStatus, contentId, draftId, user?.id]);
 
@@ -508,8 +523,11 @@ function PublishScreenContent() {
     void loadExistingContent();
   }, [contentId, draftId, loadExistingContent]);
 
+  const quoteViewerId = user?.id ?? null;
   useEffect(() => {
     let active = true;
+    const isCurrentQuoteViewer = () =>
+      active && (useAuthStore.getState().user?.id ?? null) === quoteViewerId;
     if (!quoteContentId) {
       setQuoteTarget(null);
       setLoadingQuote(false);
@@ -518,7 +536,7 @@ function PublishScreenContent() {
     setLoadingQuote(true);
     void apiRequest<Record<string, unknown>>('/contents/' + encodeURIComponent(quoteContentId), { method: 'GET' })
       .then((result) => {
-        if (!active) return;
+        if (!isCurrentQuoteViewer()) return;
         if (!result.response.ok) throw new Error(apiFailureDiagnostic(result, '无法加载要引用的原帖。'));
         const target = unwrapContent(result.data);
         if (!target || target.id !== quoteContentId || target.contentType !== 'post' || target.state !== 'PUBLISHED' || target.accessMode !== 'PUBLIC') {
@@ -528,13 +546,13 @@ function PublishScreenContent() {
         setErrorMessage('');
       })
       .catch((error) => {
-        if (!active) return;
+        if (!isCurrentQuoteViewer()) return;
         setQuoteTarget(null);
         setErrorMessage(error instanceof Error ? error.message : '无法加载要引用的原帖。');
       })
-      .finally(() => { if (active) setLoadingQuote(false); });
+      .finally(() => { if (isCurrentQuoteViewer()) setLoadingQuote(false); });
     return () => { active = false; };
-  }, [quoteContentId]);
+  }, [quoteContentId, quoteViewerId]);
 
   const uploadAsset = useCallback(async (asset: ComposerAsset) => {
     let uploaded = asset.uploaded;
