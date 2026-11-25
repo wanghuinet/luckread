@@ -1845,8 +1845,16 @@ function PublishScreenContent() {
       setErrorMessage('请先登录后再发布。');
       return;
     }
-    const requestAsOwner = <T,>(path: string, options: ApiRequestOptions = {}) =>
-      apiRequest<T>(path, { ...options, expectedAccountId: ownerId });
+    const assertCurrentOwner = () => {
+      if (useAuthStore.getState().user?.id !== ownerId) {
+        throw new Error('Your account changed. Reopen the composer and try again.');
+      }
+    };
+    const requestAsOwner = async <T,>(path: string, options: ApiRequestOptions = {}) => {
+      const result = await apiRequest<T>(path, { ...options, expectedAccountId: ownerId });
+      assertCurrentOwner();
+      return result;
+    };
     const trimmedBody = body.trim();
     if (quoteContentId && (!quoteTarget || quoteTarget.id !== quoteContentId || loadingQuote)) {
       setErrorMessage('请先加载并确认可引用的原帖。');
@@ -1968,6 +1976,7 @@ function PublishScreenContent() {
         }
         const bodyAttempt = bodyUploadRef.current;
         const uploadedBody = await uploadTextBody(trimmedBody, bodyAttempt.key, ownerId);
+        assertCurrentOwner();
         bodyAttempt.uploaded = uploadedBody;
         bodyRef = uploadedBody.url;
       }
@@ -2008,6 +2017,7 @@ function PublishScreenContent() {
         }
         const replyAudienceFingerprint = createReplyAudienceFingerprint(trimmedBody, replyAudience);
         const replyPolicyResult = await saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody, ownerId);
+        assertCurrentOwner();
         assertCurrentOwner();
         if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
           throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Post changes were saved, but reply permissions could not be updated.'));
