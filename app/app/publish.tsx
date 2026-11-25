@@ -2275,7 +2275,7 @@ function PublishScreenContent() {
     } finally {
       if (useAuthStore.getState().user?.id === ownerId) setBusy(false);
     }
-  }, [accessMode, assets, body, contentId, coverRef, loadingQuote, mediaWarning, pollDurationMinutes, pollEnabled, pollOptions, publishPending, quoteContentId, quoteTarget, replyAudience, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens, user?.id]);
+  }, [accessMode, assets, authStatus, body, contentId, coverRef, loadingQuote, mediaWarning, pollDurationMinutes, pollEnabled, pollOptions, publishPending, quoteContentId, quoteTarget, replyAudience, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens, user?.id]);
 
   if (authStatus !== 'authenticated') {
     return (
