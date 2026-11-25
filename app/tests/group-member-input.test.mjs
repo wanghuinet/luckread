@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { parseGroupMemberIds } from '../lib/group-member-input.ts';
 
 test('parses group member IDs separated by spaces, tabs, and newlines', () => {
-  expect(parseGroupMemberIds('user-a user-b\\tuser-c\\nuser-d\\r\\nuser-e')).toEqual([
+  expect(parseGroupMemberIds('user-a user-b\tuser-c\nuser-d\r\nuser-e')).toEqual([
     'user-a',
     'user-b',
     'user-c',
@@ -12,7 +12,7 @@ test('parses group member IDs separated by spaces, tabs, and newlines', () => {
 });
 
 test('parses comma and semicolon separated IDs, including mixed separators', () => {
-  expect(parseGroupMemberIds('user-a,user-b; user-c\\nuser-d;')).toEqual([
+  expect(parseGroupMemberIds('user-a,user-b; user-c\nuser-d;')).toEqual([
     'user-a',
     'user-b',
     'user-c',
@@ -29,5 +29,5 @@ test('ignores leading, trailing, and repeated separators without changing ID ord
 });
 
 test('returns an empty list for blank input', () => {
-  expect(parseGroupMemberIds('  ,;\\n\\t')).toEqual([]);
+  expect(parseGroupMemberIds('  ,;\n\t')).toEqual([]);
 });
