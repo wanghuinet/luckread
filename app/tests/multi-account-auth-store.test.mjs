@@ -229,7 +229,7 @@ test('failed account validation restores the previously active account and its c
   expect(storedTokens.get('user-first@example.com')).toBe('token-first@example.com');
 });
 
-test('late bootstrap 401 cannot invalidate an account activated while session validation was pending', async () => {
+test('failed target-account validation restores the original push registration', async () => {\n  await useAuthStore.getState().login('first@example.com', 'password-one');\n  await useAuthStore.getState().login('second@example.com', 'password-two');\n  await useAuthStore.getState().switchAccount('user-first@example.com');\n  rejectSessionFor = 'user-second@example.com';\n\n  await expect(\n    useAuthStore.getState().switchAccount('user-second@example.com'),\n  ).rejects.toMatchObject({ status: 401 });\n\n  expect(activeAccountId).toBe('user-first@example.com');\n  expect(useAuthStore.getState().user?.id).toBe('user-first@example.com');\n  expect(pushRestoreCalls).toEqual(['user-first@example.com']);\n});\n\ntest('late bootstrap 401 cannot invalidate an account activated while session validation was pending', async () => {
   await useAuthStore.getState().login('first@example.com', 'password-one');
   rejectSessionFor = 'user-first@example.com';
   deferNextSessionResponse = true;
