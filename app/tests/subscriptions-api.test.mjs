@@ -48,46 +48,50 @@ test('pins Android Kotlin to the Hyperswitch and Expo SDK 58 compatible version'
 
 test('loads the signed-in subscriber list through the canonical W01 route', async () => {
   const controller = new AbortController();
-  await fetchMySubscriptionsPage({ page: 2, limit: 15, signal: controller.signal });
+  await fetchMySubscriptionsPage({ page: 2, limit: 15, signal: controller.signal, expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/memberships/subscriptions?limit=15&page=2');
   expect(calls[0]?.options.method).toBe('GET');
   expect(calls[0]?.options.signal).toBe(controller.signal);
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
 });
 
 test('loads a single subscriber-owned subscription through the canonical W01 route', async () => {
-  await fetchMySubscription('sub_' + 'a'.repeat(64));
+  await fetchMySubscription('sub_' + 'a'.repeat(64), { expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/memberships/subscriptions/sub_' + 'a'.repeat(64));
   expect(calls[0]?.options.method).toBe('GET');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
 });
 
 test('loads the W07 plan-change preview without mutating subscription state', async () => {
   const subscriptionId = 'sub_' + 'a'.repeat(64);
   const planId = 'plan_' + 'b'.repeat(64);
   const controller = new AbortController();
-  await fetchSubscriptionPlanChangePreview(subscriptionId, planId, { signal: controller.signal });
+  await fetchSubscriptionPlanChangePreview(subscriptionId, planId, { signal: controller.signal, expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/memberships/subscriptions/' + subscriptionId +
     '/change-plan-preview?targetPlanId=' + planId);
   expect(calls[0]?.options.method).toBe('GET');
   expect(calls[0]?.options.signal).toBe(controller.signal);
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
 });
 
 test('starts an upgrade checkout using W07 quote ETag and an idempotency key', async () => {
   const subscriptionId = 'sub_' + 'a'.repeat(64);
   const planId = 'plan_' + 'b'.repeat(64);
   const etag = '"lr-v7"';
-  await createSubscriptionPlanUpgradeCheckout(subscriptionId, planId, etag, 'upgrade_attempt_1');
+  await createSubscriptionPlanUpgradeCheckout(subscriptionId, planId, etag, 'upgrade_attempt_1', { expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/memberships/subscriptions/' + subscriptionId + '/change-plan/checkout');
   expect(calls[0]?.options.method).toBe('POST');
   expect(calls[0]?.options.headers).toEqual({ 'If-Match': etag });
   expect(calls[0]?.options.idempotencyKey).toBe('upgrade_attempt_1');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
   expect(JSON.parse(calls[0]?.options.body)).toEqual({ planId });
 });
 
@@ -95,13 +99,14 @@ test('schedules a downgrade at the end of the current subscription period', asyn
   const subscriptionId = 'sub_' + 'a'.repeat(64);
   const planId = 'plan_' + 'b'.repeat(64);
   const etag = '"lr-v2"';
-  await scheduleSubscriptionPlanDowngrade(subscriptionId, planId, etag, 'downgrade_attempt_1');
+  await scheduleSubscriptionPlanDowngrade(subscriptionId, planId, etag, 'downgrade_attempt_1', { expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/memberships/subscriptions/' + subscriptionId + '/change-plan/schedule');
   expect(calls[0]?.options.method).toBe('POST');
   expect(calls[0]?.options.headers).toEqual({ 'If-Match': etag });
   expect(calls[0]?.options.idempotencyKey).toBe('downgrade_attempt_1');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
   expect(JSON.parse(calls[0]?.options.body)).toEqual({ planId });
 });
 
@@ -109,13 +114,14 @@ test('schedules a billing interval change through the existing W07 operation', a
   const subscriptionId = 'sub_' + 'a'.repeat(64);
   const planId = 'plan_' + 'b'.repeat(64);
   const etag = '"lr-v4"';
-  await scheduleSubscriptionBillingIntervalChange(subscriptionId, planId, etag, 'interval_attempt_1');
+  await scheduleSubscriptionBillingIntervalChange(subscriptionId, planId, etag, 'interval_attempt_1', { expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/memberships/subscriptions/' + subscriptionId + '/change-plan/interval-schedule');
   expect(calls[0]?.options.method).toBe('POST');
   expect(calls[0]?.options.headers).toEqual({ 'If-Match': etag });
   expect(calls[0]?.options.idempotencyKey).toBe('interval_attempt_1');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
   expect(JSON.parse(calls[0]?.options.body)).toEqual({ planId });
 });
 
@@ -162,11 +168,12 @@ test('creates a server-priced membership order using only the selected plan refe
 });
 
 test('creates a customer-owned payment intent using only the server-created order ID', async () => {
-  await createMembershipPaymentIntent('ord_checkout_001');
+  await createMembershipPaymentIntent('ord_checkout_001', { expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/payments/intents');
   expect(calls[0]?.options.method).toBe('POST');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
   expect(JSON.parse(calls[0]?.options.body)).toEqual({ orderId: 'ord_checkout_001' });
 });
 
@@ -185,18 +192,20 @@ test('rejects invalid order and plan identifiers before making a mutation', () =
 });
 
 test('loads saved payment methods using the payment-method collection endpoint', async () => {
-  await fetchSavedPaymentMethods();
+  await fetchSavedPaymentMethods({ expectedAccountId: 'viewer-a' });
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/payment-methods');
   expect(calls[0]?.options.method).toBe('GET');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
 });
 
 test('revokes a saved payment method through the dedicated payment-method resource', async () => {
-  await revokeSavedPaymentMethod('spm_' + 'a'.repeat(26), 'revoke_attempt_1');
+  await revokeSavedPaymentMethod('spm_' + 'a'.repeat(26), 'revoke_attempt_1', { expectedAccountId: 'viewer-a' });
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/payment-methods/' + 'spm_' + 'a'.repeat(26));
   expect(calls[0]?.options.method).toBe('DELETE');
   expect(calls[0]?.options.idempotencyKey).toBe('revoke_attempt_1');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer-a');
 });
 
 test('rejects invalid payment-method IDs and revocation keys before transport', () => {
@@ -233,6 +242,9 @@ test('connects supported plan changes and keeps unverified subscription lifecycl
   expect(subscriptionsScreen).toContain('管理套餐');
   expect(subscriptionsScreen).toContain('/subscription-change?subscriptionId=');
   expect(planChangeScreen).toContain('fetchSubscriptionPlanChangePreview');
+  expect(planChangeScreen).toContain('viewerGenerationRef');
+  expect(planChangeScreen).toContain('assertCurrentViewer(expectedViewerId, generation)');
+  expect(planChangeScreen).toContain('expectedAccountId: expectedViewerId');
   expect(planChangeScreen).toContain('createSubscriptionPlanUpgradeCheckout');
   expect(planChangeScreen).toContain('scheduleSubscriptionPlanDowngrade');
   expect(planChangeScreen).toContain('scheduleSubscriptionBillingIntervalChange');
