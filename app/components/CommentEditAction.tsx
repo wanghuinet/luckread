@@ -40,8 +40,11 @@ export default function CommentEditAction({ comment, onSaved }: CommentEditActio
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const pendingEditRef = useRef<PendingEdit | null>(null);
+  const viewerScopeRef = useRef<string | null>(currentUserId);
 
   useEffect(() => {
+    if (viewerScopeRef.current === currentUserId) return;
+    viewerScopeRef.current = currentUserId;
     pendingEditRef.current = null;
     setVisible(false);
     setDraft(comment.body);
