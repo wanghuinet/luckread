@@ -56,6 +56,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Cache Bun package downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: luckread-bun-${{ runner.os }}-${{ hashFiles('app/bun.lockb', 'app/bun.lock', 'app/package.json') }}
+          restore-keys: |
+            luckread-bun-${{ runner.os }}-
       - name: Install Expo app dependencies
         run: bun install
       - name: Export generated Bun lockfile for the reviewed PR
@@ -153,6 +160,15 @@ jobs:
             echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
           } >> "$GITHUB_ENV"
 
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: luckread-gradle-${{ runner.os }}-${{ hashFiles('app/bun.lockb', 'app/bun.lock', 'app/package.json', 'app/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            luckread-gradle-${{ runner.os }}-
       - name: Generate and verify Hyperswitch native module Codegen
         run: |
           test -f android/gradle.properties
