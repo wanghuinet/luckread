@@ -52,7 +52,7 @@ export default function LoginScreen() {
       await login(normalizedEmail, password);
       router.replace('/' as never);
     } catch (cause) {
-      if (cause instanceof AuthStoreError && (cause.code === 'EMAIL_NOT_VERIFIED' || cause.status === 403)) {
+      if (cause instanceof AuthStoreError && cause.code === 'EMAIL_NOT_VERIFIED') {
         setNeedsVerification(true);
         setErrorMessage('这个邮箱还没有完成验证。请检查收件箱，或重新发送验证邮件。');
       } else {
