@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -40,6 +40,17 @@ export default function CommentEditAction({ comment, onSaved }: CommentEditActio
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const pendingEditRef = useRef<PendingEdit | null>(null);
+  const viewerScopeRef = useRef<string | null>(currentUserId);
+
+  useEffect(() => {
+    if (viewerScopeRef.current === currentUserId) return;
+    viewerScopeRef.current = currentUserId;
+    pendingEditRef.current = null;
+    setVisible(false);
+    setDraft(comment.body);
+    setSaving(false);
+    setMessage('');
+  }, [currentUserId, comment.body]);
 
   if (!currentUserId || comment.authorUserId !== currentUserId) return null;
 
@@ -69,6 +80,8 @@ export default function CommentEditAction({ comment, onSaved }: CommentEditActio
       return;
     }
 
+    const viewerIdAtStart = currentUserId;
+    if (!viewerIdAtStart || viewerIdAtStart !== comment.authorUserId) return;
     setSaving(true);
     setMessage('');
     const pending = pendingEditRef.current;
@@ -86,12 +99,14 @@ export default function CommentEditAction({ comment, onSaved }: CommentEditActio
     };
 
     try {
-      await updateComment(comment.id, normalizedBody, version, key);
+      await updateComment(comment.id, normalizedBody, version, key, viewerIdAtStart);
+      if (useAuthStore.getState().user?.id !== viewerIdAtStart) return;
       pendingEditRef.current = null;
       setVisible(false);
       setDraft('');
       await onSaved();
     } catch (cause) {
+      if (useAuthStore.getState().user?.id !== viewerIdAtStart) return;
       if (cause instanceof CommentEditApiError && cause.status === 401) {
         router.push('/login' as never);
         return;
@@ -114,7 +129,7 @@ export default function CommentEditAction({ comment, onSaved }: CommentEditActio
             : 'Could not update this comment. Please retry.',
       );
     } finally {
-      setSaving(false);
+      if (useAuthStore.getState().user?.id === viewerIdAtStart) setSaving(false);
     }
   };
 

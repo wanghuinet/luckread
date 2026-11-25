@@ -2,11 +2,16 @@ import { readFileSync } from 'node:fs';
 import { beforeEach, expect, mock, test } from 'bun:test';
 
 const calls = [];
+let activeViewerId = 'viewer-a';
 let respond = async () => ({
   response: { ok: true, status: 204 },
   data: null,
   error: null,
 });
+
+mock.module('../store/auth-store.ts', () => ({
+  useAuthStore: { getState: () => ({ user: activeViewerId ? { id: activeViewerId } : null }) },
+}));
 
 mock.module('../lib/api-client.ts', () => ({
   apiRequest: async (path, options) => {
@@ -20,6 +25,7 @@ mock.module('../lib/api-client.ts', () => ({
 const { CommentDeleteApiError, deleteComment } = await import('../lib/comment-delete-api.ts');
 
 beforeEach(() => {
+  activeViewerId = 'viewer-a';
   calls.length = 0;
   respond = async () => ({
     response: { ok: true, status: 204 },
@@ -29,7 +35,7 @@ beforeEach(() => {
 });
 
 test('deletes through the existing W01 comment route and preserves the retry key', async () => {
-  await expect(deleteComment('comment/id', 'same-key-for-retry')).resolves.toBeUndefined();
+  await expect(deleteComment('comment/id', 'viewer-a', 'same-key-for-retry')).resolves.toBeUndefined();
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/comments/comment%2Fid');
   expect(calls[0].options.method).toBe('DELETE');
@@ -48,7 +54,7 @@ test('surfaces server refusal when a comment cannot be deleted', async () => {
       retryable: false,
     },
   });
-  await expect(deleteComment('parent-comment', 'delete-key')).rejects.toMatchObject({
+  await expect(deleteComment('parent-comment', 'viewer-a', 'delete-key')).rejects.toMatchObject({
     name: 'CommentDeleteApiError',
     status: 409,
     code: 'COMMENT_HAS_REPLIES',
@@ -68,15 +74,15 @@ test('preserves authentication errors and does not report success on failed writ
       retryable: false,
     },
   });
-  await expect(deleteComment('comment-1', 'delete-key')).rejects.toMatchObject({
+  await expect(deleteComment('comment-1', 'viewer-a', 'delete-key')).rejects.toMatchObject({
     status: 401,
     code: 'UNAUTHENTICATED',
   });
 });
 
 test('rejects missing identifiers or invalid idempotency keys without sending requests', async () => {
-  await expect(deleteComment('  ', 'delete-key')).rejects.toThrow('Comment ID is required.');
-  await expect(deleteComment('comment-1', ' ')).rejects.toThrow('A valid idempotency key is required.');
+  await expect(deleteComment('  ', 'viewer-a', 'delete-key')).rejects.toThrow('Comment ID is required.');
+  await expect(deleteComment('comment-1', 'viewer-a', ' ')).rejects.toThrow('A valid idempotency key is required.');
   expect(calls).toHaveLength(0);
 });
 
@@ -85,6 +91,16 @@ test('shows delete only for the authenticated author and confirms before mutatio
   expect(source).toContain('comment.authorUserId === currentUserId');
   expect(source).toContain("Alert.alert(");
   expect(source).toContain("style: 'destructive'");
-  expect(source).toContain("deleteCommentRequest(comment.id, key)");
+  expect(source).toContain("deleteCommentRequest(comment.id, viewerIdAtStart, key)");
   expect(source).toContain("setComments((current) => current.filter((candidate) => candidate.id !== comment.id))");
+});
+
+
+test('rejects comment deletion when the active viewer changed before the request', async () => {
+  activeViewerId = 'viewer-b';
+  await expect(deleteComment('comment-1', 'viewer-a', 'delete-key')).rejects.toMatchObject({
+    name: 'CommentDeleteApiError',
+    code: 'VIEWER_CHANGED',
+  });
+  expect(calls).toHaveLength(0);
 });

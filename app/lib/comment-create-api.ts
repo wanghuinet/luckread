@@ -1,8 +1,10 @@
 import { apiRequest, createIdempotencyKey, type ApiResult } from './api-client';
+import { useAuthStore } from '../store/auth-store';
 
 export type CreateCommentInput = {
   contentId: string;
   body: string;
+  expectedViewerId: string;
   parentId?: string | null;
   idempotencyKey?: string;
 };
@@ -19,6 +21,9 @@ export async function createComment<T = unknown>(
     : input.idempotencyKey.trim();
 
   if (!contentId) throw new TypeError('Content ID is required.');
+  if (!input.expectedViewerId || useAuthStore.getState().user?.id !== input.expectedViewerId) {
+    throw new Error('Your account changed before this reply could be published.');
+  }
   if (!body || body.length > 10000) {
     throw new TypeError('Comment text must contain 1 to 10000 characters.');
   }
