@@ -2,11 +2,16 @@ import { readFileSync } from 'node:fs';
 import { beforeEach, expect, mock, test } from 'bun:test';
 
 const calls = [];
+let activeViewerId = 'viewer-a';
 let handler = async () => ({
   response: { ok: true, status: 200 },
   data: { data: { liked: false, likeCount: 0 } },
   error: null,
 });
+
+mock.module('../store/auth-store.ts', () => ({
+  useAuthStore: { getState: () => ({ user: activeViewerId ? { id: activeViewerId } : null }) },
+}));
 
 mock.module('../lib/api-client.ts', () => ({
   apiRequest: async (path, options) => {
@@ -20,6 +25,7 @@ mock.module('../lib/api-client.ts', () => ({
 const { CommentLikeApiError, toggleCommentLike } = await import('../lib/comment-likes-api.ts');
 
 beforeEach(() => {
+  activeViewerId = 'viewer-a';
   calls.length = 0;
   handler = async () => ({
     response: { ok: true, status: 200 },
@@ -41,7 +47,7 @@ test('reads authoritative status and likes a comment through the existing endpoi
         error: null,
       };
 
-  await expect(toggleCommentLike('comment/id')).resolves.toEqual({ liked: true });
+  await expect(toggleCommentLike('comment/id', 'viewer-a')).resolves.toEqual({ liked: true });
 
   expect(calls).toHaveLength(2);
   expect(calls[0].path).toBe('/interactions/likes?targetType=comment&targetId=comment%2Fid');
@@ -64,7 +70,7 @@ test('unlikes an already-liked comment and allows 204 success responses', async 
         error: null,
       };
 
-  await expect(toggleCommentLike('comment-1')).resolves.toEqual({ liked: false });
+  await expect(toggleCommentLike('comment-1', 'viewer-a')).resolves.toEqual({ liked: false });
 
   expect(calls[1].options.method).toBe('DELETE');
   expect(calls[1].options.idempotencyKey).toBe('native-comment-like:comment-1:unlike:test-idempotency');
@@ -105,7 +111,7 @@ test('does not report a failed mutation as a successful like', async () => {
 });
 
 test('validates a missing comment ID before touching the API', async () => {
-  await expect(toggleCommentLike('   ')).rejects.toThrow('A valid comment ID is required.');
+  await expect(toggleCommentLike('   ', 'viewer-a')).rejects.toThrow('A valid comment ID is required.');
   expect(calls).toHaveLength(0);
 });
 
@@ -116,4 +122,39 @@ test('wires the reply like button to the tested API adapter and authoritative li
   expect(component).toContain('item.likedByViewer === true');
   expect(component).toContain('onPress={() => void toggleCommentLike(comment)}');
   expect(component).toContain("accessibilityLabel={likedComments[comment.id] ? 'Unlike reply' : 'Like reply'}");
+});
+
+
+test('does not send a like mutation when the viewer changes after reading status', async () => {
+  handler = async (path) => {
+    if (path.startsWith('/interactions/likes?')) {
+      activeViewerId = 'viewer-b';
+      return {
+        response: { ok: true, status: 200 },
+        data: { data: { liked: false, likeCount: 2 } },
+        error: null,
+      };
+    }
+    return {
+      response: { ok: true, status: 201 },
+      data: { data: { liked: true, likeCount: 3 } },
+      error: null,
+    };
+  };
+
+  await expect(toggleCommentLike('comment-switch', 'viewer-a')).rejects.toMatchObject({
+    name: 'CommentLikeApiError',
+    code: 'VIEWER_CHANGED',
+  });
+  expect(calls).toHaveLength(1);
+  expect(calls[0].options.method).toBe('GET');
+});
+
+test('rejects comment likes when no authenticated viewer was captured', async () => {
+  activeViewerId = null;
+  await expect(toggleCommentLike('comment-anonymous', null)).rejects.toMatchObject({
+    name: 'CommentLikeApiError',
+    code: 'VIEWER_CHANGED',
+  });
+  expect(calls).toHaveLength(0);
 });
