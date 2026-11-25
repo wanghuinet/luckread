@@ -88,8 +88,16 @@ export default function PostThreadComposer({
       setError('请先登录后再发布线程。');
       return;
     }
-    const requestAsViewer = <T,>(path: string, options: ApiRequestOptions = {}) =>
-      apiRequest<T>(path, { ...options, expectedAccountId: viewerId });
+    const assertCurrentViewer = () => {
+      if (useAuthStore.getState().user?.id !== viewerId) {
+        throw new Error('Your account changed. Reopen the composer and try again.');
+      }
+    };
+    const requestAsViewer = async <T,>(path: string, options: ApiRequestOptions = {}) => {
+      const result = await apiRequest<T>(path, { ...options, expectedAccountId: viewerId });
+      assertCurrentViewer();
+      return result;
+    };
     const working = itemsRef.current.map(item => ({ ...item }));
     if (working.length < 2 || working.length > MAX_ITEMS ||
         working.some(item => !item.body.trim() || item.body.trim().length > MAX_TEXT)) {
@@ -110,6 +118,7 @@ export default function PostThreadComposer({
         const body = item.body.trim();
         if (!item.bodyRef) {
           const uploaded = await uploadTextBody(body, item.key, viewerId);
+          assertCurrentViewer();
           item.bodyRef = uploaded.url;
           updateItems(working);
         }
