@@ -129,6 +129,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
 
       - name: Configure Android SDK
         run: |
