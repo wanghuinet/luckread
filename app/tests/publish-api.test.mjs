@@ -122,6 +122,17 @@ test('forwards native upload progress updates through the shared media API call'
   ]);
 });
 
+test('binds media uploads to the account that initiated them', async () => {
+  await uploadMediaFile({
+    uri: 'content://device/cache/scoped.png',
+    name: 'scoped.png',
+    mimeType: 'image/png',
+    size: 10,
+  }, 'scoped-upload-key', undefined, 'viewer-a');
+
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
+});
+
 test('rejects local temporary paths returned as media URLs', () => {
   expect(normalizeUploadedMedia({
     doc: { id: 'media-2', url: 'content://device/cache/photo.png' },
@@ -140,6 +151,11 @@ test('uploads text body through Payload media so content receives a permanent bo
   expect(calls[0].options.headers['X-LuckRead-Upload-Fingerprint']).toMatch(/^lr-up1-[a-f0-9]{16}$/);
   expect(calls[0].options.body.get('_payload')).toContain('.txt');
   expect(calls[0].options.body.get('file')).toBeInstanceOf(Blob);
+});
+
+test('binds post body uploads to the initiating account', async () => {
+  await uploadTextBody('Scoped post body', 'scoped-body-key', 'viewer-a');
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
 });
 
 test('resolves playback from the server using the media ID', async () => {
