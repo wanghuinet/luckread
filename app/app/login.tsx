@@ -20,7 +20,13 @@ export default function LoginScreen() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
-  const params = useLocalSearchParams<{ verified?: string; addAccount?: string }>();
+  const params = useLocalSearchParams<{ verified?: string; addAccount?: string; returnTo?: string | string[] }>();
+  const requestedReturnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
+  const safeReturnTo = requestedReturnTo && requestedReturnTo.startsWith('/') &&
+    !requestedReturnTo.startsWith('//') && !requestedReturnTo.includes('\\') &&
+    !/[\u0000-\u001f\u007f]/.test(requestedReturnTo)
+    ? requestedReturnTo
+    : '/';
   const isAddingAccount = params.addAccount === '1';
   const login = useAuthStore((state) => state.login);
   const [email, setEmail] = useState('');
@@ -53,7 +59,7 @@ export default function LoginScreen() {
     setSubmitting(true);
     try {
       await login(normalizedEmail, password);
-      if (inputRevision.current === requestRevision) router.replace('/' as never);
+      if (inputRevision.current === requestRevision) router.replace((isAddingAccount ? '/' : safeReturnTo) as never);
     } catch (cause) {
       if (inputRevision.current !== requestRevision) return;
       if (cause instanceof AuthStoreError && cause.code === 'EMAIL_NOT_VERIFIED') {
