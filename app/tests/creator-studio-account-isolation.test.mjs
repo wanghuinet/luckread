@@ -9,10 +9,19 @@ test('creator studio binds mutations to the active authenticated viewer', async 
   assert.match(source, /viewerRef\.current = viewerId/);
   assert.match(source, /useAuthStore\.getState\(\)\.status === 'authenticated'/);
   assert.match(source, /useAuthStore\.getState\(\)\.user\?\.id === owner/);
-  for (const mutation of ['submitCreatorApplication(', 'updateMyCreatorPlan(', 'createMyCreatorPlan(', 'publishMyCreatorPlan(', 'changeMyCreatorPlanLifecycle(']) {
-    const call = source.indexOf(mutation);
+  const submit = source.slice(source.indexOf('const submitApplication'));
+  const save = source.slice(source.indexOf('const savePlan'));
+  const action = source.slice(source.indexOf('const planAction'));
+  for (const [section, mutation] of [
+    [submit, 'submitCreatorApplication('],
+    [save, 'updateMyCreatorPlan('],
+    [save, 'createMyCreatorPlan('],
+    [action, 'publishMyCreatorPlan('],
+    [action, 'changeMyCreatorPlanLifecycle('],
+  ]) {
+    const call = section.indexOf(mutation);
     assert.ok(call >= 0, mutation + ' must remain wired');
-    const guard = source.lastIndexOf('isCurrentViewer(owner)', call);
+    const guard = section.lastIndexOf('isCurrentViewer(owner)', call);
     assert.ok(guard >= 0, mutation + ' must be protected by initiating account check');
   }
 });
