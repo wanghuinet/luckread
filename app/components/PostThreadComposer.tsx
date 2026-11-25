@@ -194,9 +194,11 @@ export default function PostThreadComposer({
 
       onComplete(working[0].contentId as string);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '线程发布失败，请重试。');
+      if (useAuthStore.getState().user?.id === viewerId) {
+        setError(cause instanceof Error ? cause.message : '线程发布失败，请重试。');
+      }
     } finally {
-      setBusy(false);
+      if (useAuthStore.getState().user?.id === viewerId) setBusy(false);
     }
   };
 
