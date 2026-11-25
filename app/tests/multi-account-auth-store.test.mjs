@@ -9,6 +9,7 @@ const loginRequests = [];
 const pushUnregisterCalls = [];
 let failPushUnregisterFor = null;
 let unauthorizedHandler = null;
+let removeAccountCalls = 0;
 
 const userFromEmail = (email) => ({
   id: 'user-' + email.toLowerCase(),
@@ -50,6 +51,7 @@ const secureSessionMock = {
     return account;
   },
   removeStoredAccount: async (userId) => {
+    removeAccountCalls += 1;
     storedAccounts.delete(userId);
     storedTokens.delete(userId);
     if (activeAccountId === userId) activeAccountId = null;
@@ -125,6 +127,7 @@ beforeEach(() => {
   loginRequests.length = 0;
   pushUnregisterCalls.length = 0;
   failPushUnregisterFor = null;
+  removeAccountCalls = 0;
   useAuthStore.setState({ status: 'anonymous', user: null, accounts: [] });
 });
 
@@ -217,6 +220,15 @@ test('401 for the currently active credential invalidates only that account', as
   expect(activeAccountId).toBeNull();
   expect(useAuthStore.getState().status).toBe('anonymous');
   expect(storedTokens.has('user-first@example.com')).toBe(false);
+});
+
+test('concurrent 401 responses for one credential share a single invalidation', async () => {
+  await useAuthStore.getState().login('first@example.com', 'password-one');
+  const snapshot = { accountId: activeAccountId, token: storedTokens.get(activeAccountId) };
+  await Promise.all([unauthorizedHandler(snapshot), unauthorizedHandler(snapshot), unauthorizedHandler(snapshot)]);
+  expect(removeAccountCalls).toBe(1);
+  expect(activeAccountId).toBeNull();
+  expect(useAuthStore.getState().status).toBe('anonymous');
 });
 
 test('removing the active account leaves other saved accounts intact and signs out only the active slot', async () => {
