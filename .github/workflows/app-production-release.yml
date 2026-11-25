@@ -110,7 +110,7 @@ jobs:
           AAB_CERT_SHA="$(awk '/SHA256:/{print $2; exit}' "$RUNNER_TEMP/aab-certificate.txt" | tr -d ':')"
           KEY_CERT_SHA="$(awk '/SHA256:/{print $2; exit}' "$RUNNER_TEMP/keystore-certificate.txt" | tr -d ':')"
           test -n "$AAB_CERT_SHA" && test "$AAB_CERT_SHA" = "$KEY_CERT_SHA" || { echo "AAB signer does not match configured production keystore" >&2; exit 1; }
-          node -e 'const fs=require("node:fs");const s=fs.readFileSync("android/app/build.gradle","utf8");if(!/applicationId\\s+["\\x27]com\\.luckread\\.app["\\x27]/.test(s))throw new Error("Unexpected Android applicationId; expected com.luckread.app")'
+          grep -Fq 'applicationId "com.luckread.app"' android/app/build.gradle || { echo "Unexpected Android applicationId; expected com.luckread.app" >&2; exit 1; }
           sha256sum "$AAB" | tee "$RUNNER_TEMP/android-aab.sha256"
       - uses: actions/upload-artifact@v4
         with:
@@ -192,6 +192,11 @@ jobs:
           security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
           PROFILE_TEAM="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$PROFILE_PLIST")"
           PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$PROFILE_PLIST")"
+          PROFILE_UUID="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$PROFILE_PLIST")"
+          PROFILE_INSTALL_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_INSTALL_PATH="$PROFILE_INSTALL_DIR/$PROFILE_UUID.mobileprovision"
+          mkdir -p "$PROFILE_INSTALL_DIR"
+          install -m 600 "$PROFILE_PATH" "$PROFILE_INSTALL_PATH"
           PROFILE_APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$PROFILE_PLIST")"
           [[ "$PROFILE_TEAM" == "$IOS_TEAM_ID" ]] || { echo "Provisioning profile Team ID mismatch" >&2; exit 1; }
           [[ "$PROFILE_APP_ID" == "$IOS_TEAM_ID.com.luckread.app" ]] || { echo "Provisioning profile must target $IOS_TEAM_ID.com.luckread.app" >&2; exit 1; }
@@ -204,6 +209,7 @@ jobs:
             echo "IOS_KEYCHAIN_PATH=$KEYCHAIN_PATH"
             echo "IOS_KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD"
             echo "IOS_PROFILE_NAME=$PROFILE_NAME"
+            echo "IOS_PROFILE_INSTALL_PATH=$PROFILE_INSTALL_PATH"
             echo "IOS_EXPORT_OPTIONS_PATH=$EXPORT_PATH"
           } >> "$GITHUB_ENV"
       - name: Install CocoaPods dependencies
@@ -249,5 +255,8 @@ jobs:
         run: |
           if [ -n "${IOS_KEYCHAIN_PATH:-}" ]; then
             security delete-keychain "$IOS_KEYCHAIN_PATH" || true
+          fi
+          if [ -n "${IOS_PROFILE_INSTALL_PATH:-}" ]; then
+            rm -f "$IOS_PROFILE_INSTALL_PATH"
           fi
           rm -rf "${RUNNER_TEMP}/luckread-ios-signing"
