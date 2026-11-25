@@ -205,6 +205,8 @@ jobs:
         run: bun test tests/group-info-query-recovery.test.mjs
       - name: Test login email verification error classification
         run: bun test tests/login-verification-state.test.mjs
+      - name: Test authentication feedback clears when inputs change
+        run: bun test tests/auth-feedback-reset.test.mjs
       - name: Test native subscription management API
         run: bun run test:subscriptions-api
       - name: Test native creator studio application and membership plan workflows
