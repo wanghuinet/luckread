@@ -5,12 +5,14 @@ on:
     paths:
       - "app/**"
       - ".github/workflows/app-mobile-ci.yml"
+      - ".github/workflows/app-production-release.yml"
   push:
     branches:
       - main
     paths:
       - "app/**"
       - ".github/workflows/app-mobile-ci.yml"
+      - ".github/workflows/app-production-release.yml"
   workflow_dispatch:
     inputs:
       run_native_builds:
