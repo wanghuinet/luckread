@@ -555,6 +555,8 @@ function PublishScreenContent() {
   }, [quoteContentId, quoteViewerId]);
 
   const uploadAsset = useCallback(async (asset: ComposerAsset) => {
+    const ownerId = user?.id;
+    if (!ownerId) return false;
     let uploaded = asset.uploaded;
     try {
       if (!uploaded) {
@@ -609,10 +611,9 @@ function PublishScreenContent() {
             uploadLoadedBytes: progress.loaded,
             uploadTotalBytes: progress.total || undefined,
           });
-        }, user?.id);
-        if (user?.id) {
-          await markPendingMediaRecoveryUploaded(user.id, asset.localId, uploaded.url).catch(() => undefined);
-        }
+        }, ownerId);
+        if (useAuthStore.getState().user?.id !== ownerId) throw new Error('Your account changed. Reopen the composer and try again.');
+        await markPendingMediaRecoveryUploaded(ownerId, asset.localId, uploaded.url).catch(() => undefined);
         updateAsset(asset.localId, {
           uploaded,
           altText: uploaded.alt || asset.altText || asset.filename,
@@ -627,7 +628,8 @@ function PublishScreenContent() {
 
       let deliveryUrl = uploaded.url;
       if (isVideoAsset(asset)) {
-        const playback = await getMediaPlayback(uploaded.id);
+        const playback = await getMediaPlayback(uploaded.id, undefined, ownerId);
+        if (useAuthStore.getState().user?.id !== ownerId) throw new Error('Your account changed. Reopen the composer and try again.');
         deliveryUrl = playback.url;
       }
       updateAsset(asset.localId, {
@@ -649,7 +651,7 @@ function PublishScreenContent() {
       });
       return false;
     }
-  }, [persistPendingAsset, updateAsset]);
+  }, [persistPendingAsset, updateAsset, user?.id]);
 
   const addCapturedPhoto = useCallback(async (photo: CapturedCameraPhoto) => {
     if (busy || loadingEdit || publishPending) return;
@@ -838,6 +840,8 @@ function PublishScreenContent() {
   }, [busy, publishPending]);
 
   const saveAssetAltText = useCallback(async (asset: ComposerAsset, value: string) => {
+    const ownerId = user?.id;
+    if (!ownerId) throw new Error('请先登录后再保存图片替代文本。');
     const media = asset.uploaded;
     if (!media?.id) throw new Error('只有当前账号拥有的已上传图片才能保存替代文本。');
     const alt = value.normalize('NFKC').trim();
@@ -848,8 +852,9 @@ function PublishScreenContent() {
     }
     const result = await apiRequest<Record<string, unknown>>(
       '/media/' + encodeURIComponent(media.id),
-      { method: 'PATCH', body: JSON.stringify({ alt }), expectedAccountId: user?.id },
+      { method: 'PATCH', body: JSON.stringify({ alt }), expectedAccountId: ownerId },
     );
+    if (useAuthStore.getState().user?.id !== ownerId) throw new Error('Your account changed. Reopen the composer and try again.');
     if (!result.response.ok) {
       throw new Error(apiFailureDiagnostic(result, '图片替代文本保存失败。'));
     }
