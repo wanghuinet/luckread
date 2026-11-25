@@ -51,7 +51,7 @@ import { useTabBarVisibilityOnAnimatedScroll } from '~/components/TabBarScroll';
 
 import { FeedItem, FeedContent, ProfileImage, PROFILE_IMAGE_SIZE_MAP } from '~/components/FeedItem';
 import FollowButton from '~/components/FollowButton';
-import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, resolveNativeMediaSource, resolvePublicProfileById, unwrapApiData, type ApiContentPage, type ApiContentRecord } from '~/lib/content-adapter';
 import { buildPublicProfileUrl } from '~/lib/public-profile-url';
@@ -826,16 +826,6 @@ export default function UserProfileScreen() {
   }, [userHandle, currentUserId]);
 
   useEffect(() => {
-    void loadProfile();
-    return () => {
-      requestRef.current?.abort();
-      likesRequestRef.current?.abort();
-      repliesRequestRef.current?.abort();
-      mediaRequestRef.current?.abort();
-    };
-  }, [loadProfile]);
-
-  useEffect(() => {
     setSelectedTabIndex(0);
     setRefreshing(false);
     setLikesError('');
@@ -1202,6 +1192,23 @@ export default function UserProfileScreen() {
       void loadLikedPosts(user.id, null, false);
     }
   }, [showingLikes, user?.id, likesLoadedForUserId, likesLoading, likesError, loadLikedPosts]);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Re-fetch the profile whenever this screen becomes visible again (e.g. after editing a post).
+      setRepliesLoadedForUserId(null);
+      setMediaLoadedForUserId(null);
+      setLikesLoadedForUserId(null);
+      void loadProfile();
+
+      return () => {
+        requestRef.current?.abort();
+        likesRequestRef.current?.abort();
+        repliesRequestRef.current?.abort();
+        mediaRequestRef.current?.abort();
+      };
+    }, [loadProfile]),
+  );
 
   const displayedPosts: FeedContent[] = showingReplies
     ? profileReplies
