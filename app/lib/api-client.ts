@@ -1,4 +1,4 @@
-import { getActiveStoredAccountId, readCachedUser, readSessionCredentialSnapshot, saveSessionTokenForSnapshot, type SessionCredentialSnapshot } from './secure-session';
+import { readCachedUser, readSessionCredentialSnapshot, saveSessionTokenForSnapshot, type SessionCredentialSnapshot } from './secure-session';
 
 const DEFAULT_API_BASE_URL = 'https://api.luckread.com';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -99,11 +99,9 @@ export function createIdempotencyKey(): string {
 /** Headers for native image/file components that cannot call apiRequest directly. */
 export async function getApiAuthHeaders(expectedAccountId?: string): Promise<Record<string, string>> {
   const snapshot = await readSessionCredentialSnapshot();
-  if (await getActiveStoredAccountId() !== snapshot.accountId) {
-    throw new Error('Your account changed. Reopen this conversation and try again.');
-  }
   const accountId = snapshot.accountId ?? (await readCachedUser())?.id ?? null;
-  if (await getActiveStoredAccountId() !== snapshot.accountId) {
+  const latest = await readSessionCredentialSnapshot();
+  if (latest.accountId !== snapshot.accountId || latest.token !== snapshot.token) {
     throw new Error('Your account changed. Reopen this conversation and try again.');
   }
   if (expectedAccountId && accountId !== expectedAccountId) {
