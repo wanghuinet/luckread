@@ -75,6 +75,7 @@ test('content like state is isolated and refreshed independently for each signed
   activeViewerId = 'viewer-a';
   serverLikes.set('viewer-a', true);
   await refreshContentLikeStatus(contentId, 'viewer-a');
+  expect(calls.at(-1).options.expectedAccountId).toBe('viewer-a');
 
   activeViewerId = 'viewer-b';
   serverLikes.set('viewer-b', false);
@@ -105,6 +106,7 @@ test('content like mutation reconciles only the initiating viewer cache', async 
 
   activeViewerId = 'viewer-a';
   await expect(toggleContentLike(contentId, 'viewer-a')).resolves.toMatchObject({ ok: true });
+  expect(calls.find((call) => call.path === '/interactions/likes' && call.options.method === 'POST')?.options.expectedAccountId).toBe('viewer-a');
 
   expect(getContentLikeSnapshot(contentId, {}, 'viewer-a').liked).toBe(false);
   expect(getContentLikeSnapshot(contentId, {}, 'viewer-b').liked).toBe(false);
@@ -124,6 +126,7 @@ test('follow state is isolated and refreshed independently for each signed-in vi
   activeViewerId = 'viewer-a';
   serverFollows.set('viewer-a:' + targetId, true);
   await refreshUserFollowStatus(targetId, 'viewer-a');
+  expect(calls.at(-1).options.expectedAccountId).toBe('viewer-a');
 
   activeViewerId = 'viewer-b';
   serverFollows.set('viewer-b:' + targetId, false);
@@ -154,6 +157,7 @@ test('follow mutation reconciles only the initiating viewer cache', async () => 
 
   activeViewerId = 'viewer-a';
   await expect(toggleUserFollow(targetId, 'viewer-a')).resolves.toMatchObject({ ok: true });
+  expect(calls.find((call) => call.path === '/social/follows/' + targetId && call.options.method === 'POST')?.options.expectedAccountId).toBe('viewer-a');
 
   expect(getUserFollowSnapshot(targetId, 'viewer-a').following).toBe(true);
   expect(getUserFollowSnapshot(targetId, 'viewer-b').following).toBe(false);
