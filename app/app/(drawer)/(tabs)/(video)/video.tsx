@@ -61,6 +61,7 @@ async function resolveVideoSource(
   item: ApiContentRecord,
   sessionToken: string | null,
   signal?: AbortSignal,
+  expectedAccountId?: string,
 ): Promise<VideoPlaybackResult> {
   const reference = item.mediaRefs?.find((value) => typeof value === 'string' && value.trim())?.trim();
   if (!reference) return { source: null, error: 'This video has no playable media attached.' };
@@ -77,7 +78,7 @@ async function resolveVideoSource(
 
   // Opaque media IDs must use the existing playback authorization endpoint.
   try {
-    const playback = await getMediaPlayback(reference, signal);
+    const playback = await getMediaPlayback(reference, signal, expectedAccountId);
     const source = resolveNativeMediaSource(playback.url, sessionToken);
     return source
       ? { source }
@@ -509,7 +510,7 @@ export default function VideoFeed() {
           body: () => readContentBody(record, controller.signal, sessionToken),
           social: async () => (await readContentSocialBatch([record.id], controller.signal, viewerId ?? undefined)).get(record.id) ?? record.social ?? null,
           author: () => readContentAuthor(record, controller.signal),
-          playback: () => resolveVideoSource(record, sessionToken, controller.signal),
+          playback: () => resolveVideoSource(record, sessionToken, controller.signal, viewerId ?? undefined),
         },
         { social: record.social ?? null, author: record.creator ?? record.author ?? null },
       );
