@@ -588,18 +588,19 @@ export default function ConversationScreen() {
   const [readAckCycle, setReadAckCycle] = useState(0);
   const readAckStateRef = useRef<{
     conversationId: string;
+    userId?: string;
     acknowledged: string;
     inFlight: boolean;
     retryPending: boolean;
     retryTarget: string;
     retryAttempt: number;
     retryTimer: ReturnType<typeof setTimeout> | null;
-  }>({ conversationId, acknowledged: '0', inFlight: false, retryPending: false, retryTarget: '0', retryAttempt: 0, retryTimer: null });
-  // Route params can change without remounting this screen. Give each conversation
-  // an isolated acknowledgement state so a stale request cannot affect the next chat.
-  if (readAckStateRef.current.conversationId !== conversationId) {
+  }>({ conversationId, userId, acknowledged: '0', inFlight: false, retryPending: false, retryTarget: '0', retryAttempt: 0, retryTimer: null });
+  // Route params or authenticated identity can change without remounting this screen.
+  // Isolate acknowledgement progress and retries across both conversation and account.
+  if (readAckStateRef.current.conversationId !== conversationId || readAckStateRef.current.userId !== userId) {
     if (readAckStateRef.current.retryTimer) clearTimeout(readAckStateRef.current.retryTimer);
-    readAckStateRef.current = { conversationId, acknowledged: '0', inFlight: false, retryPending: false, retryTarget: '0', retryAttempt: 0, retryTimer: null };
+    readAckStateRef.current = { conversationId, userId, acknowledged: '0', inFlight: false, retryPending: false, retryTarget: '0', retryAttempt: 0, retryTimer: null };
   }
   useEffect(() => () => {
     const state = readAckStateRef.current;
@@ -664,7 +665,7 @@ export default function ConversationScreen() {
           setReadAckCycle((cycle) => cycle + 1);
         }
       });
-  }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient, readAckCycle, isFocused, appState]);
+  }, [conversationId, userId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient, readAckCycle, isFocused, appState]);
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
