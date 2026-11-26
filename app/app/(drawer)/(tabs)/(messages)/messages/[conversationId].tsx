@@ -97,6 +97,7 @@ export default function ConversationScreen() {
   useEffect(() => {
     if (!conversationId || !isFocused || appState !== 'active') return;
     return connectMessagingRealtime({
+      userId: userId ?? '',
       conversationId,
       onState: (state) => {
         if (state === 'revoked') {
@@ -227,14 +228,14 @@ export default function ConversationScreen() {
     typingRefreshTimer.current = null;
     if (!typingActiveRef.current) return;
     typingActiveRef.current = false;
-    setMessagingRealtimeTyping(conversationId, false);
-  }, [conversationId]);
+    setMessagingRealtimeTyping(userId ?? '', conversationId, false);
+  }, [conversationId, userId]);
   const handleDraftChange = useCallback((value: string) => {
     setDraft(value);
     if (!value.trim()) { stopTyping(); return; }
     if (!typingActiveRef.current) {
       typingActiveRef.current = true;
-      setMessagingRealtimeTyping(conversationId, true);
+      setMessagingRealtimeTyping(userId ?? '', conversationId, true);
       typingRefreshTimer.current = setInterval(() => {
         if (typingActiveRef.current) setMessagingRealtimeTyping(conversationId, true);
       }, 3_000);
