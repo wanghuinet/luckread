@@ -39,6 +39,14 @@ export default function LoginScreen() {
   const inputRevision = useRef(0);
   const emailRevision = useRef(0);
 
+  const openPolicy = async (url: string, label: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      setErrorMessage(`暂时无法打开${label}，请检查网络后重试。`);
+    }
+  };
+
   const submit = async () => {
     if (submitting) return;
     const requestRevision = inputRevision.current;
@@ -190,11 +198,11 @@ export default function LoginScreen() {
 
       <View style={{ marginTop: 22, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5 }}>
         <Text style={{ color: isDark ? '#9ca3af' : '#8b98a5', fontSize: 12 }}>查看 LuckRead</Text>
-        <Pressable accessibilityRole="link" onPress={() => void Linking.openURL('https://luckread.com/terms').catch(() => undefined)}>
+        <Pressable accessibilityRole="link" onPress={() => void openPolicy('https://luckread.com/terms', '用户协议')}>
           <Text style={{ color: AUTH_COLORS.accent, fontSize: 12, fontWeight: '700' }}>用户协议</Text>
         </Pressable>
         <Text style={{ color: '#8b98a5', fontSize: 12 }}>和</Text>
-        <Pressable accessibilityRole="link" onPress={() => void Linking.openURL('https://luckread.com/privacy').catch(() => undefined)}>
+        <Pressable accessibilityRole="link" onPress={() => void openPolicy('https://luckread.com/privacy', '隐私政策')}>
           <Text style={{ color: AUTH_COLORS.accent, fontSize: 12, fontWeight: '700' }}>隐私政策</Text>
         </Pressable>
       </View>

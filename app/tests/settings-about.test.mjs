@@ -5,6 +5,7 @@ const drawer = readFileSync(new URL('../app/(drawer)/_layout.tsx', import.meta.u
 const settings = readFileSync(new URL('../app/(drawer)/settings.tsx', import.meta.url), 'utf8');
 const about = readFileSync(new URL('../app/(drawer)/about.tsx', import.meta.url), 'utf8');
 const registration = readFileSync(new URL('../app/register.tsx', import.meta.url), 'utf8');
+const login = readFileSync(new URL('../app/login.tsx', import.meta.url), 'utf8');
 const appConfig = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8'));
 const appPackage = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
@@ -55,4 +56,11 @@ test('About page never substitutes OTA metadata for the installed native binary 
   expect(about).toContain('Application.nativeBuildVersion');
   expect(about).not.toContain('Updates.manifest');
   expect(about).not.toContain('Updates.runtimeVersion');
+});
+
+test('Login legal links report failures instead of silently swallowing them', () => {
+  expect(login).toContain("openPolicy('https://luckread.com/terms', '用户协议')");
+  expect(login).toContain("openPolicy('https://luckread.com/privacy', '隐私政策')");
+  expect(login).toContain('暂时无法打开${label}');
+  expect(login).not.toContain("catch(() => undefined)");
 });
