@@ -23,6 +23,7 @@ export function connectMessagingRealtime({ conversationId, onEvent, onState }: R
   let stopped = false;
   let socket: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let stableTimer: ReturnType<typeof setTimeout> | null = null;
   let retry = 0;
   const clearReconnect = () => { if (reconnectTimer) clearTimeout(reconnectTimer); reconnectTimer = null; };
   const scheduleReconnect = () => {
@@ -45,7 +46,9 @@ export function connectMessagingRealtime({ conversationId, onEvent, onState }: R
       candidate.onopen = () => {
         if (stopped || socket !== candidate) return;
         activeSockets.set(conversationId, candidate);
-        retry = 0;
+        // Reset backoff only after a sustained connection, not on brief flaps.
+        if (stableTimer) clearTimeout(stableTimer);
+        stableTimer = setTimeout(() => { stableTimer = null; retry = 0; }, 30_000);
         onState?.('connected');
       };
       candidate.onmessage = (message) => {
@@ -54,6 +57,8 @@ export function connectMessagingRealtime({ conversationId, onEvent, onState }: R
       };
       candidate.onerror = () => { /* onclose owns the single reconnect path */ };
       candidate.onclose = (event) => {
+        if (stableTimer) clearTimeout(stableTimer);
+        stableTimer = null;
         if (activeSockets.get(conversationId) === candidate) activeSockets.delete(conversationId);
         if (socket === candidate) socket = null;
         if (event.code === 4003) {
@@ -70,6 +75,8 @@ export function connectMessagingRealtime({ conversationId, onEvent, onState }: R
   return () => {
     stopped = true;
     clearReconnect();
+    if (stableTimer) clearTimeout(stableTimer);
+    stableTimer = null;
     const current = socket;
     socket = null;
     if (current) {

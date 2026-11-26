@@ -9,3 +9,12 @@ test('read receipt API rejects non-success HTTP responses so retry logic can run
   expect(implementation).toContain('if (!result.response.ok)');
   expect(implementation).toContain('throw new Error');
 });
+
+
+test('realtime reconnect backoff is not reset by short-lived connections', () => {
+  const source = readFileSync(new URL('../lib/messaging-realtime.ts', import.meta.url), 'utf8');
+  expect(source).toContain('stableTimer');
+  expect(source).toContain('30_000');
+  expect(source).toContain('Reset backoff only after a sustained connection');
+  expect(source).toContain('if (stableTimer) clearTimeout(stableTimer)');
+});
