@@ -117,6 +117,7 @@ async function writePushEndpoint(
     '/push/endpoints/' + encodeURIComponent(resolvedInstallationId),
     {
       method: 'PUT',
+      expectedAccountId: userId,
       body: JSON.stringify({
         platform,
         permissionStatus,
@@ -259,7 +260,7 @@ async function unregisterPushEndpointForUserNow(userId: string): Promise<void> {
 
   const result = await apiRequest<unknown>(
     '/push/endpoints/' + encodeURIComponent(installationId),
-    { method: 'DELETE' },
+    { method: 'DELETE', expectedAccountId: userId },
   );
   if (!result.response.ok) {
     throw new Error(result.error?.message || 'Could not unregister this device from LuckRead notifications.');
