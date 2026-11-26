@@ -449,6 +449,8 @@ test('block and mute actions use authenticated canonical endpoints and supported
   expect(calls[3].path).toBe('/interactions/mutes/user-id_123');
   expect(calls[3].options.method).toBe('DELETE');
   expect(calls.every((call) => call.options.expectedAccountId === 'viewer-a')).toBe(true);
+  expect(feedItemSource).toContain('expectedAccountId: currentUser?.id');
+  expect(bookmarkScreenSource).toContain('unblockUser(targetId, operationAccountId)');
 });
 
 test('block and mute menu items invoke real actions in feed and post detail', () => {
