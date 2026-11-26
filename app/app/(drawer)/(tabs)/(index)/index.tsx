@@ -226,6 +226,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     const socialBatchPromise = readContentSocialBatch(
       pendingRecords.map((item) => item.id),
       socialBatchController.signal,
+      viewerId ?? undefined,
     );
     for (const item of pendingRecords) {
       const controller = new AbortController();
