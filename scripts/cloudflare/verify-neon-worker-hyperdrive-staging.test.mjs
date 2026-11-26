@@ -135,3 +135,13 @@ test('keeps the legacy media runtime E2E fail-closed until its Neon fixtures and
   assert.match(workflow, /'d1','execute'/, 'the legacy D1 fixture path must be visible for future replacement')
   assert.match(workflow, /dedicated non-production W01 \+ isolated Neon DB/, 'the re-enable requirement must remain explicit')
 })
+
+
+test('keeps the obsolete D1 media owner migration workflow disabled after W01 Neon cutover', async () => {
+  const workflow = await readFile(
+    new URL('../../.github/workflows/w01-media-owner-migration-execution.yml', import.meta.url),
+    'utf8',
+  )
+  assert.match(workflow, /^  execute:\n    # Safety hold: this legacy workflow targets D1; W01 now runs on Neon Hyperdrive\n    # Do not execute until a Neon-native migration workflow is reviewed and provisioned\.\n    if: \$\{\{ false \}\}$/m)
+  assert.match(workflow, /wrangler.*d1 execute|d1 execute/, 'legacy D1 commands must remain detectable')
+})
