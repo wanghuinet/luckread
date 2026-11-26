@@ -84,6 +84,14 @@ async function writeAccountIndex(accounts: StoredLuckReadAccount[]): Promise<voi
   );
 }
 
+
+let secureSessionMutationQueue: Promise<void> = Promise.resolve();
+function runSecureSessionMutation<T>(operation: () => Promise<T>): Promise<T> {
+  const result = secureSessionMutationQueue.then(operation, operation);
+  secureSessionMutationQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
 function normalizedIdentity(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -114,7 +122,7 @@ export async function assertStoredAccountCapacity(identity: string): Promise<voi
  * Store each opaque session token under its own platform-protected key.
  * The index contains public profile data only and never contains credentials.
  */
-export async function saveAccountSession(userValue: LuckReadUser, token: string): Promise<void> {
+async function saveAccountSessionUnlocked(userValue: LuckReadUser, token: string): Promise<void> {
   const user = normalizeUser(userValue);
   if (!user) throw new Error('The sign-in response did not contain a valid user.');
   if (!token || !token.trim()) throw new Error('The session response did not contain a usable credential.');
@@ -154,7 +162,7 @@ export async function saveAccountSession(userValue: LuckReadUser, token: string)
 }
 
 /** Activate a saved account only after confirming its credential still exists. */
-export async function activateStoredAccount(userId: string): Promise<StoredLuckReadAccount> {
+async function activateStoredAccountUnlocked(userId: string): Promise<StoredLuckReadAccount> {
   const accounts = await readAccountIndex();
   const account = accounts.find((item) => item.id === userId);
   if (!account) throw new Error('这个账号已从此设备移除，请重新登录。');
@@ -178,7 +186,7 @@ export async function activateStoredAccount(userId: string): Promise<StoredLuckR
 }
 
 /** Remove only the selected account from this device; other credentials remain intact. */
-export async function removeStoredAccount(userId: string): Promise<void> {
+async function removeStoredAccountUnlocked(userId: string): Promise<void> {
   const accounts = await readAccountIndex();
   await SecureStore.deleteItemAsync(accountTokenKey(userId));
   await writeAccountIndex(accounts.filter((account) => account.id !== userId));
@@ -188,7 +196,7 @@ export async function removeStoredAccount(userId: string): Promise<void> {
   }
 }
 
-export async function clearActiveAccountSelection(): Promise<void> {
+async function clearActiveAccountSelectionUnlocked(): Promise<void> {
   await SecureStore.deleteItemAsync(ACTIVE_ACCOUNT_KEY);
   await Promise.all([
     SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY),
@@ -235,7 +243,7 @@ export async function readCachedUser(): Promise<LuckReadUser | null> {
 }
 
 /** Persist a renewal to the account that initiated the request, never the newly active account. */
-export async function saveSessionTokenForSnapshot(
+async function saveSessionTokenForSnapshotUnlocked(
   token: string,
   snapshot: SessionCredentialSnapshot,
 ): Promise<void> {
@@ -257,7 +265,7 @@ export async function saveSessionTokenForSnapshot(
 }
 
 /** API session-renewal responses update only the currently active account. */
-export async function saveSessionToken(token: string): Promise<void> {
+async function saveSessionTokenUnlocked(token: string): Promise<void> {
   if (!token.trim()) throw new Error('The session response did not contain a usable credential.');
   const activeAccountId = await getActiveStoredAccountId();
   await SecureStore.setItemAsync(
@@ -267,7 +275,7 @@ export async function saveSessionToken(token: string): Promise<void> {
   );
 }
 
-export async function saveCachedUser(userValue: LuckReadUser): Promise<void> {
+async function saveCachedUserUnlocked(userValue: LuckReadUser): Promise<void> {
   const user = normalizeUser(userValue);
   if (!user) throw new Error('Cannot cache an invalid LuckRead user.');
 
@@ -302,6 +310,15 @@ export async function clearLegacySessionForSnapshot(snapshot: SessionCredentialS
     SecureStore.deleteItemAsync(LEGACY_USER_KEY),
   ]);
 }
+
+
+export async function saveAccountSession(userValue: LuckReadUser, token: string): Promise<void> { return runSecureSessionMutation(() => saveAccountSessionUnlocked(userValue, token)); }
+export async function activateStoredAccount(userId: string): Promise<StoredLuckReadAccount> { return runSecureSessionMutation(() => activateStoredAccountUnlocked(userId)); }
+export async function removeStoredAccount(userId: string): Promise<void> { return runSecureSessionMutation(() => removeStoredAccountUnlocked(userId)); }
+export async function clearActiveAccountSelection(): Promise<void> { return runSecureSessionMutation(() => clearActiveAccountSelectionUnlocked()); }
+export async function saveSessionTokenForSnapshot(token: string, snapshot: SessionCredentialSnapshot): Promise<void> { return runSecureSessionMutation(() => saveSessionTokenForSnapshotUnlocked(token, snapshot)); }
+export async function saveSessionToken(token: string): Promise<void> { return runSecureSessionMutation(() => saveSessionTokenUnlocked(token)); }
+export async function saveCachedUser(userValue: LuckReadUser): Promise<void> { return runSecureSessionMutation(() => saveCachedUserUnlocked(userValue)); }
 
 export async function clearStoredSession(): Promise<void> {
   const activeAccountId = await getActiveStoredAccountId();
