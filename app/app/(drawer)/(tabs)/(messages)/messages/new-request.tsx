@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StatusBar, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -18,12 +18,19 @@ export default function NewMessageRequestScreen() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const mutation = useMutation({
-    mutationFn: () => createMessageRequest(recipientUserId ?? '', body, undefined, userId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'requests', 'outgoing'] });
+    mutationFn: (variables: { recipientUserId: string; body: string; expectedAccountId?: string }) =>
+      createMessageRequest(variables.recipientUserId, variables.body, undefined, variables.expectedAccountId),
+    onSuccess: async (_result, variables) => {
+      if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;
+      await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'requests', 'outgoing'] });
+      if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;
       router.back();
     },
   });
+  useEffect(() => {
+    setBody('');
+    mutation.reset();
+  }, [userId]);
   const canSend = Boolean(recipientUserId && body.trim() && !mutation.isPending);
   const errorCode = mutation.error instanceof Error ? mutation.error.message : '';
   const errorMessage = errorCode === 'RATE_LIMITED'
@@ -41,7 +48,7 @@ export default function NewMessageRequestScreen() {
       <View className="flex-row items-center justify-between border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
         <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={() => router.back()} className="p-2"><Feather name="arrow-left" size={22} color={isDark ? '#fff' : '#111'} /></Pressable>
         <Text className="text-lg font-bold text-neutral-900 dark:text-white">发送私信请求</Text>
-        <Pressable disabled={!canSend} onPress={() => mutation.mutate()} className={`rounded-full px-4 py-2 ${canSend ? 'bg-sky-500' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
+        <Pressable disabled={!canSend} onPress={() => mutation.mutate({ recipientUserId: recipientUserId ?? '', body, expectedAccountId: userId })} className={`rounded-full px-4 py-2 ${canSend ? 'bg-sky-500' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
           {mutation.isPending ? <ActivityIndicator color="#fff" size="small" /> : <Text className="font-semibold text-white">发送</Text>}
         </Pressable>
       </View>
