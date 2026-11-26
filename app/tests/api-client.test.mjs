@@ -1481,3 +1481,14 @@ test('viewer-specific engagement mutations cannot run with another account crede
   expect(outcomes.every((outcome) => outcome.ok === false)).toBe(true);
   expect(fetchCount).toBe(4);
 });
+
+test('engagement state APIs pass the viewer identity into the shared request boundary', async () => {
+  const like = await Bun.file(new URL('../lib/content-like-state.ts', import.meta.url)).text();
+  const bookmark = await Bun.file(new URL('../lib/content-bookmark-state.ts', import.meta.url)).text();
+  const repost = await Bun.file(new URL('../lib/content-repost-state.ts', import.meta.url)).text();
+  const follow = await Bun.file(new URL('../lib/user-follow-state.ts', import.meta.url)).text();
+  expect(like).toContain('expectedAccountId: viewerId ?? undefined');
+  expect(bookmark).toContain('expectedAccountId: viewerId');
+  expect(repost).toContain('expectedAccountId: viewerId');
+  expect(follow).toContain('expectedAccountId: viewerId ?? undefined');
+});
