@@ -137,7 +137,7 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
   const router = useRouter();
   const handleMessagePress = useCallback(async () => {
     try {
-      const conversation = await createDirectConversation(user.id);
+      const conversation = await createDirectConversation(user.id, currentUserId);
       router.push({ pathname: '/messages/[conversationId]', params: { conversationId: conversation.conversationId, participantName: user.name } } as never);
     } catch (cause) {
       if (cause instanceof Error && cause.message === 'CONTACT_POLICY_DENIED') {
@@ -146,7 +146,7 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
       }
       Alert.alert('无法发起私信', cause instanceof Error ? cause.message : '请稍后重试。');
     }
-  }, [router, user.id, user.name]);
+  }, [currentUserId, router, user.id, user.name]);
 
   const handleShareProfile = useCallback(async () => {
     const url = buildPublicProfileUrl(user.public_profile_id);
