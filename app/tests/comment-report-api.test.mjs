@@ -144,7 +144,9 @@ test('wires the report dialog only for comments authored by another user', () =>
   expect(comments).toContain('comment.authorUserId !== viewer?.id');
   expect(comments).toContain('onPress={() => setReportingCommentId(comment.id)}');
   expect(comments).toContain('<ReportCommentDialog');
+  expect(comments).toContain('expectedViewerId={currentUserId}');
   expect(dialog).toContain('reportComment({');
+  expect(dialog).toContain('if (useAuthStore.getState().user?.id !== viewerIdAtStart) return;');
   expect(dialog).toContain('expectedViewerId: viewerIdAtStart');
   expect(dialog).toContain("result === 'DEDUPLICATED'");
   expect(dialog).toContain("router.push('/login'");
