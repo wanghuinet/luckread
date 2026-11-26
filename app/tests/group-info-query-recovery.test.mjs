@@ -16,3 +16,15 @@ test('lets group owners retry failed following and candidate profile queries', (
   expect(screen).toContain('void following.refetch()');
   expect(screen).toContain('void candidates.refetch()');
 });
+
+
+test('group membership destructive operations propagate HTTP failures to UI mutations', () => {
+  const api = readFileSync(new URL('../lib/messaging-api.ts', import.meta.url), 'utf8');
+  for (const name of ['removeGroupMember', 'transferGroupOwnership', 'leaveGroupConversation']) {
+    const start = api.indexOf('export async function ' + name);
+    const end = api.indexOf('\n}', start);
+    const implementation = api.slice(start, end);
+    expect(implementation).toContain('if (!result.response.ok)');
+    expect(implementation).toContain('throw new Error');
+  }
+});
