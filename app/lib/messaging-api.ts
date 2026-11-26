@@ -206,6 +206,6 @@ export async function setConversationTyping(conversationId: string, typing: bool
 }
 export async function fetchConversationTyping(conversationId: string, signal?: AbortSignal, expectedAccountId?: string): Promise<MessagingTypingSnapshot> {
   return unwrap(await apiRequest<Envelope<MessagingTypingSnapshot>>(
-    '/conversations/' + encodeURIComponent(conversationId) + '/typing', { method: 'GET', signal },
+    '/conversations/' + encodeURIComponent(conversationId) + '/typing', { method: 'GET', signal, expectedAccountId },
   ))
 }
