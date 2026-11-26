@@ -137,7 +137,7 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
   const router = useRouter();
   const handleMessagePress = useCallback(async () => {
     try {
-      const conversation = await createDirectConversation(user.id, currentUserId);
+      const conversation = await createDirectConversation(user.id, currentUserId ?? undefined);
       router.push({ pathname: '/messages/[conversationId]', params: { conversationId: conversation.conversationId, participantName: user.name } } as never);
     } catch (cause) {
       if (cause instanceof Error && cause.message === 'CONTACT_POLICY_DENIED') {
