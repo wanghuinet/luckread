@@ -191,7 +191,12 @@ async function syncPushEndpointForAuthenticatedUserNow(
   if (!nativePlatform()) return 'unsupported';
 
   const permission = await getDevicePushPermission();
-  if (permission.status === 'undetermined') return 'not-requested';
+  if (permission.status === 'undetermined') {
+    // A previously granted endpoint may survive an OS permission reset or app reinstall.
+    // Keep the no-prompt behavior, but make the server state match the current permission.
+    await disableExistingPushEndpoint(userId);
+    return 'not-requested';
+  }
 
   if (permission.status === 'denied') {
     await disableExistingPushEndpoint(userId);
