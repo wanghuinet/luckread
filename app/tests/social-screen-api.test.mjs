@@ -430,10 +430,10 @@ test('saved list removes an item only after shared bookmark status confirms it i
 
 
 test('block and mute actions use authenticated canonical endpoints and supported target IDs', async () => {
-  await blockUser(' user-id_123 ');
-  await muteUser(' user-id_123 ');
-  await unblockUser('user-id_123');
-  await unmuteUser('user-id_123');
+  await blockUser(' user-id_123 ', 'viewer-a');
+  await muteUser(' user-id_123 ', 'viewer-a');
+  await unblockUser('user-id_123', 'viewer-a');
+  await unmuteUser('user-id_123', 'viewer-a');
 
   expect(calls).toHaveLength(4);
   expect(calls[0].path).toBe('/interactions/blocks');
@@ -448,6 +448,7 @@ test('block and mute actions use authenticated canonical endpoints and supported
   expect(calls[2].options.method).toBe('DELETE');
   expect(calls[3].path).toBe('/interactions/mutes/user-id_123');
   expect(calls[3].options.method).toBe('DELETE');
+  expect(calls.every((call) => call.options.expectedAccountId === 'viewer-a')).toBe(true);
 });
 
 test('block and mute menu items invoke real actions in feed and post detail', () => {
