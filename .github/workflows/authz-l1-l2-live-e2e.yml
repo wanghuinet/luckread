@@ -6,6 +6,7 @@ on:
     paths:
       - 'scripts/authz-l1-l2-live-e2e.mjs'
       - '.github/workflows/authz-l1-l2-live-e2e.yml'
+      - 'scripts/cloudflare/verify-stale-authz-d1-e2e-disabled.test.mjs'
       - 'workers/W02-identity/src/authz/role-assignment.ts'
       - 'workers/W02-identity/src/auth/better-auth.ts'
       - 'workers/W02-identity/migrations/0001_role_assignments.sql'
