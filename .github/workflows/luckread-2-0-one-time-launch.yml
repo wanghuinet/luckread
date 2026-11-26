@@ -1,10 +1,6 @@
 name: LuckRead 2.0 One-Time Production Launch
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R9.md
   workflow_dispatch:
     inputs:
       confirm:
@@ -21,7 +17,7 @@ permissions:
 
 jobs:
   launch:
-    if: github.event_name != 'workflow_dispatch' || inputs.confirm == 'RUN'
+    if: ${{ inputs.confirm == 'RUN' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
