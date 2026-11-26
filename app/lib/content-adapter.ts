@@ -311,11 +311,12 @@ export async function readContentAuthor(item: ApiContentRecord, signal?: AbortSi
 export async function readContentSocial(
   contentId: string,
   signal?: AbortSignal,
+  expectedAccountId?: string,
 ): Promise<ApiContentSocial | null> {
   try {
     const { response, data } = await apiRequest<unknown>(
       '/contents/' + encodeURIComponent(contentId) + '/social',
-      { method: 'GET', signal },
+      { method: 'GET', signal, expectedAccountId },
     );
     if (!response.ok) return null;
     return unwrapApiData<ApiContentSocial>(data);
@@ -329,6 +330,7 @@ export async function readContentSocial(
 export async function readContentSocialBatch(
   contentIds: readonly string[],
   signal?: AbortSignal,
+  expectedAccountId?: string,
 ): Promise<Map<string, ApiContentSocial>> {
   const uniqueIds = [...new Set(contentIds.filter((id) => typeof id === 'string' && id.trim()).map((id) => id.trim()))];
   if (uniqueIds.length === 0) return new Map();
@@ -338,6 +340,7 @@ export async function readContentSocialBatch(
     const { response, data } = await apiRequest<unknown>('/contents/social/batch', {
       method: 'POST',
       signal,
+      expectedAccountId,
       body: JSON.stringify({ contentIds: uniqueIds }),
       headers: { 'content-type': 'application/json' },
     });
