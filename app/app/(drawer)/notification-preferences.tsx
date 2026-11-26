@@ -102,7 +102,10 @@ export default function NotificationPreferencesScreen() {
 
     const controller = new AbortController();
     let active = true;
+    setPreferences(null);
+    setSavedPreferences(null);
     setLoading(true);
+    setSaving(false);
     setError('');
     setMessage('');
     setAuthRequired(false);
@@ -131,7 +134,7 @@ export default function NotificationPreferencesScreen() {
       active = false;
       controller.abort();
     };
-  }, [authStatus, retryKey]);
+  }, [accountId, authStatus, retryKey]);
 
 
   useEffect(() => {
@@ -220,12 +223,15 @@ export default function NotificationPreferencesScreen() {
     setSaving(true);
     setError('');
     setMessage('');
+    const operationAccountId = accountId;
     try {
       const canonical = await saveNotificationPreferences(preferences);
+      if (useAuthStore.getState().user?.id !== operationAccountId) return;
       setPreferences(canonical);
       setSavedPreferences(canonical);
       setMessage('通知偏好设置已保存。');
     } catch (cause) {
+      if (useAuthStore.getState().user?.id !== operationAccountId) return;
       if (cause instanceof NotificationPreferencesApiError && cause.status === 401) {
         setAuthRequired(true);
         return;
@@ -234,9 +240,9 @@ export default function NotificationPreferencesScreen() {
         ? cause.message
         : '通知偏好设置保存失败，请重试。');
     } finally {
-      setSaving(false);
+      if (useAuthStore.getState().user?.id === operationAccountId) setSaving(false);
     }
-  }, [dirty, preferences, saving]);
+  }, [accountId, dirty, preferences, saving]);
 
   return (
     <View className="flex-1 bg-white dark:bg-black" style={{ paddingTop: insets.top }}>
