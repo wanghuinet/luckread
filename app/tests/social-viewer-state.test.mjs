@@ -167,8 +167,6 @@ test('follow mutation reconciles only the initiating viewer cache', async () => 
 test('like and follow hooks resubscribe and re-read when the authenticated viewer changes', () => {
   const likeSource = readFileSync(new URL('../lib/content-like-state.ts', import.meta.url), 'utf8');
   const followSource = readFileSync(new URL('../lib/user-follow-state.ts', import.meta.url), 'utf8');
-  const repostSource = readFileSync(new URL('../lib/content-repost-state.ts', import.meta.url), 'utf8');
-  const bookmarkSource = readFileSync(new URL('../lib/content-bookmark-state.ts', import.meta.url), 'utf8');
   const followButtonSource = readFileSync(new URL('../components/FollowButton.tsx', import.meta.url), 'utf8');
 
   for (const source of [likeSource, followSource]) {
