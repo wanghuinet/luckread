@@ -61,7 +61,7 @@ export function connectMessagingRealtime({ userId, conversationId, onEvent, onSt
       candidate.onclose = (event) => {
         if (stableTimer) clearTimeout(stableTimer);
         stableTimer = null;
-        if (activeSockets.get(socketKey(userId, conversationId)) === candidate) activeSockets.delete(socketKey(userId, conversationId);
+        if (activeSockets.get(socketKey(userId, conversationId)) === candidate) activeSockets.delete(socketKey(userId, conversationId));
         if (socket === candidate) socket = null;
         if (event.code === 4003) {
           stopped = true;
