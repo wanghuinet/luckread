@@ -214,7 +214,7 @@ export default function ConversationScreen() {
         void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
       },
     });
-  }, [conversationId, isFocused, appState, queryClient, router]);
+  }, [conversationId, userId, isFocused, appState, queryClient, router]);
   const pendingSend = useRef<{ fingerprint: string; key: string } | null>(null);
   const sendMutationPendingRef = useRef(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
