@@ -45,6 +45,7 @@ test('updates only through W01 PATCH with If-Match and a stable idempotency key'
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/comments/comment%2Fid');
   expect(calls[0].options.method).toBe('PATCH');
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
   expect(calls[0].options.idempotencyKey).toBe('same-edit-key');
   expect(calls[0].options.headers['If-Match']).toBe('"2026-10-21T10:00:00.000Z"');
   expect(JSON.parse(calls[0].options.body)).toEqual({ body: 'updated body' });
