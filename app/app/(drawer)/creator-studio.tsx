@@ -61,11 +61,13 @@ export default function CreatorStudioScreen() {
   const viewerId = useAuthStore(s => s.user?.id ?? null);
   const viewerRef = useRef<string | null>(viewerId);
   viewerRef.current = viewerId;
+  const previousViewerIdRef = useRef<string | null>(viewerId);
   const isCurrentViewer = (owner: string) =>
     viewerRef.current === owner &&
     useAuthStore.getState().status === 'authenticated' &&
     useAuthStore.getState().user?.id === owner;
   const [application, setApplication] = useState<CreatorApplication | null>(null);
+  const [loadedViewerId, setLoadedViewerId] = useState<string | null>(null);
   const [plans, setPlans] = useState<CreatorPlan[]>([]);
   const [creatorType, setCreatorType] = useState<string>('PERSONAL');
   const [statement, setStatement] = useState('');
@@ -105,11 +107,31 @@ export default function CreatorStudioScreen() {
         if (!page || !Array.isArray(page.docs) || !page.docs.every(validPlan)) throw new Error('会员方案数据格式无效。');
         setPlans(page.docs);
       } else setPlans([]);
+      setLoadedViewerId(owner);
     } catch (e) { if (viewerRef.current === owner) setError(e instanceof Error ? e.message : '工作室加载失败。'); }
     finally { if (viewerRef.current === owner) { setLoading(false); setRefreshing(false); } }
   }, [authStatus, router, viewerId]);
 
   useEffect(() => {
+    if (previousViewerIdRef.current !== viewerId) {
+      previousViewerIdRef.current = viewerId;
+      setApplication(null);
+      setPlans([]);
+      setLoadedViewerId(null);
+      setEditing(null);
+      setCreatorType('PERSONAL');
+      setStatement('');
+      setName('');
+      setTier('supporter');
+      setInterval('MONTHLY');
+      setPrice('900');
+      setCurrency('USD');
+      setBenefits('会员专属内容');
+      setSaving(false);
+      setBusyPlan(null);
+      setError('');
+      setNotice('');
+    }
     if (authStatus !== 'loading') void load();
     return () => { /* account identity guards late responses */ };
   }, [authStatus, load, viewerId]);
@@ -176,8 +198,11 @@ export default function CreatorStudioScreen() {
 
   if (authStatus === 'loading' || loading) return <View className="flex-1 items-center justify-center bg-white dark:bg-black"><StatusBar style={dark ? 'light' : 'dark'} /><ActivityIndicator size="large" color={BLUE} /><Text className="mt-3 text-sm text-neutral-500">正在加载创作者工作室…</Text></View>;
   if (authStatus !== 'authenticated' || !viewerId) return <View className="flex-1 items-center justify-center bg-white px-6 dark:bg-black"><StatusBar style={dark ? 'light' : 'dark'} /><Text className="mb-4 text-lg font-bold text-neutral-900 dark:text-white">登录后使用创作者工作室</Text><Button title="登录" onPress={() => router.push(('/login?returnTo=' + encodeURIComponent('/creator-studio')) as never)} /></View>;
-  const qualified = application?.status === 'APPROVED' && application.grant_state === 'GRANTED';
-  const canApply = !application || application.status === 'REJECTED';
+  const currentViewerDataReady = loadedViewerId === viewerId;
+  const visibleApplication = currentViewerDataReady ? application : null;
+  const visiblePlans = currentViewerDataReady ? plans : [];
+  const qualified = visibleApplication?.status === 'APPROVED' && visibleApplication.grant_state === 'GRANTED';
+  const canApply = !visibleApplication || visibleApplication.status === 'REJECTED';
   return <View className="flex-1 bg-white dark:bg-black">
     <StatusBar style={dark ? 'light' : 'dark'} />
     <View className="flex-row items-center border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
@@ -190,7 +215,7 @@ export default function CreatorStudioScreen() {
       {notice ? <Text className="mb-4 text-sm font-semibold text-emerald-700 dark:text-emerald-400">{notice}</Text> : null}
       <View className="mb-5 rounded-2xl border border-neutral-200 p-4 dark:border-neutral-800">
         <Text className="text-base font-extrabold text-neutral-900 dark:text-white">创作者资格</Text>
-        {application ? <><Text className="mt-2 text-sm text-neutral-700 dark:text-neutral-300">申请状态：{application.status === 'PENDING' ? '等待审核' : application.status === 'REJECTED' ? '未通过' : qualified ? '已通过，权限已生效' : '审核通过，权限确认中'}</Text><Text className="mt-1 text-xs text-neutral-500">提交时间：{new Date(application.created_at).toLocaleString('zh-CN')}</Text>{application.decision_reason ? <Text className="mt-2 text-sm text-neutral-600 dark:text-neutral-300">审核反馈：{application.decision_reason}</Text> : null}</> : <Text className="mt-2 text-sm text-neutral-500">提交创作者资格申请，审核通过并完成权限确认后即可管理会员方案。</Text>}
+        {visibleApplication ? <><Text className="mt-2 text-sm text-neutral-700 dark:text-neutral-300">申请状态：{visibleApplication.status === 'PENDING' ? '等待审核' : visibleApplication.status === 'REJECTED' ? '未通过' : qualified ? '已通过，权限已生效' : '审核通过，权限确认中'}</Text><Text className="mt-1 text-xs text-neutral-500">提交时间：{new Date(visibleApplication.created_at).toLocaleString('zh-CN')}</Text>{visibleApplication.decision_reason ? <Text className="mt-2 text-sm text-neutral-600 dark:text-neutral-300">审核反馈：{visibleApplication.decision_reason}</Text> : null}</> : <Text className="mt-2 text-sm text-neutral-500">提交创作者资格申请，审核通过并完成权限确认后即可管理会员方案。</Text>}
         {canApply ? <>
           <Text className="mb-2 mt-4 text-sm font-bold text-neutral-800 dark:text-neutral-200">创作方向</Text>
           <View className="mb-3 flex-row flex-wrap gap-2">{TYPES.map(t => <Pressable key={t[0]} onPress={() => setCreatorType(t[0])} className={'rounded-full border px-3 py-2 ' + (creatorType === t[0] ? 'border-sky-500 bg-sky-50 dark:bg-sky-950/30' : 'border-neutral-300 dark:border-neutral-700')}><Text className="text-sm text-neutral-800 dark:text-neutral-200">{t[1]}</Text></Pressable>)}</View>
@@ -213,7 +238,7 @@ export default function CreatorStudioScreen() {
           <Field label="会员权益（每行一项）" value={benefits} onChangeText={setBenefits} placeholder="会员专属内容" multiline />
           <View className="flex-row gap-2"><View className="flex-1"><Button title={saving ? '保存中…' : editing ? '保存修改' : '创建草稿'} disabled={saving || !name.trim() || !/^\d+$/.test(price)} onPress={() => void savePlan()} /></View>{editing ? <Button title="取消编辑" secondary disabled={saving} onPress={clearEditor} /> : null}</View>
         </View>
-        {plans.length ? plans.map(p => <View key={p.planId} className="mb-3 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
+        {visiblePlans.length ? visiblePlans.map(p => <View key={p.planId} className="mb-3 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
           <View className="flex-row items-start justify-between"><View className="flex-1"><Text className="text-lg font-extrabold text-neutral-900 dark:text-white">{p.name}</Text><Text className="mt-1 text-xs text-neutral-500">{p.tier} · {p.billingInterval === 'MONTHLY' ? '月付' : '年付'}</Text></View><Text className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-bold text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">{({DRAFT:'草稿',ACTIVE:'公开销售中',PAUSED:'已暂停',RETIRED:'已退役'} as const)[p.status]}</Text></View>
           <Text className="mt-3 text-xl font-extrabold text-neutral-900 dark:text-white">{priceLabel(p.priceMinor, p.currency)}</Text>
           {p.benefits.map(b => <Text key={b} className="mt-2 text-sm text-neutral-600 dark:text-neutral-300">• {b}</Text>)}
