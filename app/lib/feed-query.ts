@@ -59,6 +59,7 @@ export async function fetchNativeFeedPage(input: {
   kind: NativeFeedKind;
   cursor: string | null;
   signal?: AbortSignal;
+  viewerId?: string | null;
 }): Promise<NativeFeedPage> {
   const params = new URLSearchParams({ limit: '20' });
   if (input.cursor) params.set('cursor', input.cursor);
@@ -71,6 +72,7 @@ export async function fetchNativeFeedPage(input: {
       method: 'GET',
       auth: input.kind === 'following',
       signal: input.signal,
+      expectedAccountId: input.kind === 'following' ? input.viewerId ?? undefined : undefined,
     },
   );
 
