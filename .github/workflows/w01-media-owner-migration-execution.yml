@@ -28,7 +28,9 @@ env:
 
 jobs:
   execute:
-    if: ${{ inputs.confirm == 'APPLY_MEDIA_OWNER_MIGRATION' }}
+    # Safety hold: this legacy workflow targets D1; W01 now runs on Neon Hyperdrive.
+    # Do not execute until a Neon-native migration workflow is reviewed and provisioned.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
