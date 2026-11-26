@@ -1,7 +1,7 @@
 # LuckRead Beta Release Blocker Register
 
-- Baseline SHA: `2bf2fe61e672a32440e77fbacf88a289afbfe0ec`
-- Updated: 2026-11-26
+- Current main SHA: `002ca8e2649be944f2ad85d098d8bb4709109d95`
+- Updated: 2026-11-27
 - Overall status: `RELEASE_NOT_GREEN`
 - Purpose: one release-oriented register to replace repetitive audit loops with evidence-driven closure. This is not a release approval.
 
@@ -14,9 +14,12 @@
 6. Beta readiness is not feature parity with X/Threads; defer non-critical advanced features explicitly.
 
 ## Baseline evidence snapshot
-- Main SHA: `2bf2fe61e672a32440e77fbacf88a289afbfe0ec`.
-- PR #2245 (register creation) merged; all 19 reported checks completed successfully.
-- PR #2246 (native README feature inventory correction) remains a separate open PR; its reported checks passed. Do not merge without explicit authorization.
+- Historical register-creation baseline: `2bf2fe61e672a32440e77fbacf88a289afbfe0ec`.
+- PR #2246 (native README feature inventory correction) was merged at `183fe10faa0532314f3e0ee32b1c8e5ad7261129`.
+- PR #2247 (Neon media runtime E2E release-blocker record) was merged at `d49eab250872b713e7fe3ebaccb04bb2d5f1c1ae`.
+- PR #2271 (manual protected-main confirmation for the one-time production launch workflow) was merged at current main `002ca8e2649be944f2ad85d098d8bb4709109d95`; superseded PR #2265 was closed unmerged.
+- Repository query on 2026-11-27 found zero open PRs and zero open issues. This is a queue snapshot, not release acceptance.
+- Checks on PR #2246/#2247 included successful checks and skipped native build jobs; skipped builds are not build acceptance.
 - The above does not establish full release readiness.
 
 ## Release workstreams
@@ -45,9 +48,10 @@
 - Do not run this current workflow as a production test until the fixture database path is corrected.
 
 ## Existing documented acceptance gaps
-- Native app release documentation records device and authenticated E2E acceptance as not green.
+- Native app release documentation records device and authenticated E2E acceptance as not green; its PR snapshot section is historical and must not be treated as the current open-PR list.
 - The publish-window closure document distinguishes full-file retry from byte-level resumable upload; do not claim resumability without evidence and scope approval.
 - Physical device/build/production checks cannot be marked verified without actual evidence.
+- The media runtime E2E workflow still provisions fixtures and cleanup through `wrangler d1 execute`, while W01 production configuration selects Neon Hyperdrive and declares no D1 binding. The workflow is not valid runtime acceptance until this mismatch is repaired.
 - Native README feature inventory correction is pending PR #2246; source presence and regression suites do not prove production E2E.
 
 ## Batch closure protocol
