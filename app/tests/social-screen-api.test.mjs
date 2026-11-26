@@ -84,7 +84,6 @@ test('notification inbox data, actor cache, and pending reads are isolated when 
   expect(notificationsScreenSource).toContain('viewerIdRef.current !== requestViewerId');
   expect(notificationsScreenSource).toContain('expectedAccountId: requestViewerId');
   expect(notificationsScreenSource).toContain('if (viewerIdRef.current !== requestViewerId) return;');
-  expect(notificationsScreenSource).toContain('if (viewerIdRef.current !== requestViewerId) return;');
   expect(notificationsScreenSource).toContain('}, [authStatus, filter, loadActorProfiles, viewerId]);');
   expect(notificationsScreenSource).toContain('}, [authStatus, viewerId]);');
   expect(notificationsScreenSource).toContain('if (!viewerId || viewerIdRef.current !== viewerId) return;');
@@ -201,7 +200,7 @@ test('notification taps resolve by server-owned notification ID and never trust 
   expect(rootLayoutSource).toContain('payload?.notificationId');
   expect(rootLayoutSource).toContain("pathname: '/notifications', params: { notificationId }");
   expect(rootLayoutSource).not.toContain('payload?.url');
-  expect(notificationsScreenSource).toContain('fetchNotificationById(notificationId, controller.signal)');
+  expect(notificationsScreenSource).toContain('fetchNotificationById(notificationId, controller.signal, requestViewerId)');
   expect(notificationsScreenSource).toContain('candidate.id === notificationId');
   expect(notificationsScreenSource).toContain('const actorRoute = actor?.username || actor?.id || item.actorUserId');
 });
