@@ -82,7 +82,7 @@ export function connectMessagingRealtime({ userId, conversationId, onEvent, onSt
     const current = socket;
     socket = null;
     if (current) {
-      if (activeSockets.get(socketKey(userId, conversationId)) === current) activeSockets.delete(socketKey(userId, conversationId);
+      if (activeSockets.get(socketKey(userId, conversationId)) === current) activeSockets.delete(socketKey(userId, conversationId));
       current.onopen = null; current.onmessage = null; current.onerror = null; current.onclose = null;
       try { current.close(); } catch { /* already closed */ }
     }
