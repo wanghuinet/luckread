@@ -113,3 +113,13 @@ test('native private media and realtime credentials are bound to the initiating 
   expect(screen).toContain('key={userId ?? \'anonymous\'}');
   expect(screen).toContain('}, [userId]);');
 });
+
+
+test('message request action completions cannot navigate or invalidate another account after switching', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages.tsx', import.meta.url), 'utf8');
+  expect(source).toContain('expectedAccountId?: string');
+  expect(source).toContain('respondToMessageRequest(requestId, action, expectedAccountId)');
+  expect(source).toContain('onSuccess: async (result, variables) => {');
+  expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;');
+  expect(source).toContain('expectedAccountId: userId');
+});
