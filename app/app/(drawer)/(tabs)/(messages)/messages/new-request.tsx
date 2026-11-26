@@ -31,9 +31,9 @@ export default function NewMessageRequestScreen() {
     setBody('');
     mutation.reset();
   }, [userId]);
-  const mutationBelongsToCurrentAccount = mutation.variables?.expectedAccountId === userId;
+  const mutationBelongsToCurrentAccount = Boolean(userId && mutation.variables?.expectedAccountId === userId);
   const isPendingForCurrentAccount = mutation.isPending && mutationBelongsToCurrentAccount;
-  const canSend = Boolean(recipientUserId && body.trim() && !isPendingForCurrentAccount);
+  const canSend = Boolean(userId && recipientUserId && body.trim() && !isPendingForCurrentAccount);
   const errorCode = mutationBelongsToCurrentAccount && mutation.error instanceof Error ? mutation.error.message : '';
   const errorMessage = errorCode === 'RATE_LIMITED'
     ? '今天发起的私信请求已达到上限，请明天再试。'
@@ -61,7 +61,7 @@ export default function NewMessageRequestScreen() {
           value={body}
           onChangeText={setBody}
           accessibilityLabel="私信请求内容"
-          editable={!mutation.isPending}
+          editable={!isPendingForCurrentAccount}
           multiline
           maxLength={1000}
           autoFocus
