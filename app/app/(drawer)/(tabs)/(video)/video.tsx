@@ -354,6 +354,7 @@ export default function VideoFeed() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const isFocused = useIsFocused();
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
   const [items, setItems] = useState<VideoFeedItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
