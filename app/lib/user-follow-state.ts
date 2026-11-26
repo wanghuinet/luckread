@@ -149,7 +149,7 @@ export async function refreshUserFollowStatus(targetUserId?: string, viewerId?: 
   if (current.loading || current.pending) return;
   publish(id, viewerId, { loading: true, error: null });
   try {
-    const result = await apiRequest<unknown>('/social/follows/' + encodeURIComponent(id), { method: 'GET' });
+    const result = await apiRequest<unknown>('/social/follows/' + encodeURIComponent(id), { method: 'GET', expectedAccountId: viewerId ?? undefined });
     if (!isCurrentViewer(viewerId)) {
       publish(id, viewerId, { following: false, loaded: false, loading: false, pending: false, error: null });
       return;
@@ -193,6 +193,7 @@ export async function toggleUserFollow(targetUserId?: string, viewerId?: string 
     const result = await apiRequest<unknown>('/social/follows/' + encodeURIComponent(id), {
       method: nextFollowing ? 'POST' : 'DELETE',
       idempotencyKey: createIdempotencyKey(),
+      expectedAccountId: viewerId ?? undefined,
     });
     if (!isCurrentViewer(viewerId)) {
       publish(id, viewerId, { following: false, loaded: false, pending: false, loading: false, error: null });

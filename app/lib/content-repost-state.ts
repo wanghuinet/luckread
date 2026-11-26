@@ -109,7 +109,7 @@ export async function refreshContentRepostStatus(
   if (current.loading || current.pending) return;
   publish(viewerId, id, { loading: true, error: null });
   try {
-    const result = await apiRequest<unknown>('/contents/' + encodeURIComponent(id) + '/social', { method: 'GET' });
+    const result = await apiRequest<unknown>('/contents/' + encodeURIComponent(id) + '/social', { method: 'GET', expectedAccountId: viewerId ?? undefined });
     if (currentViewerId() !== viewerId) {
       if (viewerId) resetStaleViewerSnapshot(viewerId, id);
       return;
@@ -154,6 +154,7 @@ export async function toggleContentRepost(
     }
     const result = await apiRequest<unknown>('/content/' + encodeURIComponent(id) + '/reposts', {
       method: nextReposted ? 'POST' : 'DELETE', idempotencyKey: createIdempotencyKey(),
+      expectedAccountId: viewerId,
     });
     if (currentViewerId() !== viewerId) {
       resetStaleViewerSnapshot(viewerId, id);

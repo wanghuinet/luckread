@@ -155,7 +155,7 @@ export async function refreshContentLikeStatus(contentId?: string, viewerId?: st
   try {
     const result = await apiRequest<unknown>(
       '/interactions/likes?targetType=content&targetId=' + encodeURIComponent(id),
-      { method: 'GET' },
+      { method: 'GET', expectedAccountId: viewerId ?? undefined },
     );
     if (!isCurrentViewer(viewerId)) {
       publish(id, viewerId, { liked: false, likeCount: null, loading: false, pending: false, error: null });
@@ -204,6 +204,7 @@ export async function toggleContentLike(contentId?: string, viewerId?: string | 
       method: nextLiked ? 'POST' : 'DELETE',
       body: JSON.stringify({ targetType: 'content', targetId: id }),
       idempotencyKey: createIdempotencyKey(),
+      expectedAccountId: viewerId ?? undefined,
     });
     if (!isCurrentViewer(viewerId)) {
       publish(id, viewerId, { liked: false, likeCount: null, pending: false, loading: false, error: null });

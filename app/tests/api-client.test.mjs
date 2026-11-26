@@ -4,7 +4,7 @@ let storedToken = 'secure-test-token';
 let mockActiveAccountId = 'account-a';
 let savedTokens = [];
 let pendingFetch;
-let activeViewerId = 'stage3-bookmark-viewer';
+let activeViewerId = 'account-a';
 const mockedAuthStore = Object.assign(
   (selector) => selector({ status: 'authenticated', user: { id: activeViewerId } }),
   { getState: () => ({ status: 'authenticated', user: { id: activeViewerId } }) },
@@ -64,7 +64,7 @@ beforeEach(() => {
   storedToken = 'secure-test-token';
   mockActiveAccountId = 'account-a';
   savedTokens = [];
-  activeViewerId = 'stage3-bookmark-viewer';
+  activeViewerId = 'account-a';
   pendingFetch = async () => new Response(JSON.stringify({ data: { ok: true } }), { status: 200 });
   globalThis.fetch = (input, init) => pendingFetch(input, init);
 });
@@ -793,11 +793,13 @@ test('keeps one content bookmark relationship separate for two authenticated vie
   pendingFetch = async () => new Response(JSON.stringify({ data: { favorited } }), { status: 200 });
 
   activeViewerId = 'bookmark-viewer-a';
+  mockActiveAccountId = 'bookmark-viewer-a';
   await refreshContentBookmarkStatus(contentId);
   expect(getContentBookmarkSnapshot(contentId, 'bookmark-viewer-a'))
     .toMatchObject({ bookmarked: true, loaded: true });
 
   activeViewerId = 'bookmark-viewer-b';
+  mockActiveAccountId = 'bookmark-viewer-b';
   favorited = false;
   await refreshContentBookmarkStatus(contentId);
   expect(getContentBookmarkSnapshot(contentId, 'bookmark-viewer-b'))
@@ -1394,9 +1396,11 @@ test('does not hydrate repost state from a late previous-viewer response', async
   });
 
   activeViewerId = 'repost-viewer-a';
+  mockActiveAccountId = 'repost-viewer-a';
   const pending = refreshContentRepostStatus(contentId, activeViewerId);
   await fetchStarted;
   activeViewerId = 'repost-viewer-b';
+  mockActiveAccountId = 'repost-viewer-b';
   releaseResponse();
   await pending;
 
@@ -1425,4 +1429,53 @@ test('allows callers to disable the shared API request timeout', async () => {
   await apiRequest('/long-running-endpoint', { timeoutMs: 0 });
   expect(capturedSignal).toBeInstanceOf(AbortSignal);
   expect(capturedSignal.aborted).toBe(false);
+});
+
+test('viewer-specific engagement reads reject credentials from a different active account', async () => {
+  let fetchCount = 0;
+  activeViewerId = 'engagement-viewer-a';
+  mockActiveAccountId = 'engagement-viewer-b';
+  pendingFetch = async () => {
+    fetchCount += 1;
+    return new Response(JSON.stringify({ data: { liked: false, likeCount: 0, favorited: false, counts: { reposts: 0 }, viewer: { reposted: false }, following: false } }), { status: 200 });
+  };
+
+  await refreshContentLikeStatus('engagement-like-read', activeViewerId);
+  await refreshContentBookmarkStatus('engagement-bookmark-read', activeViewerId);
+  await refreshContentRepostStatus('engagement-repost-read', activeViewerId);
+  await refreshUserFollowStatus('engagement-follow-read', activeViewerId);
+
+  expect(fetchCount).toBe(0);
+});
+
+test('viewer-specific engagement mutations cannot run with another account credential', async () => {
+  let fetchCount = 0;
+  activeViewerId = 'engagement-viewer-a';
+  mockActiveAccountId = 'engagement-viewer-a';
+  pendingFetch = async (input) => {
+    fetchCount += 1;
+    const path = new URL(String(input)).pathname;
+    const data = path.includes('/interactions/likes') ? { liked: false, likeCount: 0 }
+      : path.includes('/interactions/bookmarks') ? { favorited: false }
+        : path.includes('/contents/') ? { counts: { reposts: 0 }, viewer: { reposted: false } }
+          : { following: false };
+    return new Response(JSON.stringify({ data }), { status: 200 });
+  };
+
+  await refreshContentLikeStatus('engagement-like-write', activeViewerId);
+  await refreshContentBookmarkStatus('engagement-bookmark-write', activeViewerId);
+  await refreshContentRepostStatus('engagement-repost-write', activeViewerId);
+  await refreshUserFollowStatus('engagement-follow-write', activeViewerId);
+  expect(fetchCount).toBe(4);
+
+  mockActiveAccountId = 'engagement-viewer-b';
+  const outcomes = await Promise.all([
+    toggleContentLike('engagement-like-write', activeViewerId),
+    toggleContentBookmark('engagement-bookmark-write', activeViewerId),
+    toggleContentRepost('engagement-repost-write', activeViewerId),
+    toggleUserFollow('engagement-follow-write', activeViewerId),
+  ]);
+
+  expect(outcomes.every((outcome) => outcome.ok === false)).toBe(true);
+  expect(fetchCount).toBe(4);
 });
