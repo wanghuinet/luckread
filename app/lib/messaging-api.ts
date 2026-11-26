@@ -142,10 +142,11 @@ export async function sendDirectMessage(
   body: string,
   idempotencyKey = createIdempotencyKey(),
   attachments: MessagingAttachment[] = [],
+  expectedAccountId?: string,
 ): Promise<MessagingMessage> {
   return unwrap<MessagingMessage>(await apiRequest<Envelope<MessagingMessage>>(
     '/conversations/' + encodeURIComponent(conversationId) + '/messages',
-    { method: 'POST', body: JSON.stringify({ body, attachments }), idempotencyKey },
+    { method: 'POST', body: JSON.stringify({ body, attachments }), idempotencyKey, expectedAccountId },
   ));
 }
 export async function editDirectMessage(conversationId: string, messageId: string, body: string): Promise<MessagingMessage> {
