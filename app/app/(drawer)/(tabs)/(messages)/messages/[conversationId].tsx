@@ -27,15 +27,18 @@ type PendingAttachment = {
 };
 type SendVariables = { body: string; attachments: MessagingAttachment[]; conversationId: string; userId?: string; scopeVersion: number };
 
-function PrivateMessageImages({ currentMessage }: { currentMessage: IMessage }) {
+function PrivateMessageImages({ currentMessage, userId }: { currentMessage: IMessage; userId?: string }) {
   const [headers, setHeaders] = useState<Record<string, string>>({});
   useEffect(() => {
     let active = true;
-    void getApiAuthHeaders().then((value) => {
+    setHeaders({});
+    void getApiAuthHeaders(userId).then((value) => {
       if (active) setHeaders(value);
+    }).catch(() => {
+      if (active) setHeaders({});
     });
     return () => { active = false; };
-  }, []);
+  }, [userId]);
   const imageUrls = useMemo(() => {
     if (!currentMessage.image) return [];
     try {
@@ -97,6 +100,7 @@ export default function ConversationScreen() {
   useEffect(() => {
     if (!conversationId || !isFocused || appState !== 'active') return;
     return connectMessagingRealtime({
+      userId: userId ?? '',
       conversationId,
       onState: (state) => {
         if (state === 'revoked') {
@@ -253,16 +257,16 @@ export default function ConversationScreen() {
     typingRefreshTimer.current = null;
     if (!typingActiveRef.current) return;
     typingActiveRef.current = false;
-    setMessagingRealtimeTyping(conversationId, false);
-  }, [conversationId]);
+    setMessagingRealtimeTyping(userId ?? '', conversationId, false);
+  }, [conversationId, userId]);
   const handleDraftChange = useCallback((value: string) => {
     setDraft(value);
     if (!value.trim()) { stopTyping(); return; }
     if (!typingActiveRef.current) {
       typingActiveRef.current = true;
-      setMessagingRealtimeTyping(conversationId, true);
+      setMessagingRealtimeTyping(userId ?? '', conversationId, true);
       typingRefreshTimer.current = setInterval(() => {
-        if (typingActiveRef.current) setMessagingRealtimeTyping(conversationId, true);
+        if (typingActiveRef.current) setMessagingRealtimeTyping(userId ?? '', conversationId, true);
       }, 3_000);
     }
     if (typingTimer.current) clearTimeout(typingTimer.current);
@@ -404,7 +408,7 @@ export default function ConversationScreen() {
     setPendingAttachments((current) => current.map((item) => item.localId === localId
       ? { ...item, status: 'uploading', error: undefined } : item));
     try {
-      const attachment = await uploadMessageAttachment(file, localId);
+      const attachment = await uploadMessageAttachment(file, localId, userId);
       if (conversationScopeRef.current.version !== scopeVersion) return;
       setPendingAttachments((current) => current.map((item) => item.localId === localId
         ? { ...item, status: 'ready', attachment, error: undefined } : item));
@@ -413,7 +417,7 @@ export default function ConversationScreen() {
       setPendingAttachments((current) => current.map((item) => item.localId === localId
         ? { ...item, status: 'failed', error: error instanceof Error ? error.message : '上传失败' } : item));
     }
-  }, []);
+  }, [userId]);
 
   const pickAttachments = useCallback(async () => {
     if (isPicking || sendMutationPendingRef.current) return;
@@ -472,7 +476,7 @@ export default function ConversationScreen() {
       if (!pendingSend.current || pendingSend.current.fingerprint !== fingerprint) {
         pendingSend.current = { fingerprint, key: createIdempotencyKey() };
       }
-      return sendDirectMessage(variables.conversationId, variables.body, pendingSend.current.key, variables.attachments);
+      return sendDirectMessage(variables.conversationId, variables.body, pendingSend.current.key, variables.attachments, variables.userId);
     },
     onMutate: () => { sendMutationPendingRef.current = true; },
     onSuccess: async (sentMessage, variables) => {
@@ -725,7 +729,7 @@ export default function ConversationScreen() {
               appearance="plain"
               enableGestureHandlerRootView={false}
               attachments={false}
-              renderMessageImage={(props) => <PrivateMessageImages currentMessage={props.currentMessage} />}
+              renderMessageImage={(props) => <PrivateMessageImages key={userId ?? 'anonymous'} currentMessage={props.currentMessage} userId={userId} />}
               onLongPressMessage={handleLongPressMessage}
               audioRecording={false}
               videoRecording={false}

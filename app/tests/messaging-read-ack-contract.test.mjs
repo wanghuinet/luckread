@@ -71,3 +71,45 @@ test('attachment picker and upload completions cannot leak into a newly selected
   expect(source).toContain('await uploadOne(item.localId, item.file, scopeVersion)');
   expect(source).toContain('if (conversationScopeRef.current.version === scopeVersion) setIsPicking(false);');
 });
+
+test('messaging realtime socket registry and typing frames are account-scoped', () => {
+  const source = readFileSync(new URL('../lib/messaging-realtime.ts', import.meta.url), 'utf8');
+  expect(source).toContain("const socketKey = (userId: string, conversationId: string) => userId + ':' + conversationId");
+  expect(source).toContain('setMessagingRealtimeTyping(userId: string, conversationId: string, typing: boolean)');
+  expect(source).toContain('activeSockets.get(socketKey(userId, conversationId))');
+  expect(source).toContain('setMessagingRealtimeTyping(userId ?? \'\', conversationId, true)');
+  const screen = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
+  expect(screen).toContain('userId: userId ??');
+  expect(screen).toContain('setMessagingRealtimeTyping(userId ??');
+});
+
+test('messaging attachment uploads are bound to the originating authenticated account', () => {
+  const source = readFileSync(new URL('../lib/messaging-api.ts', import.meta.url), 'utf8');
+  expect(source).toContain('expectedAccountId?: string');
+  expect(source).toContain('uploadMediaFile(file, idempotencyKey, undefined, expectedAccountId)');
+  const screen = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
+  expect(screen).toContain('uploadMessageAttachment(file, localId, userId)');
+  expect(screen).toContain('}, [userId]);');
+});
+
+
+test('message sends are bound to the originating authenticated account', () => {
+  const api = readFileSync(new URL('../lib/messaging-api.ts', import.meta.url), 'utf8');
+  expect(api).toContain('expectedAccountId?: string');
+  expect(api).toContain('idempotencyKey, expectedAccountId');
+  const screen = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
+  expect(screen).toContain('pendingSend.current.key, variables.attachments, variables.userId');
+});
+
+
+test('native private media and realtime credentials are bound to the initiating account', () => {
+  const api = readFileSync(new URL('../lib/api-client.ts', import.meta.url), 'utf8');
+  expect(api).toContain('getApiAuthHeaders(expectedAccountId?: string)');
+  expect(api).toContain('if (expectedAccountId && accountId !== expectedAccountId)');
+  const realtime = readFileSync(new URL('../lib/messaging-realtime.ts', import.meta.url), 'utf8');
+  expect(realtime).toContain('await getApiAuthHeaders(userId)');
+  const screen = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
+  expect(screen).toContain('getApiAuthHeaders(userId)');
+  expect(screen).toContain('key={userId ?? \'anonymous\'}');
+  expect(screen).toContain('}, [userId]);');
+});
