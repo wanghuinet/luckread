@@ -4,7 +4,7 @@ let storedToken = 'secure-test-token';
 let mockActiveAccountId = 'account-a';
 let savedTokens = [];
 let pendingFetch;
-let activeViewerId = 'stage3-bookmark-viewer';
+let activeViewerId = 'account-a';
 const mockedAuthStore = Object.assign(
   (selector) => selector({ status: 'authenticated', user: { id: activeViewerId } }),
   { getState: () => ({ status: 'authenticated', user: { id: activeViewerId } }) },
@@ -64,7 +64,7 @@ beforeEach(() => {
   storedToken = 'secure-test-token';
   mockActiveAccountId = 'account-a';
   savedTokens = [];
-  activeViewerId = 'stage3-bookmark-viewer';
+  activeViewerId = 'account-a';
   pendingFetch = async () => new Response(JSON.stringify({ data: { ok: true } }), { status: 200 });
   globalThis.fetch = (input, init) => pendingFetch(input, init);
 });
@@ -793,11 +793,13 @@ test('keeps one content bookmark relationship separate for two authenticated vie
   pendingFetch = async () => new Response(JSON.stringify({ data: { favorited } }), { status: 200 });
 
   activeViewerId = 'bookmark-viewer-a';
+  mockActiveAccountId = 'bookmark-viewer-a';
   await refreshContentBookmarkStatus(contentId);
   expect(getContentBookmarkSnapshot(contentId, 'bookmark-viewer-a'))
     .toMatchObject({ bookmarked: true, loaded: true });
 
   activeViewerId = 'bookmark-viewer-b';
+  mockActiveAccountId = 'bookmark-viewer-b';
   favorited = false;
   await refreshContentBookmarkStatus(contentId);
   expect(getContentBookmarkSnapshot(contentId, 'bookmark-viewer-b'))
@@ -1394,6 +1396,7 @@ test('does not hydrate repost state from a late previous-viewer response', async
   });
 
   activeViewerId = 'repost-viewer-a';
+  mockActiveAccountId = 'repost-viewer-a';
   const pending = refreshContentRepostStatus(contentId, activeViewerId);
   await fetchStarted;
   activeViewerId = 'repost-viewer-b';
