@@ -55,7 +55,7 @@ export async function addGroupMembers(conversationId: string, memberUserIds: str
 }
 export async function removeGroupMember(conversationId: string, memberUserId: string, expectedAccountId?: string): Promise<void> {
   const result = await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/members/' + encodeURIComponent(memberUserId), {
-    method: 'DELETE',
+    method: 'DELETE', expectedAccountId,
   });
   if (!result.response.ok) throw new Error(result.error?.message || '无法移除群聊成员。');
 }
