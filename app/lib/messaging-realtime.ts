@@ -38,7 +38,7 @@ export function connectMessagingRealtime({ userId, conversationId, onEvent, onSt
     if (stopped || socket) return;
     onState?.('connecting');
     try {
-      const headers = await getApiAuthHeaders();
+      const headers = await getApiAuthHeaders(userId);
       if (stopped) return;
       const base = getApiBaseUrl().replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
       const url = base + '/v1/conversations/' + encodeURIComponent(conversationId) + '/realtime';
