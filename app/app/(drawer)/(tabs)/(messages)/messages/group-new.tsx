@@ -33,10 +33,10 @@ export default function NewGroupScreen() {
     setMembers('');
     mutation.reset();
   }, [userId]);
-  const mutationBelongsToCurrentAccount = mutation.variables?.expectedAccountId === userId;
+  const mutationBelongsToCurrentAccount = Boolean(userId && mutation.variables?.expectedAccountId === userId);
   const isPendingForCurrentAccount = mutation.isPending && mutationBelongsToCurrentAccount;
   const ids = parseGroupMemberIds(members);
-  const canCreate = name.trim().length > 0 && ids.length >= 2 && ids.length <= 49 && !isPendingForCurrentAccount;
+  const canCreate = Boolean(userId && name.trim().length > 0 && ids.length >= 2 && ids.length <= 49 && !isPendingForCurrentAccount);
   return <View className="flex-1 bg-white dark:bg-black">
     <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
     <View className="flex-row items-center justify-between border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
