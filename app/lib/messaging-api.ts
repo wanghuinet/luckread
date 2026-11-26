@@ -132,7 +132,7 @@ export async function uploadMessageAttachment(file: LocalMediaFile, idempotencyK
     mediaId: media.id,
     filename: media.filename,
     mimeType: media.mimeType.toLowerCase(),
-    filesize: media.filesize ?? file.size,
+    filesize: media.filesize ?? (typeof file.size === 'number' ? file.size : 0),
     width: file.width ?? null,
     height: file.height ?? null,
   } satisfies MessagingAttachment;
