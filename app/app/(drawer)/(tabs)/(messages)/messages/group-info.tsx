@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StatusBar, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -30,6 +30,7 @@ export default function GroupInfoScreen() {
   const { colorScheme } = useColorScheme();
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
+  useEffect(() => { setSelected([]); setSearch(''); }, [conversationId, userId]);
   const members = useQuery({
     queryKey: ['messaging', userId, 'members', conversationId],
     queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal, userId),
@@ -72,24 +73,24 @@ export default function GroupInfoScreen() {
     return (p.username ?? '').toLowerCase().includes(term) || (p.displayName ?? '').toLowerCase().includes(term);
   }), [candidates.data, members.data, search, selected]);
   const addMutation = useMutation({
-    mutationFn: () => addGroupMembers(conversationId, selected, userId),
-    onSuccess: async () => { setSelected([]); await members.refetch(); await queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] }); },
-    onError: e => Alert.alert('添加失败', e instanceof Error ? e.message : '请重试'),
+    mutationFn: (variables: { memberIds: string[]; expectedAccountId?: string }) => addGroupMembers(conversationId, variables.memberIds, variables.expectedAccountId),
+    onSuccess: async (_result, variables) => { if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return; setSelected([]); await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'members', conversationId] }); await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'conversations'] }); },
+    onError: (e, variables) => { if (useAuthStore.getState().user?.id === variables.expectedAccountId) Alert.alert('添加失败', e instanceof Error ? e.message : '请重试'); },
   });
   const removeMutation = useMutation({
-    mutationFn: (memberId: string) => removeGroupMember(conversationId, memberId, userId),
-    onSuccess: async () => { await members.refetch(); await queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] }); },
-    onError: e => Alert.alert('移除失败', e instanceof Error ? e.message : '请重试'),
+    mutationFn: (variables: { memberId: string; expectedAccountId?: string }) => removeGroupMember(conversationId, variables.memberId, variables.expectedAccountId),
+    onSuccess: async (_result, variables) => { if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return; await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'members', conversationId] }); await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'conversations'] }); },
+    onError: (e, variables) => { if (useAuthStore.getState().user?.id === variables.expectedAccountId) Alert.alert('移除失败', e instanceof Error ? e.message : '请重试'); },
   });
   const transferMutation = useMutation({
-    mutationFn: (targetId: string) => transferGroupOwnership(conversationId, targetId, userId),
-    onSuccess: async () => { await members.refetch(); await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] }); Alert.alert('已移交群主', '群主身份已成功移交。'); },
-    onError: e => Alert.alert('移交失败', e instanceof Error ? e.message : '请重试'),
+    mutationFn: (variables: { targetId: string; expectedAccountId?: string }) => transferGroupOwnership(conversationId, variables.targetId, variables.expectedAccountId),
+    onSuccess: async (_result, variables) => { if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return; await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'members', conversationId] }); await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'conversations'] }); Alert.alert('已移交群主', '群主身份已成功移交。'); },
+    onError: (e, variables) => { if (useAuthStore.getState().user?.id === variables.expectedAccountId) Alert.alert('移交失败', e instanceof Error ? e.message : '请重试'); },
   });
   const leaveMutation = useMutation({
-    mutationFn: () => leaveGroupConversation(conversationId, userId),
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] }); router.replace('/messages' as never); },
-    onError: e => Alert.alert('退出失败', e instanceof Error ? e.message : '请重试'),
+    mutationFn: (variables: { expectedAccountId?: string }) => leaveGroupConversation(conversationId, variables.expectedAccountId),
+    onSuccess: async (_result, variables) => { if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return; await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'conversations'] }); if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return; router.replace('/messages' as never); },
+    onError: (e, variables) => { if (useAuthStore.getState().user?.id === variables.expectedAccountId) Alert.alert('退出失败', e instanceof Error ? e.message : '请重试'); },
   });
   const toggle = (id: string) => setSelected(current => current.includes(id) ? current.filter(v => v !== id) : current.length + (members.data?.length ?? 0) >= 50 ? current : [...current, id]);
   const display = (profile?: ApiPublicProfile | null, fallback?: string) => profile?.displayName?.trim() || (profile?.username ? '@' + profile.username : fallback || 'LuckRead 用户');
@@ -113,7 +114,7 @@ export default function GroupInfoScreen() {
       ) : members.data?.map(member => <View key={member.user_id} className="flex-row items-center border-b border-neutral-100 py-3 dark:border-neutral-800">
         <View className="h-9 w-9 items-center justify-center rounded-full bg-sky-50 dark:bg-sky-950/40">{profileById.get(member.user_id)?.avatar ? <Image source={{ uri: profileById.get(member.user_id)?.avatar as string }} className="h-9 w-9 rounded-full" /> : <Feather name="user" size={18} color="#1d9bf0" />}</View>
         <View className="ml-3 flex-1"><Text className="text-neutral-900 dark:text-white" numberOfLines={1}>{display(profileById.get(member.user_id), member.user_id)}</Text><Text className="text-xs text-neutral-500">{member.member_role === 'owner' ? '群主' : '成员'} · @{profileById.get(member.user_id)?.username || member.user_id}</Text></View>
-        {owner && member.member_role !== 'owner' ? <View className="flex-row"><Pressable disabled={transferMutation.isPending} onPress={() => Alert.alert('移交群主', '确定将群主身份移交给此成员？移交后你将成为普通成员。', [{text:'取消',style:'cancel'},{text:'移交',onPress:()=>transferMutation.mutate(member.user_id)}])} className="p-2"><Feather name="award" size={18} color="#1d9bf0" /></Pressable><Pressable disabled={removeMutation.isPending} onPress={() => Alert.alert('移除成员', '确定从群聊移除此成员？', [{text:'取消',style:'cancel'},{text:'移除',style:'destructive',onPress:()=>removeMutation.mutate(member.user_id)}])} className="p-2"><Feather name="user-minus" size={18} color="#dc2626" /></Pressable></View> : null}
+        {owner && member.member_role !== 'owner' ? <View className="flex-row"><Pressable disabled={transferMutation.isPending} onPress={() => Alert.alert('移交群主', '确定将群主身份移交给此成员？移交后你将成为普通成员。', [{text:'取消',style:'cancel'},{text:'移交',onPress:()=>transferMutation.mutate({ targetId: member.user_id, expectedAccountId: userId })}])} className="p-2"><Feather name="award" size={18} color="#1d9bf0" /></Pressable><Pressable disabled={removeMutation.isPending} onPress={() => Alert.alert('移除成员', '确定从群聊移除此成员？', [{text:'取消',style:'cancel'},{text:'移除',style:'destructive',onPress:()=>removeMutation.mutate({ memberId: member.user_id, expectedAccountId: userId })}])} className="p-2"><Feather name="user-minus" size={18} color="#dc2626" /></Pressable></View> : null}
       </View>)}
       {owner ? <View className="mt-5">
         <Text className="mb-2 font-semibold text-neutral-900 dark:text-white">添加关注的人</Text>
@@ -136,10 +137,10 @@ export default function GroupInfoScreen() {
           <Feather name={selected.includes(profile.id) ? 'check-circle' : 'circle'} size={22} color={selected.includes(profile.id) ? '#1d9bf0' : '#9ca3af'} />
         </Pressable>)}
         {selected.length > 0 ? <View className="mt-3 flex-row flex-wrap items-center"><Text className="text-sm text-sky-600">已选 {selected.length} 人</Text>{selected.map(id => { const profile = candidates.data?.find(p => p.id === id); return <Pressable key={id} onPress={() => toggle(id)} className="ml-2 mt-1 rounded-full border border-sky-200 px-3 py-1 dark:border-sky-900"><Text className="text-xs text-sky-600">{display(profile, id)} ×</Text></Pressable>; })}<Pressable onPress={() => setSelected([])} className="ml-3"><Text className="text-sm text-neutral-500">清空</Text></Pressable></View> : null}
-        <Pressable disabled={!selected.length || addMutation.isPending} onPress={() => addMutation.mutate()} className="mt-3 items-center rounded-full bg-sky-500 py-3 disabled:opacity-50">{addMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text className="font-semibold text-white">添加所选成员</Text>}</Pressable>
+        <Pressable disabled={!selected.length || addMutation.isPending} onPress={() => addMutation.mutate({ memberIds: selected, expectedAccountId: userId })} className="mt-3 items-center rounded-full bg-sky-500 py-3 disabled:opacity-50">{addMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text className="font-semibold text-white">添加所选成员</Text>}</Pressable>
         <Text className="mt-2 text-xs text-neutral-500">从关注列表选择。仅群主可添加；服务器仍会校验私信联系关系、群屏蔽策略和人数上限。</Text>
       </View> : null}
-      {owner ? <Text className="mt-6 text-sm text-neutral-500">请先移交群主身份，之后即可退出群聊。</Text> : <Pressable disabled={leaveMutation.isPending} onPress={() => Alert.alert('退出群聊', '退出后将不再接收群聊消息。确定退出？', [{text:'取消',style:'cancel'},{text:'退出',style:'destructive',onPress:()=>leaveMutation.mutate()}])} className="mt-8 items-center rounded-full border border-red-300 py-3"><Text className="font-semibold text-red-500">退出群聊</Text></Pressable>}
+      {owner ? <Text className="mt-6 text-sm text-neutral-500">请先移交群主身份，之后即可退出群聊。</Text> : <Pressable disabled={leaveMutation.isPending} onPress={() => Alert.alert('退出群聊', '退出后将不再接收群聊消息。确定退出？', [{text:'取消',style:'cancel'},{text:'退出',style:'destructive',onPress:()=>leaveMutation.mutate({ expectedAccountId: userId })}])} className="mt-8 items-center rounded-full border border-red-300 py-3"><Text className="font-semibold text-red-500">退出群聊</Text></Pressable>}
     </ScrollView>
   </View>;
 }
