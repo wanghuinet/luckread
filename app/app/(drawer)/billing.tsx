@@ -567,6 +567,8 @@ export default function BillingScreen() {
                   amountMinor,
                   item.currency,
                   key,
+                  undefined,
+                  requestViewerId,
                 );
                 // Refund is a non-cancellable write once submitted. A switched account
                 // must never receive the previous viewer's result or trigger its reload.

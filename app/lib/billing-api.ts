@@ -134,6 +134,7 @@ export function requestPaymentRefund(
   currency: string,
   idempotencyKey: string,
   reason?: string,
+  expectedAccountId?: string,
 ) {
   if (typeof paymentId !== 'string' || !PAYMENT_ID_PATTERN.test(paymentId)) {
     throw new TypeError('A valid payment ID is required.');
@@ -157,6 +158,7 @@ export function requestPaymentRefund(
   return apiRequest<unknown>('/payments/refunds', {
     method: 'POST',
     idempotencyKey,
+    expectedAccountId,
     body: JSON.stringify({
       paymentId,
       amountMinor,
