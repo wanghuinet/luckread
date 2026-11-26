@@ -91,3 +91,12 @@ test('messaging attachment uploads are bound to the originating authenticated ac
   expect(screen).toContain('uploadMessageAttachment(file, localId, userId)');
   expect(screen).toContain('}, [userId]);');
 });
+
+
+test('message sends are bound to the originating authenticated account', () => {
+  const api = readFileSync(new URL('../lib/messaging-api.ts', import.meta.url), 'utf8');
+  expect(api).toContain('expectedAccountId?: string');
+  expect(api).toContain('idempotencyKey, expectedAccountId');
+  const screen = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
+  expect(screen).toContain('pendingSend.current.key, variables.attachments, variables.userId');
+});
