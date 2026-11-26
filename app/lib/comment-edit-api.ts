@@ -57,6 +57,7 @@ export async function updateComment(
       idempotencyKey: normalizedKey,
       headers: { 'If-Match': '"' + normalizedVersion + '"' },
       body: JSON.stringify({ body: normalizedBody }),
+      expectedAccountId: expectedViewerId,
     },
   );
 

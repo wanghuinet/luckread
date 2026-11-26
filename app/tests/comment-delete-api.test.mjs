@@ -39,6 +39,7 @@ test('deletes through the existing W01 comment route and preserves the retry key
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/comments/comment%2Fid');
   expect(calls[0].options.method).toBe('DELETE');
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
   expect(calls[0].options.idempotencyKey).toBe('same-key-for-retry');
 });
 

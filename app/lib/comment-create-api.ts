@@ -37,6 +37,7 @@ export async function createComment<T = unknown>(
       method: 'POST',
       idempotencyKey,
       body: JSON.stringify({ body, parentId }),
+      expectedAccountId: input.expectedViewerId,
     },
   );
 }

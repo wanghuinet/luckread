@@ -60,7 +60,7 @@ export async function toggleCommentLike(
   const encodedId = encodeURIComponent(commentId);
   const statusResult = await apiRequest<unknown>(
     '/interactions/likes?targetType=comment&targetId=' + encodedId,
-    { method: 'GET' },
+    { method: 'GET', expectedAccountId: expectedViewerId },
   );
 
   if (!statusResult.response.ok) {
@@ -104,6 +104,7 @@ export async function toggleCommentLike(
       method,
       idempotencyKey: 'native-comment-like:' + commentId + ':' +
         (nextLiked ? 'like' : 'unlike') + ':' + createIdempotencyKey(),
+      expectedAccountId: expectedViewerId,
     },
   );
 
