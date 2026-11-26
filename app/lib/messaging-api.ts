@@ -201,7 +201,7 @@ export type MessagingTypingSnapshot = { activeUserIds: string[] }
 export async function setConversationTyping(conversationId: string, typing: boolean, expectedAccountId?: string): Promise<MessagingTypingSnapshot> {
   return unwrap(await apiRequest<Envelope<MessagingTypingSnapshot>>(
     '/conversations/' + encodeURIComponent(conversationId) + '/typing',
-    { method: 'POST', body: JSON.stringify({ typing }), idempotencyKey: false },
+    { method: 'POST', body: JSON.stringify({ typing }), idempotencyKey: false, expectedAccountId },
   ))
 }
 export async function fetchConversationTyping(conversationId: string, signal?: AbortSignal, expectedAccountId?: string): Promise<MessagingTypingSnapshot> {
