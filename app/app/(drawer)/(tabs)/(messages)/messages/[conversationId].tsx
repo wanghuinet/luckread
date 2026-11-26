@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, type AppStateStatus, ActivityIndicator, Modal, Pressable, StatusBar, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
@@ -229,13 +229,6 @@ export default function ConversationScreen() {
       userId,
       version: conversationScopeRef.current.version + 1,
     };
-    setDraft('');
-    setPendingAttachments([]);
-    setSenderProfiles({});
-    senderProfileAttempted.current.clear();
-    setEditTarget(null);
-    setEditDraft('');
-    setIsPicking(false);
     pendingSend.current = null;
     sendMutationPendingRef.current = false;
     typingActiveRef.current = false;
@@ -244,6 +237,15 @@ export default function ConversationScreen() {
     typingTimer.current = null;
     typingRefreshTimer.current = null;
   }
+  useLayoutEffect(() => {
+    setDraft('');
+    setPendingAttachments([]);
+    setSenderProfiles({});
+    senderProfileAttempted.current.clear();
+    setEditTarget(null);
+    setEditDraft('');
+    setIsPicking(false);
+  }, [conversationId, userId]);
   const stopTyping = useCallback(() => {
     if (typingTimer.current) clearTimeout(typingTimer.current);
     if (typingRefreshTimer.current) clearInterval(typingRefreshTimer.current);
@@ -563,7 +565,7 @@ export default function ConversationScreen() {
     if (sendMutation.isPending || pendingAttachments.some((item) => item.status !== 'ready')) return;
     if (!body && readyAttachments.length === 0) return;
     sendMutation.mutate({ body, attachments: readyAttachments, conversationId, userId, scopeVersion: conversationScopeRef.current.version });
-  }, [pendingAttachments, readyAttachments, sendMutation]);
+  }, [conversationId, userId, pendingAttachments, readyAttachments, sendMutation]);
   const handleChatSend = useCallback((newMessages: IMessage[]) => {
     sendCurrent(newMessages[0]?.text ?? draft);
   }, [draft, sendCurrent]);
