@@ -237,7 +237,7 @@ export default function ConversationScreen() {
       typingActiveRef.current = true;
       setMessagingRealtimeTyping(userId ?? '', conversationId, true);
       typingRefreshTimer.current = setInterval(() => {
-        if (typingActiveRef.current) setMessagingRealtimeTyping(conversationId, true);
+        if (typingActiveRef.current) setMessagingRealtimeTyping(userId ?? '', conversationId, true);
       }, 3_000);
     }
     if (typingTimer.current) clearTimeout(typingTimer.current);
