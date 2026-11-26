@@ -97,10 +97,11 @@ export default function Messages() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
+  const userId = useAuthStore((state) => state.user?.id);
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = React.useState<'chats' | 'incoming' | 'outgoing'>('chats');
   const conversations = useInfiniteQuery({
-    queryKey: ['messaging', 'conversations'],
+    queryKey: ['messaging', userId, 'conversations'],
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) => fetchConversations(pageParam, signal),
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
@@ -110,7 +111,7 @@ export default function Messages() {
   const conversationItems = conversations.data?.pages.flatMap((page) => page.items) ?? [];
   const direction = activeTab === 'outgoing' ? 'outgoing' : 'incoming';
   const requests = useInfiniteQuery({
-    queryKey: ['messaging', 'requests', direction],
+    queryKey: ['messaging', userId, 'requests', direction],
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) => fetchMessageRequests(direction, pageParam, signal),
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
@@ -122,8 +123,8 @@ export default function Messages() {
     mutationFn: ({ requestId, action }: { requestId: string; action: 'accept' | 'decline' | 'cancel' }) => respondToMessageRequest(requestId, action),
     onSuccess: async (result) => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['messaging', 'requests'] }),
-        queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] }),
+        queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'requests'] }),
+        queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] }),
       ]);
       if (result.conversationId) router.push({ pathname: '/messages/[conversationId]', params: { conversationId: result.conversationId } } as never);
     },

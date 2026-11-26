@@ -100,16 +100,16 @@ export default function ConversationScreen() {
       conversationId,
       onState: (state) => {
         if (state === 'revoked') {
-          void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
-          void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+          void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'members', conversationId] });
+          void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
           router.back();
           return;
         }
         if (state !== 'connected') return;
-        void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
-        void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
-        void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
-        void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages-after', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'members', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
       },
       onEvent: (event) => {
         if (!event || typeof event !== 'object') return;
@@ -133,9 +133,9 @@ export default function ConversationScreen() {
               if (!cached?.pages.length) {
                 // An event can race the first history request before its cache exists.
                 // Force a fresh read so the in-flight snapshot cannot hide this message.
-                void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
-                void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
-                void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+                void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages', conversationId] });
+                void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages-after', conversationId] });
+                void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
                 return;
               }
               const knownMessages = cached.pages.flatMap((page) => page.items);
@@ -145,8 +145,8 @@ export default function ConversationScreen() {
                 cached.pages[0] && cached.pages[0].items.length >= MAX_LIVE_CACHE_PAGE_ITEMS) {
                 // Let the persisted history query rebuild a bounded page instead of
                 // retaining every live event in the first infinite-query page.
-                void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
-                void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+                void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages', conversationId] });
+                void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
                 return;
               }
               if (!knownIds.has(message.message_id) && /^\d+$/.test(message.sequence) && /^\d+$/.test(knownCursor) && knownCursor !== '0') {
@@ -154,14 +154,14 @@ export default function ConversationScreen() {
                 const cursorSequence = BigInt(knownCursor);
                 if (eventSequence > cursorSequence + 1n) {
                   // A forward gap: recover from the existing cursor without prematurely inserting the event.
-                  void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
-                  void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+                  void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages-after', conversationId] });
+                  void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
                   return;
                 }
                 if (eventSequence <= cursorSequence) {
                   // Late delivery of a missing older event: refresh loaded history pages, not the advanced cursor.
-                  void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
-                  void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+                  void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages', conversationId] });
+                  void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
                   return;
                 }
               }
@@ -198,20 +198,20 @@ export default function ConversationScreen() {
                 return { ...current, pages };
               },
             );
-            void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+            void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
             return;
           }
         }
         if (realtimeEvent.type === 'conversation.read' ||
           (typeof realtimeEvent.type === 'string' && realtimeEvent.type.startsWith('group.member.'))) {
-          void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
-          void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+          void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'members', conversationId] });
+          void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
           return;
         }
-        void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
-        void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages-after', conversationId] });
-        void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
-        void queryClient.invalidateQueries({ queryKey: ['messaging', 'members', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages-after', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'members', conversationId] });
       },
     });
   }, [conversationId, userId, isFocused, appState, queryClient, router]);
@@ -244,7 +244,7 @@ export default function ConversationScreen() {
   }, [conversationId, stopTyping]);
   useEffect(() => () => stopTyping(), [stopTyping]);
   const messagesQuery = useInfiniteQuery({
-    queryKey: ['messaging', 'messages', conversationId],
+    queryKey: ['messaging', userId, 'messages', conversationId],
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) => fetchMessages(conversationId, pageParam, signal),
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
@@ -252,10 +252,10 @@ export default function ConversationScreen() {
     staleTime: 15_000,
   });
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
-  const membersQuery = useQuery({ queryKey: ['messaging', 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal), enabled: Boolean(conversationId) && params.conversationType !== 'group', staleTime: 60_000 });
+  const membersQuery = useQuery({ queryKey: ['messaging', userId, 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal), enabled: Boolean(conversationId) && params.conversationType !== 'group', staleTime: 60_000 });
   // The authenticated WebSocket sends the initial typing snapshot and subsequent changes.
   const typingQuery = useQuery({
-    queryKey: ['messaging', 'typing', conversationId],
+    queryKey: ['messaging', userId, 'typing', conversationId],
     queryFn: async () => ({ activeUserIds: [] as string[] }),
     enabled: false,
     initialData: { activeUserIds: [] as string[] },
@@ -309,7 +309,7 @@ export default function ConversationScreen() {
   const latestSequence = messages.reduce((latest, message) =>
     compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const incrementalQuery = useQuery({
-    queryKey: ['messaging', 'messages-after', conversationId, latestSequence],
+    queryKey: ['messaging', userId, 'messages-after', conversationId, latestSequence],
     queryFn: ({ signal }) => fetchMessagesAfterBatch(conversationId, latestSequence, signal),
     enabled: Boolean(conversationId) && messagesQuery.isSuccess && isFocused && appState === 'active',
     staleTime: Infinity,
@@ -317,7 +317,7 @@ export default function ConversationScreen() {
   // Continue bounded drains from the returned cursor rather than silently stopping at the 500-message budget.
   const continuationCursor = incrementalQuery.data?.hasMore ? incrementalQuery.data.nextCursor : null;
   const continuationQuery = useQuery({
-    queryKey: ['messaging', 'messages-after-continuation', conversationId, continuationCursor],
+    queryKey: ['messaging', userId, 'messages-after-continuation', conversationId, continuationCursor],
     queryFn: async ({ signal }) => {
       // Each batch is capped at 10 pages. Continue for at most four additional batches
       // (2,000 messages) in this query cycle to avoid an unbounded request burst.
@@ -366,8 +366,8 @@ export default function ConversationScreen() {
     if (cachePageOverflow) {
       // Neon is authoritative; rebuild bounded history pages rather than growing
       // one cache page by thousands of messages after a long offline interval.
-      void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
-      void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages', conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
     }
   }, [incrementalQuery.data, continuationQuery.data, conversationId, queryClient]);
 
@@ -463,9 +463,9 @@ export default function ConversationScreen() {
       if (cachePageOverflow) {
         // Local send success must obey the same bounded cache policy as WebSocket
         // and incremental sync; the persisted history query will restore the page.
-        void queryClient.invalidateQueries({ queryKey: ['messaging', 'messages', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages', conversationId] });
       }
-      await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+      await queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
     },
     onError: (_error, variables) => {
       sendMutationPendingRef.current = false;
@@ -495,7 +495,7 @@ export default function ConversationScreen() {
         };
       },
     );
-    void queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+    void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
   }, [conversationId, queryClient]);
 
   const editMutation = useMutation({
@@ -589,7 +589,7 @@ export default function ConversationScreen() {
         if (state.retryTimer) clearTimeout(state.retryTimer);
         state.retryTimer = null;
         setReadAckCycle((cycle) => cycle + 1);
-        return queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+        return queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
       })
       .catch(() => {
         if (readAckStateRef.current !== state) return;
