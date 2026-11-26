@@ -16,11 +16,14 @@ export default function NewGroupScreen() {
   const userId = useAuthStore(state => state.user?.id);
   const { colorScheme } = useColorScheme();
   const mutation = useMutation({
-    mutationFn: () => createGroupConversation(name.trim(), parseGroupMemberIds(members), userId),
-    onSuccess: async (result) => {
-      await queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
+    mutationFn: (variables: { name: string; memberUserIds: string[]; expectedAccountId?: string }) =>
+      createGroupConversation(variables.name, variables.memberUserIds, variables.expectedAccountId),
+    onSuccess: async (result, variables) => {
+      if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;
+      await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'conversations'] });
+      if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;
       router.replace({ pathname: '/messages/[conversationId]', params: {
-        conversationId: result.conversationId, participantName: name.trim(), conversationType: 'group', groupName: name.trim(),
+        conversationId: result.conversationId, participantName: variables.name, conversationType: 'group', groupName: variables.name,
       } } as never);
     },
     onError: (error) => Alert.alert('群聊创建失败', error instanceof Error ? error.message : '请稍后重试'),
@@ -32,7 +35,7 @@ export default function NewGroupScreen() {
     <View className="flex-row items-center justify-between border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
       <Pressable accessibilityLabel="返回" onPress={() => router.back()} className="p-2"><Feather name="arrow-left" size={22} color={colorScheme === 'dark' ? '#fff' : '#111'} /></Pressable>
       <Text className="text-lg font-bold text-neutral-900 dark:text-white">创建群聊</Text>
-      <Pressable disabled={!canCreate} onPress={() => mutation.mutate()} className={`rounded-full px-4 py-2 ${canCreate ? 'bg-sky-500' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
+      <Pressable disabled={!canCreate} onPress={() => mutation.mutate({ name: name.trim(), memberUserIds: ids, expectedAccountId: userId })} className={`rounded-full px-4 py-2 ${canCreate ? 'bg-sky-500' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
         {mutation.isPending ? <ActivityIndicator color="#fff" size="small" /> : <Text className="font-semibold text-white">创建</Text>}
       </Pressable>
     </View>
