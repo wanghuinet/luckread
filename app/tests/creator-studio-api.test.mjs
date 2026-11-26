@@ -11,29 +11,32 @@ const api = await import('../lib/creator-studio-api.ts');
 beforeEach(() => { calls.length = 0; });
 
 test('reads own creator application and own membership plans through W01', async () => {
-  await api.fetchMyCreatorApplication();
-  await api.fetchMyCreatorPlans({ limit: 25, cursor: 'opaque/cursor' });
+  await api.fetchMyCreatorApplication({ expectedAccountId: 'viewer_a' });
+  await api.fetchMyCreatorPlans({ limit: 25, cursor: 'opaque/cursor', expectedAccountId: 'viewer_a' });
   expect(calls[0].path).toBe('/creator-applications');
   expect(calls[0].options.method).toBe('GET');
+  expect(calls[0].options.expectedAccountId).toBe('viewer_a');
   expect(calls[1].path).toBe('/membership/plans?limit=25&cursor=opaque%2Fcursor');
   expect(calls[1].options.method).toBe('GET');
+  expect(calls[1].options.expectedAccountId).toBe('viewer_a');
 });
 
 test('submits an idempotent creator application without caller-supplied identity', async () => {
-  await api.submitCreatorApplication('WRITER', 'I write essays.', 'creator_apply_001');
+  await api.submitCreatorApplication('WRITER', 'I write essays.', 'creator_apply_001', 'viewer_a');
   expect(calls[0].path).toBe('/creator-applications');
   expect(calls[0].options.idempotencyKey).toBe('creator_apply_001');
+  expect(calls[0].options.expectedAccountId).toBe('viewer_a');
   expect(JSON.parse(calls[0].options.body)).toEqual({ creatorType: 'WRITER', statement: 'I write essays.' });
 });
 
 test('creates, updates, publishes, pauses and resumes plans using server versions', async () => {
   const id = 'plan_' + 'a'.repeat(64);
   const terms = { name: 'Supporter', tier: 'supporter', billingInterval: 'MONTHLY', priceMinor: 900, currency: 'USD', benefits: ['Member posts'] };
-  await api.createMyCreatorPlan(terms, 'create_001');
-  await api.updateMyCreatorPlan(id, '"lr-plan-v1"', terms, 'update_001');
-  await api.publishMyCreatorPlan(id, '"lr-plan-v1"');
-  await api.changeMyCreatorPlanLifecycle(id, '"lr-plan-v2"', 'pause');
-  await api.changeMyCreatorPlanLifecycle(id, '"lr-plan-v3"', 'resume');
+  await api.createMyCreatorPlan(terms, 'create_001', 'viewer_a');
+  await api.updateMyCreatorPlan(id, '"lr-plan-v1"', terms, 'update_001', 'viewer_a');
+  await api.publishMyCreatorPlan(id, '"lr-plan-v1"', 'viewer_a');
+  await api.changeMyCreatorPlanLifecycle(id, '"lr-plan-v2"', 'pause', 'viewer_a');
+  await api.changeMyCreatorPlanLifecycle(id, '"lr-plan-v3"', 'resume', 'viewer_a');
   expect(calls.map(x => x.path)).toEqual([
     '/membership/plans',
     '/membership/plans/' + id,
@@ -42,6 +45,7 @@ test('creates, updates, publishes, pauses and resumes plans using server version
     '/membership/plans/' + id + '/lifecycle',
   ]);
   expect(JSON.parse(calls[0].options.body)).toMatchObject({ ...terms, trialPeriodDays: 0 });
+  expect(calls.every(call => call.options.expectedAccountId === 'viewer_a')).toBe(true);
   expect(calls[1].options.headers).toEqual({ 'If-Match': '"lr-plan-v1"' });
   expect(calls[2].options.headers).toEqual({ 'If-Match': '"lr-plan-v1"' });
   expect(JSON.parse(calls[3].options.body)).toEqual({ action: 'pause' });
