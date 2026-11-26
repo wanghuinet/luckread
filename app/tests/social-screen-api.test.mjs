@@ -13,6 +13,7 @@ const searchScreenSource = readFileSync(new URL('../app/(drawer)/(tabs)/(search)
 const videoScreenSource = readFileSync(new URL('../app/(drawer)/(tabs)/(video)/video.tsx', import.meta.url), 'utf8');
 const contentAdapterSource = readFileSync(new URL('../lib/content-adapter.ts', import.meta.url), 'utf8');
 const subscriptionsScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/subscriptions.tsx'), 'utf8');
+const homeFeedScreenSource = readFileSync(new URL('../app/(drawer)/(tabs)/(index)/index.tsx', import.meta.url), 'utf8');
 
 const calls = [];
 let keyCounter = 0;
@@ -132,6 +133,9 @@ test('search and video personalized reads are isolated across account switches',
   expect(videoScreenSource).toContain('useAuthStore.getState().user?.id !== viewerId');
   expect(videoScreenSource).toContain('readContentSocialBatch([record.id], controller.signal, viewerId ?? undefined)');
   expect(contentAdapterSource).toContain('expectedAccountId?: string');
+  expect(homeFeedScreenSource).toContain('pendingRecords.map((item) => item.id),\n      socialBatchController.signal,\n      viewerId ?? undefined,');
+  expect(profileScreenSource).toContain('readContentSocial(record.id, controller.signal, requestViewerId ?? undefined)');
+  expect(bookmarkScreenSource).toContain('readContentSocial(item.id, undefined, requestViewerId)');
   expect(contentAdapterSource).toContain('{ method: \'GET\', signal, expectedAccountId }');
 });
 
