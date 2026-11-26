@@ -44,6 +44,7 @@ export async function deleteComment(
     {
       method: 'DELETE',
       idempotencyKey: normalizedKey,
+      expectedAccountId: expectedViewerId,
     },
   );
 
