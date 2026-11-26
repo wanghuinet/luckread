@@ -208,11 +208,13 @@ test('marks all notifications as read using the existing endpoint', async () => 
 
 test('loads the real bookmark list with cursor pagination and forwards cancellation', async () => {
   const controller = new AbortController();
-  await fetchBookmarksPage({ cursor: 'bookmark cursor/1', signal: controller.signal });
+  await fetchBookmarksPage({ cursor: 'bookmark cursor/1', signal: controller.signal, expectedAccountId: 'viewer-a' });
 
   expect(calls[0].path).toBe('/interactions/bookmarks?list=true&limit=20&cursor=bookmark+cursor%2F1');
   expect(calls[0].options.method).toBe('GET');
   expect(calls[0].options.signal).toBe(controller.signal);
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
+  expect(bookmarkScreenSource).toContain('expectedAccountId: requestViewerId');
 });
 
 test('loads all content types for the native profile Media tab with creator filtering and pagination', async () => {
