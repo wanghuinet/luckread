@@ -78,7 +78,7 @@ export default function GroupInfoScreen() {
   });
   const removeMutation = useMutation({
     mutationFn: (memberId: string) => removeGroupMember(conversationId, memberId, userId),
-    onSuccess: async () => { await members.refetch(); await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] }); },
+    onSuccess: async () => { await members.refetch(); await queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] }); },
     onError: e => Alert.alert('移除失败', e instanceof Error ? e.message : '请重试'),
   });
   const transferMutation = useMutation({
