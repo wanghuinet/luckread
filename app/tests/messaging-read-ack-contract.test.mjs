@@ -133,3 +133,15 @@ test('group creation completion cannot navigate across an account switch', () =>
   expect(source).toContain("['messaging', variables.expectedAccountId, 'conversations']");
   expect(source).toContain('participantName: variables.name');
 });
+
+
+test('group management mutations isolate completions and errors across account switches', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/group-info.tsx', import.meta.url), 'utf8');
+  expect(source).toContain("useEffect(() => { setSelected([]); setSearch(''); }, [conversationId, userId])");
+  expect(source).toContain('addGroupMembers(conversationId, variables.memberIds, variables.expectedAccountId)');
+  expect(source).toContain('removeGroupMember(conversationId, variables.memberId, variables.expectedAccountId)');
+  expect(source).toContain('transferGroupOwnership(conversationId, variables.targetId, variables.expectedAccountId)');
+  expect(source).toContain('leaveGroupConversation(conversationId, variables.expectedAccountId)');
+  expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;');
+  expect(source).not.toContain("['messaging', 'conversations']");
+});
