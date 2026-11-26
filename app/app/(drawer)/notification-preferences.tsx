@@ -217,13 +217,16 @@ export default function NotificationPreferencesScreen() {
   }, [accountId, devicePushBusy, devicePushPermission]);
 
   const openSystemNotificationSettings = useCallback(async () => {
+    const operationAccountId = accountId;
     setDevicePushError('');
     try {
       await Linking.openSettings();
     } catch {
-      setDevicePushError('无法打开系统设置，请在设备设置中找到 LuckRead 的通知权限。');
+      if (useAuthStore.getState().user?.id === operationAccountId) {
+        setDevicePushError('无法打开系统设置，请在设备设置中找到 LuckRead 的通知权限。');
+      }
     }
-  }, []);
+  }, [accountId]);
 
   const dirty = useMemo(
     () => !equalPreferences(preferences, savedPreferences),
