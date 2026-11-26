@@ -173,6 +173,9 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
 
   useEffect(() => {
     let active = true;
+    const requestViewerId = currentUserId;
+    const isCurrentHydration = () =>
+      active && (useAuthStore.getState().user?.id ?? null) === requestViewerId;
     const hasEmbeddedProfile = (comment: ApiComment) => Boolean(
       comment.author &&
       ['username', 'displayName', 'avatar'].every((key) =>
@@ -192,6 +195,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
 
     void (async () => {
       const sessionToken = await readSessionToken().catch(() => null);
+      if (!isCurrentHydration()) return;
       const next: Record<string, PublicUser> = {};
 
       // W01 returns author projections in the same comments page. Hydrate media
@@ -207,7 +211,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
         };
       }
 
-      if (Object.keys(next).length > 0) {
+      if (Object.keys(next).length > 0 && isCurrentHydration()) {
         setProfiles((current) => ({ ...current, ...next }));
       }
       if (authorIds.length === 0) return;
@@ -231,7 +235,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
         }
       }));
 
-      if (!active) return;
+      if (!isCurrentHydration()) return;
       const fallbackProfiles: Record<string, PublicUser> = {};
       for (const result of results) {
         if (result) fallbackProfiles[result[0]] = result[1];
@@ -242,7 +246,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
     })();
 
     return () => { active = false; };
-  }, [comments]);
+  }, [comments, currentUserId]);
 
   const refreshComments = useCallback(() => {
     setRefreshing(true);
