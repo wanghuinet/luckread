@@ -73,4 +73,6 @@ test('does not let a previous account push-permission request update the next ac
   expect(notificationScreen).toContain('useAuthStore.getState().user?.id !== operationAccountId');
   expect(notificationScreen).toContain('useAuthStore.getState().user?.id === operationAccountId');
   expect(notificationScreen).toContain('}, [accountId]);');
+  expect(notificationScreen).toContain('const openSystemNotificationSettings = useCallback(async () => {\n    const operationAccountId = accountId;');
+  expect(notificationScreen).toContain('if (useAuthStore.getState().user?.id === operationAccountId) {\n        setDevicePushError');
 });
