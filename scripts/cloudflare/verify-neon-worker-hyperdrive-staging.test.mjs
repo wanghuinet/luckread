@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -121,4 +121,17 @@ test('fails closed when a required Worker Wrangler file is missing', async () =>
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+
+test('keeps the legacy media runtime E2E fail-closed until its Neon fixtures and isolated environment exist', async () => {
+  const workflow = await readFile(
+    new URL('../../.github/workflows/media-runtime-e2e.yml', import.meta.url),
+    'utf8',
+  )
+  assert.match(workflow, /^on:\n  workflow_dispatch:/m, 'media E2E must remain manual-only')
+  assert.doesNotMatch(workflow, /^  workflow_run:/m, 'media E2E must not auto-run after a production deployment')
+  assert.match(workflow, /^    if: \$\{\{ false \}\}$/m, 'legacy D1 fixture job must remain disabled')
+  assert.match(workflow, /'d1','execute'/, 'the legacy D1 fixture path must be visible for future replacement')
+  assert.match(workflow, /dedicated non-production W01 \+ isolated Neon DB/, 'the re-enable requirement must remain explicit')
 })

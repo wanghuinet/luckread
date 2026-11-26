@@ -7,6 +7,7 @@ on:
       - 'workers/**/wrangler.jsonc'
       - 'scripts/cloudflare/verify-neon-worker-hyperdrive-staging.mjs'
       - 'scripts/cloudflare/verify-neon-worker-hyperdrive-staging.test.mjs'
+      - '.github/workflows/media-runtime-e2e.yml'
       - '.github/workflows/neon-worker-hyperdrive-staging-ci.yml'
   push:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - 'workers/**/wrangler.jsonc'
       - 'scripts/cloudflare/verify-neon-worker-hyperdrive-staging.mjs'
       - 'scripts/cloudflare/verify-neon-worker-hyperdrive-staging.test.mjs'
+      - '.github/workflows/media-runtime-e2e.yml'
       - '.github/workflows/neon-worker-hyperdrive-staging-ci.yml'
 
 permissions:
