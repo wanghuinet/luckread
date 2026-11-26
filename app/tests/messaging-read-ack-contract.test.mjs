@@ -24,3 +24,12 @@ test('conversation realtime lifecycle rebinds when authenticated account changes
   const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
   expect(source).toContain('[conversationId, userId, isFocused, appState, queryClient, router]');
 });
+
+
+test('messaging React Query caches are scoped by authenticated user identity', () => {
+  const listSource = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages.tsx', import.meta.url), 'utf8');
+  const conversationSource = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
+  expect(listSource).toContain("queryKey: ['messaging', userId,");
+  expect(listSource).toContain('const userId = useAuthStore((state) => state.user?.id)');
+  expect(conversationSource).toContain("queryKey: ['messaging', userId,");
+});
