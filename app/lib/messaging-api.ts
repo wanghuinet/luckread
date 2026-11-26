@@ -91,6 +91,7 @@ export async function fetchMessagesAfterBatch(
   afterSequence: string,
   signal?: AbortSignal,
   maxPages = 10,
+  expectedAccountId?: string,
 ): Promise<Page<MessagingMessage>> {
   const itemsById = new Map<string, MessagingMessage>();
   let cursor = afterSequence;
