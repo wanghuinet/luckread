@@ -167,6 +167,8 @@ test('follow mutation reconciles only the initiating viewer cache', async () => 
 test('like and follow hooks resubscribe and re-read when the authenticated viewer changes', () => {
   const likeSource = readFileSync(new URL('../lib/content-like-state.ts', import.meta.url), 'utf8');
   const followSource = readFileSync(new URL('../lib/user-follow-state.ts', import.meta.url), 'utf8');
+  const repostSource = readFileSync(new URL('../lib/content-repost-state.ts', import.meta.url), 'utf8');
+  const bookmarkSource = readFileSync(new URL('../lib/content-bookmark-state.ts', import.meta.url), 'utf8');
   const followButtonSource = readFileSync(new URL('../components/FollowButton.tsx', import.meta.url), 'utf8');
 
   for (const source of [likeSource, followSource]) {
@@ -177,6 +179,17 @@ test('like and follow hooks resubscribe and re-read when the authenticated viewe
   expect(followButtonSource).toContain('getUserFollowSnapshot(resolvedTargetId, viewerId)');
 });
 
+
+test('like, follow, repost, and bookmark API calls bind credentials to their viewer scope', () => {
+  const likeSource = readFileSync(new URL('../lib/content-like-state.ts', import.meta.url), 'utf8');
+  const followSource = readFileSync(new URL('../lib/user-follow-state.ts', import.meta.url), 'utf8');
+  const repostSource = readFileSync(new URL('../lib/content-repost-state.ts', import.meta.url), 'utf8');
+  const bookmarkSource = readFileSync(new URL('../lib/content-bookmark-state.ts', import.meta.url), 'utf8');
+  for (const source of [likeSource, followSource, repostSource]) {
+    expect(source).toContain('expectedAccountId: viewerId ?? undefined');
+  }
+  expect(bookmarkSource).toContain('expectedAccountId: viewerId');
+});
 
 test('follow refresh and mutations guard awaited requests against viewer switches', () => {
   const source = readFileSync(new URL('../lib/user-follow-state.ts', import.meta.url), 'utf8');
