@@ -33,3 +33,11 @@ test('messaging React Query caches are scoped by authenticated user identity', (
   expect(listSource).toContain('const userId = useAuthStore((state) => state.user?.id)');
   expect(conversationSource).toContain("queryKey: ['messaging', userId,");
 });
+
+
+test('messaging realtime cache reads and writes use account-scoped query keys', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
+  expect(source).toContain("getQueryData<typeof messagesQuery.data>(['messaging', userId, 'messages', conversationId])");
+  expect(source).toContain("setQueryData(['messaging', userId, 'messages', conversationId]");
+  expect(source).toContain("setQueryData(['messaging', userId, 'typing', conversationId]");
+});
