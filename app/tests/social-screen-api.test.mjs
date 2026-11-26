@@ -451,6 +451,8 @@ test('block and mute actions use authenticated canonical endpoints and supported
   expect(calls[3].options.method).toBe('DELETE');
   expect(calls.every((call) => call.options.expectedAccountId === 'viewer-a')).toBe(true);
   expect(feedItemSource).toContain('expectedAccountId: currentUser?.id');
+  expect(postDetailSource).toContain('muteUser(targetUserId, operationAccountId)');
+  expect(postDetailSource).toContain('blockUser(targetUserId, operationAccountId)');
   expect(blockedMutedScreenSource).toContain('unblockUser(targetId, operationAccountId)');
 });
 
