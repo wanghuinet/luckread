@@ -21,6 +21,8 @@ concurrency:
 
 jobs:
   verified-user-live-e2e:
+    # Safety hold: legacy harness queries production Cloudflare D1, while W02 is Neon-backed.
+    if: ${{ false }}
     name: Verify live L1/L2 authorization facts and W01-W02-W05 gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
