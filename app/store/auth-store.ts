@@ -87,6 +87,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   accounts: [],
 
   bootstrap: async () => {
+    // Each bootstrap invocation claims a fresh lifecycle generation. Concurrent
+    // bootstraps or an older restore cannot publish state after a newer action.
+    authLifecycleGeneration += 1;
     const generation = authLifecycleGeneration;
     let token: string | null = null;
     let cachedUser: LuckReadUser | null = null;
