@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   deploy:
-    if: ${{ inputs.confirm == 'DEPLOY_W07_SUBSCRIPTION' && inputs.renewal_confirm == 'DEPLOY_W07_W10_RENEWAL_RUNTIME' }}
+    if: ${{ inputs.confirm == 'DEPLOY_W07_SUBSCRIPTION' && inputs.renewal_confirm == 'DEPLOY_W07_W10_RENEWAL_RUNTIME' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -38,7 +38,7 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$GITHUB_REF" == "refs/heads/main" ]]
+          [[ "$GITHUB_REF" == "refs/heads/main" ]]\n          [[ "$GITHUB_REF_PROTECTED" == "true" ]]
           MAIN_SHA="$(git rev-parse origin/main)"
           [[ "$SOURCE_SHA" == "$GITHUB_SHA" && "$SOURCE_SHA" == "$MAIN_SHA" ]]
           [[ "$DEPLOY_CONFIRM" == "DEPLOY_W07_SUBSCRIPTION" ]]
