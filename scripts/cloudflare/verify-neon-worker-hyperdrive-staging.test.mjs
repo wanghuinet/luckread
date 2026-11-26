@@ -142,7 +142,7 @@ test('keeps the obsolete D1 media owner migration workflow disabled after W01 Ne
     new URL('../../.github/workflows/w01-media-owner-migration-execution.yml', import.meta.url),
     'utf8',
   )
-  assert.match(workflow, /if: \\?\$\{\{ false \\?\}\}/, 'legacy migration workflow must be hard-disabled')
+  assert.ok(workflow.includes('if: ${{ false }}'), 'legacy migration workflow must be hard-disabled')
   assert.match(workflow, /Safety hold: this legacy workflow targets D1/, 'migration target rationale must remain documented')
   assert.match(workflow, /d1 execute/, 'legacy D1 commands must remain detectable')
 })
