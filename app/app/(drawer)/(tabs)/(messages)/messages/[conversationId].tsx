@@ -405,7 +405,7 @@ export default function ConversationScreen() {
     setPendingAttachments((current) => current.map((item) => item.localId === localId
       ? { ...item, status: 'uploading', error: undefined } : item));
     try {
-      const attachment = await uploadMessageAttachment(file, localId);
+      const attachment = await uploadMessageAttachment(file, localId, userId);
       if (conversationScopeRef.current.version !== scopeVersion) return;
       setPendingAttachments((current) => current.map((item) => item.localId === localId
         ? { ...item, status: 'ready', attachment, error: undefined } : item));
@@ -414,7 +414,7 @@ export default function ConversationScreen() {
       setPendingAttachments((current) => current.map((item) => item.localId === localId
         ? { ...item, status: 'failed', error: error instanceof Error ? error.message : '上传失败' } : item));
     }
-  }, []);
+  }, [userId]);
 
   const pickAttachments = useCallback(async () => {
     if (isPicking || sendMutationPendingRef.current) return;
