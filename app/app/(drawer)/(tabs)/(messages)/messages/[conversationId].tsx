@@ -473,7 +473,7 @@ export default function ConversationScreen() {
       if (!pendingSend.current || pendingSend.current.fingerprint !== fingerprint) {
         pendingSend.current = { fingerprint, key: createIdempotencyKey() };
       }
-      return sendDirectMessage(variables.conversationId, variables.body, pendingSend.current.key, variables.attachments);
+      return sendDirectMessage(variables.conversationId, variables.body, pendingSend.current.key, variables.attachments, variables.userId);
     },
     onMutate: () => { sendMutationPendingRef.current = true; },
     onSuccess: async (sentMessage, variables) => {
