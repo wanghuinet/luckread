@@ -920,7 +920,7 @@ export default function UserProfileScreen() {
 
         const [body, social, author] = await Promise.all([
           readContentBody(record, controller.signal, sessionToken),
-          readContentSocial(record.id, controller.signal),
+          readContentSocial(record.id, controller.signal, requestViewerId ?? undefined),
           readContentAuthor(record),
         ]);
         return mapContentToFeedContent(record, body, social, author, sessionToken);
@@ -1018,7 +1018,7 @@ export default function UserProfileScreen() {
 
         const [parentBody, social, author] = await Promise.all([
           readContentBody(record, controller.signal, sessionToken),
-          readContentSocial(record.id, controller.signal),
+          readContentSocial(record.id, controller.signal, requestViewerId ?? undefined),
           readContentAuthor(record),
         ]);
         const parentPost = mapContentToFeedContent(record, parentBody, social, author, sessionToken);
