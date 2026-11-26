@@ -2,15 +2,17 @@ import { getApiAuthHeaders, getApiBaseUrl } from './api-client';
 
 type RealtimeOptions = {
   conversationId: string;
+  userId: string;
   onEvent?: (event: unknown) => void;
   onState?: (state: 'connecting' | 'connected' | 'disconnected' | 'revoked') => void;
 };
 
 const activeSockets = new Map<string, WebSocket>();
+const socketKey = (userId: string, conversationId: string) => userId + ':' + conversationId;
 
 /** Send ephemeral typing control frames over the existing authenticated socket (no Worker API request). */
-export function setMessagingRealtimeTyping(conversationId: string, typing: boolean): boolean {
-  const socket = activeSockets.get(conversationId);
+export function setMessagingRealtimeTyping(userId: string, conversationId: string, typing: boolean): boolean {
+  const socket = activeSockets.get(socketKey(userId, conversationId));
   if (!socket || socket.readyState !== WebSocket.OPEN) return false;
   try {
     socket.send(JSON.stringify({ type: typing ? 'typing.start' : 'typing.stop' }));
@@ -19,7 +21,7 @@ export function setMessagingRealtimeTyping(conversationId: string, typing: boole
 }
 
 /** Foreground WebSocket with bounded jittered reconnect; no periodic client heartbeat. */
-export function connectMessagingRealtime({ conversationId, onEvent, onState }: RealtimeOptions): () => void {
+export function connectMessagingRealtime({ userId, conversationId, onEvent, onState }: RealtimeOptions): () => void {
   let stopped = false;
   let socket: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -45,7 +47,7 @@ export function connectMessagingRealtime({ conversationId, onEvent, onState }: R
       socket = candidate;
       candidate.onopen = () => {
         if (stopped || socket !== candidate) return;
-        activeSockets.set(conversationId, candidate);
+        activeSockets.set(socketKey(userId, conversationId), candidate);
         // Reset backoff only after a sustained connection, not on brief flaps.
         if (stableTimer) clearTimeout(stableTimer);
         stableTimer = setTimeout(() => { stableTimer = null; retry = 0; }, 30_000);
@@ -59,7 +61,7 @@ export function connectMessagingRealtime({ conversationId, onEvent, onState }: R
       candidate.onclose = (event) => {
         if (stableTimer) clearTimeout(stableTimer);
         stableTimer = null;
-        if (activeSockets.get(conversationId) === candidate) activeSockets.delete(conversationId);
+        if (activeSockets.get(socketKey(userId, conversationId)) === candidate) activeSockets.delete(socketKey(userId, conversationId));
         if (socket === candidate) socket = null;
         if (event.code === 4003) {
           stopped = true;
@@ -80,7 +82,7 @@ export function connectMessagingRealtime({ conversationId, onEvent, onState }: R
     const current = socket;
     socket = null;
     if (current) {
-      if (activeSockets.get(conversationId) === current) activeSockets.delete(conversationId);
+      if (activeSockets.get(socketKey(userId, conversationId)) === current) activeSockets.delete(socketKey(userId, conversationId));
       current.onopen = null; current.onmessage = null; current.onerror = null; current.onclose = null;
       try { current.close(); } catch { /* already closed */ }
     }
