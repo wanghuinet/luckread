@@ -86,6 +86,23 @@ beforeEach(() => {
   platformState.OS = 'android';
 });
 
+test('undetermined permission disables a previously registered endpoint without prompting', async () => {
+  secureValues.set('luckread.native.push-installation.user-1', '123e4567-e89b-42d3-a456-426614174000');
+
+  const result = await syncPushEndpointForAuthenticatedUser('user-1');
+
+  expect(result).toBe('not-requested');
+  expect(events).toEqual([]);
+  expect(calls).toHaveLength(1);
+  expect(calls[0].options.method).toBe('PUT');
+  expect(calls[0].options.expectedAccountId).toBe('user-1');
+  expect(calls[0].path).toBe('/push/endpoints/123e4567-e89b-42d3-a456-426614174000');
+  expect(JSON.parse(calls[0].options.body)).toMatchObject({
+    permissionStatus: 'undetermined',
+    expoPushToken: null,
+  });
+});
+
 test('app resume never prompts when notification permission is undetermined', async () => {
   const result = await syncPushEndpointForAuthenticatedUser('user-1');
 
