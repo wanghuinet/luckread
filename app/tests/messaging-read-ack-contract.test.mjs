@@ -123,3 +123,13 @@ test('message request action completions cannot navigate or invalidate another a
   expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;');
   expect(source).toContain('expectedAccountId: userId');
 });
+
+
+test('group creation completion cannot navigate across an account switch', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/group-new.tsx', import.meta.url), 'utf8');
+  expect(source).toContain('expectedAccountId: userId');
+  expect(source).toContain('createGroupConversation(variables.name, variables.memberUserIds, variables.expectedAccountId)');
+  expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;');
+  expect(source).toContain("['messaging', variables.expectedAccountId, 'conversations']");
+  expect(source).toContain('participantName: variables.name');
+});
