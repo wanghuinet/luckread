@@ -104,7 +104,7 @@ export default function Search() {
   const [topicsLoading, setTopicsLoading] = useState(true);
   const [topicsError, setTopicsError] = useState('');
 
-  useEffect(() => {
+  React.useLayoutEffect(() => {
     contentRequestIdRef.current += 1;
     contentAbortRef.current?.abort();
     contentAbortRef.current = null;
