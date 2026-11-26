@@ -190,7 +190,7 @@ export default function Bookmarks() {
         .map(async (item) => {
           const [body, social, author] = await Promise.all([
             readContentBody(item, undefined, sessionToken),
-            readContentSocial(item.id),
+            readContentSocial(item.id, undefined, requestViewerId),
             readContentAuthor(item),
           ]);
           return mapContentToFeedContent(item, body, social, author, sessionToken);
