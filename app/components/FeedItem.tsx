@@ -591,7 +591,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                             if (current.state !== 'DRAFT') throw new Error('当前状态不支持编辑，请刷新信息流后重试。');
                             router.push(('/publish?contentId=' + encodeURIComponent(contentId)) as never);
                         } catch (error) {
-                            Alert.alert('无法编辑动态', error instanceof Error ? error.message : '请稍后重试。');
+                            if (useAuthStore.getState().user?.id === currentUser?.id) Alert.alert('无法编辑动态', error instanceof Error ? error.message : '请稍后重试。');
                         }
                     })();
                 } },
@@ -622,7 +622,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                 }
                 Alert.alert('已静音', '已静音 @' + authorHandle + '。静音不会屏蔽该用户。');
             } catch (error) {
-                Alert.alert('静音失败', error instanceof Error ? error.message : '静音用户失败，请稍后重试。');
+                if (useAuthStore.getState().user?.id === currentUser?.id) Alert.alert('静音失败', error instanceof Error ? error.message : '静音用户失败，请稍后重试。');
             }
         })();
     };
@@ -651,7 +651,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                 }
                                 Alert.alert('已屏蔽', '@' + authorHandle + ' 已加入屏蔽名单。刷新信息流以同步过滤结果。');
                             } catch (error) {
-                                Alert.alert('屏蔽失败', error instanceof Error ? error.message : '屏蔽用户失败，请稍后重试。');
+                                if (useAuthStore.getState().user?.id === currentUser?.id) Alert.alert('屏蔽失败', error instanceof Error ? error.message : '屏蔽用户失败，请稍后重试。');
                             }
                         })();
                     },
@@ -700,7 +700,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                         onDeleted?.(contentId);
                         Alert.alert('已删除', '这条动态已删除。');
                     } catch (error) {
-                        Alert.alert('删除失败', error instanceof Error ? error.message : '删除动态失败，请稍后重试。');
+                        if (useAuthStore.getState().user?.id === currentUser?.id) Alert.alert('删除失败', error instanceof Error ? error.message : '删除动态失败，请稍后重试。');
                     }
                 })();
             } },
