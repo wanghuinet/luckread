@@ -116,6 +116,7 @@ export function fetchBookmarksPage(options: PageRequestOptions = {}) {
   return apiRequest<unknown>('/interactions/bookmarks?' + query.toString(), {
     method: 'GET',
     signal: options.signal,
+    expectedAccountId: options.expectedAccountId,
   });
 }
 
