@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, type AppStateStatus, ActivityIndicator, Modal, Pressable, StatusBar, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
@@ -25,7 +25,7 @@ type PendingAttachment = {
   attachment?: MessagingAttachment;
   error?: string;
 };
-type SendVariables = { body: string; attachments: MessagingAttachment[] };
+type SendVariables = { body: string; attachments: MessagingAttachment[]; conversationId: string; userId?: string; scopeVersion: number };
 
 function PrivateMessageImages({ currentMessage }: { currentMessage: IMessage }) {
   const [headers, setHeaders] = useState<Record<string, string>>({});
@@ -220,6 +220,32 @@ export default function ConversationScreen() {
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingRefreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const typingActiveRef = useRef(false);
+  const conversationScopeRef = useRef({ conversationId, userId, version: 0 });
+  // A dynamic route can reuse this screen instance. Reset composer state before
+  // committing a render for another conversation or authenticated account.
+  if (conversationScopeRef.current.conversationId !== conversationId || conversationScopeRef.current.userId !== userId) {
+    conversationScopeRef.current = {
+      conversationId,
+      userId,
+      version: conversationScopeRef.current.version + 1,
+    };
+    pendingSend.current = null;
+    sendMutationPendingRef.current = false;
+    typingActiveRef.current = false;
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    if (typingRefreshTimer.current) clearInterval(typingRefreshTimer.current);
+    typingTimer.current = null;
+    typingRefreshTimer.current = null;
+  }
+  useLayoutEffect(() => {
+    setDraft('');
+    setPendingAttachments([]);
+    setSenderProfiles({});
+    senderProfileAttempted.current.clear();
+    setEditTarget(null);
+    setEditDraft('');
+    setIsPicking(false);
+  }, [conversationId, userId]);
   const stopTyping = useCallback(() => {
     if (typingTimer.current) clearTimeout(typingTimer.current);
     if (typingRefreshTimer.current) clearInterval(typingRefreshTimer.current);
@@ -373,14 +399,17 @@ export default function ConversationScreen() {
 
 
 
-  const uploadOne = useCallback(async (localId: string, file: LocalMediaFile) => {
+  const uploadOne = useCallback(async (localId: string, file: LocalMediaFile, scopeVersion = conversationScopeRef.current.version) => {
+    if (conversationScopeRef.current.version !== scopeVersion) return;
     setPendingAttachments((current) => current.map((item) => item.localId === localId
       ? { ...item, status: 'uploading', error: undefined } : item));
     try {
       const attachment = await uploadMessageAttachment(file, localId);
+      if (conversationScopeRef.current.version !== scopeVersion) return;
       setPendingAttachments((current) => current.map((item) => item.localId === localId
         ? { ...item, status: 'ready', attachment, error: undefined } : item));
     } catch (error) {
+      if (conversationScopeRef.current.version !== scopeVersion) return;
       setPendingAttachments((current) => current.map((item) => item.localId === localId
         ? { ...item, status: 'failed', error: error instanceof Error ? error.message : '上传失败' } : item));
     }
@@ -388,6 +417,7 @@ export default function ConversationScreen() {
 
   const pickAttachments = useCallback(async () => {
     if (isPicking || sendMutationPendingRef.current) return;
+    const scopeVersion = conversationScopeRef.current.version;
     const available = 4 - pendingAttachments.length;
     if (available <= 0) {
       Alert.alert('附件数量已达上限', '一条私信最多添加 4 个附件。');
@@ -396,6 +426,7 @@ export default function ConversationScreen() {
     setIsPicking(true);
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (conversationScopeRef.current.version !== scopeVersion) return;
       if (!permission.granted) {
         Alert.alert('需要照片访问权限', '允许 LuckRead 访问照片后才能添加私信图片。');
         return;
@@ -407,6 +438,7 @@ export default function ConversationScreen() {
         allowsEditing: false,
         quality: 1,
       });
+      if (conversationScopeRef.current.version !== scopeVersion) return;
       if (result.canceled || !result.assets?.length) return;
       const selected: PendingAttachment[] = result.assets.slice(0, available).map((asset) => {
         const localId = createIdempotencyKey();
@@ -421,11 +453,16 @@ export default function ConversationScreen() {
         return { localId, file, status: 'uploading' };
       });
       setPendingAttachments((current) => [...current, ...selected]);
-      for (const item of selected) await uploadOne(item.localId, item.file);
+      for (const item of selected) {
+        if (conversationScopeRef.current.version !== scopeVersion) break;
+        await uploadOne(item.localId, item.file, scopeVersion);
+      }
     } catch (error) {
-      Alert.alert('无法添加附件', error instanceof Error ? error.message : '请稍后重试。');
+      if (conversationScopeRef.current.version === scopeVersion) {
+        Alert.alert('无法添加附件', error instanceof Error ? error.message : '请稍后重试。');
+      }
     } finally {
-      setIsPicking(false);
+      if (conversationScopeRef.current.version === scopeVersion) setIsPicking(false);
     }
   }, [isPicking, pendingAttachments.length, uploadOne]);
 
@@ -435,18 +472,21 @@ export default function ConversationScreen() {
       if (!pendingSend.current || pendingSend.current.fingerprint !== fingerprint) {
         pendingSend.current = { fingerprint, key: createIdempotencyKey() };
       }
-      return sendDirectMessage(conversationId, variables.body, pendingSend.current.key, variables.attachments);
+      return sendDirectMessage(variables.conversationId, variables.body, pendingSend.current.key, variables.attachments);
     },
     onMutate: () => { sendMutationPendingRef.current = true; },
     onSuccess: async (sentMessage, variables) => {
-      sendMutationPendingRef.current = false;
-      pendingSend.current = null;
-      setDraft((current) => current.trim() === variables.body ? '' : current);
-      stopTyping();
-      setPendingAttachments([]);
+      const isCurrentScope = conversationScopeRef.current.version === variables.scopeVersion;
+      if (isCurrentScope) {
+        sendMutationPendingRef.current = false;
+        pendingSend.current = null;
+        setDraft((current) => current.trim() === variables.body ? '' : current);
+        stopTyping();
+        setPendingAttachments([]);
+      }
       let cachePageOverflow = false;
       queryClient.setQueryData<typeof messagesQuery.data>(
-        ['messaging', userId, 'messages', conversationId],
+        ['messaging', variables.userId, 'messages', variables.conversationId],
         (current) => {
           if (!current?.pages.length || current.pages.some((page) => page.items.some((item) => item.message_id === sentMessage.message_id))) return current;
           const pages = [...current.pages];
@@ -463,11 +503,12 @@ export default function ConversationScreen() {
       if (cachePageOverflow) {
         // Local send success must obey the same bounded cache policy as WebSocket
         // and incremental sync; the persisted history query will restore the page.
-        void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', variables.userId, 'messages', variables.conversationId] });
       }
-      await queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
+      await queryClient.invalidateQueries({ queryKey: ['messaging', variables.userId, 'conversations'] });
     },
     onError: (_error, variables) => {
+      if (conversationScopeRef.current.version !== variables.scopeVersion) return;
       sendMutationPendingRef.current = false;
       setDraft(variables.body);
     },
@@ -534,8 +575,8 @@ export default function ConversationScreen() {
     const body = bodyValue.trim();
     if (sendMutation.isPending || pendingAttachments.some((item) => item.status !== 'ready')) return;
     if (!body && readyAttachments.length === 0) return;
-    sendMutation.mutate({ body, attachments: readyAttachments });
-  }, [pendingAttachments, readyAttachments, sendMutation]);
+    sendMutation.mutate({ body, attachments: readyAttachments, conversationId, userId, scopeVersion: conversationScopeRef.current.version });
+  }, [conversationId, userId, pendingAttachments, readyAttachments, sendMutation]);
   const handleChatSend = useCallback((newMessages: IMessage[]) => {
     sendCurrent(newMessages[0]?.text ?? draft);
   }, [draft, sendCurrent]);
