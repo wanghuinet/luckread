@@ -295,6 +295,21 @@ test('logout preserves the active session when push endpoint deletion fails so t
   expect(logoutRequests).toHaveLength(0);
 });
 
+test('removing the active account preserves its session when push endpoint deletion fails', async () => {
+  await useAuthStore.getState().login('first@example.com', 'password-one');
+  failPushUnregisterFor = 'user-first@example.com';
+
+  await expect(useAuthStore.getState().removeAccount('user-first@example.com')).rejects.toThrow(
+    'Push endpoint could not be unregistered',
+  );
+
+  expect(activeAccountId).toBe('user-first@example.com');
+  expect(storedTokens.get('user-first@example.com')).toBe('token-first@example.com');
+  expect(useAuthStore.getState().status).toBe('authenticated');
+  expect(useAuthStore.getState().user?.id).toBe('user-first@example.com');
+  expect(storedAccounts.has('user-first@example.com')).toBe(true);
+});
+
 test('removing the active account leaves other saved accounts intact and signs out only the active slot', async () => {
   await useAuthStore.getState().login('first@example.com', 'password-one');
   await useAuthStore.getState().login('second@example.com', 'password-two');
