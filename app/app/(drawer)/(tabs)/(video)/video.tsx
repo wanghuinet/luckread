@@ -373,6 +373,24 @@ export default function VideoFeed() {
   const hydratedIdsRef = useRef<Set<string>>(new Set());
   const [hydrationRetryVersion, setHydrationRetryVersion] = useState(0);
 
+  React.useLayoutEffect(() => {
+    requestIdRef.current += 1;
+    pageControllerRef.current?.abort();
+    hydrationControllerRef.current?.abort();
+    hydrationGenerationRef.current += 1;
+    recordsByIdRef.current.clear();
+    hydratedIdsRef.current.clear();
+    loadingMoreRef.current = false;
+    setItems([]);
+    setCursor(null);
+    setHasMore(false);
+    setCurrentId(null);
+    setLoading(true);
+    setLoadingMore(false);
+    setRefreshing(false);
+    setErrorMessage('');
+  }, [viewerId]);
+
   useEffect(() => {
     if (!isFocused) return;
     let active = true;
