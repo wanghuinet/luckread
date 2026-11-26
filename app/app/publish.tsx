@@ -272,6 +272,8 @@ function PublishScreenContent() {
   const [scheduledInboxError, setScheduledInboxError] = useState('');
   const [scheduledActionId, setScheduledActionId] = useState<string | null>(null);
   const scheduledActionInFlightRef = useRef(false);
+  const scheduledActionTokenRef = useRef<object | null>(null);
+  const draftDeleteTokenRef = useRef<object | null>(null);
   const draftInboxRequestRef = useRef<AbortController | null>(null);
   const scheduledInboxRequestRef = useRef<AbortController | null>(null);
   const previousInboxViewerIdRef = useRef<string | null>(user?.id ?? null);
@@ -1518,6 +1520,9 @@ function PublishScreenContent() {
     setScheduledInboxError('');
     setScheduledInboxVisible(false);
     setScheduledActionId(null);
+    setDeletingDraftId(null);
+    scheduledActionTokenRef.current = null;
+    draftDeleteTokenRef.current = null;
     scheduledActionInFlightRef.current = false;
   }, [authStatus, user?.id]);
 
@@ -1558,6 +1563,8 @@ function PublishScreenContent() {
 
   const cancelScheduledPost = useCallback((item: NativeScheduledPost) => {
     if (scheduledActionInFlightRef.current) return;
+    const ownerId = useAuthStore.getState().user?.id;
+    if (!ownerId) return;
     Alert.alert(
       '取消定时发布',
       '“' + item.title + '”将转为草稿，不会删除内容。',
@@ -1568,15 +1575,19 @@ function PublishScreenContent() {
           style: 'destructive',
           onPress: () => {
             void (async () => {
-              if (scheduledActionInFlightRef.current) return;
+              if (scheduledActionInFlightRef.current ||
+                  useAuthStore.getState().status !== 'authenticated' ||
+                  useAuthStore.getState().user?.id !== ownerId) return;
+              const actionToken = {};
+              scheduledActionTokenRef.current = actionToken;
               scheduledActionInFlightRef.current = true;
               setScheduledActionId(item.id);
               setScheduledInboxError('');
               try {
-                const ownerId = useAuthStore.getState().user?.id;
-                if (!ownerId) return;
                 const result = await transitionOwnScheduledPostState(item, 'DRAFT', undefined, ownerId);
-                if (useAuthStore.getState().user?.id !== ownerId) return;
+                if (useAuthStore.getState().status !== 'authenticated' ||
+                    useAuthStore.getState().user?.id !== ownerId ||
+                    scheduledActionTokenRef.current !== actionToken) return;
                 if (!result.response.ok) {
                   throw new Error(apiFailureDiagnostic(result, '取消定时发布失败。'));
                 }
@@ -1584,10 +1595,20 @@ function PublishScreenContent() {
                 setScheduledInboxError('');
                 await loadScheduledInbox(null, false);
               } catch (cause) {
-                setScheduledInboxError(cause instanceof Error ? cause.message : '取消定时发布失败。');
+                if (useAuthStore.getState().status === 'authenticated' &&
+                    useAuthStore.getState().user?.id === ownerId &&
+                    scheduledActionTokenRef.current === actionToken) {
+                  setScheduledInboxError(cause instanceof Error ? cause.message : '取消定时发布失败。');
+                }
               } finally {
-                scheduledActionInFlightRef.current = false;
-                setScheduledActionId(null);
+                if (scheduledActionTokenRef.current === actionToken) {
+                  scheduledActionTokenRef.current = null;
+                  scheduledActionInFlightRef.current = false;
+                  if (useAuthStore.getState().status === 'authenticated' &&
+                      useAuthStore.getState().user?.id === ownerId) {
+                    setScheduledActionId(null);
+                  }
+                }
               }
             })();
           },
@@ -1598,16 +1619,21 @@ function PublishScreenContent() {
 
   const rescheduleScheduledPost = useCallback(async (item: NativeScheduledPost, scheduledAt: string) => {
     if (scheduledActionInFlightRef.current || scheduledActionId) return;
+    const ownerId = useAuthStore.getState().user?.id;
+    if (!ownerId) return;
+    const actionToken = {};
+    scheduledActionTokenRef.current = actionToken;
     scheduledActionInFlightRef.current = true;
     setScheduledActionId(item.id);
     setScheduledInboxError('');
     let movedToDraft = false;
+    const isCurrentAction = () =>
+      scheduledActionTokenRef.current === actionToken &&
+      useAuthStore.getState().status === 'authenticated' &&
+      useAuthStore.getState().user?.id === ownerId;
     try {
-      // Use the existing lifecycle state machine rather than adding a self-transition.
-      const ownerId = useAuthStore.getState().user?.id;
-      if (!ownerId) return;
       const unscheduled = await transitionOwnScheduledPostState(item, 'DRAFT', undefined, ownerId);
-      if (useAuthStore.getState().user?.id !== ownerId) return;
+      if (!isCurrentAction()) return;
       if (!unscheduled.response.ok) {
         throw new Error(apiFailureDiagnostic(unscheduled, '原定时未能取消，内容状态未改变。'));
       }
@@ -1624,7 +1650,7 @@ function PublishScreenContent() {
 
       const updatedDraft = { ...item, etag: nextEtag };
       const scheduled = await transitionOwnScheduledPostState(updatedDraft, 'SCHEDULED', scheduledAt, ownerId);
-      if (useAuthStore.getState().user?.id !== ownerId) return;
+      if (!isCurrentAction()) return;
       if (!scheduled.response.ok) {
         throw new Error(
           '原定时已取消，内容已安全转为草稿；重新安排失败：' +
@@ -1633,16 +1659,25 @@ function PublishScreenContent() {
       }
 
       await loadScheduledInbox(null, false);
+      if (!isCurrentAction()) return;
       Alert.alert('定时已更新', '新的发布时间：' + new Date(scheduledAt).toLocaleString() + '（本机时间）。');
     } catch (cause) {
-      if (movedToDraft) {
-        setScheduledInboxItems((current) => current.filter((candidate) => candidate.id !== item.id));
+      if (isCurrentAction()) {
+        if (movedToDraft) {
+          setScheduledInboxItems((current) => current.filter((candidate) => candidate.id !== item.id));
+        }
+        setScheduledInboxError(cause instanceof Error ? cause.message : '修改发布时间失败。');
       }
-      setScheduledInboxError(cause instanceof Error ? cause.message : '修改发布时间失败。');
     } finally {
-      scheduledActionInFlightRef.current = false;
-      setScheduledActionId(null);
-      setScheduledInboxVisible(true);
+      if (scheduledActionTokenRef.current === actionToken) {
+        scheduledActionTokenRef.current = null;
+        scheduledActionInFlightRef.current = false;
+        if (useAuthStore.getState().status === 'authenticated' &&
+            useAuthStore.getState().user?.id === ownerId) {
+          setScheduledActionId(null);
+          setScheduledInboxVisible(true);
+        }
+      }
     }
   }, [loadScheduledInbox, scheduledActionId]);
 
@@ -1707,6 +1742,8 @@ function PublishScreenContent() {
   }, [draftId, router]);
 
   const removeDraftFromInbox = useCallback((draft: NativePostDraft) => {
+    const ownerId = useAuthStore.getState().user?.id;
+    if (!ownerId) return;
     Alert.alert('删除草稿', '删除后无法恢复这条草稿。', [
       { text: '取消', style: 'cancel' },
       {
@@ -1714,17 +1751,22 @@ function PublishScreenContent() {
         style: 'destructive',
         onPress: () => {
           void (async () => {
+            if (useAuthStore.getState().status !== 'authenticated' ||
+                useAuthStore.getState().user?.id !== ownerId) return;
+            const operationToken = {};
+            draftDeleteTokenRef.current = operationToken;
             setDeletingDraftId(draft.id);
             setDraftInboxError('');
+            const isCurrentDelete = () =>
+              draftDeleteTokenRef.current === operationToken &&
+              useAuthStore.getState().status === 'authenticated' &&
+              useAuthStore.getState().user?.id === ownerId;
             try {
-              const ownerId = useAuthStore.getState().user?.id;
-              if (!ownerId) return;
               const result = await deleteOwnPostDraft(draft.id, draft.etag, ownerId);
-              if (useAuthStore.getState().user?.id !== ownerId) return;
+              if (!isCurrentDelete()) return;
               if (!result.response.ok) throw new Error(apiFailureDiagnostic(result, '删除草稿失败。'));
-              if (user?.id) {
-                await deletePendingMediaRecoveryForDraft(user.id, draft.id).catch(() => undefined);
-              }
+              await deletePendingMediaRecoveryForDraft(ownerId, draft.id).catch(() => undefined);
+              if (!isCurrentDelete()) return;
               setDraftInboxItems((current) => current.filter((item) => item.id !== draft.id));
               if (recordRef.current?.id === draft.id) {
                 recordRef.current = null;
@@ -1744,16 +1786,24 @@ function PublishScreenContent() {
                 router.setParams({ draftId: undefined } as never);
               }
             } catch (cause) {
-              setDraftInboxError(cause instanceof Error ? cause.message : '删除草稿失败。');
-              await loadDraftInbox(null, false);
+              if (isCurrentDelete()) {
+                setDraftInboxError(cause instanceof Error ? cause.message : '删除草稿失败。');
+                await loadDraftInbox(null, false);
+              }
             } finally {
-              setDeletingDraftId(null);
+              if (draftDeleteTokenRef.current === operationToken) {
+                draftDeleteTokenRef.current = null;
+                if (useAuthStore.getState().status === 'authenticated' &&
+                    useAuthStore.getState().user?.id === ownerId) {
+                  setDeletingDraftId(null);
+                }
+              }
             }
           })();
         },
       },
     ]);
-  }, [loadDraftInbox, router, user?.id]);
+  }, [loadDraftInbox, router]);
 
   const insertComposerToken = useCallback((value: string) => {
     const token = findActiveComposerToken(body, textSelection.start);

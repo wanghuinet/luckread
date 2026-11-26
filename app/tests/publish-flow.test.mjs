@@ -32,7 +32,7 @@ test('native publisher preserves pending media in app-private storage and restor
   expect(composer).toContain('bindPendingMediaRecoveryToDraft(');
   expect(composer).toContain('markPendingMediaRecoveryUploaded(ownerId, asset.localId, uploaded.url)');
   expect(composer).toContain('asset.uploadedUrl && restoredMediaRefs.includes(asset.uploadedUrl)');
-  expect(composer).toContain('deletePendingMediaRecoveryForDraft(user.id, draft.id)');
+  expect(composer).toContain('deletePendingMediaRecoveryForDraft(ownerId, draft.id)');
   expect(composer).toContain('上次上传中断。本机已保留文件，点击重试即可继续。');
   expect(composer).toContain('setAssets(pending.map((asset) => ({');
 });
@@ -65,6 +65,9 @@ test('native composer uses the existing Expo UI date-time picker for future sche
 test('native composer lists, reschedules and cancels only owner-scoped scheduled posts', () => {
   expect(composer).toContain('fetchOwnScheduledPostsPage({');
   expect(composer).toContain('scheduledInboxRequestRef.current?.abort()');
+  expect(composer).toContain('scheduledActionTokenRef.current = null');
+  expect(composer).toContain('scheduledActionTokenRef.current === actionToken');
+  expect(composer).toContain('if (isCurrentAction())');
   expect(composer).toContain("transitionOwnScheduledPostState(item, 'DRAFT', undefined, ownerId)");
   expect(composer).toContain("transitionOwnScheduledPostState(updatedDraft, 'SCHEDULED', scheduledAt, ownerId)");
   expect(composer).toContain('setScheduledInboxVisible(true)');
@@ -338,6 +341,9 @@ test('native publisher lists, restores, paginates and deletes the owner-only dra
   expect(composer).toContain('draftInboxRequestRef.current?.abort()');
   expect(composer).toContain('previousInboxViewerIdRef.current === viewerId');
   expect(composer).toContain('deleteOwnPostDraft(draft.id, draft.etag, ownerId)');
+  expect(composer).toContain('draftDeleteTokenRef.current === operationToken');
+  expect(composer).toContain('if (isCurrentDelete())');
+  expect(composer).toContain('deletePendingMediaRecoveryForDraft(ownerId, draft.id)');
   expect(composer).toContain('restoreDraftFromInbox(item)');
   expect(composer).toContain('setDraftInboxCursor(page.nextCursor || null)');
   expect(composer).toContain('draftInboxHasMore && !draftInboxLoading && draftInboxCursor');
