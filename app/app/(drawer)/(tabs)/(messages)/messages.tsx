@@ -103,7 +103,7 @@ export default function Messages() {
   const conversations = useInfiniteQuery({
     queryKey: ['messaging', userId, 'conversations'],
     initialPageParam: null as string | null,
-    queryFn: ({ pageParam, signal }) => fetchConversations(pageParam, signal),
+    queryFn: ({ pageParam, signal }) => fetchConversations(pageParam, signal, userId),
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
     enabled: authStatus === 'authenticated',
     staleTime: 30_000,
@@ -113,14 +113,14 @@ export default function Messages() {
   const requests = useInfiniteQuery({
     queryKey: ['messaging', userId, 'requests', direction],
     initialPageParam: null as string | null,
-    queryFn: ({ pageParam, signal }) => fetchMessageRequests(direction, pageParam, signal),
+    queryFn: ({ pageParam, signal }) => fetchMessageRequests(direction, pageParam, signal, userId),
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
     enabled: authStatus === 'authenticated' && activeTab !== 'chats',
     staleTime: 15_000,
   });
   const requestItems = requests.data?.pages.flatMap((page) => page.items) ?? [];
   const requestAction = useMutation({
-    mutationFn: ({ requestId, action }: { requestId: string; action: 'accept' | 'decline' | 'cancel' }) => respondToMessageRequest(requestId, action),
+    mutationFn: ({ requestId, action }: { requestId: string; action: 'accept' | 'decline' | 'cancel' }) => respondToMessageRequest(requestId, action, userId),
     onSuccess: async (result) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'requests'] }),

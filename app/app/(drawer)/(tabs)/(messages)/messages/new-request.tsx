@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createMessageRequest } from '~/lib/messaging-api';
 import { useColorScheme } from 'nativewind';
+import { useAuthStore } from '~/store/auth-store';
 
 export default function NewMessageRequestScreen() {
   const params = useLocalSearchParams<{ recipientUserId: string; participantName?: string }>();
@@ -13,12 +14,13 @@ export default function NewMessageRequestScreen() {
   const [body, setBody] = useState('');
   const router = useRouter();
   const queryClient = useQueryClient();
+  const userId = useAuthStore(state => state.user?.id);
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const mutation = useMutation({
-    mutationFn: () => createMessageRequest(recipientUserId ?? '', body),
+    mutationFn: () => createMessageRequest(recipientUserId ?? '', body, undefined, userId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['messaging', 'requests', 'outgoing'] });
+      await queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'requests', 'outgoing'] });
       router.back();
     },
   });

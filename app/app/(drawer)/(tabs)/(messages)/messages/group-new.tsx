@@ -6,17 +6,19 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createGroupConversation } from '~/lib/messaging-api';
 import { parseGroupMemberIds } from '~/lib/group-member-input';
 import { useColorScheme } from 'nativewind';
+import { useAuthStore } from '~/store/auth-store';
 
 export default function NewGroupScreen() {
   const [name, setName] = useState('');
   const [members, setMembers] = useState('');
   const router = useRouter();
   const queryClient = useQueryClient();
+  const userId = useAuthStore(state => state.user?.id);
   const { colorScheme } = useColorScheme();
   const mutation = useMutation({
-    mutationFn: () => createGroupConversation(name.trim(), parseGroupMemberIds(members)),
+    mutationFn: () => createGroupConversation(name.trim(), parseGroupMemberIds(members), userId),
     onSuccess: async (result) => {
-      await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] });
+      await queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
       router.replace({ pathname: '/messages/[conversationId]', params: {
         conversationId: result.conversationId, participantName: name.trim(), conversationType: 'group', groupName: name.trim(),
       } } as never);

@@ -24,64 +24,64 @@ function unwrap<T>(result: ApiEnvelopeResult): T {
   }
   return envelope.data as T;
 }
-export async function fetchConversations(cursor: string | null = null, signal?: AbortSignal): Promise<Page<MessagingConversation>> {
+export async function fetchConversations(cursor: string | null = null, signal?: AbortSignal, expectedAccountId?: string): Promise<Page<MessagingConversation>> {
   const query = new URLSearchParams({ limit: '30' });
   if (cursor) query.set('cursor', cursor);
-  return unwrap(await apiRequest<Envelope<Page<MessagingConversation>>>('/conversations?' + query.toString(), { method: 'GET', signal }));
+  return unwrap(await apiRequest<Envelope<Page<MessagingConversation>>>('/conversations?' + query.toString(), { method: 'GET', signal, expectedAccountId }));
 }
-export async function createDirectConversation(recipientUserId: string): Promise<{ conversationId: string }> {
+export async function createDirectConversation(recipientUserId: string, expectedAccountId?: string): Promise<{ conversationId: string }> {
   return unwrap<{ conversationId: string }>(await apiRequest<Envelope<{ conversationId: string }>>('/conversations', {
-    method: 'POST', body: JSON.stringify({ recipientUserId }), idempotencyKey: false,
+    method: 'POST', body: JSON.stringify({ recipientUserId }), idempotencyKey: false, expectedAccountId,
   }));
 }
 export type MessagingConversationMember = {
   user_id: string; member_role: 'owner' | 'member'; joined_at: string; last_read_sequence: string;
 };
-export async function createGroupConversation(name: string, memberUserIds: string[]): Promise<{ conversationId: string }> {
+export async function createGroupConversation(name: string, memberUserIds: string[], expectedAccountId?: string): Promise<{ conversationId: string }> {
   return unwrap(await apiRequest<Envelope<{ conversationId: string }>>('/conversations/groups', {
-    method: 'POST', body: JSON.stringify({ name, memberUserIds }),
+    method: 'POST', body: JSON.stringify({ name, memberUserIds }), expectedAccountId,
   }));
 }
-export async function fetchConversationMembers(conversationId: string, signal?: AbortSignal): Promise<MessagingConversationMember[]> {
+export async function fetchConversationMembers(conversationId: string, signal?: AbortSignal, expectedAccountId?: string): Promise<MessagingConversationMember[]> {
   return unwrap(await apiRequest<Envelope<MessagingConversationMember[]>>(
-    '/conversations/' + encodeURIComponent(conversationId) + '/members', { method: 'GET', signal },
+    '/conversations/' + encodeURIComponent(conversationId) + '/members', { method: 'GET', signal, expectedAccountId },
   ));
 }
-export async function addGroupMembers(conversationId: string, memberUserIds: string[]): Promise<{ addedCount: number }> {
+export async function addGroupMembers(conversationId: string, memberUserIds: string[], expectedAccountId?: string): Promise<{ addedCount: number }> {
   return unwrap(await apiRequest<Envelope<{ addedCount: number }>>(
     '/conversations/' + encodeURIComponent(conversationId) + '/members',
-    { method: 'POST', body: JSON.stringify({ memberUserIds }) },
+    { method: 'POST', body: JSON.stringify({ memberUserIds }), expectedAccountId },
   ));
 }
-export async function removeGroupMember(conversationId: string, memberUserId: string): Promise<void> {
+export async function removeGroupMember(conversationId: string, memberUserId: string, expectedAccountId?: string): Promise<void> {
   const result = await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/members/' + encodeURIComponent(memberUserId), {
-    method: 'DELETE',
+    method: 'DELETE', expectedAccountId,
   });
   if (!result.response.ok) throw new Error(result.error?.message || '无法移除群聊成员。');
 }
-export async function transferGroupOwnership(conversationId: string, targetUserId: string): Promise<void> {
+export async function transferGroupOwnership(conversationId: string, targetUserId: string, expectedAccountId?: string): Promise<void> {
   const result = await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/transfer-owner', {
-    method: 'POST', body: JSON.stringify({ targetUserId }), idempotencyKey: false,
+    method: 'POST', body: JSON.stringify({ targetUserId }), idempotencyKey: false, expectedAccountId,
   });
   if (!result.response.ok) throw new Error(result.error?.message || '无法转移群聊所有权。');
 }
-export async function leaveGroupConversation(conversationId: string): Promise<void> {
+export async function leaveGroupConversation(conversationId: string, expectedAccountId?: string): Promise<void> {
   const result = await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/leave', {
-    method: 'POST', body: JSON.stringify({ }), idempotencyKey: false,
+    method: 'POST', body: JSON.stringify({ }), idempotencyKey: false, expectedAccountId,
   });
   if (!result.response.ok) throw new Error(result.error?.message || '无法退出群聊。');
 }
-export async function fetchMessages(conversationId: string, beforeSequence: string | null = null, signal?: AbortSignal): Promise<Page<MessagingMessage>> {
+export async function fetchMessages(conversationId: string, beforeSequence: string | null = null, signal?: AbortSignal, expectedAccountId?: string): Promise<Page<MessagingMessage>> {
   const query = new URLSearchParams({ limit: '50' });
   if (beforeSequence) query.set('beforeSequence', beforeSequence);
   return unwrap(await apiRequest<Envelope<Page<MessagingMessage>>>(
-    '/conversations/' + encodeURIComponent(conversationId) + '/messages?' + query.toString(), { method: 'GET', signal },
+    '/conversations/' + encodeURIComponent(conversationId) + '/messages?' + query.toString(), { method: 'GET', signal, expectedAccountId },
   ));
 }
-export async function fetchMessagesAfter(conversationId: string, afterSequence: string, signal?: AbortSignal): Promise<Page<MessagingMessage>> {
+export async function fetchMessagesAfter(conversationId: string, afterSequence: string, signal?: AbortSignal, expectedAccountId?: string): Promise<Page<MessagingMessage>> {
   const query = new URLSearchParams({ afterSequence, limit: '50' });
   return unwrap(await apiRequest<Envelope<Page<MessagingMessage>>>(
-    '/conversations/' + encodeURIComponent(conversationId) + '/messages?' + query.toString(), { method: 'GET', signal },
+    '/conversations/' + encodeURIComponent(conversationId) + '/messages?' + query.toString(), { method: 'GET', signal, expectedAccountId },
   ));
 }
 
@@ -91,13 +91,14 @@ export async function fetchMessagesAfterBatch(
   afterSequence: string,
   signal?: AbortSignal,
   maxPages = 10,
+  expectedAccountId?: string,
 ): Promise<Page<MessagingMessage>> {
   const itemsById = new Map<string, MessagingMessage>();
   let cursor = afterSequence;
   let hasMore = false;
   const pageBudget = Math.max(1, Math.min(10, Math.floor(maxPages)));
   for (let pageIndex = 0; pageIndex < pageBudget; pageIndex++) {
-    const page = await fetchMessagesAfter(conversationId, cursor, signal);
+    const page = await fetchMessagesAfter(conversationId, cursor, signal, expectedAccountId);
     if (!page.items.length) {
       if (page.hasMore) throw new Error('私信增量同步游标未推进，请重试。');
       hasMore = false;
@@ -149,16 +150,16 @@ export async function sendDirectMessage(
     { method: 'POST', body: JSON.stringify({ body, attachments }), idempotencyKey, expectedAccountId },
   ));
 }
-export async function editDirectMessage(conversationId: string, messageId: string, body: string): Promise<MessagingMessage> {
+export async function editDirectMessage(conversationId: string, messageId: string, body: string, expectedAccountId?: string): Promise<MessagingMessage> {
   return unwrap<MessagingMessage>(await apiRequest<Envelope<MessagingMessage>>(
     '/conversations/' + encodeURIComponent(conversationId) + '/messages/' + encodeURIComponent(messageId),
-    { method: 'PATCH', body: JSON.stringify({ body }) },
+    { method: 'PATCH', body: JSON.stringify({ body }), expectedAccountId },
   ));
 }
-export async function recallDirectMessage(conversationId: string, messageId: string): Promise<MessagingMessage> {
+export async function recallDirectMessage(conversationId: string, messageId: string, expectedAccountId?: string): Promise<MessagingMessage> {
   return unwrap<MessagingMessage>(await apiRequest<Envelope<MessagingMessage>>(
     '/conversations/' + encodeURIComponent(conversationId) + '/messages/' + encodeURIComponent(messageId),
-    { method: 'DELETE' },
+    { method: 'DELETE', expectedAccountId },
   ));
 }
 export function getMessageAttachmentUrl(conversationId: string, mediaId: string): string {
@@ -166,9 +167,9 @@ export function getMessageAttachmentUrl(conversationId: string, mediaId: string)
     '/attachments/' + encodeURIComponent(mediaId);
 }
 
-export async function markConversationRead(conversationId: string, sequence: string) {
+export async function markConversationRead(conversationId: string, sequence: string, expectedAccountId?: string) {
   const result = await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/read', {
-    method: 'POST', body: JSON.stringify({ sequence }), idempotencyKey: false,
+    method: 'POST', body: JSON.stringify({ sequence }), idempotencyKey: false, expectedAccountId,
   });
   if (!result.response.ok) {
     throw new Error(result.error?.message || 'Could not update message read status.');
@@ -181,31 +182,31 @@ export type MessageRequest = {
   status: 'pending' | 'accepted' | 'declined' | 'cancelled'; conversation_id: string | null;
   created_at: string; responded_at: string | null;
 };
-export async function fetchMessageRequests(direction: 'incoming' | 'outgoing', cursor: string | null = null, signal?: AbortSignal): Promise<Page<MessageRequest>> {
+export async function fetchMessageRequests(direction: 'incoming' | 'outgoing', cursor: string | null = null, signal?: AbortSignal, expectedAccountId?: string): Promise<Page<MessageRequest>> {
   const query = new URLSearchParams({ direction, limit: '20' });
   if (cursor) query.set('cursor', cursor);
-  return unwrap(await apiRequest<Envelope<Page<MessageRequest>>>('/message-requests?' + query.toString(), { method: 'GET', signal }));
+  return unwrap(await apiRequest<Envelope<Page<MessageRequest>>>('/message-requests?' + query.toString(), { method: 'GET', signal, expectedAccountId }));
 }
-export async function createMessageRequest(recipientUserId: string, body: string, idempotencyKey = createIdempotencyKey()): Promise<MessageRequest> {
+export async function createMessageRequest(recipientUserId: string, body: string, idempotencyKey = createIdempotencyKey(), expectedAccountId?: string): Promise<MessageRequest> {
   return unwrap(await apiRequest<Envelope<MessageRequest>>('/message-requests', {
-    method: 'POST', body: JSON.stringify({ recipientUserId, body }), idempotencyKey,
+    method: 'POST', body: JSON.stringify({ recipientUserId, body }), idempotencyKey, expectedAccountId,
   }));
 }
-export async function respondToMessageRequest(requestId: string, action: 'accept' | 'decline' | 'cancel'): Promise<{ status: MessageRequest['status']; conversationId: string | null }> {
+export async function respondToMessageRequest(requestId: string, action: 'accept' | 'decline' | 'cancel', expectedAccountId?: string): Promise<{ status: MessageRequest['status']; conversationId: string | null }> {
   return unwrap(await apiRequest<Envelope<{ status: MessageRequest['status']; conversationId: string | null }>>(
-    '/message-requests/' + encodeURIComponent(requestId) + '/' + action, { method: 'POST', body: JSON.stringify({}), idempotencyKey: false },
+    '/message-requests/' + encodeURIComponent(requestId) + '/' + action, { method: 'POST', body: JSON.stringify({}), idempotencyKey: false, expectedAccountId },
   ));
 }
 
 export type MessagingTypingSnapshot = { activeUserIds: string[] }
-export async function setConversationTyping(conversationId: string, typing: boolean): Promise<MessagingTypingSnapshot> {
+export async function setConversationTyping(conversationId: string, typing: boolean, expectedAccountId?: string): Promise<MessagingTypingSnapshot> {
   return unwrap(await apiRequest<Envelope<MessagingTypingSnapshot>>(
     '/conversations/' + encodeURIComponent(conversationId) + '/typing',
-    { method: 'POST', body: JSON.stringify({ typing }), idempotencyKey: false },
+    { method: 'POST', body: JSON.stringify({ typing }), idempotencyKey: false, expectedAccountId },
   ))
 }
-export async function fetchConversationTyping(conversationId: string, signal?: AbortSignal): Promise<MessagingTypingSnapshot> {
+export async function fetchConversationTyping(conversationId: string, signal?: AbortSignal, expectedAccountId?: string): Promise<MessagingTypingSnapshot> {
   return unwrap(await apiRequest<Envelope<MessagingTypingSnapshot>>(
-    '/conversations/' + encodeURIComponent(conversationId) + '/typing', { method: 'GET', signal },
+    '/conversations/' + encodeURIComponent(conversationId) + '/typing', { method: 'GET', signal, expectedAccountId },
   ))
 }

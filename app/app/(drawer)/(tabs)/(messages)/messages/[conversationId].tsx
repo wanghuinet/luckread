@@ -276,13 +276,13 @@ export default function ConversationScreen() {
   const messagesQuery = useInfiniteQuery({
     queryKey: ['messaging', userId, 'messages', conversationId],
     initialPageParam: null as string | null,
-    queryFn: ({ pageParam, signal }) => fetchMessages(conversationId, pageParam, signal),
+    queryFn: ({ pageParam, signal }) => fetchMessages(conversationId, pageParam, signal, userId),
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
     enabled: Boolean(conversationId),
     staleTime: 15_000,
   });
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
-  const membersQuery = useQuery({ queryKey: ['messaging', userId, 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal), enabled: Boolean(conversationId) && params.conversationType !== 'group', staleTime: 60_000 });
+  const membersQuery = useQuery({ queryKey: ['messaging', userId, 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal, userId), enabled: Boolean(conversationId) && params.conversationType !== 'group', staleTime: 60_000 });
   // The authenticated WebSocket sends the initial typing snapshot and subsequent changes.
   const typingQuery = useQuery({
     queryKey: ['messaging', userId, 'typing', conversationId],
@@ -340,7 +340,7 @@ export default function ConversationScreen() {
     compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const incrementalQuery = useQuery({
     queryKey: ['messaging', userId, 'messages-after', conversationId, latestSequence],
-    queryFn: ({ signal }) => fetchMessagesAfterBatch(conversationId, latestSequence, signal),
+    queryFn: ({ signal }) => fetchMessagesAfterBatch(conversationId, latestSequence, signal, 10, userId),
     enabled: Boolean(conversationId) && messagesQuery.isSuccess && isFocused && appState === 'active',
     staleTime: Infinity,
   });
@@ -355,7 +355,7 @@ export default function ConversationScreen() {
       let cursor = continuationCursor!;
       let hasMore = true;
       for (let batch = 0; batch < 4 && hasMore; batch++) {
-        const page = await fetchMessagesAfterBatch(conversationId, cursor, signal);
+        const page = await fetchMessagesAfterBatch(conversationId, cursor, signal, 10, userId);
         items.push(...page.items);
         hasMore = page.hasMore;
         if (page.nextCursor) cursor = page.nextCursor;
@@ -399,7 +399,7 @@ export default function ConversationScreen() {
       void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages', conversationId] });
       void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
     }
-  }, [incrementalQuery.data, continuationQuery.data, conversationId, queryClient]);
+  }, [incrementalQuery.data, continuationQuery.data, conversationId, queryClient, userId]);
 
 
 
@@ -546,7 +546,7 @@ export default function ConversationScreen() {
   const editMutation = useMutation({
     mutationFn: () => {
       if (!editTarget) throw new Error('请选择要编辑的消息。');
-      return editDirectMessage(conversationId, editTarget.messageId, editDraft);
+      return editDirectMessage(conversationId, editTarget.messageId, editDraft, userId);
     },
     onSuccess: (updated) => {
       applyMessageUpdate(updated);
@@ -555,7 +555,7 @@ export default function ConversationScreen() {
     },
   });
   const recallMutation = useMutation({
-    mutationFn: (messageId: string) => recallDirectMessage(conversationId, messageId),
+    mutationFn: (messageId: string) => recallDirectMessage(conversationId, messageId, userId),
     onSuccess: applyMessageUpdate,
   });
 
@@ -588,18 +588,19 @@ export default function ConversationScreen() {
   const [readAckCycle, setReadAckCycle] = useState(0);
   const readAckStateRef = useRef<{
     conversationId: string;
+    userId?: string;
     acknowledged: string;
     inFlight: boolean;
     retryPending: boolean;
     retryTarget: string;
     retryAttempt: number;
     retryTimer: ReturnType<typeof setTimeout> | null;
-  }>({ conversationId, acknowledged: '0', inFlight: false, retryPending: false, retryTarget: '0', retryAttempt: 0, retryTimer: null });
-  // Route params can change without remounting this screen. Give each conversation
-  // an isolated acknowledgement state so a stale request cannot affect the next chat.
-  if (readAckStateRef.current.conversationId !== conversationId) {
+  }>({ conversationId, userId, acknowledged: '0', inFlight: false, retryPending: false, retryTarget: '0', retryAttempt: 0, retryTimer: null });
+  // Route params or authenticated identity can change without remounting this screen.
+  // Isolate acknowledgement progress and retries across both conversation and account.
+  if (readAckStateRef.current.conversationId !== conversationId || readAckStateRef.current.userId !== userId) {
     if (readAckStateRef.current.retryTimer) clearTimeout(readAckStateRef.current.retryTimer);
-    readAckStateRef.current = { conversationId, acknowledged: '0', inFlight: false, retryPending: false, retryTarget: '0', retryAttempt: 0, retryTimer: null };
+    readAckStateRef.current = { conversationId, userId, acknowledged: '0', inFlight: false, retryPending: false, retryTarget: '0', retryAttempt: 0, retryTimer: null };
   }
   useEffect(() => () => {
     const state = readAckStateRef.current;
@@ -626,7 +627,7 @@ export default function ConversationScreen() {
     if (state.retryTimer) return;
     state.inFlight = true;
     const targetSequence = latest.sequence;
-    void markConversationRead(conversationId, targetSequence)
+    void markConversationRead(conversationId, targetSequence, userId)
       .then(() => {
         if (readAckStateRef.current !== state) return;
         if (compareSequence(targetSequence, state.acknowledged) > 0) state.acknowledged = targetSequence;
@@ -664,7 +665,7 @@ export default function ConversationScreen() {
           setReadAckCycle((cycle) => cycle + 1);
         }
       });
-  }, [conversationId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient, readAckCycle, isFocused, appState]);
+  }, [conversationId, userId, messagesQuery.data?.pages?.[0]?.items?.[0]?.sequence, queryClient, readAckCycle, isFocused, appState]);
 
   return (
     <View className="flex-1 bg-white dark:bg-black">

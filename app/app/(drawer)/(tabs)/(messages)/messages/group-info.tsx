@@ -31,13 +31,13 @@ export default function GroupInfoScreen() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const members = useQuery({
-    queryKey: ['messaging', 'members', conversationId],
-    queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal),
+    queryKey: ['messaging', userId, 'members', conversationId],
+    queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal, userId),
     enabled: Boolean(conversationId),
   });
   const owner = members.data?.some(m => m.user_id === userId && m.member_role === 'owner') ?? false;
   const memberProfiles = useQuery({
-    queryKey: ['messaging', 'member-profiles', members.data?.map(m => m.user_id)],
+    queryKey: ['messaging', userId, 'member-profiles', members.data?.map(m => m.user_id)],
     queryFn: async ({ signal }) => Promise.all((members.data ?? []).map(async member => ({
       userId: member.user_id, profile: await resolvePublicProfileById(member.user_id, signal),
     }))),
@@ -45,7 +45,7 @@ export default function GroupInfoScreen() {
   });
   const profileById = new Map((memberProfiles.data ?? []).map(item => [item.userId, item.profile]));
   const following = useQuery({
-    queryKey: ['messaging', 'member-picker-following', userId],
+    queryKey: ['messaging', userId, 'member-picker-following'],
     queryFn: async ({ signal }) => {
       if (!userId) return [];
       const result = await fetchUserRelationshipsPage(userId, 'following', { limit: 100, signal });
@@ -56,7 +56,7 @@ export default function GroupInfoScreen() {
     enabled: owner && Boolean(userId),
   });
   const candidates = useQuery({
-    queryKey: ['messaging', 'member-picker-profiles', following.data],
+    queryKey: ['messaging', userId, 'member-picker-profiles', following.data],
     queryFn: async ({ signal }) => {
       const ids = following.data ?? [];
       const profiles = await Promise.all(ids.map(id => resolvePublicProfileById(id, signal)));
@@ -72,22 +72,22 @@ export default function GroupInfoScreen() {
     return (p.username ?? '').toLowerCase().includes(term) || (p.displayName ?? '').toLowerCase().includes(term);
   }), [candidates.data, members.data, search, selected]);
   const addMutation = useMutation({
-    mutationFn: () => addGroupMembers(conversationId, selected),
-    onSuccess: async () => { setSelected([]); await members.refetch(); await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] }); },
+    mutationFn: () => addGroupMembers(conversationId, selected, userId),
+    onSuccess: async () => { setSelected([]); await members.refetch(); await queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] }); },
     onError: e => Alert.alert('添加失败', e instanceof Error ? e.message : '请重试'),
   });
   const removeMutation = useMutation({
-    mutationFn: (memberId: string) => removeGroupMember(conversationId, memberId),
-    onSuccess: async () => { await members.refetch(); await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] }); },
+    mutationFn: (memberId: string) => removeGroupMember(conversationId, memberId, userId),
+    onSuccess: async () => { await members.refetch(); await queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] }); },
     onError: e => Alert.alert('移除失败', e instanceof Error ? e.message : '请重试'),
   });
   const transferMutation = useMutation({
-    mutationFn: (targetId: string) => transferGroupOwnership(conversationId, targetId),
+    mutationFn: (targetId: string) => transferGroupOwnership(conversationId, targetId, userId),
     onSuccess: async () => { await members.refetch(); await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] }); Alert.alert('已移交群主', '群主身份已成功移交。'); },
     onError: e => Alert.alert('移交失败', e instanceof Error ? e.message : '请重试'),
   });
   const leaveMutation = useMutation({
-    mutationFn: () => leaveGroupConversation(conversationId),
+    mutationFn: () => leaveGroupConversation(conversationId, userId),
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['messaging', 'conversations'] }); router.replace('/messages' as never); },
     onError: e => Alert.alert('退出失败', e instanceof Error ? e.message : '请重试'),
   });
