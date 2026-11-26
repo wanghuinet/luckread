@@ -120,15 +120,20 @@ export default function Messages() {
   });
   const requestItems = requests.data?.pages.flatMap((page) => page.items) ?? [];
   const requestAction = useMutation({
-    mutationFn: ({ requestId, action }: { requestId: string; action: 'accept' | 'decline' | 'cancel' }) => respondToMessageRequest(requestId, action, userId),
-    onSuccess: async (result) => {
+    mutationFn: ({ requestId, action, expectedAccountId }: { requestId: string; action: 'accept' | 'decline' | 'cancel'; expectedAccountId?: string }) =>
+      respondToMessageRequest(requestId, action, expectedAccountId),
+    onSuccess: async (result, variables) => {
+      if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'requests'] }),
-        queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] }),
+        queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'requests'] }),
+        queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'conversations'] }),
       ]);
+      if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;
       if (result.conversationId) router.push({ pathname: '/messages/[conversationId]', params: { conversationId: result.conversationId } } as never);
     },
   });
+  const requestActionBelongsToCurrentAccount = requestAction.variables?.expectedAccountId === userId;
+  const requestActionPendingForCurrentAccount = requestAction.isPending && requestActionBelongsToCurrentAccount;
   const loadMore = () => {
     if (conversations.hasNextPage && !conversations.isFetchingNextPage && !conversations.isFetching) {
       void conversations.fetchNextPage();
@@ -186,13 +191,13 @@ export default function Messages() {
             onRefresh={() => requests.refetch()}
             onEndReached={() => { if (requests.hasNextPage && !requests.isFetchingNextPage) void requests.fetchNextPage(); }}
             onEndReachedThreshold={0.4}
-            ListHeaderComponent={requestAction.isError ? (
+            ListHeaderComponent={requestAction.isError && requestActionBelongsToCurrentAccount ? (
               <View className="mx-4 mt-3 rounded-xl bg-red-50 px-3 py-2 dark:bg-red-950/30">
                 <Text className="text-sm text-red-600 dark:text-red-300">{requestAction.error instanceof Error ? requestAction.error.message : '操作失败，请稍后重试。'}</Text>
               </View>
             ) : undefined}
             ListEmptyComponent={<View className="flex-1 items-center justify-center px-8 py-20"><Feather name="mail" size={30} color="#9ca3af" /><Text className="mt-4 text-base font-semibold text-neutral-900 dark:text-white">暂无私信请求</Text><Text className="mt-2 text-center text-sm text-neutral-500">陌生人的私信会先出现在这里，由你决定是否接受。</Text></View>}
-            renderItem={({ item }) => <MessageRequestRow item={item} direction={direction} busy={requestAction.isPending} onAction={(requestId, action) => requestAction.mutate({ requestId, action })} />}
+            renderItem={({ item }) => <MessageRequestRow item={item} direction={direction} busy={requestActionPendingForCurrentAccount} onAction={(requestId, action) => requestAction.mutate({ requestId, action, expectedAccountId: userId })} />}
             ListFooterComponent={requests.isFetchingNextPage ? <View className="py-4"><ActivityIndicator color="#1d9bf0" /></View> : undefined}
           />
         )

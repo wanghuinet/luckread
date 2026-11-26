@@ -113,3 +113,62 @@ test('native private media and realtime credentials are bound to the initiating 
   expect(screen).toContain('key={userId ?? \'anonymous\'}');
   expect(screen).toContain('}, [userId]);');
 });
+
+
+test('message request action completions cannot navigate or invalidate another account after switching', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages.tsx', import.meta.url), 'utf8');
+  expect(source).toContain('expectedAccountId?: string');
+  expect(source).toContain('respondToMessageRequest(requestId, action, expectedAccountId)');
+  expect(source).toContain('onSuccess: async (result, variables) => {');
+  expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;');
+  expect(source).toContain('expectedAccountId: userId');
+  expect(source).toContain("queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'conversations'] })");
+  expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;\n      if (result.conversationId)');
+});
+
+
+test('group creation completion cannot navigate across an account switch', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/group-new.tsx', import.meta.url), 'utf8');
+  expect(source).toContain('expectedAccountId: userId');
+  expect(source).toContain('createGroupConversation(variables.name, variables.memberUserIds, variables.expectedAccountId)');
+  expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;');
+  expect(source).toContain("['messaging', variables.expectedAccountId, 'conversations']");
+  expect(source).toContain('participantName: variables.name');
+});
+
+
+test('new message request completion cannot navigate after the initiating account changes', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/new-request.tsx', import.meta.url), 'utf8');
+  expect(source).toContain('createMessageRequest(variables.recipientUserId, variables.body, undefined, variables.expectedAccountId)');
+  expect(source).toContain("queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'requests', 'outgoing'] })");
+  expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;');
+  expect(source).toContain('mutation.reset();');
+  expect(source).toContain('mutationBelongsToCurrentAccount = Boolean(userId && mutation.variables?.expectedAccountId === userId)');
+  expect(source).toContain('mutation.isError && mutationBelongsToCurrentAccount');
+});
+
+test('group creation errors and pending UI are scoped to the initiating account', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/group-new.tsx', import.meta.url), 'utf8');
+  expect(source).toContain('if (useAuthStore.getState().user?.id === variables.expectedAccountId) Alert.alert');
+  expect(source).toContain('mutationBelongsToCurrentAccount = mutation.variables?.expectedAccountId === userId');
+  expect(source).toContain('mutation.reset();');
+});
+
+test('message request list feedback and busy state are scoped to the initiating account', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages.tsx', import.meta.url), 'utf8');
+  expect(source).toContain('requestActionBelongsToCurrentAccount = requestAction.variables?.expectedAccountId === userId');
+  expect(source).toContain('requestAction.isError && requestActionBelongsToCurrentAccount');
+  expect(source).toContain('busy={requestActionPendingForCurrentAccount}');
+});
+
+test('group management mutations isolate completions and errors across account switches', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/group-info.tsx', import.meta.url), 'utf8');
+  expect(source).toContain("useEffect(() => { setSelected([]); setSearch(''); }, [conversationId, userId])");
+  expect(source).toContain('addGroupMembers(conversationId, variables.memberIds, variables.expectedAccountId)');
+  expect(source).toContain('removeGroupMember(conversationId, variables.memberId, variables.expectedAccountId)');
+  expect(source).toContain('transferGroupOwnership(conversationId, variables.targetId, variables.expectedAccountId)');
+  expect(source).toContain('leaveGroupConversation(conversationId, variables.expectedAccountId)');
+  expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;');
+  expect(source).not.toContain("['messaging', 'conversations']");
+  expect(source).toContain("await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'conversations'] }); if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return; Alert.alert('已移交群主'");
+});

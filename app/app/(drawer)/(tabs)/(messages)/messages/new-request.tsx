@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StatusBar, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -18,14 +18,23 @@ export default function NewMessageRequestScreen() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const mutation = useMutation({
-    mutationFn: () => createMessageRequest(recipientUserId ?? '', body, undefined, userId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'requests', 'outgoing'] });
+    mutationFn: (variables: { recipientUserId: string; body: string; expectedAccountId?: string }) =>
+      createMessageRequest(variables.recipientUserId, variables.body, undefined, variables.expectedAccountId),
+    onSuccess: async (_result, variables) => {
+      if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;
+      await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'requests', 'outgoing'] });
+      if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;
       router.back();
     },
   });
-  const canSend = Boolean(recipientUserId && body.trim() && !mutation.isPending);
-  const errorCode = mutation.error instanceof Error ? mutation.error.message : '';
+  useEffect(() => {
+    setBody('');
+    mutation.reset();
+  }, [userId]);
+  const mutationBelongsToCurrentAccount = Boolean(userId && mutation.variables?.expectedAccountId === userId);
+  const isPendingForCurrentAccount = mutation.isPending && mutationBelongsToCurrentAccount;
+  const canSend = Boolean(userId && recipientUserId && body.trim() && !isPendingForCurrentAccount);
+  const errorCode = mutationBelongsToCurrentAccount && mutation.error instanceof Error ? mutation.error.message : '';
   const errorMessage = errorCode === 'RATE_LIMITED'
     ? '今天发起的私信请求已达到上限，请明天再试。'
     : errorCode === 'REQUEST_ALREADY_PENDING'
@@ -41,8 +50,8 @@ export default function NewMessageRequestScreen() {
       <View className="flex-row items-center justify-between border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
         <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={() => router.back()} className="p-2"><Feather name="arrow-left" size={22} color={isDark ? '#fff' : '#111'} /></Pressable>
         <Text className="text-lg font-bold text-neutral-900 dark:text-white">发送私信请求</Text>
-        <Pressable disabled={!canSend} onPress={() => mutation.mutate()} className={`rounded-full px-4 py-2 ${canSend ? 'bg-sky-500' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
-          {mutation.isPending ? <ActivityIndicator color="#fff" size="small" /> : <Text className="font-semibold text-white">发送</Text>}
+        <Pressable disabled={!canSend} onPress={() => mutation.mutate({ recipientUserId: recipientUserId ?? '', body, expectedAccountId: userId })} className={`rounded-full px-4 py-2 ${canSend ? 'bg-sky-500' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
+          {isPendingForCurrentAccount ? <ActivityIndicator color="#fff" size="small" /> : <Text className="font-semibold text-white">发送</Text>}
         </Pressable>
       </View>
       <View className="px-4 py-5">
@@ -52,7 +61,7 @@ export default function NewMessageRequestScreen() {
           value={body}
           onChangeText={setBody}
           accessibilityLabel="私信请求内容"
-          editable={!mutation.isPending}
+          editable={!isPendingForCurrentAccount}
           multiline
           maxLength={1000}
           autoFocus
@@ -62,7 +71,7 @@ export default function NewMessageRequestScreen() {
           className="mt-5 min-h-36 rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
         />
         <Text className="mt-2 text-right text-xs text-neutral-400">{body.length}/1000</Text>
-        {mutation.isError ? <Text className="mt-3 text-sm text-red-500">{errorMessage}</Text> : null}
+        {mutation.isError && mutationBelongsToCurrentAccount ? <Text className="mt-3 text-sm text-red-500">{errorMessage}</Text> : null}
         <Text className="mt-5 text-xs leading-5 text-neutral-500">为减少骚扰，每位用户每天最多发起 10 条私信请求。请求只能发送一条开场消息，且对方可以拒绝或屏蔽你。</Text>
       </View>
     </View>
