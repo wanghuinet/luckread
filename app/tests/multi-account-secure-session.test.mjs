@@ -100,3 +100,16 @@ test('removing the active account deletes only its credential and leaves other a
   await activateStoredAccount('second');
   expect(await readSessionToken()).toBe('second-token');
 });
+
+
+test('concurrent session saves serialize index writes and enforce the five-account limit', async () => {
+  const results = await Promise.allSettled(Array.from({ length: 6 }, (_, index) => saveAccountSession(user('parallel-' + index), 'token-' + index)));
+  expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(5);
+  expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+  const accounts = await listStoredAccounts();
+  expect(accounts).toHaveLength(5);
+  for (const account of accounts) {
+    await activateStoredAccount(account.id);
+    expect(await readSessionToken()).toBe('token-' + account.id.split('-').at(-1));
+  }
+});
