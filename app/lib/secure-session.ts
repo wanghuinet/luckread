@@ -300,7 +300,7 @@ async function saveCachedUserUnlocked(userValue: LuckReadUser): Promise<void> {
 }
 
 /** Backward-compatible cleanup for the legacy single-session auth store. */
-export async function clearLegacySessionForSnapshot(snapshot: SessionCredentialSnapshot): Promise<void> {
+async function clearLegacySessionForSnapshotUnlocked(snapshot: SessionCredentialSnapshot): Promise<void> {
   if (snapshot.accountId !== null || await getActiveStoredAccountId() !== null) return;
   if (await SecureStore.getItemAsync(LEGACY_TOKEN_KEY) !== snapshot.token) return;
   // Delete only legacy slots; never clear ACTIVE_ACCOUNT_KEY, which may now
@@ -320,8 +320,10 @@ export async function saveSessionTokenForSnapshot(token: string, snapshot: Sessi
 export async function saveSessionToken(token: string): Promise<void> { return runSecureSessionMutation(() => saveSessionTokenUnlocked(token)); }
 export async function saveCachedUser(userValue: LuckReadUser): Promise<void> { return runSecureSessionMutation(() => saveCachedUserUnlocked(userValue)); }
 
-export async function clearStoredSession(): Promise<void> {
+async function clearStoredSessionUnlocked(): Promise<void> {
   const activeAccountId = await getActiveStoredAccountId();
-  if (activeAccountId) await removeStoredAccount(activeAccountId);
-  await clearActiveAccountSelection();
+  if (activeAccountId) await removeStoredAccountUnlocked(activeAccountId);
+  await clearActiveAccountSelectionUnlocked();
 }
+export async function clearStoredSession(): Promise<void> { return runSecureSessionMutation(() => clearStoredSessionUnlocked()); }
+export async function clearLegacySessionForSnapshot(snapshot: SessionCredentialSnapshot): Promise<void> { return runSecureSessionMutation(() => clearLegacySessionForSnapshotUnlocked(snapshot)); }
