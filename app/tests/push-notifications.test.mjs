@@ -13,6 +13,8 @@ const permissionState = {
 };
 let pushToken = 'ExponentPushToken[abcdefghijklmnop_1234567890]';
 let apiStatus = 200;
+let apiGate = null;
+let onApiCallStarted = null;
 
 mock.module('expo-constants', () => ({
   default: {
@@ -53,6 +55,8 @@ mock.module('react-native', () => ({
 mock.module('../lib/api-client.ts', () => ({
   apiRequest: async (path, options) => {
     calls.push({ path, options });
+    onApiCallStarted?.();
+    if (apiGate) await apiGate;
     return {
       response: { ok: apiStatus >= 200 && apiStatus < 300, status: apiStatus },
       data: null,
@@ -77,7 +81,27 @@ beforeEach(() => {
   permissionState.requested = { status: 'granted', canAskAgain: false };
   pushToken = 'ExponentPushToken[abcdefghijklmnop_1234567890]';
   apiStatus = 200;
+  apiGate = null;
+  onApiCallStarted = null;
   platformState.OS = 'android';
+});
+
+test('undetermined permission disables a previously registered endpoint without prompting', async () => {
+  secureValues.set('luckread.native.push-installation.user-1', '123e4567-e89b-42d3-a456-426614174000');
+
+  const result = await syncPushEndpointForAuthenticatedUser('user-1');
+
+  expect(result).toBe('not-requested');
+  expect(events).toEqual([]);
+  expect(calls).toHaveLength(1);
+  expect(calls[0].options.method).toBe('PUT');
+  expect(calls[0].options.expectedAccountId).toBe('user-1');
+  expect(calls[0].path).toBe('/push/endpoints/123e4567-e89b-42d3-a456-426614174000');
+  expect(JSON.parse(calls[0].options.body)).toMatchObject({
+    permissionStatus: 'undetermined',
+    expoPushToken: null,
+    appVersion: '1.0.0',
+  });
 });
 
 test('app resume never prompts when notification permission is undetermined', async () => {
@@ -97,6 +121,7 @@ test('explicit enable action creates the Android channel before asking permissio
   expect(events[2]).toContain('get-expo-token:123e4567-e89b-42d3-a456-426614174000');
   expect(calls).toHaveLength(1);
   expect(calls[0].options.method).toBe('PUT');
+  expect(calls[0].options.expectedAccountId).toBe('user-1');
   expect(calls[0].path).toMatch(/^\/push\/endpoints\/[0-9a-f-]{36}$/i);
 
   const body = JSON.parse(calls[0].options.body);
@@ -179,6 +204,7 @@ test('logout deletes only the current account installation endpoint and clears i
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/push/endpoints/123e4567-e89b-42d3-a456-426614174000');
   expect(calls[0].options.method).toBe('DELETE');
+  expect(calls[0].options.expectedAccountId).toBe('user-1');
   expect(secureValues.has('luckread.native.push-installation.user-1')).toBe(false);
   expect(secureValues.has('luckread.native.push-installation.user-2')).toBe(true);
 });
@@ -198,6 +224,43 @@ test('API errors are not reported as successful registration', async () => {
   await expect(requestDevicePushPermission('user-1')).rejects.toThrow('API request failed');
 });
 
+
+
+test('serializes old-account registration, logout cleanup, and new-account registration', async () => {
+  const oldInstallationId = '123e4567-e89b-42d3-a456-426614174000';
+  const newInstallationId = '123e4567-e89b-42d3-a456-426614174001';
+  secureValues.set('luckread.native.push-installation.user-1', oldInstallationId);
+  secureValues.set('luckread.native.push-installation.user-2', newInstallationId);
+  permissionState.current = { status: 'granted', canAskAgain: false };
+
+  let releaseFirstRequest;
+  apiGate = new Promise((resolve) => { releaseFirstRequest = resolve; });
+  let markFirstCallStarted;
+  const firstCallStarted = new Promise((resolve) => { markFirstCallStarted = resolve; });
+  onApiCallStarted = () => {
+    if (markFirstCallStarted) {
+      markFirstCallStarted();
+      markFirstCallStarted = null;
+    }
+  };
+
+  const oldAccountRegistration = syncPushEndpointForAuthenticatedUser('user-1');
+  await firstCallStarted;
+  const oldAccountCleanup = unregisterPushEndpointForUser('user-1');
+  const newAccountRegistration = syncPushEndpointForAuthenticatedUser('user-2');
+
+  await Promise.resolve();
+  expect(calls.map((call) => call.options.method)).toEqual(['PUT']);
+
+  releaseFirstRequest();
+  await Promise.all([oldAccountRegistration, oldAccountCleanup, newAccountRegistration]);
+
+  expect(calls.map((call) => call.options.method)).toEqual(['PUT', 'DELETE', 'PUT']);
+  expect(calls.map((call) => call.options.expectedAccountId)).toEqual(['user-1', 'user-1', 'user-2']);
+  expect(calls[0].path).toBe('/push/endpoints/' + oldInstallationId);
+  expect(calls[1].path).toBe('/push/endpoints/' + oldInstallationId);
+  expect(calls[2].path).toBe('/push/endpoints/' + newInstallationId);
+});
 
 test('notification settings exposes both explicit enable and system permission management actions', () => {
   const screen = readFileSync(

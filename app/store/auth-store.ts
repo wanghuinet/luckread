@@ -311,14 +311,19 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     authLifecycleGeneration += 1;
     const generation = authLifecycleGeneration;
     const currentUserId = get().user?.id;
-    try {
-      const token = await readSessionToken();
+    const token = await readSessionToken();
+    if (generation !== authLifecycleGeneration) return;
+
+    // Keep the active session available for retry if endpoint deletion fails.
+    // Logging out first would discard the only local credential that can safely
+    // authorize a retry for this account's installation endpoint.
+    if (token && currentUserId) {
+      await unregisterPushEndpointForUser(currentUserId);
       if (generation !== authLifecycleGeneration) return;
+    }
+
+    try {
       if (token) {
-        if (currentUserId) {
-          await unregisterPushEndpointForUser(currentUserId).catch(() => undefined);
-          if (generation !== authLifecycleGeneration) return;
-        }
         await apiRequest<unknown>('/auth/logout', { method: 'POST', idempotencyKey: false });
         if (generation !== authLifecycleGeneration) return;
       }

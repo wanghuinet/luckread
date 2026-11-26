@@ -24,6 +24,16 @@ const INSTALLATION_KEY_PREFIX = 'luckread.native.push-installation.';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EAS_PROJECT_ID_PATTERN = UUID_PATTERN;
 
+// The backend owns one row per native push token. Serialize every mutation so
+// an older account's in-flight registration cannot win after an account switch.
+let endpointMutationQueue: Promise<void> = Promise.resolve();
+
+function enqueueEndpointMutation<T>(operation: () => Promise<T>): Promise<T> {
+  const result = endpointMutationQueue.then(operation, operation);
+  endpointMutationQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
 function nativePlatform(): 'ios' | 'android' | null {
   if (Platform.OS === 'ios' || Platform.OS === 'android') return Platform.OS;
   return null;
@@ -107,6 +117,7 @@ async function writePushEndpoint(
     '/push/endpoints/' + encodeURIComponent(resolvedInstallationId),
     {
       method: 'PUT',
+      expectedAccountId: userId,
       body: JSON.stringify({
         platform,
         permissionStatus,
@@ -121,10 +132,13 @@ async function writePushEndpoint(
   }
 }
 
-async function disableExistingPushEndpoint(userId: string): Promise<void> {
+async function disableExistingPushEndpoint(
+  userId: string,
+  permissionStatus: 'denied' | 'undetermined',
+): Promise<void> {
   const installationId = await readInstallationId(userId);
   if (!installationId) return;
-  await writePushEndpoint(userId, 'denied', null, installationId);
+  await writePushEndpoint(userId, permissionStatus, null, installationId);
 }
 
 async function ensureAndroidNotificationChannel(): Promise<void> {
@@ -173,17 +187,22 @@ export async function getDevicePushPermission(): Promise<DevicePushPermission> {
  * Reconcile permission and token state without ever opening a permission prompt.
  * Called after authentication and when the app returns to the foreground.
  */
-export async function syncPushEndpointForAuthenticatedUser(
+async function syncPushEndpointForAuthenticatedUserNow(
   userId: string,
   devicePushToken?: Notifications.DevicePushToken,
 ): Promise<PushRegistrationResult> {
   if (!nativePlatform()) return 'unsupported';
 
   const permission = await getDevicePushPermission();
-  if (permission.status === 'undetermined') return 'not-requested';
+  if (permission.status === 'undetermined') {
+    // A previously granted endpoint may survive an OS permission reset or app reinstall.
+    // Keep the no-prompt behavior, but make the server state match the current permission.
+    await disableExistingPushEndpoint(userId, 'undetermined');
+    return 'not-requested';
+  }
 
   if (permission.status === 'denied') {
-    await disableExistingPushEndpoint(userId);
+    await disableExistingPushEndpoint(userId, 'denied');
     return 'denied';
   }
 
@@ -191,10 +210,17 @@ export async function syncPushEndpointForAuthenticatedUser(
   return 'enabled';
 }
 
+export function syncPushEndpointForAuthenticatedUser(
+  userId: string,
+  devicePushToken?: Notifications.DevicePushToken,
+): Promise<PushRegistrationResult> {
+  return enqueueEndpointMutation(() => syncPushEndpointForAuthenticatedUserNow(userId, devicePushToken));
+}
+
 /**
  * Called only by an explicit user action in Notification Settings.
  */
-export async function requestDevicePushPermission(
+async function requestDevicePushPermissionNow(
   userId: string,
 ): Promise<PushRegistrationResult> {
   const platform = nativePlatform();
@@ -202,7 +228,7 @@ export async function requestDevicePushPermission(
 
   let permission = await Notifications.getPermissionsAsync();
   if (permission.status === 'denied' && permission.canAskAgain === false) {
-    await disableExistingPushEndpoint(userId);
+    await disableExistingPushEndpoint(userId, 'denied');
     return 'settings-required';
   }
 
@@ -219,18 +245,22 @@ export async function requestDevicePushPermission(
   }
 
   if (permission.status === 'denied') {
-    await disableExistingPushEndpoint(userId);
+    await disableExistingPushEndpoint(userId, 'denied');
     return permission.canAskAgain === false ? 'settings-required' : 'denied';
   }
 
   return 'not-requested';
 }
 
+export function requestDevicePushPermission(userId: string): Promise<PushRegistrationResult> {
+  return enqueueEndpointMutation(() => requestDevicePushPermissionNow(userId));
+}
+
 /**
  * Best-effort removal before logout. A separate installation UUID is kept per
  * account so one account can never take over another account's endpoint row.
  */
-export async function unregisterPushEndpointForUser(userId: string): Promise<void> {
+async function unregisterPushEndpointForUserNow(userId: string): Promise<void> {
   if (!nativePlatform()) return;
   const key = accountInstallationKey(userId);
   const installationId = await readInstallationId(userId);
@@ -238,10 +268,14 @@ export async function unregisterPushEndpointForUser(userId: string): Promise<voi
 
   const result = await apiRequest<unknown>(
     '/push/endpoints/' + encodeURIComponent(installationId),
-    { method: 'DELETE' },
+    { method: 'DELETE', expectedAccountId: userId },
   );
   if (!result.response.ok) {
     throw new Error(result.error?.message || 'Could not unregister this device from LuckRead notifications.');
   }
   await SecureStore.deleteItemAsync(key);
+}
+
+export function unregisterPushEndpointForUser(userId: string): Promise<void> {
+  return enqueueEndpointMutation(() => unregisterPushEndpointForUserNow(userId));
 }

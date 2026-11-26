@@ -8,6 +8,7 @@ let activeAccountId = null;
 let rejectSessionFor = null;
 const sessionRequests = [];
 const loginRequests = [];
+const logoutRequests = [];
 const pushUnregisterCalls = [];
 let failPushUnregisterFor = null;
 let unauthorizedHandler = null;
@@ -126,6 +127,7 @@ mock.module('../lib/api-client.ts', () => ({
       return respond();
     }
     if (path === '/auth/logout') {
+      logoutRequests.push({ accountId: activeAccountId, token: storedTokens.get(activeAccountId) });
       return { response: new Response(null, { status: 204 }), data: null, error: null };
     }
     throw new Error('Unexpected API request: ' + path);
@@ -150,6 +152,7 @@ beforeEach(() => {
   rejectSessionFor = null;
   sessionRequests.length = 0;
   loginRequests.length = 0;
+  logoutRequests.length = 0;
   pushUnregisterCalls.length = 0;
   failPushUnregisterFor = null;
   removeAccountCalls = 0;
@@ -275,6 +278,36 @@ test('concurrent 401 responses for one credential share a single invalidation', 
   expect(removeAccountCalls).toBe(1);
   expect(activeAccountId).toBeNull();
   expect(useAuthStore.getState().status).toBe('anonymous');
+});
+
+test('logout preserves the active session when push endpoint deletion fails so the user can retry', async () => {
+  await useAuthStore.getState().login('first@example.com', 'password-one');
+  failPushUnregisterFor = 'user-first@example.com';
+
+  await expect(useAuthStore.getState().logout()).rejects.toThrow(
+    'Push endpoint could not be unregistered',
+  );
+
+  expect(activeAccountId).toBe('user-first@example.com');
+  expect(storedTokens.get('user-first@example.com')).toBe('token-first@example.com');
+  expect(useAuthStore.getState().status).toBe('authenticated');
+  expect(useAuthStore.getState().user?.id).toBe('user-first@example.com');
+  expect(logoutRequests).toHaveLength(0);
+});
+
+test('removing the active account preserves its session when push endpoint deletion fails', async () => {
+  await useAuthStore.getState().login('first@example.com', 'password-one');
+  failPushUnregisterFor = 'user-first@example.com';
+
+  await expect(useAuthStore.getState().removeAccount('user-first@example.com')).rejects.toThrow(
+    'Push endpoint could not be unregistered',
+  );
+
+  expect(activeAccountId).toBe('user-first@example.com');
+  expect(storedTokens.get('user-first@example.com')).toBe('token-first@example.com');
+  expect(useAuthStore.getState().status).toBe('authenticated');
+  expect(useAuthStore.getState().user?.id).toBe('user-first@example.com');
+  expect(storedAccounts.has('user-first@example.com')).toBe(true);
 });
 
 test('removing the active account leaves other saved accounts intact and signs out only the active slot', async () => {
