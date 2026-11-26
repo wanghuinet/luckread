@@ -407,7 +407,9 @@ test('a newer bootstrap supersedes an older deferred bootstrap response', async 
   await useAuthStore.getState().login('bootstrap@example.com', 'password');
   deferNextSessionResponse = true;
   const olderBootstrap = useAuthStore.getState().bootstrap();
-  await Promise.resolve();
+  for (let attempt = 0; attempt < 5 && !resolveDeferredSessionResponse; attempt += 1) await Promise.resolve();
+  expect(resolveDeferredSessionResponse).toBeTypeOf('function');
+
   const newerBootstrap = useAuthStore.getState().bootstrap();
   await newerBootstrap;
   resolveDeferredSessionResponse?.();
