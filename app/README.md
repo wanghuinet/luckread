@@ -4,7 +4,7 @@ Expo / React Native client source for LuckRead. The root web application and the
 
 ## Local development
 
-Requirements: Node.js 22.13+ for the Expo SDK 58 baseline (CI uses Node.js 22.13.1), Bun 1.1.x, Android Studio for Android builds, and macOS with Xcode + CocoaPods for iOS builds.
+Requirements: Node.js 22.13+ for the Expo SDK 58 baseline (CI uses Node.js 22.13.1), Bun 1.1.x, Android Studio for local Android builds, and macOS with Xcode + CocoaPods for local iOS builds.
 
 The APP dependency graph is pinned by `app/bun.lockb`. Regenerate and commit that lockfile whenever APP dependencies change, using the repository's Bun 1.1.38 toolchain; APP CI verifies the committed lockfile.
 
@@ -13,8 +13,8 @@ cd app
 bun install
 bunx expo install --check
 bunx expo-doctor@latest
-bun run typecheck       # TypeScript 7 native compiler
-bun run typecheck:ts6   # TypeScript 6 API compatibility check
+bun run typecheck
+bun run typecheck:ts6
 bun start
 ```
 
@@ -25,7 +25,7 @@ bun run android
 bun run ios
 ```
 
-The GitHub Actions workflow `.github/workflows/app-mobile-ci.yml` installs dependencies, checks the Expo SDK 58 compatibility, type-checks the client, verifies native Codegen, and builds the Android Release APK. The SDK 58 Android baseline uses compile API 37 and target API 36; iOS builds require Xcode 26.4 or newer.
+The GitHub Actions workflow `.github/workflows/app-mobile-ci.yml` installs dependencies, checks Expo SDK compatibility, type-checks the client, verifies native Codegen, runs targeted native contract/regression tests, and builds the Android Release APK. The SDK 58 Android baseline uses compile API 37 and target API 36; iOS builds require Xcode 26.4 or newer.
 
 ## API configuration
 
@@ -35,21 +35,40 @@ The default API base is `https://api.luckread.com`. Override it for staging with
 EXPO_PUBLIC_API_BASE_URL=https://your-staging-host.example bun start
 ```
 
-The client uses these existing W01 public routes:
+The native client uses the W01 API contract through the shared API client. Authentication uses the APP-AUTH-01 session contract: the native session credential is accepted from the `X-LuckRead-Session-Token` response header and stored using `expo-secure-store` (iOS Keychain / Android Keystore-backed storage). Authenticated requests use `Authorization: Bearer <session-token>`; the token is not stored in plain AsyncStorage or included in a request/response JSON body.
 
-- `POST /v1/auth/login`
-- `GET /v1/auth/session`
-- `POST /v1/auth/logout`
-- `GET /v1/contents?type=post&limit=20`
-- `GET /v1/feed/following?limit=20`
+## Implemented native feature areas
 
-The native session credential is accepted from the `X-LuckRead-Session-Token` response header and stored using `expo-secure-store` (iOS Keychain / Android Keystore-backed storage). Authenticated requests use `Authorization: Bearer <session-token>`. The token is never stored in plain AsyncStorage or included in a request/response JSON body.
+The current source tree includes native implementations and focused regression tests for these feature areas. Their presence does not by itself prove successful production or device acceptance.
 
-## Current scope and limitations
+- Authentication: login, registration, email verification, password recovery, session validation, logout, secure multi-account storage/switching and session management.
+- Home and discovery: For You and Following feed queries, post detail/thread, profile and relationships, search/history/trending topics, video feed and media galleries.
+- Social interactions: content likes, reposts, bookmarks, comments (create/edit/delete/like/report), follow relationships, block/mute controls, sharing and post interaction summaries.
+- Publishing: post composer, drafts/autosave, image/video selection and camera capture, upload preparation, media upload and playback lookup, pending-upload recovery, polls, reply audiences and scheduled publishing.
+- Messaging and notifications: direct/group conversation routes, notification inbox/preferences, push permission lifecycle and push endpoint registration/cleanup.
+- Creator and commerce surfaces: creator applications/plans, membership/subscription management, billing history, invoices/receipts and refund requests.
 
-- Public For You posts and authenticated Following timeline are connected to W01.
-- Login and startup session validation use the frozen APP-AUTH-01 contract. Production end-to-end acceptance of valid sign-in/session-revocation still needs a QA credential-backed run.
-- Post cards currently map the public content list fields supported by the W01/W03 response. This does not yet connect native like/repost/comment writes, image/video upload, media playback authorization, push notifications, or creator subscriptions.
-- The imported UI still contains other upstream prototype screens and placeholders. Those are not evidence that the equivalent LuckRead business function is implemented.
+Relevant regression suites are declared in `package.json` (including auth, API client, publishing, media, social screens, comments, feed queries, notifications, subscriptions, billing, paid content and creator studio). Run the focused test command for the changed feature and the required CI gates; do not rerun unrelated suites without a reason.
 
-This client should not be considered release-ready until the dependency checks and both native build jobs pass and device-level auth/feed tests are completed.
+## Release acceptance still required
+
+The following are separate release gates and must not be inferred from source code or unit tests:
+
+- Run the credential-backed production auth/session E2E, including login, protected requests, revocation/logout, with QA credentials configured in GitHub Actions.
+- Run public API live smoke only after the relevant W01 routing deployment is confirmed.
+- Verify media owner-scope runtime E2E against a known successful deployment artifact.
+- Build the signed Android Beta artifact using the stable signing secrets for a publishable release. A temporary one-run signing key is only for device testing and must not be used for a public release.
+- Build and sign iOS with the required macOS/Xcode toolchain and valid Apple signing configuration.
+- Install the release artifacts on physical Android and iOS devices and complete authenticated core journeys, including app restart, network interruption/recovery, media and push permission flows.
+- Complete privacy, account deletion, moderation/reporting, store metadata and platform review checks.
+
+## Release workflow entry points
+
+- `.github/workflows/app-mobile-ci.yml`: native CI, dependency compatibility, type checks, regression tests and Android build validation.
+- `.github/workflows/app-android-beta-release.yml`: manually dispatched Android Beta APK build. Stable signing secrets are mandatory when publishing a release; temporary signing is test-only.
+- `.github/workflows/app-production-release.yml`: production release workflow; inspect its required inputs and environment protections before dispatch.
+- `.github/workflows/app-auth-session-live-e2e.yml`: credential-backed production auth/session verification.
+- `.github/workflows/api-app-live-smoke.yml`: manually confirmed public API smoke probes after deployment.
+- `.github/workflows/media-runtime-e2e.yml`: deployment-provenance-bound media ownership runtime test.
+
+A CI pass is not a release approval. LuckRead Beta is ready only after code gates, production runtime evidence, signed build artifacts, physical-device acceptance and store/compliance requirements are all recorded as passed.
