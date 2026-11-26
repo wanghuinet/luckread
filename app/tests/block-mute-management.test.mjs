@@ -46,7 +46,7 @@ test('rejects invalid list types, limits, and cursors without network calls', ()
 
 test('management screen wires existing list and remove APIs with confirmation', () => {
   expect(screenSource).toContain("fetchManagedRelationshipsPage(kind,");
-  expect(screenSource).toContain("isBlock ? await unblockUser(targetId) : await unmuteUser(targetId)");
+  expect(screenSource).toContain("isBlock ? await unblockUser(targetId, operationAccountId) : await unmuteUser(targetId, operationAccountId)");
   expect(screenSource).toContain("if (!result.response.ok)");
   expect(screenSource).toContain("setRows((current) => current.filter((item) => item.relation.targetUserId !== targetId))");
   expect(screenSource).toContain("Alert.alert(");
