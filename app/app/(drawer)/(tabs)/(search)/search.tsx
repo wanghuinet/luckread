@@ -70,14 +70,14 @@ export default function Search() {
   const trendingRequestIdRef = useRef(0);
   const trendingAbortRef = useRef<AbortController | null>(null);
   const historyRequestIdRef = useRef(0);
-  const searchViewerIdRef = useRef<string | null>(viewerId);
-  searchViewerIdRef.current = viewerId;
   const tabBarScroll = useTabBarScroll();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
   const viewerId = useAuthStore((state) => state.user?.id ?? null);
+  const searchViewerIdRef = useRef<string | null>(viewerId);
+  searchViewerIdRef.current = viewerId;
   const historyScopeRef = useRef<string | null>(viewerId);
   historyScopeRef.current = viewerId;
   const [historyViewerId, setHistoryViewerId] = useState<string | null>(viewerId);
