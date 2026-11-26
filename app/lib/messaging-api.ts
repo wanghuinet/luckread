@@ -123,11 +123,11 @@ export async function fetchMessagesAfterBatch(
 function compareMessagingSequence(left: string, right: string): number {
   return left.length === right.length ? left.localeCompare(right) : left.length - right.length;
 }
-export async function uploadMessageAttachment(file: LocalMediaFile, idempotencyKey = createIdempotencyKey()) {
+export async function uploadMessageAttachment(file: LocalMediaFile, idempotencyKey = createIdempotencyKey(), expectedAccountId?: string) {
   if (typeof file.size === 'number' && (!Number.isFinite(file.size) || file.size <= 0 || file.size > 20 * 1024 * 1024)) throw new Error('附件不能超过 20 MB，且文件大小必须有效。');
   const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
   if (!allowed.includes(file.mimeType.toLowerCase())) throw new Error('仅支持 JPG、PNG、WebP、GIF 和 PDF。');
-  const media = await uploadMediaFile(file, idempotencyKey);
+  const media = await uploadMediaFile(file, idempotencyKey, undefined, expectedAccountId);
   return {
     mediaId: media.id,
     filename: media.filename,
