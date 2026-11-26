@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   provision:
+    if: ${{ github.ref == 'refs/heads/main' && github.ref_protected == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
