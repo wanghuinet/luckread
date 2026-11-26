@@ -136,7 +136,7 @@ export async function refreshContentBookmarkStatus(
   try {
     const result = await apiRequest<unknown>(
       '/interactions/bookmarks?targetType=content&targetId=' + encodeURIComponent(id),
-      { method: 'GET' },
+      { method: 'GET', expectedAccountId: viewerId },
     );
 
     // A response started for one viewer is never published into another
@@ -218,6 +218,7 @@ export async function toggleContentBookmark(
       method: nextBookmarked ? 'POST' : 'DELETE',
       body: JSON.stringify({ targetType: 'content', targetId: id }),
       idempotencyKey: createIdempotencyKey(),
+      expectedAccountId: viewerId,
     });
 
     if (currentViewerId() !== viewerId) {
