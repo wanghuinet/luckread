@@ -1,11 +1,8 @@
 name: Media Owner Scope Runtime E2E
 
+# SAFETY HOLD: legacy fixture SQL targets D1 while deployed W01 uses Neon.
+# Do not re-enable until isolated Neon test infrastructure is implemented.
 on:
-  workflow_run:
-    workflows:
-      - W01 W02 Auth Binding Deploy
-      - W01 Payload Application Deploy
-    types: [completed]
   workflow_dispatch:
     inputs:
       tested_commit:
@@ -38,19 +35,17 @@ permissions:
 
 env:
   WRANGLER_VERSION: 4.116.0
-  TESTED_COMMIT: ${{ github.event_name == 'workflow_run' && '' || inputs.tested_commit }}
-  DEPLOYMENT_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.deployment_run_id }}
-  W01_BASE_URL: ${{ github.event_name == 'workflow_run' && 'https://api.luckread.com' || inputs.w01_base_url }}
-  DATABASE_NAME: ${{ github.event_name == 'workflow_run' && 'luckread' || inputs.database_name }}
+  TESTED_COMMIT: ${{ inputs.tested_commit }}
+  DEPLOYMENT_RUN_ID: ${{ inputs.deployment_run_id }}
+  W01_BASE_URL: ${{ inputs.w01_base_url }}
+  DATABASE_NAME: ${{ inputs.database_name }}
 
 jobs:
   media-runtime-e2e:
-    if: >-
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main') ||
-      (github.event_name == 'workflow_dispatch' &&
-       inputs.confirm == 'RUN_MEDIA_RUNTIME_E2E')
+    # Intentionally disabled: fixture setup/cleanup uses D1 against Neon W01,
+    # and the legacy harness defaults to the public production API.
+    # Re-enable only for a dedicated non-production W01 + isolated Neon DB.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
