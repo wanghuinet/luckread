@@ -100,6 +100,7 @@ test('undetermined permission disables a previously registered endpoint without 
   expect(JSON.parse(calls[0].options.body)).toMatchObject({
     permissionStatus: 'undetermined',
     expoPushToken: null,
+    appVersion: '1.0.0',
   });
 });
 
