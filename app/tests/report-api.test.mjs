@@ -80,7 +80,7 @@ test('wires the feed and post-detail report menu entries to the shared dialog', 
   expect(dialog).toContain('Submit report');
   expect(dialog).toContain("submitContentReport(contentId, reasonCode, description, requestViewerId)");
   expect(dialog).toContain('viewerIdRef.current !== requestViewerId');
-  expect(dialog).toContain('finally {\n      setSubmitting(false);');
+  expect(dialog).toContain('finally {\n      if (viewerIdRef.current === requestViewerId) setSubmitting(false);');
   expect(dialog).toContain('Could not submit this report. Please check your connection and try again.');
   expect(dialog).toContain('Additional details (optional)');
 });
