@@ -125,9 +125,10 @@ export default function Messages() {
     onSuccess: async (result, variables) => {
       if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'requests'] }),
-        queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] }),
+        queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'requests'] }),
+        queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'conversations'] }),
       ]);
+      if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;
       if (result.conversationId) router.push({ pathname: '/messages/[conversationId]', params: { conversationId: result.conversationId } } as never);
     },
   });
