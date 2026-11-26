@@ -276,13 +276,13 @@ export default function ConversationScreen() {
   const messagesQuery = useInfiniteQuery({
     queryKey: ['messaging', userId, 'messages', conversationId],
     initialPageParam: null as string | null,
-    queryFn: ({ pageParam, signal }) => fetchMessages(conversationId, pageParam, signal),
+    queryFn: ({ pageParam, signal }) => fetchMessages(conversationId, pageParam, signal, userId),
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
     enabled: Boolean(conversationId),
     staleTime: 15_000,
   });
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [], [messagesQuery.data?.pages]);
-  const membersQuery = useQuery({ queryKey: ['messaging', userId, 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal), enabled: Boolean(conversationId) && params.conversationType !== 'group', staleTime: 60_000 });
+  const membersQuery = useQuery({ queryKey: ['messaging', userId, 'members', conversationId], queryFn: ({ signal }) => fetchConversationMembers(conversationId, signal, userId), enabled: Boolean(conversationId) && params.conversationType !== 'group', staleTime: 60_000 });
   // The authenticated WebSocket sends the initial typing snapshot and subsequent changes.
   const typingQuery = useQuery({
     queryKey: ['messaging', userId, 'typing', conversationId],
@@ -340,7 +340,7 @@ export default function ConversationScreen() {
     compareSequence(message.sequence, latest) > 0 ? message.sequence : latest, '0');
   const incrementalQuery = useQuery({
     queryKey: ['messaging', userId, 'messages-after', conversationId, latestSequence],
-    queryFn: ({ signal }) => fetchMessagesAfterBatch(conversationId, latestSequence, signal),
+    queryFn: ({ signal }) => fetchMessagesAfterBatch(conversationId, latestSequence, signal, 10, userId),
     enabled: Boolean(conversationId) && messagesQuery.isSuccess && isFocused && appState === 'active',
     staleTime: Infinity,
   });
@@ -546,7 +546,7 @@ export default function ConversationScreen() {
   const editMutation = useMutation({
     mutationFn: () => {
       if (!editTarget) throw new Error('请选择要编辑的消息。');
-      return editDirectMessage(conversationId, editTarget.messageId, editDraft);
+      return editDirectMessage(conversationId, editTarget.messageId, editDraft, userId);
     },
     onSuccess: (updated) => {
       applyMessageUpdate(updated);
@@ -555,7 +555,7 @@ export default function ConversationScreen() {
     },
   });
   const recallMutation = useMutation({
-    mutationFn: (messageId: string) => recallDirectMessage(conversationId, messageId),
+    mutationFn: (messageId: string) => recallDirectMessage(conversationId, messageId, userId),
     onSuccess: applyMessageUpdate,
   });
 
@@ -626,7 +626,7 @@ export default function ConversationScreen() {
     if (state.retryTimer) return;
     state.inFlight = true;
     const targetSequence = latest.sequence;
-    void markConversationRead(conversationId, targetSequence)
+    void markConversationRead(conversationId, targetSequence, userId)
       .then(() => {
         if (readAckStateRef.current !== state) return;
         if (compareSequence(targetSequence, state.acknowledged) > 0) state.acknowledged = targetSequence;
