@@ -52,8 +52,10 @@ test('reads authoritative status and likes a comment through the existing endpoi
   expect(calls).toHaveLength(2);
   expect(calls[0].path).toBe('/interactions/likes?targetType=comment&targetId=comment%2Fid');
   expect(calls[0].options.method).toBe('GET');
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
   expect(calls[1].path).toBe('/comments/comment%2Fid/likes');
   expect(calls[1].options.method).toBe('POST');
+  expect(calls[1].options.expectedAccountId).toBe('viewer-a');
   expect(calls[1].options.idempotencyKey).toBe('native-comment-like:comment/id:like:test-idempotency');
 });
 
