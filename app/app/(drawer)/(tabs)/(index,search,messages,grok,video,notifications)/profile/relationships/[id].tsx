@@ -17,6 +17,7 @@ import { useTabBarScroll } from '~/components/TabBarScroll';
 import { getApiErrorMessage } from '~/lib/api-client';
 import { fetchUserRelationshipsPage } from '~/lib/social-screen-api';
 import { resolvePublicProfileById, unwrapApiData } from '~/lib/content-adapter';
+import { useAuthStore } from '~/store/auth-store';
 
 type FollowRelation = {
   relationshipId: string;
@@ -56,6 +57,9 @@ export default function ProfileRelationships() {
   const relationType = rawType === 'following' ? 'following' : 'followers';
   const title = relationType === 'following' ? '关注列表' : '关注者';
   const router = useRouter();
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
+  const viewerIdRef = useRef<string | null>(viewerId);
+  viewerIdRef.current = viewerId;
   const [rows, setRows] = useState<FollowListRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -72,17 +76,24 @@ export default function ProfileRelationships() {
     const controller = new AbortController();
     abortRef.current = controller;
     const requestId = ++requestIdRef.current;
-    const isCurrent = () => requestId === requestIdRef.current && !controller.signal.aborted;
+    const requestViewerId = viewerId;
+    const isCurrent = () => requestId === requestIdRef.current && !controller.signal.aborted && viewerIdRef.current === requestViewerId;
     if (!ownerId) {
       if (isCurrent()) { setError('缺少用户 ID。'); setLoading(false); }
       return;
     }
     if (append) setLoadingMore(true);
-    else setLoading(true);
+    else {
+      setRows([]);
+      setTotalCount(0);
+      setCursor(null);
+      setHasMore(false);
+      setLoading(true);
+    }
     setError('');
     try {
       const result = await fetchUserRelationshipsPage(ownerId, relationType, {
-        cursor: nextCursor, signal: controller.signal,
+        cursor: nextCursor, signal: controller.signal, expectedAccountId: requestViewerId ?? undefined,
       });
       if (!isCurrent()) return;
       if (!result.response.ok) {
@@ -112,12 +123,15 @@ export default function ProfileRelationships() {
         if (abortRef.current === controller) abortRef.current = null;
       }
     }
-  }, [ownerId, relationType]);
+  }, [ownerId, relationType, viewerId]);
 
-  useEffect(() => () => {
-    requestIdRef.current += 1;
-    abortRef.current?.abort();
-    abortRef.current = null;
+  useEffect(() => {
+    void loadPage(null, false);
+    return () => {
+      requestIdRef.current += 1;
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
   }, [loadPage]);
 
   const renderItem = useCallback(({ item }: { item: FollowListRow }) => {

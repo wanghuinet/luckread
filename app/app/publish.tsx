@@ -399,7 +399,7 @@ function PublishScreenContent() {
         throw new Error('The server did not return a version for this post. Refresh it before editing.');
       }
 
-      const replyPolicyResult = await fetchOwnPostReplyAudience(targetContentId);
+      const replyPolicyResult = await fetchOwnPostReplyAudience(targetContentId, undefined, ownerId);
       if (!isCurrentOwner()) return;
       const restoredReplyAudience = readReplyAudienceFromResult(replyPolicyResult.data);
       if (!replyPolicyResult.response.ok || !isNativeReplyAudience(restoredReplyAudience)) {

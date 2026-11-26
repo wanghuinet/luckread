@@ -194,6 +194,7 @@ export default function Notifications() {
         cursor: nextCursor,
         filter,
         signal: controller.signal,
+        expectedAccountId: requestViewerId,
       });
       if (requestId !== requestIdRef.current || controller.signal.aborted || viewerIdRef.current !== requestViewerId) return;
 
@@ -273,7 +274,7 @@ export default function Notifications() {
     setBusyIds((current) => new Set(current).add(item.id));
     setError('');
     try {
-      const result = await markNotificationRead(item.id);
+      const result = await markNotificationRead(item.id, requestViewerId);
       if (!result.response.ok) {
         throw new Error(getApiErrorMessage(result.data, '无法标记通知为已读。', result.response.status));
       }
@@ -284,6 +285,7 @@ export default function Notifications() {
       ));
       setUnreadCount((count) => Math.max(0, count - 1));
     } catch (cause) {
+      if (viewerIdRef.current !== requestViewerId) return;
       setError(cause instanceof Error ? cause.message : '无法标记通知为已读。');
     } finally {
       if (viewerIdRef.current === requestViewerId) {
@@ -302,7 +304,7 @@ export default function Notifications() {
     setReadAllBusy(true);
     setError('');
     try {
-      const result = await markAllNotificationsRead();
+      const result = await markAllNotificationsRead(requestViewerId);
       if (!result.response.ok) {
         throw new Error(getApiErrorMessage(result.data, '无法将通知全部标记为已读。', result.response.status));
       }
@@ -311,6 +313,7 @@ export default function Notifications() {
       setItems((current) => current.map((item) => item.readAt ? item : { ...item, readAt }));
       setUnreadCount(0);
     } catch (cause) {
+      if (viewerIdRef.current !== requestViewerId) return;
       setError(cause instanceof Error ? cause.message : '无法将通知全部标记为已读。');
     } finally {
       if (viewerIdRef.current === requestViewerId) setReadAllBusy(false);
@@ -349,7 +352,7 @@ export default function Notifications() {
     setError('');
 
     void (async () => {
-      const result = await fetchNotificationById(notificationId, controller.signal);
+      const result = await fetchNotificationById(notificationId, controller.signal, requestViewerId);
       if (!active || controller.signal.aborted || viewerIdRef.current !== requestViewerId) return;
       if (!result.response.ok) {
         throw new Error(getApiErrorMessage(result.data, '无法打开这条通知，请重试。', result.response.status));
@@ -367,7 +370,7 @@ export default function Notifications() {
       void loadActorProfiles([item], controller.signal);
       openNotification(item);
     })().catch((cause) => {
-      if (active && !controller.signal.aborted) {
+      if (active && !controller.signal.aborted && viewerIdRef.current === requestViewerId) {
         handledDeepLinkIdRef.current = null;
         setError(cause instanceof Error ? cause.message : '无法打开这条通知，请重试。');
       }

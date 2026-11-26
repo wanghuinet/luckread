@@ -49,7 +49,7 @@ export default function GroupInfoScreen() {
     queryKey: ['messaging', userId, 'member-picker-following'],
     queryFn: async ({ signal }) => {
       if (!userId) return [];
-      const result = await fetchUserRelationshipsPage(userId, 'following', { limit: 100, signal });
+      const result = await fetchUserRelationshipsPage(userId, 'following', { limit: 100, signal, expectedAccountId: userId });
       if (!result.response.ok) throw new Error('无法加载关注列表');
       const page = unwrapApiData<unknown>(result.data);
       return extractIds(page);

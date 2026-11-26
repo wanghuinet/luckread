@@ -649,7 +649,7 @@ export default function UserProfileScreen() {
         website?: string | null; category?: string | null; createdAt?: string; followerCount?: number; followingCount?: number;
         coverImage?: string | null; headerImage?: string | null; isVerified?: boolean; verifiedBadge?: string | null;
         isOrganization?: boolean; error?: { message?: string };
-      }>(profilePath, { method: 'GET', signal: controller.signal });
+      }>(profilePath, { method: 'GET', signal: controller.signal, expectedAccountId: requestViewerId ?? undefined });
       let profile = profileResult.response.ok ? unwrapApiData<{
         id?: string; identityId?: string | null; username?: string; displayName?: string | null; bio?: string | null; avatar?: string | null;
         website?: string | null; category?: string | null; createdAt?: string; followerCount?: number; followingCount?: number;
@@ -682,7 +682,7 @@ export default function UserProfileScreen() {
       const contentParams = new URLSearchParams({ creatorId: canonicalProfileId, type: 'post', limit: '20' });
       const feedResult = await apiRequest<{ data?: ApiContentPage; error?: { message?: string } }>(
         '/contents?' + contentParams.toString(),
-        { method: 'GET', signal: controller.signal },
+        { method: 'GET', signal: controller.signal, expectedAccountId: requestViewerId ?? undefined },
       );
       const page = feedResult.response.ok ? unwrapApiData<ApiContentPage>(feedResult.data) : null;
       if (!feedResult.response.ok || !page || !Array.isArray(page.items)) {
@@ -888,8 +888,9 @@ export default function UserProfileScreen() {
         cursor: nextCursor,
         limit: 20,
         signal: controller.signal,
+        expectedAccountId: requestViewerId ?? undefined,
       });
-      if (controller.signal.aborted || !isCurrentViewer()) return;
+      if (controller.signal.aborted || !isCurrentViewer()) return
       const page = result.response.ok
         ? unwrapApiData<ProfileLikedContentPage>(result.data)
         : null;
@@ -905,7 +906,7 @@ export default function UserProfileScreen() {
 
         const contentResult = await apiRequest<unknown>(
           '/contents/' + encodeURIComponent(likedItem.contentId),
-          { method: 'GET', signal: controller.signal },
+          { method: 'GET', signal: controller.signal, expectedAccountId: requestViewerId ?? undefined },
         );
         if (!contentResult.response.ok) {
           if ([403, 404, 410].includes(contentResult.response.status)) return null;
@@ -977,6 +978,7 @@ export default function UserProfileScreen() {
         cursor: nextCursor,
         limit: 20,
         signal: controller.signal,
+        expectedAccountId: requestViewerId ?? undefined,
       });
       const page = result.response.ok ? unwrapApiData<ProfileReplyPage>(result.data) : null;
       if (
@@ -1003,7 +1005,7 @@ export default function UserProfileScreen() {
 
         const contentResult = await apiRequest<unknown>(
           '/contents/' + encodeURIComponent(contentId),
-          { method: 'GET', signal: controller.signal },
+          { method: 'GET', signal: controller.signal, expectedAccountId: requestViewerId ?? undefined },
         );
         if (!contentResult.response.ok) {
           if ([403, 404, 410].includes(contentResult.response.status)) return null;
@@ -1087,6 +1089,7 @@ export default function UserProfileScreen() {
         cursor: nextCursor,
         limit: 20,
         signal: controller.signal,
+        expectedAccountId: requestViewerId ?? undefined,
       });
       const page = result.response.ok ? unwrapApiData<ApiContentPage>(result.data) : null;
       if (
