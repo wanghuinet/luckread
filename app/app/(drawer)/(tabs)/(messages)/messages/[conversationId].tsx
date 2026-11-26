@@ -355,7 +355,7 @@ export default function ConversationScreen() {
       let cursor = continuationCursor!;
       let hasMore = true;
       for (let batch = 0; batch < 4 && hasMore; batch++) {
-        const page = await fetchMessagesAfterBatch(conversationId, cursor, signal);
+        const page = await fetchMessagesAfterBatch(conversationId, cursor, signal, 10, userId);
         items.push(...page.items);
         hasMore = page.hasMore;
         if (page.nextCursor) cursor = page.nextCursor;
@@ -399,7 +399,7 @@ export default function ConversationScreen() {
       void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages', conversationId] });
       void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
     }
-  }, [incrementalQuery.data, continuationQuery.data, conversationId, queryClient]);
+  }, [incrementalQuery.data, continuationQuery.data, conversationId, queryClient, userId]);
 
 
 
