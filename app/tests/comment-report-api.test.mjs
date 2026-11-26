@@ -84,13 +84,13 @@ test('rejects unknown report reasons and invalid IDs before requesting the API',
     reasonCode: 'NOT_A_REASON',
     idempotencyKey: 'key',
     expectedViewerId: 'viewer-a',
-    expectedViewerId: 'viewer-a',
   })).rejects.toThrow('Choose a valid report reason.');
 
   await expect(reportComment({
     commentId: '  ',
     reasonCode: 'SPAM',
     idempotencyKey: 'key',
+    expectedViewerId: 'viewer-a',
   })).rejects.toThrow('A valid comment ID is required.');
 
   expect(calls).toHaveLength(0);
@@ -125,6 +125,7 @@ test('validates report description and idempotency key bounds', async () => {
     reasonCode: 'OTHER',
     description: 'x'.repeat(4001),
     idempotencyKey: 'key',
+    expectedViewerId: 'viewer-a',
   })).rejects.toThrow('4,000 characters or fewer.');
 
   await expect(reportComment({
