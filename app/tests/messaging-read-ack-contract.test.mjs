@@ -143,7 +143,7 @@ test('new message request completion cannot navigate after the initiating accoun
   expect(source).toContain("queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'requests', 'outgoing'] })");
   expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;');
   expect(source).toContain('mutation.reset();');
-  expect(source).toContain('mutationBelongsToCurrentAccount = mutation.variables?.expectedAccountId === userId');
+  expect(source).toContain('mutationBelongsToCurrentAccount = Boolean(userId && mutation.variables?.expectedAccountId === userId)');
   expect(source).toContain('mutation.isError && mutationBelongsToCurrentAccount');
 });
 
