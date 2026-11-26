@@ -10,6 +10,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { createIdempotencyKey } from '~/lib/api-client';
+import { useAuthStore } from '~/store/auth-store';
 import {
   COMMENT_REPORT_REASONS,
   CommentReportApiError,
@@ -19,10 +20,11 @@ import {
 
 type Props = {
   commentId: string;
+  expectedViewerId: string | null;
   onClose: () => void;
 };
 
-export default function ReportCommentDialog({ commentId, onClose }: Props) {
+export default function ReportCommentDialog({ commentId, expectedViewerId, onClose }: Props) {
   const router = useRouter();
   const [reason, setReason] = useState<CommentReportReason>('ABUSE');
   const [description, setDescription] = useState('');
@@ -33,6 +35,8 @@ export default function ReportCommentDialog({ commentId, onClose }: Props) {
 
   const submit = async () => {
     if (submitting || result) return;
+    const viewerIdAtStart = expectedViewerId;
+    if (!viewerIdAtStart || useAuthStore.getState().user?.id !== viewerIdAtStart) return;
     const trimmedDescription = description.trim();
     const signature = JSON.stringify([reason, trimmedDescription]);
     const pending = pendingRef.current;
@@ -49,10 +53,13 @@ export default function ReportCommentDialog({ commentId, onClose }: Props) {
         reasonCode: reason,
         description: trimmedDescription,
         idempotencyKey,
+        expectedViewerId: viewerIdAtStart,
       });
+      if (useAuthStore.getState().user?.id !== viewerIdAtStart) return;
       pendingRef.current = null;
       setResult(response.status);
     } catch (cause) {
+      if (useAuthStore.getState().user?.id !== viewerIdAtStart) return;
       if (cause instanceof CommentReportApiError && cause.status === 401) {
         onClose();
         router.push('/login' as never);
@@ -62,7 +69,7 @@ export default function ReportCommentDialog({ commentId, onClose }: Props) {
         ? cause.message
         : 'Could not submit the report. Please try again.');
     } finally {
-      setSubmitting(false);
+      if (useAuthStore.getState().user?.id === viewerIdAtStart) setSubmitting(false);
     }
   };
 
