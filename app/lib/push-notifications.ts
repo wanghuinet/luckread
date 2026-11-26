@@ -113,7 +113,7 @@ async function writePushEndpoint(
 
   const resolvedInstallationId = installationId ?? await getOrCreateInstallationId(userId);
   const appVersion = currentAppVersion();
-  const result = await enqueueEndpointMutation(() => apiRequest<unknown>(
+  const result = await apiRequest<unknown>(
     '/push/endpoints/' + encodeURIComponent(resolvedInstallationId),
     {
       method: 'PUT',
@@ -124,7 +124,7 @@ async function writePushEndpoint(
         ...(appVersion ? { appVersion } : {}),
       }),
     },
-  ));
+  );
 
   if (!result.response.ok) {
     throw new Error(result.error?.message || 'Could not register this device for LuckRead notifications.');
@@ -183,7 +183,7 @@ export async function getDevicePushPermission(): Promise<DevicePushPermission> {
  * Reconcile permission and token state without ever opening a permission prompt.
  * Called after authentication and when the app returns to the foreground.
  */
-export async function syncPushEndpointForAuthenticatedUser(
+async function syncPushEndpointForAuthenticatedUserNow(
   userId: string,
   devicePushToken?: Notifications.DevicePushToken,
 ): Promise<PushRegistrationResult> {
@@ -201,10 +201,17 @@ export async function syncPushEndpointForAuthenticatedUser(
   return 'enabled';
 }
 
+export function syncPushEndpointForAuthenticatedUser(
+  userId: string,
+  devicePushToken?: Notifications.DevicePushToken,
+): Promise<PushRegistrationResult> {
+  return enqueueEndpointMutation(() => syncPushEndpointForAuthenticatedUserNow(userId, devicePushToken));
+}
+
 /**
  * Called only by an explicit user action in Notification Settings.
  */
-export async function requestDevicePushPermission(
+async function requestDevicePushPermissionNow(
   userId: string,
 ): Promise<PushRegistrationResult> {
   const platform = nativePlatform();
@@ -236,22 +243,30 @@ export async function requestDevicePushPermission(
   return 'not-requested';
 }
 
+export function requestDevicePushPermission(userId: string): Promise<PushRegistrationResult> {
+  return enqueueEndpointMutation(() => requestDevicePushPermissionNow(userId));
+}
+
 /**
  * Best-effort removal before logout. A separate installation UUID is kept per
  * account so one account can never take over another account's endpoint row.
  */
-export async function unregisterPushEndpointForUser(userId: string): Promise<void> {
+async function unregisterPushEndpointForUserNow(userId: string): Promise<void> {
   if (!nativePlatform()) return;
   const key = accountInstallationKey(userId);
   const installationId = await readInstallationId(userId);
   if (!installationId) return;
 
-  const result = await enqueueEndpointMutation(() => apiRequest<unknown>(
+  const result = await apiRequest<unknown>(
     '/push/endpoints/' + encodeURIComponent(installationId),
     { method: 'DELETE' },
-  ));
+  );
   if (!result.response.ok) {
     throw new Error(result.error?.message || 'Could not unregister this device from LuckRead notifications.');
   }
   await SecureStore.deleteItemAsync(key);
+}
+
+export function unregisterPushEndpointForUser(userId: string): Promise<void> {
+  return enqueueEndpointMutation(() => unregisterPushEndpointForUserNow(userId));
 }
