@@ -27,28 +27,31 @@ beforeEach(() => {
 
 test('loads invoice and receipt snapshots through the canonical W01 route', async () => {
   const controller = new AbortController();
-  await fetchBillingDocumentsPage({ limit: 10, cursor: 'opaque/cursor', signal: controller.signal });
+  await fetchBillingDocumentsPage({ limit: 10, cursor: 'opaque/cursor', signal: controller.signal, expectedAccountId: 'viewer_123' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/billing/documents?limit=10&cursor=opaque%2Fcursor');
   expect(calls[0]?.options.method).toBe('GET');
   expect(calls[0]?.options.signal).toBe(controller.signal);
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer_123');
 });
 
 test('loads customer-owned payment history through the canonical W01 route', async () => {
-  await fetchPaymentHistoryPage({ limit: 25 });
+  await fetchPaymentHistoryPage({ limit: 25, expectedAccountId: 'viewer_123' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/payments/history?limit=25');
   expect(calls[0]?.options.method).toBe('GET');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer_123');
 });
 
 test('loads customer-owned refund history through the canonical W01 route', async () => {
-  await fetchRefundHistoryPage({ limit: 15, cursor: 'refund-cursor' });
+  await fetchRefundHistoryPage({ limit: 15, cursor: 'refund-cursor', expectedAccountId: 'viewer_123' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/payments/refunds?limit=15&cursor=refund-cursor');
   expect(calls[0]?.options.method).toBe('GET');
+  expect(calls[0]?.options.expectedAccountId).toBe('viewer_123');
 });
 
 test('requests refunds with the payment-owned resource, amount, currency and stable idempotency key', async () => {
@@ -100,6 +103,7 @@ test('connects billing history, refund requests and authenticated navigation in 
   expect(screen).toContain('fetchPaymentHistoryPage');
   expect(screen).toContain('fetchRefundHistoryPage');
   expect(screen).toContain('requestPaymentRefund');
+  expect(screen).toContain('expectedAccountId: requestViewerId');
   expect(screen).toContain('REFUND_PENDING_STATUSES');
   expect(screen).toContain('支付服务商的签名回调');
   expect(screen).toContain('createIdempotencyKey');
@@ -112,12 +116,13 @@ test('connects billing history, refund requests and authenticated navigation in 
 
 test('propagates cancellation signals to payment and refund history page reads', async () => {
   const controller = new AbortController();
-  await fetchPaymentHistoryPage({ limit: 10, signal: controller.signal });
-  await fetchRefundHistoryPage({ limit: 10, signal: controller.signal });
+  await fetchPaymentHistoryPage({ limit: 10, signal: controller.signal, expectedAccountId: 'viewer_123' });
+  await fetchRefundHistoryPage({ limit: 10, signal: controller.signal, expectedAccountId: 'viewer_123' });
 
   expect(calls).toHaveLength(2);
   expect(calls[0]?.options.signal).toBe(controller.signal);
   expect(calls[1]?.options.signal).toBe(controller.signal);
+  expect(calls.every((call) => call.options.expectedAccountId === 'viewer_123')).toBe(true);
 });
 
 test('isolates billing records and refund callbacks on direct account switches', () => {

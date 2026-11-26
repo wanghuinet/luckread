@@ -165,7 +165,7 @@ export default function Bookmarks() {
     else setLoading(true);
 
     try {
-      const result = await fetchBookmarksPage({ cursor: nextCursor, signal: controller.signal });
+      const result = await fetchBookmarksPage({ cursor: nextCursor, signal: controller.signal, expectedAccountId: requestViewerId });
       if (!isCurrentRequest()) return;
 
       if (result.response.status === 401) {
