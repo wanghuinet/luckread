@@ -32,3 +32,15 @@ test('late creator mutation responses cannot update another account UI', async (
   assert.match(source, /finally \{ if \(isCurrentViewer\(owner\)\) setSaving\(false\); \}/);
   assert.match(source, /finally \{ if \(isCurrentViewer\(owner\)\) setBusyPlan\(null\); \}/);
 });
+
+
+test('creator studio binds every authenticated read and write to its initiating account', async () => {
+  const source = await readFile(sourcePath, 'utf8');
+  assert.match(source, /fetchMyCreatorApplication\(\{ expectedAccountId: owner \}\)/);
+  assert.match(source, /fetchMyCreatorPlans\(\{ limit: 50, expectedAccountId: owner \}\)/);
+  assert.match(source, /submitCreatorApplication\(creatorType, statement\.trim\(\), makeKey\('creator_apply'\), owner\)/);
+  assert.match(source, /updateMyCreatorPlan\(editing\.planId, editing\.etag, terms, makeKey\('plan_update'\), owner\)/);
+  assert.match(source, /createMyCreatorPlan\(terms, makeKey\('plan_create'\), owner\)/);
+  assert.match(source, /publishMyCreatorPlan\(p\.planId, p\.etag, owner\)/);
+  assert.match(source, /changeMyCreatorPlanLifecycle\(p\.planId, p\.etag, action, owner\)/);
+});
