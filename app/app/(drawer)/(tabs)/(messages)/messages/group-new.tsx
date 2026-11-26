@@ -16,7 +16,7 @@ export default function NewGroupScreen() {
   const userId = useAuthStore(state => state.user?.id);
   const { colorScheme } = useColorScheme();
   const mutation = useMutation({
-    mutationFn: () => createGroupConversation(name.trim(), parseGroupMemberIds(members), userId,
+    mutationFn: () => createGroupConversation(name.trim(), parseGroupMemberIds(members), userId),
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
       router.replace({ pathname: '/messages/[conversationId]', params: {
