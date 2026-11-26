@@ -52,7 +52,7 @@ test('pins and unpins using the canonical W01 endpoint and idempotency key', asy
   const pinned = await setProfilePin('pin-owner-write', 'post-123', true);
   expect(pinned.ok).toBe(true);
   expect(calls[0].path).toBe('/content/post-123/pin');
-  expect(calls[0].options).toMatchObject({ method: 'POST', idempotencyKey: 'profile-pin-test-key' });
+  expect(calls[0].options).toMatchObject({ method: 'POST', idempotencyKey: 'profile-pin-test-key', expectedAccountId: 'pin-owner-write' });
   expect(getProfilePinSnapshot()).toMatchObject({
     userId: 'pin-owner-write',
     contentId: 'post-123',
@@ -63,7 +63,7 @@ test('pins and unpins using the canonical W01 endpoint and idempotency key', asy
   const unpinned = await setProfilePin('pin-owner-write', 'post-123', false);
   expect(unpinned.ok).toBe(true);
   expect(calls[1].path).toBe('/content/post-123/pin');
-  expect(calls[1].options).toMatchObject({ method: 'DELETE', idempotencyKey: 'profile-pin-test-key' });
+  expect(calls[1].options).toMatchObject({ method: 'DELETE', idempotencyKey: 'profile-pin-test-key', expectedAccountId: 'pin-owner-write' });
   expect(getProfilePinSnapshot()).toMatchObject({
     userId: 'pin-owner-write',
     contentId: null,
@@ -107,5 +107,6 @@ test('profile pin requests are guarded against stale account reads and mutations
   const source = readFileSync(new URL('../lib/profile-pin-state.ts', import.meta.url), 'utf8');
   expect(source).toContain('if (!userId || !isCurrentViewer(userId)) return;');
   expect(source).toContain('Your account changed. Refresh profile pin status before trying again.');
+  expect(source).toContain('expectedAccountId: userId');
   expect(source).toContain('generation !== loadGeneration || !isCurrentViewer(userId)');
 });

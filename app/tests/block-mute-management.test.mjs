@@ -22,12 +22,13 @@ beforeEach(() => calls.splice(0, calls.length));
 
 test('loads the canonical block list with pagination', async () => {
   const controller = new AbortController();
-  await fetchManagedRelationshipsPage('blocks', { cursor: 'block-next', signal: controller.signal });
+  await fetchManagedRelationshipsPage('blocks', { cursor: 'block-next', signal: controller.signal, expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/interactions/blocks?limit=20&cursor=block-next');
   expect(calls[0].options.method).toBe('GET');
   expect(calls[0].options.signal).toBe(controller.signal);
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
 });
 
 test('loads the canonical mute list and honors a valid page size', async () => {
@@ -46,6 +47,7 @@ test('rejects invalid list types, limits, and cursors without network calls', ()
 
 test('management screen wires existing list and remove APIs with confirmation', () => {
   expect(screenSource).toContain("fetchManagedRelationshipsPage(kind,");
+  expect(screenSource).toContain('expectedAccountId: accountId');
   expect(screenSource).toContain("isBlock ? await unblockUser(targetId, operationAccountId) : await unmuteUser(targetId, operationAccountId)");
   expect(screenSource).toContain("if (!result.response.ok)");
   expect(screenSource).toContain("setRows((current) => current.filter((item) => item.relation.targetUserId !== targetId))");

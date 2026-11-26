@@ -26,6 +26,7 @@ export async function submitContentReport(
   contentIdValue: string,
   reasonValue: string,
   descriptionValue = '',
+  expectedAccountId?: string,
 ): Promise<ContentReportResult> {
   const contentId = contentIdValue.trim();
   const reasonCode = reasonValue.trim();
@@ -51,6 +52,7 @@ export async function submitContentReport(
         ...(description ? { description } : {}),
       }),
       idempotencyKey: 'native-content-report:' + contentId + ':' + createIdempotencyKey(),
+      expectedAccountId,
     });
 
     if (!result.response.ok) {

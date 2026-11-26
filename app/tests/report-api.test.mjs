@@ -27,11 +27,12 @@ beforeEach(() => {
 });
 
 test('submits a post report through W01 with the validated target and optional description', async () => {
-  const result = await submitContentReport('post-123', 'ABUSE', ' Targeted harassment ');
+  const result = await submitContentReport('post-123', 'ABUSE', ' Targeted harassment ', 'report-viewer');
   expect(result).toMatchObject({ ok: true, status: 201, deduplicated: false });
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/reports');
   expect(calls[0].options.method).toBe('POST');
+  expect(calls[0].options.expectedAccountId).toBe('report-viewer');
   expect(calls[0].options.idempotencyKey).toBe('native-content-report:post-123:report-idempotency-test');
   expect(JSON.parse(calls[0].options.body)).toEqual({
     targetType: 'content',
@@ -43,7 +44,7 @@ test('submits a post report through W01 with the validated target and optional d
 
 test('omits blank optional descriptions and recognizes moderation deduplication', async () => {
   responseData = { data: { status: 'DEDUPLICATED', reportId: 'report-existing' } };
-  const result = await submitContentReport('post-123', 'SPAM', '  ');
+  const result = await submitContentReport('post-123', 'SPAM', '  ', 'report-viewer');
   expect(result).toMatchObject({ ok: true, deduplicated: true });
   expect(JSON.parse(calls[0].options.body)).toEqual({
     targetType: 'content',
@@ -53,14 +54,14 @@ test('omits blank optional descriptions and recognizes moderation deduplication'
 });
 
 test('rejects invalid IDs and unsupported reasons before making a request', async () => {
-  expect((await submitContentReport('', 'SPAM')).ok).toBe(false);
-  expect((await submitContentReport('post-123', 'FAKE_REASON')).ok).toBe(false);
+  expect((await submitContentReport('', 'SPAM', '', 'report-viewer')).ok).toBe(false);
+  expect((await submitContentReport('post-123', 'FAKE_REASON', '', 'report-viewer')).ok).toBe(false);
   expect(calls).toHaveLength(0);
 });
 
 test('returns the canonical API error without falsely reporting success', async () => {
   responseStatus = 403;
-  const result = await submitContentReport('post-123', 'OTHER');
+  const result = await submitContentReport('post-123', 'OTHER', '', 'report-viewer');
   expect(result).toMatchObject({ ok: false, status: 403, message: 'mock report failure' });
 });
 
@@ -77,8 +78,9 @@ test('wires the feed and post-detail report menu entries to the shared dialog', 
   expect(postDetail).toContain('<ReportPostDialog visible={reportDialogOpen} contentId={contentId}');
   expect(postDetail).toContain('contentId={postId}');
   expect(dialog).toContain('Submit report');
-  expect(dialog).toContain("submitContentReport(contentId, reasonCode, description)");
-  expect(dialog).toContain('finally {\n      setSubmitting(false);');
+  expect(dialog).toContain("submitContentReport(contentId, reasonCode, description, requestViewerId)");
+  expect(dialog).toContain('viewerIdRef.current !== requestViewerId');
+  expect(dialog).toContain('finally {\n      if (viewerIdRef.current === requestViewerId) setSubmitting(false);');
   expect(dialog).toContain('Could not submit this report. Please check your connection and try again.');
   expect(dialog).toContain('Additional details (optional)');
 });

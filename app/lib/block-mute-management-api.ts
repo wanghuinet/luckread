@@ -6,6 +6,7 @@ export type ManagedRelationshipPageRequest = {
   cursor?: string | null;
   signal?: AbortSignal;
   limit?: number;
+  expectedAccountId?: string;
 };
 
 /** Read the signed-in user's authoritative W05 block or mute list through W01. */
@@ -30,6 +31,6 @@ export function fetchManagedRelationshipsPage(
 
   return apiRequest<unknown>(
     '/interactions/' + kind + '?' + params.toString(),
-    { method: 'GET', signal: options.signal },
+    { method: 'GET', signal: options.signal, expectedAccountId: options.expectedAccountId },
   );
 }
