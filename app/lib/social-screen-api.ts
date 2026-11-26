@@ -21,14 +21,14 @@ export function isNativeReplyAudience(value: unknown): value is NativeReplyAudie
 }
 
 /** Read the current owner's reply policy through the canonical W01 -> W05 route. */
-export function fetchOwnPostReplyAudience(contentIdValue: string, signal?: AbortSignal) {
+export function fetchOwnPostReplyAudience(contentIdValue: string, signal?: AbortSignal, expectedAccountId?: string) {
   const contentId = contentIdValue.trim();
   if (!isValidContentId(contentId)) {
     throw new TypeError('A valid post ID is required to read reply permissions.');
   }
   return apiRequest<NativeReplyAudienceEnvelope>(
     '/contents/' + encodeURIComponent(contentId) + '/reply-audience',
-    { method: 'GET', signal },
+    { method: 'GET', signal, expectedAccountId },
   );
 }
 
@@ -84,29 +84,30 @@ export function fetchNotificationsPage(options: PageRequestOptions & {
   return apiRequest<unknown>('/notifications?' + query.toString(), {
     method: 'GET',
     signal: options.signal,
+    expectedAccountId: options.expectedAccountId,
   });
 }
 
 /** Fetch one notification by its server-owned ID, scoped to the current account. */
-export function fetchNotificationById(notificationIdValue: string, signal?: AbortSignal) {
+export function fetchNotificationById(notificationIdValue: string, signal?: AbortSignal, expectedAccountId?: string) {
   const notificationId = notificationIdValue.trim();
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(notificationId)) {
     throw new TypeError('A valid notification ID is required.');
   }
-  return fetchNotificationsPage({ limit: 1, notificationId, signal });
+  return fetchNotificationsPage({ limit: 1, notificationId, signal, expectedAccountId });
 }
 
 /** Mark one real notification as read. */
-export function markNotificationRead(notificationId: string) {
+export function markNotificationRead(notificationId: string, expectedAccountId?: string) {
   return apiRequest<unknown>(
     '/notifications/' + encodeURIComponent(notificationId) + '/read',
-    { method: 'POST' },
+    { method: 'POST', expectedAccountId },
   );
 }
 
 /** Mark all of the signed-in user's notifications as read. */
-export function markAllNotificationsRead() {
-  return apiRequest<unknown>('/notifications/read-all', { method: 'POST' });
+export function markAllNotificationsRead(expectedAccountId?: string) {
+  return apiRequest<unknown>('/notifications/read-all', { method: 'POST', expectedAccountId });
 }
 
 /** Fetch the signed-in user's real saved content list. */
@@ -132,6 +133,7 @@ export function fetchUserProfileContentPage(userIdValue: string, options: PageRe
   return apiRequest<unknown>('/contents?' + query.toString(), {
     method: 'GET',
     signal: options.signal,
+    expectedAccountId: options.expectedAccountId,
   });
 }
 
@@ -275,7 +277,7 @@ export function fetchUserRepliesPage(userIdValue: string, options: PageRequestOp
   const query = pageQuery(options.limit, options.cursor);
   return apiRequest<unknown>(
     '/users/' + encodeURIComponent(userId) + '/replies?' + query.toString(),
-    { method: 'GET', signal: options.signal },
+    { method: 'GET', signal: options.signal, expectedAccountId: options.expectedAccountId },
   );
 }
 
@@ -286,7 +288,7 @@ export function fetchUserLikedContentsPage(userIdValue: string, options: PageReq
   const query = pageQuery(options.limit, options.cursor);
   return apiRequest<unknown>(
     '/users/' + encodeURIComponent(userId) + '/likes?' + query.toString(),
-    { method: 'GET', signal: options.signal },
+    { method: 'GET', signal: options.signal, expectedAccountId: options.expectedAccountId },
   );
 }
 
@@ -299,7 +301,7 @@ export function fetchUserRelationshipsPage(
   const query = pageQuery(options.limit, options.cursor);
   return apiRequest<unknown>(
     '/users/' + encodeURIComponent(ownerId) + '/' + relation + '?' + query.toString(),
-    { method: 'GET', signal: options.signal },
+    { method: 'GET', signal: options.signal, expectedAccountId: options.expectedAccountId },
   );
 }
 

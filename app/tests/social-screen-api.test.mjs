@@ -82,6 +82,8 @@ test('notification inbox data, actor cache, and pending reads are isolated when 
   expect(notificationsScreenSource).toContain('setItems([]);');
   expect(notificationsScreenSource).toContain('setActorProfiles({});');
   expect(notificationsScreenSource).toContain('viewerIdRef.current !== requestViewerId');
+  expect(notificationsScreenSource).toContain('expectedAccountId: requestViewerId');
+  expect(notificationsScreenSource).toContain('if (viewerIdRef.current !== requestViewerId) return;');
   expect(notificationsScreenSource).toContain('if (viewerIdRef.current !== requestViewerId) return;');
   expect(notificationsScreenSource).toContain('}, [authStatus, filter, loadActorProfiles, viewerId]);');
   expect(notificationsScreenSource).toContain('}, [authStatus, viewerId]);');
@@ -170,21 +172,24 @@ test('uses the existing mention filter and cursor for notification pagination', 
     cursor: 'next page/2',
     filter: 'mentions',
     signal: controller.signal,
+    expectedAccountId: 'viewer-a',
   });
 
   expect(calls[0].path).toBe('/notifications?limit=20&cursor=next+page%2F2&type=MENTION');
   expect(calls[0].options.method).toBe('GET');
   expect(calls[0].options.signal).toBe(controller.signal);
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
 });
 
 test('loads one exact notification through the existing recipient-scoped notifications query', async () => {
   const controller = new AbortController();
-  await fetchNotificationById('notification_123', controller.signal);
+  await fetchNotificationById('notification_123', controller.signal, 'viewer-a');
 
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/notifications?limit=1&notificationId=notification_123');
   expect(calls[0].options.method).toBe('GET');
   expect(calls[0].options.signal).toBe(controller.signal);
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
 });
 
 test('rejects malformed notification IDs before making an API request', () => {
@@ -210,18 +215,19 @@ test('retries the exact deep-linked notification lookup after a transient fetch 
 });
 
 test('marks an individual notification as read with an encoded ID', async () => {
-  await markNotificationRead('notification/with space');
+  await markNotificationRead('notification/with space', 'viewer-a');
 
   expect(calls[0].path).toBe('/notifications/notification%2Fwith%20space/read');
   expect(calls[0].options.method).toBe('POST');
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
 });
 
 test('marks all notifications as read using the existing endpoint', async () => {
-  await markAllNotificationsRead();
+  await markAllNotificationsRead('viewer-a');
 
   expect(calls[0]).toEqual({
     path: '/notifications/read-all',
-    options: { method: 'POST' },
+    options: { method: 'POST', expectedAccountId: 'viewer-a' },
   });
 });
 
@@ -238,12 +244,13 @@ test('loads the real bookmark list with cursor pagination and forwards cancellat
 
 test('loads all content types for the native profile Media tab with creator filtering and pagination', async () => {
   const controller = new AbortController();
-  await fetchUserProfileContentPage('profile/id', { cursor: 'media-next', limit: 15, signal: controller.signal });
+  await fetchUserProfileContentPage('profile/id', { cursor: 'media-next', limit: 15, signal: controller.signal, expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/contents?creatorId=profile%2Fid&limit=15&cursor=media-next');
   expect(calls[0].options.method).toBe('GET');
   expect(calls[0].options.signal).toBe(controller.signal);
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
 });
 
 test('rejects a missing profile ID before requesting profile media', () => {
@@ -253,7 +260,7 @@ test('rejects a missing profile ID before requesting profile media', () => {
 
 test('loads a real profile Replies page with cursor pagination through the existing route', async () => {
   const controller = new AbortController();
-  await fetchUserRepliesPage('profile/id', { cursor: 'reply-next', signal: controller.signal });
+  await fetchUserRepliesPage('profile/id', { cursor: 'reply-next', signal: controller.signal, expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/users/profile%2Fid/replies?limit=20&cursor=reply-next');
@@ -268,7 +275,7 @@ test('rejects a missing profile ID before requesting its Replies page', () => {
 
 test('loads a real profile Likes page with cursor pagination through the existing route', async () => {
   const controller = new AbortController();
-  await fetchUserLikedContentsPage('profile/id', { cursor: 'liked-next', signal: controller.signal });
+  await fetchUserLikedContentsPage('profile/id', { cursor: 'liked-next', signal: controller.signal, expectedAccountId: 'viewer-a' });
 
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/users/profile%2Fid/likes?limit=20&cursor=liked-next');
@@ -324,10 +331,11 @@ test('wires public profile Replies and Media plus own-profile Likes to real chan
 });
 
 test('loads follower and following lists with encoded profile IDs', async () => {
-  await fetchUserRelationshipsPage('profile/id', 'followers', { cursor: 'follower-next' });
+  await fetchUserRelationshipsPage('profile/id', 'followers', { cursor: 'follower-next', expectedAccountId: 'viewer-a' });
   await fetchUserRelationshipsPage('profile/id', 'following');
 
   expect(calls[0].path).toBe('/users/profile%2Fid/followers?limit=20&cursor=follower-next');
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
   expect(calls[1].path).toBe('/users/profile%2Fid/following?limit=20');
   expect(calls.every((call) => call.options.method === 'GET')).toBe(true);
 });
