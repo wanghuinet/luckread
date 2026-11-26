@@ -114,7 +114,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
       if (nextCursor) params.set('cursor', nextCursor);
       const { response, data } = await apiRequest<CommentPageResponse>(
         '/contents/' + encodeURIComponent(contentId) + '/comments?' + params.toString(),
-        { method: 'GET' },
+        { method: 'GET', expectedAccountId: requestViewerId ?? undefined },
       );
       const page = unwrapApiData<CommentPage>(data);
       if (!response.ok || !page || !Array.isArray(page.items)) {
@@ -156,6 +156,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
     setSubmitting(false);
     setDeletingIds(new Set());
     setLikingCommentId(null);
+    setReportingCommentId(null);
     setLikedComments({});
     setComments([]);
     setProfiles({});
@@ -220,7 +221,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
         try {
           const { response, data } = await apiRequest<PublicUserResponse>(
             '/users/' + encodeURIComponent(authorId),
-            { method: 'GET' },
+            { method: 'GET', auth: false },
           );
           const profile = unwrapApiData<PublicUser>(data);
           if (!response.ok || !profile || typeof profile.id !== 'string') return null;
@@ -565,6 +566,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
       {reportingCommentId ? (
         <ReportCommentDialog
           commentId={reportingCommentId}
+          expectedViewerId={currentUserId}
           onClose={() => setReportingCommentId(null)}
         />
       ) : null}
