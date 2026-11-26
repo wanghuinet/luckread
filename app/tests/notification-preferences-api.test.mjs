@@ -33,7 +33,7 @@ beforeEach(() => {
 
 test('loads all four canonical preferences and forwards cancellation', async () => {
   const controller = new AbortController();
-  await expect(fetchNotificationPreferences(controller.signal)).resolves.toEqual({
+  await expect(fetchNotificationPreferences(controller.signal, 'user-1')).resolves.toEqual({
     follow: true,
     like: true,
     comment: true,
@@ -43,12 +43,14 @@ test('loads all four canonical preferences and forwards cancellation', async () 
   expect(calls[0].path).toBe('/notification-preferences');
   expect(calls[0].options.method).toBe('GET');
   expect(calls[0].options.signal).toBe(controller.signal);
+  expect(calls[0].options.expectedAccountId).toBe('user-1');
 });
 
 test('saves the complete settings payload and uses the server response as canonical state', async () => {
   respond = async (path, options) => {
     expect(path).toBe('/notification-preferences');
     expect(options.method).toBe('PATCH');
+    expect(options.expectedAccountId).toBe('user-1');
     expect(JSON.parse(options.body)).toEqual({
       follow: false,
       like: true,
@@ -67,7 +69,7 @@ test('saves the complete settings payload and uses the server response as canoni
     like: true,
     comment: false,
     mention: true,
-  })).resolves.toEqual({
+  }, 'user-1')).resolves.toEqual({
     follow: false,
     like: true,
     comment: false,
@@ -110,7 +112,7 @@ test('rejects incomplete server payloads and failed saves', async () => {
     like: false,
     comment: true,
     mention: false,
-  })).rejects.toBeInstanceOf(NotificationPreferencesApiError);
+  }, 'user-1')).rejects.toBeInstanceOf(NotificationPreferencesApiError);
 });
 
 test('does not request the API for an invalid runtime preference payload', async () => {
@@ -119,7 +121,7 @@ test('does not request the API for an invalid runtime preference payload', async
     like: 'false',
     comment: true,
     mention: false,
-  })).rejects.toThrow('Every notification preference must be a boolean.');
+  }, 'user-1')).rejects.toThrow('Every notification preference must be a boolean.');
   expect(calls).toHaveLength(0);
 });
 
