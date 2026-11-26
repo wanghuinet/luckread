@@ -103,6 +103,7 @@ test('explicit enable action creates the Android channel before asking permissio
   expect(events[2]).toContain('get-expo-token:123e4567-e89b-42d3-a456-426614174000');
   expect(calls).toHaveLength(1);
   expect(calls[0].options.method).toBe('PUT');
+  expect(calls[0].options.expectedAccountId).toBe('user-1');
   expect(calls[0].path).toMatch(/^\/push\/endpoints\/[0-9a-f-]{36}$/i);
 
   const body = JSON.parse(calls[0].options.body);
@@ -185,6 +186,7 @@ test('logout deletes only the current account installation endpoint and clears i
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/push/endpoints/123e4567-e89b-42d3-a456-426614174000');
   expect(calls[0].options.method).toBe('DELETE');
+  expect(calls[0].options.expectedAccountId).toBe('user-1');
   expect(secureValues.has('luckread.native.push-installation.user-1')).toBe(false);
   expect(secureValues.has('luckread.native.push-installation.user-2')).toBe(true);
 });
@@ -236,6 +238,7 @@ test('serializes old-account registration, logout cleanup, and new-account regis
   await Promise.all([oldAccountRegistration, oldAccountCleanup, newAccountRegistration]);
 
   expect(calls.map((call) => call.options.method)).toEqual(['PUT', 'DELETE', 'PUT']);
+  expect(calls.map((call) => call.options.expectedAccountId)).toEqual(['user-1', 'user-1', 'user-2']);
   expect(calls[0].path).toBe('/push/endpoints/' + oldInstallationId);
   expect(calls[1].path).toBe('/push/endpoints/' + oldInstallationId);
   expect(calls[2].path).toBe('/push/endpoints/' + newInstallationId);
