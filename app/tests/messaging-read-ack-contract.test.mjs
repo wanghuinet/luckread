@@ -82,3 +82,12 @@ test('messaging realtime socket registry and typing frames are account-scoped', 
   expect(screen).toContain('userId: userId ??');
   expect(screen).toContain('setMessagingRealtimeTyping(userId ??');
 });
+
+test('messaging attachment uploads are bound to the originating authenticated account', () => {
+  const source = readFileSync(new URL('../lib/messaging-api.ts', import.meta.url), 'utf8');
+  expect(source).toContain('expectedAccountId?: string');
+  expect(source).toContain('uploadMediaFile(file, idempotencyKey, undefined, expectedAccountId)');
+  const screen = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
+  expect(screen).toContain('uploadMessageAttachment(file, localId, userId)');
+  expect(screen).toContain('}, [userId]);');
+});
