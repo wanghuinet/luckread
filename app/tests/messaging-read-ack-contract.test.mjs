@@ -144,4 +144,5 @@ test('group management mutations isolate completions and errors across account s
   expect(source).toContain('leaveGroupConversation(conversationId, variables.expectedAccountId)');
   expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;');
   expect(source).not.toContain("['messaging', 'conversations']");
+  expect(source).toContain("await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'conversations'] }); if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return; Alert.alert('已移交群主'");
 });
