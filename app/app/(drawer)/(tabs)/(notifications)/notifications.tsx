@@ -351,7 +351,10 @@ export default function Notifications() {
     void (async () => {
       const result = await fetchNotificationById(notificationId, controller.signal);
       if (!active || controller.signal.aborted || viewerIdRef.current !== requestViewerId) return;
-      const page = result.response.ok ? unwrapApiData<NotificationPage>(result.data) : null;
+      if (!result.response.ok) {
+        throw new Error(getApiErrorMessage(result.data, '无法打开这条通知，请重试。', result.response.status));
+      }
+      const page = unwrapApiData<NotificationPage>(result.data);
       const item = page?.items?.find((candidate) => candidate.id === notificationId);
       if (!item) {
         throw new Error('这条通知暂时无法打开，请从通知列表查看。');
