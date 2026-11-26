@@ -172,8 +172,15 @@ export default function NotificationPreferencesScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    setDevicePushBusy(false);
+    setDevicePushError('');
+    setDevicePushMessage('');
+  }, [accountId]);
+
   const enableDevicePush = useCallback(async () => {
     if (!accountId || devicePushBusy || !devicePushPermission.supported) return;
+    const operationAccountId = accountId;
     setDevicePushBusy(true);
     setDevicePushError('');
     setDevicePushMessage('');
@@ -183,8 +190,10 @@ export default function NotificationPreferencesScreen() {
         return;
       }
 
-      const result = await requestDevicePushPermission(accountId);
+      const result = await requestDevicePushPermission(operationAccountId);
+      if (useAuthStore.getState().user?.id !== operationAccountId) return;
       const permission = await getDevicePushPermission();
+      if (useAuthStore.getState().user?.id !== operationAccountId) return;
       setDevicePushPermission(permission);
 
       if (result === 'enabled') {
@@ -199,9 +208,11 @@ export default function NotificationPreferencesScreen() {
         setDevicePushMessage('尚未授予通知权限。');
       }
     } catch (cause) {
-      setDevicePushError(cause instanceof Error ? cause.message : '无法启用此设备的推送通知，请重试。');
+      if (useAuthStore.getState().user?.id === operationAccountId) {
+        setDevicePushError(cause instanceof Error ? cause.message : '无法启用此设备的推送通知，请重试。');
+      }
     } finally {
-      setDevicePushBusy(false);
+      if (useAuthStore.getState().user?.id === operationAccountId) setDevicePushBusy(false);
     }
   }, [accountId, devicePushBusy, devicePushPermission]);
 
