@@ -38,6 +38,14 @@ test('passes the next cursor through the shared API client', async () => {
   expect(calls[0].options.signal).toBe(controller.signal);
 });
 
+test('binds personalized video feed requests to the initiating account', async () => {
+  const controller = new AbortController();
+  await fetchVideoFeedPage({ signal: controller.signal, expectedAccountId: 'viewer-a' });
+
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
+  expect(calls[0].options.signal).toBe(controller.signal);
+});
+
 test('clamps page size to the existing API limit and rejects invalid sizes safely', async () => {
   await fetchVideoFeedPage({ limit: 1000 });
   await fetchVideoFeedPage({ limit: Number.NaN });
