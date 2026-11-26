@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 const bookmarkScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/bookmarks.tsx'), 'utf8');
 const bookmarkStateSource = readFileSync(resolve(process.cwd(), 'lib/content-bookmark-state.ts'), 'utf8');
 const feedItemSource = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
+const blockedMutedScreenSource = readFileSync(new URL('../app/(drawer)/blocked-muted.tsx', import.meta.url), 'utf8');
 const postDetailSource = readFileSync(new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/post/[id].tsx', import.meta.url), 'utf8');
 const profileScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/profile/[id].tsx'), 'utf8');
 const rootLayoutSource = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
@@ -450,7 +451,7 @@ test('block and mute actions use authenticated canonical endpoints and supported
   expect(calls[3].options.method).toBe('DELETE');
   expect(calls.every((call) => call.options.expectedAccountId === 'viewer-a')).toBe(true);
   expect(feedItemSource).toContain('expectedAccountId: currentUser?.id');
-  expect(bookmarkScreenSource).toContain('unblockUser(targetId, operationAccountId)');
+  expect(blockedMutedScreenSource).toContain('unblockUser(targetId, operationAccountId)');
 });
 
 test('block and mute menu items invoke real actions in feed and post detail', () => {
