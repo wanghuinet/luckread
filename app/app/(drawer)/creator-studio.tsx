@@ -222,8 +222,8 @@ export default function CreatorStudioScreen() {
           <Field label="创作说明（最多 2000 字）" value={statement} onChangeText={setStatement} placeholder="介绍你的内容方向、创作计划与希望提供的价值…" multiline />
           <Button title={saving ? '正在提交…' : '提交创作者申请'} disabled={saving} onPress={() => void submitApplication()} />
         </> : null}
-        {application?.status === 'PENDING' ? <Text className="mt-3 text-xs text-neutral-500">申请正在审核中，可以刷新查看状态。</Text> : null}
-        {application?.status === 'APPROVED' && !qualified ? <Text className="mt-3 text-xs text-amber-700 dark:text-amber-400">权限授予尚未确认。请稍后刷新；权限生效前不会开放方案写入。</Text> : null}
+        {visibleApplication?.status === 'PENDING' ? <Text className="mt-3 text-xs text-neutral-500">申请正在审核中，可以刷新查看状态。</Text> : null}
+        {visibleApplication?.status === 'APPROVED' && !qualified ? <Text className="mt-3 text-xs text-amber-700 dark:text-amber-400">权限授予尚未确认。请稍后刷新；权限生效前不会开放方案写入。</Text> : null}
       </View>
       {qualified ? <>
         <Text className="mb-1 text-lg font-extrabold text-neutral-900 dark:text-white">会员方案</Text>
