@@ -132,6 +132,6 @@ test('keeps the legacy media runtime E2E fail-closed until its Neon fixtures and
   assert.match(workflow, /^on:\n  workflow_dispatch:/m, 'media E2E must remain manual-only')
   assert.doesNotMatch(workflow, /^  workflow_run:/m, 'media E2E must not auto-run after a production deployment')
   assert.match(workflow, /^    if: \$\{\{ false \}\}$/m, 'legacy D1 fixture job must remain disabled')
-  assert.match(workflow, /wrangler d1 execute/, 'the legacy D1 fixture path must be visible for future replacement')
+  assert.match(workflow, /'d1','execute'/, 'the legacy D1 fixture path must be visible for future replacement')
   assert.match(workflow, /dedicated non-production W01 \+ isolated Neon DB/, 'the re-enable requirement must remain explicit')
 })
