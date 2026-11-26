@@ -27,15 +27,18 @@ type PendingAttachment = {
 };
 type SendVariables = { body: string; attachments: MessagingAttachment[]; conversationId: string; userId?: string; scopeVersion: number };
 
-function PrivateMessageImages({ currentMessage }: { currentMessage: IMessage }) {
+function PrivateMessageImages({ currentMessage, userId }: { currentMessage: IMessage; userId?: string }) {
   const [headers, setHeaders] = useState<Record<string, string>>({});
   useEffect(() => {
     let active = true;
-    void getApiAuthHeaders().then((value) => {
+    setHeaders({});
+    void getApiAuthHeaders(userId).then((value) => {
       if (active) setHeaders(value);
+    }).catch(() => {
+      if (active) setHeaders({});
     });
     return () => { active = false; };
-  }, []);
+  }, [userId]);
   const imageUrls = useMemo(() => {
     if (!currentMessage.image) return [];
     try {
@@ -726,7 +729,7 @@ export default function ConversationScreen() {
               appearance="plain"
               enableGestureHandlerRootView={false}
               attachments={false}
-              renderMessageImage={(props) => <PrivateMessageImages currentMessage={props.currentMessage} />}
+              renderMessageImage={(props) => <PrivateMessageImages key={userId ?? 'anonymous'} currentMessage={props.currentMessage} userId={userId} />}
               onLongPressMessage={handleLongPressMessage}
               audioRecording={false}
               videoRecording={false}
