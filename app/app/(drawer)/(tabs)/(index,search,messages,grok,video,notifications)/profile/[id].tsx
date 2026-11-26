@@ -695,7 +695,7 @@ export default function UserProfileScreen() {
             .map(async (item) => {
               const [body, social, author] = await Promise.all([
                 readContentBody(item, controller.signal, sessionToken),
-                readContentSocial(item.id, controller.signal),
+                readContentSocial(item.id, controller.signal, requestViewerId ?? undefined),
                 readContentAuthor(item),
               ]);
               return mapContentToFeedContent(item, body, social, author, sessionToken);
@@ -739,7 +739,7 @@ export default function UserProfileScreen() {
           ) {
             const [body, social, author] = await Promise.all([
               readContentBody(pinnedRecord, controller.signal, sessionToken),
-              readContentSocial(pinnedRecord.id, controller.signal),
+              readContentSocial(pinnedRecord.id, controller.signal, requestViewerId ?? undefined),
               readContentAuthor(pinnedRecord),
             ]);
             pinnedPost = mapContentToFeedContent(
@@ -920,7 +920,7 @@ export default function UserProfileScreen() {
 
         const [body, social, author] = await Promise.all([
           readContentBody(record, controller.signal, sessionToken),
-          readContentSocial(record.id, controller.signal),
+          readContentSocial(record.id, controller.signal, requestViewerId ?? undefined),
           readContentAuthor(record),
         ]);
         return mapContentToFeedContent(record, body, social, author, sessionToken);
@@ -1018,7 +1018,7 @@ export default function UserProfileScreen() {
 
         const [parentBody, social, author] = await Promise.all([
           readContentBody(record, controller.signal, sessionToken),
-          readContentSocial(record.id, controller.signal),
+          readContentSocial(record.id, controller.signal, requestViewerId ?? undefined),
           readContentAuthor(record),
         ]);
         const parentPost = mapContentToFeedContent(record, parentBody, social, author, sessionToken);
@@ -1114,7 +1114,7 @@ export default function UserProfileScreen() {
 
         const [body, social, author] = await Promise.all([
           readContentBody(item, controller.signal, sessionToken),
-          readContentSocial(item.id, controller.signal),
+          readContentSocial(item.id, controller.signal, requestViewerId ?? undefined),
           readContentAuthor(item),
         ]);
         const mapped = mapContentToFeedContent(item, body, social, author, sessionToken);

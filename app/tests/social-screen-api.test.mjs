@@ -10,7 +10,10 @@ const profileScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/(t
 const rootLayoutSource = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
 const notificationsScreenSource = readFileSync(new URL('../app/(drawer)/(tabs)/(notifications)/notifications.tsx', import.meta.url), 'utf8');
 const searchScreenSource = readFileSync(new URL('../app/(drawer)/(tabs)/(search)/search.tsx', import.meta.url), 'utf8');
+const videoScreenSource = readFileSync(new URL('../app/(drawer)/(tabs)/(video)/video.tsx', import.meta.url), 'utf8');
+const contentAdapterSource = readFileSync(new URL('../lib/content-adapter.ts', import.meta.url), 'utf8');
 const subscriptionsScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/subscriptions.tsx'), 'utf8');
+const homeFeedScreenSource = readFileSync(new URL('../app/(drawer)/(tabs)/(index)/index.tsx', import.meta.url), 'utf8');
 
 const calls = [];
 let keyCounter = 0;
@@ -118,6 +121,22 @@ test('search screens cancel stale requests and ignore out-of-order responses', (
   expect(searchScreenSource).toContain('contentRequestIdRef.current += 1;');
   expect(searchScreenSource).toContain('userRequestIdRef.current += 1;');
   expect(searchScreenSource).toContain('topicsRequestIdRef.current += 1;');
+});
+
+test('search and video personalized reads are isolated across account switches', () => {
+  expect(searchScreenSource).toContain('searchViewerIdRef.current = viewerId;');
+  expect(searchScreenSource).toContain('React.useLayoutEffect(() => {\n    contentRequestIdRef.current += 1;');
+  expect(searchScreenSource).toContain('searchViewerIdRef.current === requestViewerId');
+  expect(searchScreenSource).toContain('readContentSocial(item.id, controller.signal, requestViewerId ?? undefined)');
+  expect(videoScreenSource).toContain('const viewerId = useAuthStore((state) => state.user?.id ?? null);');
+  expect(videoScreenSource).toContain('expectedAccountId: viewerId ?? undefined');
+  expect(videoScreenSource).toContain('useAuthStore.getState().user?.id !== viewerId');
+  expect(videoScreenSource).toContain('readContentSocialBatch([record.id], controller.signal, viewerId ?? undefined)');
+  expect(contentAdapterSource).toContain('expectedAccountId?: string');
+  expect(homeFeedScreenSource).toContain('pendingRecords.map((item) => item.id),\n      socialBatchController.signal,\n      viewerId ?? undefined,');
+  expect(profileScreenSource).toContain('readContentSocial(record.id, controller.signal, requestViewerId ?? undefined)');
+  expect(bookmarkScreenSource).toContain('readContentSocial(item.id, undefined, requestViewerId)');
+  expect(contentAdapterSource).toContain('{ method: \'GET\', signal, expectedAccountId }');
 });
 
 test('loads bounded public trending search terms through W01 without viewer authentication', async () => {

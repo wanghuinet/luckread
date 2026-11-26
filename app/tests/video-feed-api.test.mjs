@@ -38,6 +38,14 @@ test('passes the next cursor through the shared API client', async () => {
   expect(calls[0].options.signal).toBe(controller.signal);
 });
 
+test('binds personalized video feed requests to the initiating account', async () => {
+  const controller = new AbortController();
+  await fetchVideoFeedPage({ signal: controller.signal, expectedAccountId: 'viewer-a' });
+
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
+  expect(calls[0].options.signal).toBe(controller.signal);
+});
+
 test('clamps page size to the existing API limit and rejects invalid sizes safely', async () => {
   await fetchVideoFeedPage({ limit: 1000 });
   await fetchVideoFeedPage({ limit: Number.NaN });
@@ -111,7 +119,8 @@ test('renders video list projections immediately and hydrates only the visible v
   expect(videoScreen).toContain('recordsByIdRef.current.get(currentId)');
   expect(videoScreen).toContain('signal: controller.signal');
   expect(videoScreen).toContain('setCursor(page.nextCursor || null)');
-  expect(videoScreen).toContain('playback: () => resolveVideoSource(record, sessionToken, controller.signal)');
+  expect(videoScreen).toContain('playback: () => resolveVideoSource(record, sessionToken, controller.signal, viewerId ?? undefined)');
+  expect(videoScreen).toContain('getMediaPlayback(reference, signal, expectedAccountId)');
   expect(videoScreen).toContain('readContentAuthor(record, controller.signal)');
   expect(videoScreen).toContain('controller.abort()');
   expect(videoScreen).toContain('videoSource: null, mediaLoading: false');

@@ -49,6 +49,7 @@ test('Following feed uses the authenticated canonical route and preserves its cu
     kind: 'following',
     cursor: 'next page/2',
     signal: controller.signal,
+    viewerId: 'viewer-a',
   });
 
   expect(calls).toHaveLength(1);
@@ -56,6 +57,7 @@ test('Following feed uses the authenticated canonical route and preserves its cu
   expect(calls[0].options.method).toBe('GET');
   expect(calls[0].options.auth).toBe(true);
   expect(calls[0].options.signal).toBe(controller.signal);
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
 });
 
 test('expired Following session remains a request failure while the shared API boundary handles auth invalidation', async () => {

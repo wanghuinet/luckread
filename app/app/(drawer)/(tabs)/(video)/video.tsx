@@ -61,6 +61,7 @@ async function resolveVideoSource(
   item: ApiContentRecord,
   sessionToken: string | null,
   signal?: AbortSignal,
+  expectedAccountId?: string,
 ): Promise<VideoPlaybackResult> {
   const reference = item.mediaRefs?.find((value) => typeof value === 'string' && value.trim())?.trim();
   if (!reference) return { source: null, error: 'This video has no playable media attached.' };
@@ -77,7 +78,7 @@ async function resolveVideoSource(
 
   // Opaque media IDs must use the existing playback authorization endpoint.
   try {
-    const playback = await getMediaPlayback(reference, signal);
+    const playback = await getMediaPlayback(reference, signal, expectedAccountId);
     const source = resolveNativeMediaSource(playback.url, sessionToken);
     return source
       ? { source }
@@ -354,6 +355,7 @@ export default function VideoFeed() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const isFocused = useIsFocused();
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
   const [items, setItems] = useState<VideoFeedItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -372,6 +374,24 @@ export default function VideoFeed() {
   const recordsByIdRef = useRef<Map<string, ApiContentRecord>>(new Map());
   const hydratedIdsRef = useRef<Set<string>>(new Set());
   const [hydrationRetryVersion, setHydrationRetryVersion] = useState(0);
+
+  React.useLayoutEffect(() => {
+    requestIdRef.current += 1;
+    pageControllerRef.current?.abort();
+    hydrationControllerRef.current?.abort();
+    hydrationGenerationRef.current += 1;
+    recordsByIdRef.current.clear();
+    hydratedIdsRef.current.clear();
+    loadingMoreRef.current = false;
+    setItems([]);
+    setCursor(null);
+    setHasMore(false);
+    setCurrentId(null);
+    setLoading(true);
+    setLoadingMore(false);
+    setRefreshing(false);
+    setErrorMessage('');
+  }, [viewerId]);
 
   useEffect(() => {
     if (!isFocused) return;
@@ -405,7 +425,7 @@ export default function VideoFeed() {
     setErrorMessage('');
 
     try {
-      const result = await fetchVideoFeedPage({ cursor: nextCursor, limit: PAGE_SIZE, signal: controller.signal });
+      const result = await fetchVideoFeedPage({ cursor: nextCursor, limit: PAGE_SIZE, signal: controller.signal, expectedAccountId: viewerId ?? undefined });
       if (requestId !== requestIdRef.current || controller.signal.aborted) return;
       const page = unwrapApiData<ApiContentPage>(result.data);
       if (!result.response.ok || !page || !Array.isArray(page.items)) {
@@ -461,7 +481,7 @@ export default function VideoFeed() {
         setRefreshing(false);
       }
     }
-  }, []);
+  }, [viewerId]);
 
   // Only the active card performs optional reads and obtains playback authority.
   useEffect(() => {
@@ -484,17 +504,17 @@ export default function VideoFeed() {
 
     void (async () => {
       const sessionToken = await readSessionToken().catch(() => null);
-      if (controller.signal.aborted || generation !== hydrationGenerationRef.current) return;
+      if (controller.signal.aborted || generation !== hydrationGenerationRef.current || useAuthStore.getState().user?.id !== viewerId) return;
       const { body, social, author, playback } = await settleVideoFeedEnrichment(
         {
           body: () => readContentBody(record, controller.signal, sessionToken),
-          social: async () => (await readContentSocialBatch([record.id], controller.signal)).get(record.id) ?? record.social ?? null,
+          social: async () => (await readContentSocialBatch([record.id], controller.signal, viewerId ?? undefined)).get(record.id) ?? record.social ?? null,
           author: () => readContentAuthor(record, controller.signal),
-          playback: () => resolveVideoSource(record, sessionToken, controller.signal),
+          playback: () => resolveVideoSource(record, sessionToken, controller.signal, viewerId ?? undefined),
         },
         { social: record.social ?? null, author: record.creator ?? record.author ?? null },
       );
-      if (controller.signal.aborted || generation !== hydrationGenerationRef.current) return;
+      if (controller.signal.aborted || generation !== hydrationGenerationRef.current || useAuthStore.getState().user?.id !== viewerId) return;
 
       const hydrated: VideoFeedItem = {
         ...mapContentToFeedContent(record, body, social, author, sessionToken),
@@ -521,7 +541,7 @@ export default function VideoFeed() {
       hydratedIdsRef.current.delete(currentId);
       if (hydrationControllerRef.current === controller) hydrationControllerRef.current = null;
     };
-  }, [currentId, isFocused, hydrationRetryVersion]);
+  }, [currentId, isFocused, hydrationRetryVersion, viewerId]);
   useEffect(() => {
     void loadPage();
     return () => {
