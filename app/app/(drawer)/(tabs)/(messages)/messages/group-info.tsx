@@ -84,7 +84,7 @@ export default function GroupInfoScreen() {
   });
   const transferMutation = useMutation({
     mutationFn: (variables: { targetId: string; expectedAccountId?: string }) => transferGroupOwnership(conversationId, variables.targetId, variables.expectedAccountId),
-    onSuccess: async (_result, variables) => { if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return; await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'members', conversationId] }); await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'conversations'] }); Alert.alert('已移交群主', '群主身份已成功移交。'); },
+    onSuccess: async (_result, variables) => { if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return; await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'members', conversationId] }); await queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'conversations'] }); if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return; Alert.alert('已移交群主', '群主身份已成功移交。'); },
     onError: (e, variables) => { if (useAuthStore.getState().user?.id === variables.expectedAccountId) Alert.alert('移交失败', e instanceof Error ? e.message : '请重试'); },
   });
   const leaveMutation = useMutation({
