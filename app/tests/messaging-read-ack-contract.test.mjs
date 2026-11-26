@@ -100,3 +100,16 @@ test('message sends are bound to the originating authenticated account', () => {
   const screen = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
   expect(screen).toContain('pendingSend.current.key, variables.attachments, variables.userId');
 });
+
+
+test('native private media and realtime credentials are bound to the initiating account', () => {
+  const api = readFileSync(new URL('../lib/api-client.ts', import.meta.url), 'utf8');
+  expect(api).toContain('getApiAuthHeaders(expectedAccountId?: string)');
+  expect(api).toContain('if (expectedAccountId && accountId !== expectedAccountId)');
+  const realtime = readFileSync(new URL('../lib/messaging-realtime.ts', import.meta.url), 'utf8');
+  expect(realtime).toContain('await getApiAuthHeaders(userId)');
+  const screen = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
+  expect(screen).toContain('getApiAuthHeaders(userId)');
+  expect(screen).toContain('key={userId ?? \'anonymous\'}');
+  expect(screen).toContain('}, [userId]);');
+});
