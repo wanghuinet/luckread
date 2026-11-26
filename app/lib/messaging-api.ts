@@ -54,19 +54,22 @@ export async function addGroupMembers(conversationId: string, memberUserIds: str
   ));
 }
 export async function removeGroupMember(conversationId: string, memberUserId: string): Promise<void> {
-  await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/members/' + encodeURIComponent(memberUserId), {
+  const result = await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/members/' + encodeURIComponent(memberUserId), {
     method: 'DELETE',
   });
+  if (!result.response.ok) throw new Error(result.error?.message || '无法移除群聊成员。');
 }
 export async function transferGroupOwnership(conversationId: string, targetUserId: string): Promise<void> {
-  await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/transfer-owner', {
+  const result = await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/transfer-owner', {
     method: 'POST', body: JSON.stringify({ targetUserId }), idempotencyKey: false,
   });
+  if (!result.response.ok) throw new Error(result.error?.message || '无法转移群聊所有权。');
 }
 export async function leaveGroupConversation(conversationId: string): Promise<void> {
-  await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/leave', {
+  const result = await apiRequest('/conversations/' + encodeURIComponent(conversationId) + '/leave', {
     method: 'POST', body: JSON.stringify({ }), idempotencyKey: false,
   });
+  if (!result.response.ok) throw new Error(result.error?.message || '无法退出群聊。');
 }
 export async function fetchMessages(conversationId: string, beforeSequence: string | null = null, signal?: AbortSignal): Promise<Page<MessagingMessage>> {
   const query = new URLSearchParams({ limit: '50' });
