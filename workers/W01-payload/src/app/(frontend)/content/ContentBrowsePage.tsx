@@ -63,6 +63,8 @@ export default function ContentBrowsePage() {
   const [error, setError] = useState('')
   const requestIdRef = useRef(0)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
+  const loadMoreInFlightRef = useRef(false)
 
   const load = useCallback(async (
     cursor: string | null,
@@ -126,6 +128,31 @@ export default function ContentBrowsePage() {
       window.clearTimeout(timer)
     }
   }, [contentLoadError, contentType, load])
+
+  const loadMore = useCallback(async () => {
+    if (loadMoreInFlightRef.current || loading || !page.hasMore || !page.nextCursor) return
+    loadMoreInFlightRef.current = true
+    try {
+      await load(page.nextCursor, contentType, contentLoadError)
+    } finally {
+      loadMoreInFlightRef.current = false
+    }
+  }, [contentLoadError, contentType, load, loading, page.hasMore, page.nextCursor])
+
+  useEffect(() => {
+    const target = loadMoreSentinelRef.current
+    if (!target || !page.hasMore || !page.nextCursor || loading || error) return
+    if (typeof IntersectionObserver === 'undefined') return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void loadMore()
+      },
+      { rootMargin: '480px 0px' },
+    )
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [error, loadMore, loading, page.hasMore, page.nextCursor])
 
   return (
     <TwitterCloneSecondaryPageLayout locale={locale} title={copy.content.title} active="explore">
@@ -250,17 +277,25 @@ export default function ContentBrowsePage() {
         ) : null}
 
         {!loading && !error && page.hasMore && page.nextCursor ? (
-          <div className="flex justify-center px-4 py-5">
-            <button
-              aria-busy={loadingMore}
-              className="rounded-full border border-light-border px-5 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10"
-              disabled={loadingMore}
-              onClick={() => void load(page.nextCursor, contentType, contentLoadError)}
-              type="button"
-            >
-              {loadingMore ? copy.content.loading : copy.content.more}
-            </button>
-          </div>
+          <>
+            <div
+              aria-hidden="true"
+              className="h-px w-full"
+              data-testid="content-browse-load-more-sentinel"
+              ref={loadMoreSentinelRef}
+            />
+            <div className="flex justify-center px-4 py-5">
+              <button
+                aria-busy={loadingMore}
+                className="rounded-full border border-light-border px-5 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10"
+                disabled={loadingMore}
+                onClick={() => void loadMore()}
+                type="button"
+              >
+                {loadingMore ? copy.content.loading : copy.content.more}
+              </button>
+            </div>
+          </>
         ) : null}
       </section>
     </TwitterCloneSecondaryPageLayout>

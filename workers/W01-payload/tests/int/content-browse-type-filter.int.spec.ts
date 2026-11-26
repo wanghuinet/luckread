@@ -43,4 +43,16 @@ describe('public content type filter', () => {
     expect(page).not.toContain("method: 'PATCH'")
     expect(page).not.toContain("method: 'DELETE'")
   })
+  it('automatically paginates near the end of the public list and keeps the manual fallback', () => {
+    const page = read('src/app/(frontend)/content/ContentBrowsePage.tsx')
+
+    expect(page).toContain('const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)')
+    expect(page).toContain('const loadMoreInFlightRef = useRef(false)')
+    expect(page).toContain('new IntersectionObserver(')
+    expect(page).toContain("{ rootMargin: '480px 0px' }")
+    expect(page).toContain('data-testid="content-browse-load-more-sentinel"')
+    expect(page).toContain('onClick={() => void loadMore()}')
+    expect(page).toContain('await load(page.nextCursor, contentType, contentLoadError)')
+  })
+
 })
