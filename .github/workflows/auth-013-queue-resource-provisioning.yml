@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   provision:
-    if: ${{ inputs.confirm == 'CREATE' }}
+    if: ${{ inputs.confirm == 'CREATE' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -24,6 +24,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+
+      - name: Guard protected main dispatch
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REF_PROTECTED" = "true"
+          test "${{ inputs.confirm }}" = "CREATE"
 
       - name: Validate Cloudflare credentials
         run: |
