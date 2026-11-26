@@ -91,7 +91,14 @@ export default function NotificationPreferencesScreen() {
 
 
   useEffect(() => {
-    if (authStatus === 'loading') return;
+    if (authStatus === 'loading') {
+      setPreferences(null);
+      setSavedPreferences(null);
+      setLoading(true);
+      setSaving(false);
+      setAuthRequired(false);
+      return;
+    }
     if (authStatus !== 'authenticated') {
       setAuthRequired(true);
       setPreferences(null);
@@ -102,12 +109,15 @@ export default function NotificationPreferencesScreen() {
 
     const controller = new AbortController();
     let active = true;
+    setPreferences(null);
+    setSavedPreferences(null);
     setLoading(true);
+    setSaving(false);
     setError('');
     setMessage('');
     setAuthRequired(false);
 
-    void fetchNotificationPreferences(controller.signal)
+    void fetchNotificationPreferences(controller.signal, accountId ?? undefined)
       .then((result) => {
         if (!active || controller.signal.aborted) return;
         setPreferences(result);
@@ -131,7 +141,7 @@ export default function NotificationPreferencesScreen() {
       active = false;
       controller.abort();
     };
-  }, [authStatus, retryKey]);
+  }, [accountId, authStatus, retryKey]);
 
 
   useEffect(() => {
@@ -216,16 +226,19 @@ export default function NotificationPreferencesScreen() {
   }, []);
 
   const save = useCallback(async () => {
-    if (!preferences || saving || !dirty) return;
+    if (!accountId || !preferences || saving || !dirty) return;
     setSaving(true);
     setError('');
     setMessage('');
+    const operationAccountId = accountId;
     try {
-      const canonical = await saveNotificationPreferences(preferences);
+      const canonical = await saveNotificationPreferences(preferences, operationAccountId);
+      if (useAuthStore.getState().user?.id !== operationAccountId) return;
       setPreferences(canonical);
       setSavedPreferences(canonical);
       setMessage('通知偏好设置已保存。');
     } catch (cause) {
+      if (useAuthStore.getState().user?.id !== operationAccountId) return;
       if (cause instanceof NotificationPreferencesApiError && cause.status === 401) {
         setAuthRequired(true);
         return;
@@ -234,9 +247,9 @@ export default function NotificationPreferencesScreen() {
         ? cause.message
         : '通知偏好设置保存失败，请重试。');
     } finally {
-      setSaving(false);
+      if (useAuthStore.getState().user?.id === operationAccountId) setSaving(false);
     }
-  }, [dirty, preferences, saving]);
+  }, [accountId, dirty, preferences, saving]);
 
   return (
     <View className="flex-1 bg-white dark:bg-black" style={{ paddingTop: insets.top }}>

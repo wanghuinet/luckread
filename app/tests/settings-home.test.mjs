@@ -46,3 +46,17 @@ test('keeps settings navigation usable in both app color schemes with screen-rea
   expect(screen).toContain('accessibilityState={{ selected, disabled }}');
   expect(screen).toContain('accessibilityRole="alert"');
 });
+
+
+test('reloads notification preferences when the authenticated account changes', () => {
+  const notificationScreen = readFileSync(
+    new URL('../app/(drawer)/notification-preferences.tsx', import.meta.url),
+    'utf8',
+  );
+
+  expect(notificationScreen).toContain('}, [accountId, authStatus, retryKey]);');
+  expect(notificationScreen).toContain('setPreferences(null);');
+  expect(notificationScreen).toContain('setSavedPreferences(null);');
+  expect(notificationScreen).toContain('const operationAccountId = accountId;');
+  expect(notificationScreen).toContain('useAuthStore.getState().user?.id !== operationAccountId');
+});
