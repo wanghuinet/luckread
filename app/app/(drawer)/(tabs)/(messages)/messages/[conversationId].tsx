@@ -117,7 +117,7 @@ export default function ConversationScreen() {
         if (realtimeEvent.type === 'typing.changed' && realtimeEvent.payload &&
           typeof realtimeEvent.payload === 'object' &&
           Array.isArray((realtimeEvent.payload as { activeUserIds?: unknown }).activeUserIds)) {
-          queryClient.setQueryData(['messaging', 'typing', conversationId], {
+          queryClient.setQueryData(['messaging', userId, 'typing', conversationId], {
             activeUserIds: (realtimeEvent.payload as { activeUserIds: unknown[] }).activeUserIds.filter((id): id is string => typeof id === 'string'),
           });
           return;
@@ -129,7 +129,7 @@ export default function ConversationScreen() {
             typeof message.conversation_id === 'string' && typeof message.sender_user_id === 'string' &&
             typeof message.body === 'string' && typeof message.created_at === 'string') {
             if (realtimeEvent.type === 'message.created') {
-              const cached = queryClient.getQueryData<typeof messagesQuery.data>(['messaging', 'messages', conversationId]);
+              const cached = queryClient.getQueryData<typeof messagesQuery.data>(['messaging', userId, 'messages', conversationId]);
               if (!cached?.pages.length) {
                 // An event can race the first history request before its cache exists.
                 // Force a fresh read so the in-flight snapshot cannot hide this message.
@@ -167,7 +167,7 @@ export default function ConversationScreen() {
               }
             }
             queryClient.setQueryData<typeof messagesQuery.data>(
-              ['messaging', 'messages', conversationId],
+              ['messaging', userId, 'messages', conversationId],
               (current) => {
                 if (!current?.pages.length) return current;
                 let found = false;
@@ -344,7 +344,7 @@ export default function ConversationScreen() {
     if (!incoming.length) return;
     let cachePageOverflow = false;
     queryClient.setQueryData<typeof messagesQuery.data>(
-      ['messaging', 'messages', conversationId],
+      ['messaging', userId, 'messages', conversationId],
       (current) => {
         if (!current?.pages.length) return current;
         const known = new Set(current.pages.flatMap((page) => page.items.map((item) => item.message_id)));
@@ -446,7 +446,7 @@ export default function ConversationScreen() {
       setPendingAttachments([]);
       let cachePageOverflow = false;
       queryClient.setQueryData<typeof messagesQuery.data>(
-        ['messaging', 'messages', conversationId],
+        ['messaging', userId, 'messages', conversationId],
         (current) => {
           if (!current?.pages.length || current.pages.some((page) => page.items.some((item) => item.message_id === sentMessage.message_id))) return current;
           const pages = [...current.pages];
@@ -475,7 +475,7 @@ export default function ConversationScreen() {
 
   const applyMessageUpdate = useCallback((updated: import('~/lib/messaging-api').MessagingMessage) => {
     queryClient.setQueryData<typeof messagesQuery.data>(
-      ['messaging', 'messages', conversationId],
+      ['messaging', userId, 'messages', conversationId],
       (current) => {
         if (!current?.pages.length) return current;
         return {
