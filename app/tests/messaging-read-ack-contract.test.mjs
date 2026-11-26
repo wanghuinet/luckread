@@ -143,6 +143,22 @@ test('new message request completion cannot navigate after the initiating accoun
   expect(source).toContain("queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'requests', 'outgoing'] })");
   expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;');
   expect(source).toContain('mutation.reset();');
+  expect(source).toContain('mutationBelongsToCurrentAccount = mutation.variables?.expectedAccountId === userId');
+  expect(source).toContain('mutation.isError && mutationBelongsToCurrentAccount');
+});
+
+test('group creation errors and pending UI are scoped to the initiating account', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/group-new.tsx', import.meta.url), 'utf8');
+  expect(source).toContain('if (useAuthStore.getState().user?.id === variables.expectedAccountId) Alert.alert');
+  expect(source).toContain('mutationBelongsToCurrentAccount = mutation.variables?.expectedAccountId === userId');
+  expect(source).toContain('mutation.reset();');
+});
+
+test('message request list feedback and busy state are scoped to the initiating account', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages.tsx', import.meta.url), 'utf8');
+  expect(source).toContain('requestActionBelongsToCurrentAccount = requestAction.variables?.expectedAccountId === userId');
+  expect(source).toContain('requestAction.isError && requestActionBelongsToCurrentAccount');
+  expect(source).toContain('busy={requestActionPendingForCurrentAccount}');
 });
 
 test('group management mutations isolate completions and errors across account switches', () => {
