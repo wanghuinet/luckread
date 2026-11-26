@@ -46,6 +46,7 @@ test('creates a nested reply through the existing W01 comments route with the su
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/contents/content%2Fid/comments');
   expect(calls[0].options.method).toBe('POST');
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
   expect(calls[0].options.idempotencyKey).toBe('same-key-for-retry');
   expect(JSON.parse(calls[0].options.body)).toEqual({
     body: 'Reply text',
