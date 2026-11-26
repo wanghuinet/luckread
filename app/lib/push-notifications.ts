@@ -24,6 +24,16 @@ const INSTALLATION_KEY_PREFIX = 'luckread.native.push-installation.';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EAS_PROJECT_ID_PATTERN = UUID_PATTERN;
 
+// The backend owns one row per native push token. Serialize every mutation so
+// an older account's in-flight registration cannot win after an account switch.
+let endpointMutationQueue: Promise<void> = Promise.resolve();
+
+function enqueueEndpointMutation<T>(operation: () => Promise<T>): Promise<T> {
+  const result = endpointMutationQueue.then(operation, operation);
+  endpointMutationQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
 function nativePlatform(): 'ios' | 'android' | null {
   if (Platform.OS === 'ios' || Platform.OS === 'android') return Platform.OS;
   return null;
@@ -103,7 +113,7 @@ async function writePushEndpoint(
 
   const resolvedInstallationId = installationId ?? await getOrCreateInstallationId(userId);
   const appVersion = currentAppVersion();
-  const result = await apiRequest<unknown>(
+  const result = await enqueueEndpointMutation(() => apiRequest<unknown>(
     '/push/endpoints/' + encodeURIComponent(resolvedInstallationId),
     {
       method: 'PUT',
@@ -114,7 +124,7 @@ async function writePushEndpoint(
         ...(appVersion ? { appVersion } : {}),
       }),
     },
-  );
+  ));
 
   if (!result.response.ok) {
     throw new Error(result.error?.message || 'Could not register this device for LuckRead notifications.');
@@ -236,10 +246,10 @@ export async function unregisterPushEndpointForUser(userId: string): Promise<voi
   const installationId = await readInstallationId(userId);
   if (!installationId) return;
 
-  const result = await apiRequest<unknown>(
+  const result = await enqueueEndpointMutation(() => apiRequest<unknown>(
     '/push/endpoints/' + encodeURIComponent(installationId),
     { method: 'DELETE' },
-  );
+  ));
   if (!result.response.ok) {
     throw new Error(result.error?.message || 'Could not unregister this device from LuckRead notifications.');
   }
