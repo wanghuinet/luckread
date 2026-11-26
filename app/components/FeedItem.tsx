@@ -565,6 +565,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                     headers: { 'If-Match': etag },
                                     idempotencyKey: 'native-post-edit-' + to.toLowerCase() + ':' + contentId + ':' + etag,
                                     body: JSON.stringify({ to }),
+                                    expectedAccountId: currentUser?.id,
                                 });
                                 if (!result.response.ok) {
                                     throw new Error(result.error?.message || getApiErrorMessage(result.data, '无法安全切换动态状态。', result.response.status));
