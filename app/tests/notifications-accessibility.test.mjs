@@ -29,3 +29,9 @@ test('mark-all-read action announces its scope and disabled state', () => {
 test('notification accessibility contract is included in the existing required social-screen test command', () => {
   expect(packageJson.scripts['test:social-screen-api']).toContain('tests/notifications-accessibility.test.mjs');
 });
+
+
+test('notification deep-link fetch surfaces HTTP failures instead of treating them as missing items', () => {
+  expect(screen).toContain('if (!result.response.ok)');
+  expect(screen).toContain("getApiErrorMessage(result.data, '无法打开这条通知，请重试。', result.response.status)");
+});
