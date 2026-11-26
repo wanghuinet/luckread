@@ -37,35 +37,35 @@ function validTerms(t: CreatorPlanTerms) {
       !t.benefits.every(x => typeof x === 'string' && x.trim() === x && x.length > 0 && x.length <= 180) ||
       new Set(t.benefits).size !== t.benefits.length) throw new TypeError('Membership plan terms are invalid.');
 }
-export function fetchMyCreatorApplication(options: { signal?: AbortSignal } = {}) {
-  return apiRequest<unknown>('/creator-applications', { method: 'GET', signal: options.signal });
+export function fetchMyCreatorApplication(options: { signal?: AbortSignal; expectedAccountId?: string } = {}) {
+  return apiRequest<unknown>('/creator-applications', { method: 'GET', signal: options.signal, expectedAccountId: options.expectedAccountId });
 }
-export function submitCreatorApplication(creatorType: string, statement: string, idempotencyKey: string) {
+export function submitCreatorApplication(creatorType: string, statement: string, idempotencyKey: string, expectedAccountId?: string) {
   if (!['PERSONAL', 'WRITER', 'VIDEO_CREATOR', 'DEVELOPER', 'ARTIST', 'OTHER'].includes(creatorType)) throw new TypeError('Creator type is invalid.');
   if (typeof statement !== 'string' || statement.trim() !== statement || statement.length > 2000) throw new TypeError('Creator application statement is invalid.');
   validKey(idempotencyKey);
-  return apiRequest<unknown>('/creator-applications', { method: 'POST', idempotencyKey, body: JSON.stringify({ creatorType, statement }) });
+  return apiRequest<unknown>('/creator-applications', { method: 'POST', idempotencyKey, body: JSON.stringify({ creatorType, statement }), expectedAccountId });
 }
-export function fetchMyCreatorPlans(options: { limit?: number; cursor?: string | null; signal?: AbortSignal } = {}) {
+export function fetchMyCreatorPlans(options: { limit?: number; cursor?: string | null; signal?: AbortSignal; expectedAccountId?: string } = {}) {
   const limit = options.limit ?? 50;
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) throw new RangeError('Creator plan page size must be between 1 and 50.');
   const query = new URLSearchParams({ limit: String(limit) });
   if (options.cursor) query.set('cursor', options.cursor);
-  return apiRequest<unknown>('/membership/plans?' + query.toString(), { method: 'GET', signal: options.signal });
+  return apiRequest<unknown>('/membership/plans?' + query.toString(), { method: 'GET', signal: options.signal, expectedAccountId: options.expectedAccountId });
 }
-export function createMyCreatorPlan(terms: CreatorPlanTerms, idempotencyKey: string) {
+export function createMyCreatorPlan(terms: CreatorPlanTerms, idempotencyKey: string, expectedAccountId?: string) {
   validTerms(terms); validKey(idempotencyKey);
-  return apiRequest<unknown>('/membership/plans', { method: 'POST', idempotencyKey, body: JSON.stringify({ ...terms, trialPeriodDays: 0 }) });
+  return apiRequest<unknown>('/membership/plans', { method: 'POST', idempotencyKey, body: JSON.stringify({ ...terms, trialPeriodDays: 0 }), expectedAccountId });
 }
-export function updateMyCreatorPlan(planId: string, etag: string, terms: CreatorPlanTerms, idempotencyKey: string) {
+export function updateMyCreatorPlan(planId: string, etag: string, terms: CreatorPlanTerms, idempotencyKey: string, expectedAccountId?: string) {
   validId(planId); validEtag(etag); validTerms(terms); validKey(idempotencyKey);
-  return apiRequest<unknown>('/membership/plans/' + encodeURIComponent(planId), { method: 'PUT', headers: { 'If-Match': etag }, idempotencyKey, body: JSON.stringify(terms) });
+  return apiRequest<unknown>('/membership/plans/' + encodeURIComponent(planId), { method: 'PUT', headers: { 'If-Match': etag }, idempotencyKey, body: JSON.stringify(terms), expectedAccountId });
 }
-export function publishMyCreatorPlan(planId: string, etag: string) {
+export function publishMyCreatorPlan(planId: string, etag: string, expectedAccountId?: string) {
   validId(planId); validEtag(etag);
-  return apiRequest<unknown>('/membership/plans/' + encodeURIComponent(planId) + '/publish', { method: 'POST', headers: { 'If-Match': etag } });
+  return apiRequest<unknown>('/membership/plans/' + encodeURIComponent(planId) + '/publish', { method: 'POST', headers: { 'If-Match': etag }, expectedAccountId });
 }
-export function changeMyCreatorPlanLifecycle(planId: string, etag: string, action: 'pause' | 'resume' | 'retire') {
+export function changeMyCreatorPlanLifecycle(planId: string, etag: string, action: 'pause' | 'resume' | 'retire', expectedAccountId?: string) {
   validId(planId); validEtag(etag);
-  return apiRequest<unknown>('/membership/plans/' + encodeURIComponent(planId) + '/lifecycle', { method: 'POST', headers: { 'If-Match': etag }, body: JSON.stringify({ action }) });
+  return apiRequest<unknown>('/membership/plans/' + encodeURIComponent(planId) + '/lifecycle', { method: 'POST', headers: { 'If-Match': etag }, body: JSON.stringify({ action }), expectedAccountId });
 }
