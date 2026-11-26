@@ -18,3 +18,9 @@ test('realtime reconnect backoff is not reset by short-lived connections', () =>
   expect(source).toContain('Reset backoff only after a sustained connection');
   expect(source).toContain('if (stableTimer) clearTimeout(stableTimer)');
 });
+
+
+test('conversation realtime lifecycle rebinds when authenticated account changes', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
+  expect(source).toContain('[conversationId, userId, isFocused, appState, queryClient, router]');
+});
