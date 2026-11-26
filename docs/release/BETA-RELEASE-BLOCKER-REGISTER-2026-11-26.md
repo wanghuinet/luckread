@@ -45,7 +45,7 @@
 
 - `.github/workflows/w01-payload-app-deploy.yml` deploys W01 using its Neon configuration, with `PAYLOAD_DATABASE_DRIVER=neon`, no production D1 bindings, and Neon Hyperdrive.
 - `.github/workflows/media-runtime-e2e.yml` still contains fixture setup/cleanup using `wrangler d1 execute`; this does not match the deployed Neon W01 database path.
-- The legacy workflow previously had a production deployment trigger and a default production API target. PR #2273 removed automatic deployment triggering and hard-disabled the job (`if: \${{ false }}`). It remains a safety hold, not a successful test.
+- The legacy workflow previously had a production deployment trigger and a default production API target. PR #2273 removed automatic deployment triggering and hard-disabled the job (`if: ${{ false }}`). It remains a safety hold, not a successful test.
 - A regression test is being added to assert that the workflow remains manual-only and disabled until an isolated non-production W01 and Neon test database are available.
 - W01 Wrangler source currently names its R2 binding target `luckread-w01-assets-placeholder`. This source value is not proof that the bucket exists or that a separate test bucket is provisioned. W01 also declares service bindings to the named W02/W03/W04/W05/W06/W07/W08/W11 services; no independent media test topology is established by these source configs.
 - The repository's Hyperdrive staging verifier reports `SOURCE_CONFIG_STAGED_ONLY`, with runtime drivers disabled and no production deployment performed. It validates source configuration only.
