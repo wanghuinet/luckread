@@ -122,6 +122,8 @@ test('message request action completions cannot navigate or invalidate another a
   expect(source).toContain('onSuccess: async (result, variables) => {');
   expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;');
   expect(source).toContain('expectedAccountId: userId');
+  expect(source).toContain("queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'conversations'] })");
+  expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;\n      if (result.conversationId)');
 });
 
 
@@ -135,7 +137,7 @@ test('group creation completion cannot navigate across an account switch', () =>
 });
 
 
-test('group management mutations isolate completions and errors across account switches', () => {
+test('new message request completion cannot navigate after the initiating account changes', () => {\n  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/new-request.tsx', import.meta.url), 'utf8');\n  expect(source).toContain('createMessageRequest(variables.recipientUserId, variables.body, undefined, variables.expectedAccountId)');\n  expect(source).toContain("queryClient.invalidateQueries({ queryKey: ['messaging', variables.expectedAccountId, 'requests', 'outgoing'] })");\n  expect(source).toContain('if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;');\n  expect(source).toContain('mutation.reset();');\n});\n\ntest('group management mutations isolate completions and errors across account switches', () => {
   const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/group-info.tsx', import.meta.url), 'utf8');
   expect(source).toContain("useEffect(() => { setSelected([]); setSearch(''); }, [conversationId, userId])");
   expect(source).toContain('addGroupMembers(conversationId, variables.memberIds, variables.expectedAccountId)');
