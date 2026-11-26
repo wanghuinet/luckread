@@ -51,3 +51,14 @@ test('attachment upload does not reject metadata-only missing file size before s
   expect(implementation).toContain('typeof file.size === \'number\'');
   expect(implementation).not.toContain('!file.size');
 });
+
+
+test('conversation composer state is isolated when route or account scope changes', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
+  expect(source).toContain('conversationScopeRef.current.conversationId !== conversationId || conversationScopeRef.current.userId !== userId');
+  expect(source).toContain('setPendingAttachments([]);');
+  expect(source).toContain('senderProfileAttempted.current.clear();');
+  expect(source).toContain('scopeVersion: conversationScopeRef.current.version');
+  expect(source).toContain('conversationScopeRef.current.version !== variables.scopeVersion');
+  expect(source).toContain('sendDirectMessage(variables.conversationId');
+});
