@@ -41,3 +41,14 @@ test('messaging realtime cache reads and writes use account-scoped query keys', 
   expect(source).toContain("setQueryData(['messaging', userId, 'messages', conversationId]");
   expect(source).toContain("setQueryData(['messaging', userId, 'typing', conversationId]");
 });
+
+
+test('messaging realtime socket registry and typing frames are account-scoped', () => {
+  const source = readFileSync(new URL('../lib/messaging-realtime.ts', import.meta.url), 'utf8');
+  expect(source).toContain("const socketKey = (userId: string, conversationId: string) => userId + ':' + conversationId");
+  expect(source).toContain('setMessagingRealtimeTyping(userId: string, conversationId: string, typing: boolean)');
+  expect(source).toContain('activeSockets.get(socketKey(userId, conversationId))');
+  const screen = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
+  expect(screen).toContain('userId: userId ??');
+  expect(screen).toContain('setMessagingRealtimeTyping(userId ??');
+});
