@@ -46,7 +46,7 @@ test('automatically appends the next public content page when the list sentinel 
 
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('http://127.0.0.1:3000/content')
-  await expect(page.getByRole('heading', { name: 'First page article 1' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'First page article 1', exact: true })).toBeVisible()
   await page.getByTestId('content-browse-load-more-sentinel').scrollIntoViewIfNeeded()
   await expect(page.getByRole('heading', { name: secondPageItem.title })).toBeVisible()
   expect(contentPageRequests).toBe(2)
