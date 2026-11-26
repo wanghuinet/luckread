@@ -146,7 +146,7 @@ export default function Comments({ contentId, sort = 'relevant', onReplySubmitte
   }, [contentId, sort, currentUserId]);
 
   const viewerScopeRef = useRef<string | null>(currentUserId);
-  useEffect(() => {
+  React.useLayoutEffect(() => {
     if (viewerScopeRef.current === currentUserId) return;
     viewerScopeRef.current = currentUserId;
     requestIdRef.current += 1;
