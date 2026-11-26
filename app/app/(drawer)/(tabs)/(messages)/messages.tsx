@@ -120,8 +120,10 @@ export default function Messages() {
   });
   const requestItems = requests.data?.pages.flatMap((page) => page.items) ?? [];
   const requestAction = useMutation({
-    mutationFn: ({ requestId, action }: { requestId: string; action: 'accept' | 'decline' | 'cancel' }) => respondToMessageRequest(requestId, action, userId),
-    onSuccess: async (result) => {
+    mutationFn: ({ requestId, action, expectedAccountId }: { requestId: string; action: 'accept' | 'decline' | 'cancel'; expectedAccountId?: string }) =>
+      respondToMessageRequest(requestId, action, expectedAccountId),
+    onSuccess: async (result, variables) => {
+      if (useAuthStore.getState().user?.id !== variables.expectedAccountId) return;
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'requests'] }),
         queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] }),
@@ -192,7 +194,7 @@ export default function Messages() {
               </View>
             ) : undefined}
             ListEmptyComponent={<View className="flex-1 items-center justify-center px-8 py-20"><Feather name="mail" size={30} color="#9ca3af" /><Text className="mt-4 text-base font-semibold text-neutral-900 dark:text-white">暂无私信请求</Text><Text className="mt-2 text-center text-sm text-neutral-500">陌生人的私信会先出现在这里，由你决定是否接受。</Text></View>}
-            renderItem={({ item }) => <MessageRequestRow item={item} direction={direction} busy={requestAction.isPending} onAction={(requestId, action) => requestAction.mutate({ requestId, action })} />}
+            renderItem={({ item }) => <MessageRequestRow item={item} direction={direction} busy={requestAction.isPending} onAction={(requestId, action) => requestAction.mutate({ requestId, action, expectedAccountId: userId })} />}
             ListFooterComponent={requests.isFetchingNextPage ? <View className="py-4"><ActivityIndicator color="#1d9bf0" /></View> : undefined}
           />
         )
