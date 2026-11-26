@@ -4,6 +4,7 @@ export type VideoFeedPageOptions = {
   cursor?: string | null;
   limit?: number;
   signal?: AbortSignal;
+  expectedAccountId?: string;
 };
 
 /**
@@ -21,5 +22,6 @@ export function fetchVideoFeedPage(options: VideoFeedPageOptions = {}) {
   return apiRequest<unknown>('/contents?' + query.toString(), {
     method: 'GET',
     signal: options.signal,
+    expectedAccountId: options.expectedAccountId,
   });
 }
