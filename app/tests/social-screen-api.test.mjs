@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 const bookmarkScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/bookmarks.tsx'), 'utf8');
 const bookmarkStateSource = readFileSync(resolve(process.cwd(), 'lib/content-bookmark-state.ts'), 'utf8');
 const feedItemSource = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
+const blockedMutedScreenSource = readFileSync(new URL('../app/(drawer)/blocked-muted.tsx', import.meta.url), 'utf8');
 const postDetailSource = readFileSync(new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/post/[id].tsx', import.meta.url), 'utf8');
 const profileScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/profile/[id].tsx'), 'utf8');
 const rootLayoutSource = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
@@ -437,10 +438,10 @@ test('saved list removes an item only after shared bookmark status confirms it i
 
 
 test('block and mute actions use authenticated canonical endpoints and supported target IDs', async () => {
-  await blockUser(' user-id_123 ');
-  await muteUser(' user-id_123 ');
-  await unblockUser('user-id_123');
-  await unmuteUser('user-id_123');
+  await blockUser(' user-id_123 ', 'viewer-a');
+  await muteUser(' user-id_123 ', 'viewer-a');
+  await unblockUser('user-id_123', 'viewer-a');
+  await unmuteUser('user-id_123', 'viewer-a');
 
   expect(calls).toHaveLength(4);
   expect(calls[0].path).toBe('/interactions/blocks');
@@ -455,6 +456,11 @@ test('block and mute actions use authenticated canonical endpoints and supported
   expect(calls[2].options.method).toBe('DELETE');
   expect(calls[3].path).toBe('/interactions/mutes/user-id_123');
   expect(calls[3].options.method).toBe('DELETE');
+  expect(calls.every((call) => call.options.expectedAccountId === 'viewer-a')).toBe(true);
+  expect(feedItemSource).toContain('expectedAccountId: currentUser?.id');
+  expect(postDetailSource).toContain('muteUser(targetUserId, operationAccountId)');
+  expect(postDetailSource).toContain('blockUser(targetUserId, operationAccountId)');
+  expect(blockedMutedScreenSource).toContain('unblockUser(targetId, operationAccountId)');
 });
 
 test('block and mute menu items invoke real actions in feed and post detail', () => {

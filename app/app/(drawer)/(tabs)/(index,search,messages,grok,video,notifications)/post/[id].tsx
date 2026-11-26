@@ -63,11 +63,14 @@ export const MoreContextIcons = ({
         }
         void (async () => {
             try {
-                const result = await muteUser(targetUserId);
+                const operationAccountId = currentUserId;
+                if (!operationAccountId || useAuthStore.getState().user?.id !== operationAccountId) return;
+                const result = await muteUser(targetUserId, operationAccountId);
+                if (useAuthStore.getState().user?.id !== operationAccountId) return;
                 if (!result.response.ok) throw new Error(result.error?.message || getApiErrorMessage(result.data, '静音用户失败，请稍后重试。', result.response.status));
                 Alert.alert('已静音', '已静音 @' + username + '。静音不会屏蔽该用户。');
             } catch (error) {
-                Alert.alert('静音失败', error instanceof Error ? error.message : '静音用户失败，请稍后重试。');
+                if (useAuthStore.getState().user?.id === currentUserId) Alert.alert('静音失败', error instanceof Error ? error.message : '静音用户失败，请稍后重试。');
             }
         })();
     };
@@ -85,11 +88,14 @@ export const MoreContextIcons = ({
                 onPress: () => {
                     void (async () => {
                         try {
-                            const result = await blockUser(targetUserId);
+                            const operationAccountId = currentUserId;
+                            if (!operationAccountId || useAuthStore.getState().user?.id !== operationAccountId) return;
+                            const result = await blockUser(targetUserId, operationAccountId);
+                            if (useAuthStore.getState().user?.id !== operationAccountId) return;
                             if (!result.response.ok) throw new Error(result.error?.message || getApiErrorMessage(result.data, '屏蔽用户失败，请稍后重试。', result.response.status));
                             Alert.alert('已屏蔽', '@' + username + ' 已加入屏蔽名单。刷新信息流以同步过滤结果。');
                         } catch (error) {
-                            Alert.alert('屏蔽失败', error instanceof Error ? error.message : '屏蔽用户失败，请稍后重试。');
+                            if (useAuthStore.getState().user?.id === currentUserId) Alert.alert('屏蔽失败', error instanceof Error ? error.message : '屏蔽用户失败，请稍后重试。');
                         }
                     })();
                 },

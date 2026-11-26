@@ -179,8 +179,8 @@ export default function BlockedMutedScreen() {
               setPendingTargetId(targetId);
               setError('');
               try {
-                if (accountIdRef.current !== operationAccountId || authUserRef.current !== operationUser) return;
-                const result = isBlock ? await unblockUser(targetId) : await unmuteUser(targetId);
+                if (!operationAccountId || accountIdRef.current !== operationAccountId || authUserRef.current !== operationUser) return;
+                const result = isBlock ? await unblockUser(targetId, operationAccountId) : await unmuteUser(targetId, operationAccountId);
                 if (accountIdRef.current !== operationAccountId || authUserRef.current !== operationUser) return;
                 if (result.response.status === 401) {
                   router.replace(('/login?returnTo=' + encodeURIComponent('/blocked-muted')) as never);

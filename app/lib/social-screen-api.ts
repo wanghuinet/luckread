@@ -354,43 +354,47 @@ export function fetchContentSearchPage(queryValue: string, options: PageRequestO
 
 
 /** Block a target user through the canonical W01 → W05 relationship authority. */
-export function blockUser(targetUserId: string) {
+export function blockUser(targetUserId: string, expectedAccountId?: string) {
   const target = targetUserId.trim();
   if (!target) throw new TypeError('A target user ID is required.');
   return apiRequest<unknown>('/interactions/blocks', {
     method: 'POST',
     body: JSON.stringify({ targetUserId: target }),
     idempotencyKey: 'native-block-user:' + target + ':' + createIdempotencyKey(),
+    expectedAccountId,
   });
 }
 
 /** Remove an existing block through the canonical W01 → W05 relationship authority. */
-export function unblockUser(targetUserId: string) {
+export function unblockUser(targetUserId: string, expectedAccountId?: string) {
   const target = targetUserId.trim();
   if (!target) throw new TypeError('A target user ID is required.');
   return apiRequest<unknown>('/interactions/blocks/' + encodeURIComponent(target), {
     method: 'DELETE',
     idempotencyKey: 'native-unblock-user:' + target + ':' + createIdempotencyKey(),
+    expectedAccountId,
   });
 }
 
 /** Mute a target user without treating mute as block. */
-export function muteUser(targetUserId: string) {
+export function muteUser(targetUserId: string, expectedAccountId?: string) {
   const target = targetUserId.trim();
   if (!target) throw new TypeError('A target user ID is required.');
   return apiRequest<unknown>('/interactions/mutes', {
     method: 'POST',
     body: JSON.stringify({ targetUserId: target }),
     idempotencyKey: 'native-mute-user:' + target + ':' + createIdempotencyKey(),
+    expectedAccountId,
   });
 }
 
 /** Remove an existing mute through the canonical W01 → W05 relationship authority. */
-export function unmuteUser(targetUserId: string) {
+export function unmuteUser(targetUserId: string, expectedAccountId?: string) {
   const target = targetUserId.trim();
   if (!target) throw new TypeError('A target user ID is required.');
   return apiRequest<unknown>('/interactions/mutes/' + encodeURIComponent(target), {
     method: 'DELETE',
     idempotencyKey: 'native-unmute-user:' + target + ':' + createIdempotencyKey(),
+    expectedAccountId,
   });
 }

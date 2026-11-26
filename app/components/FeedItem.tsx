@@ -544,7 +544,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                     void (async () => {
                         try {
                             const readLatest = async () => {
-                                const result = await apiRequest<any>('/contents/' + encodeURIComponent(contentId), { method: 'GET' });
+                                const result = await apiRequest<any>('/contents/' + encodeURIComponent(contentId), { method: 'GET', expectedAccountId: currentUser?.id });
                                 if (!result.response.ok) throw new Error(result.error?.message || getApiErrorMessage(result.data, '无法读取动态当前状态。', result.response.status));
                                 const envelope = result.data as any;
                                 const record = envelope?.data?.id ? envelope.data : envelope?.doc?.id ? envelope.doc : envelope;
@@ -565,6 +565,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                     headers: { 'If-Match': etag },
                                     idempotencyKey: 'native-post-edit-' + to.toLowerCase() + ':' + contentId + ':' + etag,
                                     body: JSON.stringify({ to }),
+                                    expectedAccountId: currentUser?.id,
                                 });
                                 if (!result.response.ok) {
                                     throw new Error(result.error?.message || getApiErrorMessage(result.data, '无法安全切换动态状态。', result.response.status));
@@ -591,7 +592,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                             if (current.state !== 'DRAFT') throw new Error('当前状态不支持编辑，请刷新信息流后重试。');
                             router.push(('/publish?contentId=' + encodeURIComponent(contentId)) as never);
                         } catch (error) {
-                            Alert.alert('无法编辑动态', error instanceof Error ? error.message : '请稍后重试。');
+                            if (useAuthStore.getState().user?.id === currentUser?.id) Alert.alert('无法编辑动态', error instanceof Error ? error.message : '请稍后重试。');
                         }
                     })();
                 } },
@@ -614,13 +615,15 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
         }
         void (async () => {
             try {
-                const result = await muteUser(targetUserId);
+                assertActiveOwner();
+                const result = await muteUser(targetUserId, currentUser?.id);
+                assertActiveOwner();
                 if (!result.response.ok) {
                     throw new Error(result.error?.message || getApiErrorMessage(result.data, '静音用户失败，请稍后重试。', result.response.status));
                 }
                 Alert.alert('已静音', '已静音 @' + authorHandle + '。静音不会屏蔽该用户。');
             } catch (error) {
-                Alert.alert('静音失败', error instanceof Error ? error.message : '静音用户失败，请稍后重试。');
+                if (useAuthStore.getState().user?.id === currentUser?.id) Alert.alert('静音失败', error instanceof Error ? error.message : '静音用户失败，请稍后重试。');
             }
         })();
     };
@@ -641,13 +644,15 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                     onPress: () => {
                         void (async () => {
                             try {
-                                const result = await blockUser(targetUserId);
+                                assertActiveOwner();
+                                const result = await blockUser(targetUserId, currentUser?.id);
+                                assertActiveOwner();
                                 if (!result.response.ok) {
                                     throw new Error(result.error?.message || getApiErrorMessage(result.data, '屏蔽用户失败，请稍后重试。', result.response.status));
                                 }
                                 Alert.alert('已屏蔽', '@' + authorHandle + ' 已加入屏蔽名单。刷新信息流以同步过滤结果。');
                             } catch (error) {
-                                Alert.alert('屏蔽失败', error instanceof Error ? error.message : '屏蔽用户失败，请稍后重试。');
+                                if (useAuthStore.getState().user?.id === currentUser?.id) Alert.alert('屏蔽失败', error instanceof Error ? error.message : '屏蔽用户失败，请稍后重试。');
                             }
                         })();
                     },
@@ -666,7 +671,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                     try {
                         // Always read the current ETag; the timeline version may be stale.
                         assertActiveOwner();
-                        const latest = await apiRequest<any>('/contents/' + encodeURIComponent(contentId), { method: 'GET' });
+                        const latest = await apiRequest<any>('/contents/' + encodeURIComponent(contentId), { method: 'GET', expectedAccountId: currentUser?.id });
                         assertActiveOwner();
                         if (!latest.response.ok) {
                             throw new Error(latest.error?.message || getApiErrorMessage(latest.data, '无法读取动态当前状态。', latest.response.status));
@@ -687,6 +692,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                             method: 'DELETE',
                             headers: { 'If-Match': etag },
                             idempotencyKey: 'native-content-delete:' + contentId + ':' + etag,
+                            expectedAccountId: currentUser?.id,
                         });
                         assertActiveOwner();
                         if (!result.response.ok) {
@@ -695,7 +701,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                         onDeleted?.(contentId);
                         Alert.alert('已删除', '这条动态已删除。');
                     } catch (error) {
-                        Alert.alert('删除失败', error instanceof Error ? error.message : '删除动态失败，请稍后重试。');
+                        if (useAuthStore.getState().user?.id === currentUser?.id) Alert.alert('删除失败', error instanceof Error ? error.message : '删除动态失败，请稍后重试。');
                     }
                 })();
             } },
