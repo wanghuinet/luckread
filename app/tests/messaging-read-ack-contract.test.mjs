@@ -62,3 +62,12 @@ test('conversation composer state is isolated when route or account scope change
   expect(source).toContain('conversationScopeRef.current.version !== variables.scopeVersion');
   expect(source).toContain('sendDirectMessage(variables.conversationId');
 });
+
+
+test('attachment picker and upload completions cannot leak into a newly selected conversation', () => {
+  const source = readFileSync(new URL('../app/(drawer)/(tabs)/(messages)/messages/[conversationId].tsx', import.meta.url), 'utf8');
+  expect(source).toContain('const scopeVersion = conversationScopeRef.current.version;');
+  expect(source).toContain('if (conversationScopeRef.current.version !== scopeVersion) return;');
+  expect(source).toContain('await uploadOne(item.localId, item.file, scopeVersion)');
+  expect(source).toContain('if (conversationScopeRef.current.version === scopeVersion) setIsPicking(false);');
+});
