@@ -8,7 +8,7 @@ test('automatically appends the next public content page when the list sentinel 
     title: 'First page article ' + (index + 1),
     createdAt: '2026-11-01T00:00:00.000Z',
     updatedAt: '2026-11-01T00:00:00.000Z',
-    coverRef: null,
+    coverRef: null as string | null,
   }))
   const secondPageItem = {
     id: 'public-article-next',
@@ -17,7 +17,7 @@ test('automatically appends the next public content page when the list sentinel 
     title: 'Second page article loaded automatically',
     createdAt: '2026-11-02T00:00:00.000Z',
     updatedAt: '2026-11-02T00:00:00.000Z',
-    coverRef: null,
+    coverRef: null as string | null,
   }
   let contentPageRequests = 0
 
