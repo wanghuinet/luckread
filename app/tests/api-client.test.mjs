@@ -822,6 +822,7 @@ test('does not hydrate a new viewer from a late previous-viewer bookmark respons
   });
 
   activeViewerId = 'bookmark-viewer-a';
+  mockActiveAccountId = 'bookmark-viewer-a';
   const pending = refreshContentBookmarkStatus(contentId);
   // Wait until the shared client has read the secure session and actually
   // entered fetch, so the account switch happens while the request is pending.
