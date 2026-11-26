@@ -41,3 +41,13 @@ test('messaging realtime cache reads and writes use account-scoped query keys', 
   expect(source).toContain("setQueryData(['messaging', userId, 'messages', conversationId]");
   expect(source).toContain("setQueryData(['messaging', userId, 'typing', conversationId]");
 });
+
+
+test('attachment upload does not reject metadata-only missing file size before server validation', () => {
+  const source = readFileSync(new URL('../lib/messaging-api.ts', import.meta.url), 'utf8');
+  const start = source.indexOf('export async function uploadMessageAttachment');
+  const end = source.indexOf('\n}\n', start);
+  const implementation = source.slice(start, end);
+  expect(implementation).toContain('typeof file.size === \'number\'');
+  expect(implementation).not.toContain('!file.size');
+});
