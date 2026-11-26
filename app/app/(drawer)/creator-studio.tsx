@@ -90,7 +90,7 @@ export default function CreatorStudioScreen() {
     if (refresh) setRefreshing(true); else setLoading(true);
     setError('');
     try {
-      const result = await fetchMyCreatorApplication();
+      const result = await fetchMyCreatorApplication({ expectedAccountId: owner });
       if (viewerRef.current !== owner) return;
       if (result.response.status === 401) { router.replace(('/login?returnTo=' + encodeURIComponent('/creator-studio')) as never); return; }
       if (!result.response.ok) throw new Error(message(result, '创作者申请状态读取失败。'));
@@ -98,7 +98,7 @@ export default function CreatorStudioScreen() {
       if (!payload || (payload.application !== null && !validApp(payload.application))) throw new Error('创作者申请数据格式无效。');
       setApplication(payload.application);
       if (payload.application?.status === 'APPROVED' && payload.application.grant_state === 'GRANTED') {
-        const planResult = await fetchMyCreatorPlans({ limit: 50 });
+        const planResult = await fetchMyCreatorPlans({ limit: 50, expectedAccountId: owner });
         if (viewerRef.current !== owner) return;
         if (!planResult.response.ok) throw new Error(message(planResult, '会员方案读取失败。'));
         const page = unwrapApiData<{ docs: CreatorPlan[] }>(planResult.data);
@@ -120,7 +120,7 @@ export default function CreatorStudioScreen() {
     if (!owner || !isCurrentViewer(owner)) return;
     setSaving(true); setError(''); setNotice('');
     try {
-      const r = await submitCreatorApplication(creatorType, statement.trim(), makeKey('creator_apply'));
+      const r = await submitCreatorApplication(creatorType, statement.trim(), makeKey('creator_apply'), owner);
       if (!isCurrentViewer(owner)) return;
       if (!r.response.ok) throw new Error(message(r, '申请提交失败。'));
       setNotice('申请已提交，审核状态已刷新。');
@@ -143,8 +143,8 @@ export default function CreatorStudioScreen() {
     setSaving(true); setError(''); setNotice('');
     try {
       const r = editing
-        ? await updateMyCreatorPlan(editing.planId, editing.etag, terms, makeKey('plan_update'))
-        : await createMyCreatorPlan(terms, makeKey('plan_create'));
+        ? await updateMyCreatorPlan(editing.planId, editing.etag, terms, makeKey('plan_update'), owner)
+        : await createMyCreatorPlan(terms, makeKey('plan_create'), owner);
       if (!isCurrentViewer(owner)) return;
       if (!r.response.ok) throw new Error(message(r, '会员方案保存失败。'));
       setNotice(editing ? '会员方案已更新。' : '会员方案草稿已创建。');
@@ -163,8 +163,8 @@ export default function CreatorStudioScreen() {
         void (async () => {
           try {
             const r = action === 'publish'
-              ? await publishMyCreatorPlan(p.planId, p.etag)
-              : await changeMyCreatorPlanLifecycle(p.planId, p.etag, action);
+              ? await publishMyCreatorPlan(p.planId, p.etag, owner)
+              : await changeMyCreatorPlanLifecycle(p.planId, p.etag, action, owner);
             if (!isCurrentViewer(owner)) return;
             if (!r.response.ok) throw new Error(message(r, label + '失败。'));
             setNotice('方案状态已更新。'); await load();
