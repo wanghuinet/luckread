@@ -12,9 +12,10 @@ function QueryLifecycle({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (previousViewerId.current !== undefined && previousViewerId.current !== viewerId) {
-      // Following feed entries are viewer-scoped. Never retain one account's
-      // cached timeline after logout or an account switch.
-      queryClient.removeQueries({ queryKey: ['native-feed', 'following'] });
+      // All authenticated queries and pending mutations may contain viewer-specific
+      // data. Purge the entire in-memory cache when identity changes rather
+      // than trying to maintain a brittle list of feature-specific cache keys.
+      queryClient.clear();
     }
     previousViewerId.current = viewerId;
   }, [viewerId]);
