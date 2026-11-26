@@ -112,6 +112,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
       kind,
       cursor: pageParam,
       signal,
+      viewerId,
     }),
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
     staleTime: 30_000,
