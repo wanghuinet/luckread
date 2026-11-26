@@ -132,10 +132,13 @@ async function writePushEndpoint(
   }
 }
 
-async function disableExistingPushEndpoint(userId: string): Promise<void> {
+async function disableExistingPushEndpoint(
+  userId: string,
+  permissionStatus: 'denied' | 'undetermined',
+): Promise<void> {
   const installationId = await readInstallationId(userId);
   if (!installationId) return;
-  await writePushEndpoint(userId, 'denied', null, installationId);
+  await writePushEndpoint(userId, permissionStatus, null, installationId);
 }
 
 async function ensureAndroidNotificationChannel(): Promise<void> {
@@ -194,12 +197,12 @@ async function syncPushEndpointForAuthenticatedUserNow(
   if (permission.status === 'undetermined') {
     // A previously granted endpoint may survive an OS permission reset or app reinstall.
     // Keep the no-prompt behavior, but make the server state match the current permission.
-    await disableExistingPushEndpoint(userId);
+    await disableExistingPushEndpoint(userId, 'undetermined');
     return 'not-requested';
   }
 
   if (permission.status === 'denied') {
-    await disableExistingPushEndpoint(userId);
+    await disableExistingPushEndpoint(userId, 'denied');
     return 'denied';
   }
 
@@ -225,7 +228,7 @@ async function requestDevicePushPermissionNow(
 
   let permission = await Notifications.getPermissionsAsync();
   if (permission.status === 'denied' && permission.canAskAgain === false) {
-    await disableExistingPushEndpoint(userId);
+    await disableExistingPushEndpoint(userId, 'denied');
     return 'settings-required';
   }
 
@@ -242,7 +245,7 @@ async function requestDevicePushPermissionNow(
   }
 
   if (permission.status === 'denied') {
-    await disableExistingPushEndpoint(userId);
+    await disableExistingPushEndpoint(userId, 'denied');
     return permission.canAskAgain === false ? 'settings-required' : 'denied';
   }
 
