@@ -117,7 +117,7 @@ export default function NotificationPreferencesScreen() {
     setMessage('');
     setAuthRequired(false);
 
-    void fetchNotificationPreferences(controller.signal)
+    void fetchNotificationPreferences(controller.signal, accountId ?? undefined)
       .then((result) => {
         if (!active || controller.signal.aborted) return;
         setPreferences(result);
@@ -226,13 +226,13 @@ export default function NotificationPreferencesScreen() {
   }, []);
 
   const save = useCallback(async () => {
-    if (!preferences || saving || !dirty) return;
+    if (!accountId || !preferences || saving || !dirty) return;
     setSaving(true);
     setError('');
     setMessage('');
     const operationAccountId = accountId;
     try {
-      const canonical = await saveNotificationPreferences(preferences);
+      const canonical = await saveNotificationPreferences(preferences, operationAccountId);
       if (useAuthStore.getState().user?.id !== operationAccountId) return;
       setPreferences(canonical);
       setSavedPreferences(canonical);
