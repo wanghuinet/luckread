@@ -22,6 +22,7 @@ test('comment list requests and local interaction state reset on viewer changes'
   expect(comments).toContain('pendingSubmissionRef.current = null;');
   expect(comments).toContain('pendingDeleteKeysRef.current = {};');
   expect(comments).toContain('setReportingCommentId(null);');
+  expect(comments).toContain('React.useLayoutEffect(() => {');
   expect(comments).toContain('expectedAccountId: requestViewerId ?? undefined');
   expect(comments).toContain("{ method: 'GET', auth: false }");
   expect(comments).toContain('setDeletingIds(new Set());');
