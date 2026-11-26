@@ -70,6 +70,8 @@ export default function Search() {
   const trendingRequestIdRef = useRef(0);
   const trendingAbortRef = useRef<AbortController | null>(null);
   const historyRequestIdRef = useRef(0);
+  const searchViewerIdRef = useRef<string | null>(viewerId);
+  searchViewerIdRef.current = viewerId;
   const tabBarScroll = useTabBarScroll();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -101,6 +103,25 @@ export default function Search() {
   const [topics, setTopics] = useState<DiscoveryTopic[]>([]);
   const [topicsLoading, setTopicsLoading] = useState(true);
   const [topicsError, setTopicsError] = useState('');
+
+  useEffect(() => {
+    contentRequestIdRef.current += 1;
+    contentAbortRef.current?.abort();
+    contentAbortRef.current = null;
+    userRequestIdRef.current += 1;
+    userAbortRef.current?.abort();
+    userAbortRef.current = null;
+    setContentResults([]);
+    setContentCursor(null);
+    setContentHasMore(false);
+    setContentBusy(false);
+    setContentLoadingMore(false);
+    setContentError('');
+    setUserResult(null);
+    setUserBusy(false);
+    setUserError('');
+    setContentSearchSubmitted(false);
+  }, [viewerId]);
 
   useEffect(() => {
     const scope = viewerId;
@@ -213,6 +234,7 @@ export default function Search() {
     setContentSearchSubmitted(true);
 
     const requestId = ++contentRequestIdRef.current;
+    const requestViewerId = viewerId;
     contentAbortRef.current?.abort();
     contentAbortRef.current = null;
 
@@ -230,7 +252,7 @@ export default function Search() {
 
     const controller = new AbortController();
     contentAbortRef.current = controller;
-    const isCurrent = () => requestId === contentRequestIdRef.current && !controller.signal.aborted;
+    const isCurrent = () => requestId === contentRequestIdRef.current && !controller.signal.aborted && searchViewerIdRef.current === requestViewerId;
 
     if (append) {
       setContentLoadingMore(true);
@@ -266,7 +288,7 @@ export default function Search() {
             // Search returns canonical metadata only. Do not dereference bodyRef or
             // fetch media until search-serving visibility/entitlement checks exist.
             const [social, author] = await Promise.all([
-              readContentSocial(item.id),
+              readContentSocial(item.id, controller.signal, requestViewerId ?? undefined),
               readContentAuthor(item),
             ]);
             return mapContentToFeedContent(item, undefined, social, author, sessionToken);
@@ -290,7 +312,7 @@ export default function Search() {
         if (contentAbortRef.current === controller) contentAbortRef.current = null;
       }
     }
-  }, [contentCursor, contentInput, rememberSearch]);
+  }, [contentCursor, contentInput, rememberSearch, viewerId]);
 
   const loadTopics = useCallback(async () => {
     const requestId = ++topicsRequestIdRef.current;
@@ -349,6 +371,7 @@ export default function Search() {
     Keyboard.dismiss();
 
     const requestId = ++userRequestIdRef.current;
+    const requestViewerId = viewerId;
     userAbortRef.current?.abort();
     userAbortRef.current = null;
     setUserResult(null);
@@ -361,7 +384,7 @@ export default function Search() {
 
     const controller = new AbortController();
     userAbortRef.current = controller;
-    const isCurrent = () => requestId === userRequestIdRef.current && !controller.signal.aborted;
+    const isCurrent = () => requestId === userRequestIdRef.current && !controller.signal.aborted && searchViewerIdRef.current === requestViewerId;
 
     setUserBusy(true);
     try {
@@ -386,7 +409,7 @@ export default function Search() {
         if (userAbortRef.current === controller) userAbortRef.current = null;
       }
     }
-  }, [usernameInput]);
+  }, [usernameInput, viewerId]);
 
   const openTopic = useCallback(async (topic: DiscoveryTopic) => {
     const name = topic.name?.trim();
