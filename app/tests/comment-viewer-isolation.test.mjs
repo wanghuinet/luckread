@@ -30,3 +30,12 @@ test('comment submit, delete, and like completions cannot update a different vie
   expect(comments).toContain('if ((useAuthStore.getState().user?.id ?? null) === viewerIdAtStart) setLikingCommentId(null);');
   expect(comments).toContain('if (useAuthStore.getState().user?.id === viewerIdAtStart)');
 });
+
+test('comment author profile hydration is invalidated on account switch and after async token lookup', () => {
+  expect(comments).toContain('const requestViewerId = currentUserId;');
+  expect(comments).toContain('const isCurrentHydration = () =>');
+  expect(comments).toContain('if (!isCurrentHydration()) return;');
+  expect(comments).toContain('Object.keys(next).length > 0 && isCurrentHydration()');
+  expect(comments).toContain('if (!isCurrentHydration()) return;');
+  expect(comments).toContain('}, [comments, currentUserId]);');
+});
