@@ -60,3 +60,19 @@ test('reloads notification preferences when the authenticated account changes', 
   expect(notificationScreen).toContain('const operationAccountId = accountId;');
   expect(notificationScreen).toContain('useAuthStore.getState().user?.id !== operationAccountId');
 });
+
+
+test('does not let a previous account push-permission request update the next account UI', () => {
+  const notificationScreen = readFileSync(
+    new URL('../app/(drawer)/notification-preferences.tsx', import.meta.url),
+    'utf8',
+  );
+
+  expect(notificationScreen).toContain('const operationAccountId = accountId;');
+  expect(notificationScreen).toContain('requestDevicePushPermission(operationAccountId)');
+  expect(notificationScreen).toContain('useAuthStore.getState().user?.id !== operationAccountId');
+  expect(notificationScreen).toContain('useAuthStore.getState().user?.id === operationAccountId');
+  expect(notificationScreen).toContain('}, [accountId]);');
+  expect(notificationScreen).toContain('const openSystemNotificationSettings = useCallback(async () => {\n    const operationAccountId = accountId;');
+  expect(notificationScreen).toContain('if (useAuthStore.getState().user?.id === operationAccountId) {\n        setDevicePushError');
+});

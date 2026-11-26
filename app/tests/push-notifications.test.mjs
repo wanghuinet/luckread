@@ -268,7 +268,7 @@ test('notification settings exposes both explicit enable and system permission m
     'utf8',
   );
 
-  expect(screen).toContain('requestDevicePushPermission(accountId)');
+  expect(screen).toContain('requestDevicePushPermission(operationAccountId)');
   expect(screen).toContain('openSystemNotificationSettings');
   expect(screen).toContain('管理系统通知');
   expect(screen).toContain('Linking.openSettings()');
