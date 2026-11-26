@@ -25,7 +25,7 @@ type PendingAttachment = {
   attachment?: MessagingAttachment;
   error?: string;
 };
-type SendVariables = { body: string; attachments: MessagingAttachment[] };
+type SendVariables = { body: string; attachments: MessagingAttachment[]; conversationId: string; userId?: string; scopeVersion: number };
 
 function PrivateMessageImages({ currentMessage }: { currentMessage: IMessage }) {
   const [headers, setHeaders] = useState<Record<string, string>>({});
@@ -220,6 +220,30 @@ export default function ConversationScreen() {
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingRefreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const typingActiveRef = useRef(false);
+  const conversationScopeRef = useRef({ conversationId, userId, version: 0 });
+  // A dynamic route can reuse this screen instance. Reset composer state before
+  // committing a render for another conversation or authenticated account.
+  if (conversationScopeRef.current.conversationId !== conversationId || conversationScopeRef.current.userId !== userId) {
+    conversationScopeRef.current = {
+      conversationId,
+      userId,
+      version: conversationScopeRef.current.version + 1,
+    };
+    setDraft('');
+    setPendingAttachments([]);
+    setSenderProfiles({});
+    senderProfileAttempted.current.clear();
+    setEditTarget(null);
+    setEditDraft('');
+    setIsPicking(false);
+    pendingSend.current = null;
+    sendMutationPendingRef.current = false;
+    typingActiveRef.current = false;
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    if (typingRefreshTimer.current) clearInterval(typingRefreshTimer.current);
+    typingTimer.current = null;
+    typingRefreshTimer.current = null;
+  }
   const stopTyping = useCallback(() => {
     if (typingTimer.current) clearTimeout(typingTimer.current);
     if (typingRefreshTimer.current) clearInterval(typingRefreshTimer.current);
@@ -435,18 +459,21 @@ export default function ConversationScreen() {
       if (!pendingSend.current || pendingSend.current.fingerprint !== fingerprint) {
         pendingSend.current = { fingerprint, key: createIdempotencyKey() };
       }
-      return sendDirectMessage(conversationId, variables.body, pendingSend.current.key, variables.attachments);
+      return sendDirectMessage(variables.conversationId, variables.body, pendingSend.current.key, variables.attachments);
     },
     onMutate: () => { sendMutationPendingRef.current = true; },
     onSuccess: async (sentMessage, variables) => {
-      sendMutationPendingRef.current = false;
-      pendingSend.current = null;
-      setDraft((current) => current.trim() === variables.body ? '' : current);
-      stopTyping();
-      setPendingAttachments([]);
+      const isCurrentScope = conversationScopeRef.current.version === variables.scopeVersion;
+      if (isCurrentScope) {
+        sendMutationPendingRef.current = false;
+        pendingSend.current = null;
+        setDraft((current) => current.trim() === variables.body ? '' : current);
+        stopTyping();
+        setPendingAttachments([]);
+      }
       let cachePageOverflow = false;
       queryClient.setQueryData<typeof messagesQuery.data>(
-        ['messaging', userId, 'messages', conversationId],
+        ['messaging', variables.userId, 'messages', variables.conversationId],
         (current) => {
           if (!current?.pages.length || current.pages.some((page) => page.items.some((item) => item.message_id === sentMessage.message_id))) return current;
           const pages = [...current.pages];
@@ -463,11 +490,12 @@ export default function ConversationScreen() {
       if (cachePageOverflow) {
         // Local send success must obey the same bounded cache policy as WebSocket
         // and incremental sync; the persisted history query will restore the page.
-        void queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'messages', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['messaging', variables.userId, 'messages', variables.conversationId] });
       }
-      await queryClient.invalidateQueries({ queryKey: ['messaging', userId, 'conversations'] });
+      await queryClient.invalidateQueries({ queryKey: ['messaging', variables.userId, 'conversations'] });
     },
     onError: (_error, variables) => {
+      if (conversationScopeRef.current.version !== variables.scopeVersion) return;
       sendMutationPendingRef.current = false;
       setDraft(variables.body);
     },
@@ -534,7 +562,7 @@ export default function ConversationScreen() {
     const body = bodyValue.trim();
     if (sendMutation.isPending || pendingAttachments.some((item) => item.status !== 'ready')) return;
     if (!body && readyAttachments.length === 0) return;
-    sendMutation.mutate({ body, attachments: readyAttachments });
+    sendMutation.mutate({ body, attachments: readyAttachments, conversationId, userId, scopeVersion: conversationScopeRef.current.version });
   }, [pendingAttachments, readyAttachments, sendMutation]);
   const handleChatSend = useCallback((newMessages: IMessage[]) => {
     sendCurrent(newMessages[0]?.text ?? draft);
