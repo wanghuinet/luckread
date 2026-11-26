@@ -399,14 +399,17 @@ export default function ConversationScreen() {
 
 
 
-  const uploadOne = useCallback(async (localId: string, file: LocalMediaFile) => {
+  const uploadOne = useCallback(async (localId: string, file: LocalMediaFile, scopeVersion = conversationScopeRef.current.version) => {
+    if (conversationScopeRef.current.version !== scopeVersion) return;
     setPendingAttachments((current) => current.map((item) => item.localId === localId
       ? { ...item, status: 'uploading', error: undefined } : item));
     try {
       const attachment = await uploadMessageAttachment(file, localId);
+      if (conversationScopeRef.current.version !== scopeVersion) return;
       setPendingAttachments((current) => current.map((item) => item.localId === localId
         ? { ...item, status: 'ready', attachment, error: undefined } : item));
     } catch (error) {
+      if (conversationScopeRef.current.version !== scopeVersion) return;
       setPendingAttachments((current) => current.map((item) => item.localId === localId
         ? { ...item, status: 'failed', error: error instanceof Error ? error.message : '上传失败' } : item));
     }
@@ -414,6 +417,7 @@ export default function ConversationScreen() {
 
   const pickAttachments = useCallback(async () => {
     if (isPicking || sendMutationPendingRef.current) return;
+    const scopeVersion = conversationScopeRef.current.version;
     const available = 4 - pendingAttachments.length;
     if (available <= 0) {
       Alert.alert('附件数量已达上限', '一条私信最多添加 4 个附件。');
@@ -422,6 +426,7 @@ export default function ConversationScreen() {
     setIsPicking(true);
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (conversationScopeRef.current.version !== scopeVersion) return;
       if (!permission.granted) {
         Alert.alert('需要照片访问权限', '允许 LuckRead 访问照片后才能添加私信图片。');
         return;
@@ -433,6 +438,7 @@ export default function ConversationScreen() {
         allowsEditing: false,
         quality: 1,
       });
+      if (conversationScopeRef.current.version !== scopeVersion) return;
       if (result.canceled || !result.assets?.length) return;
       const selected: PendingAttachment[] = result.assets.slice(0, available).map((asset) => {
         const localId = createIdempotencyKey();
@@ -447,11 +453,16 @@ export default function ConversationScreen() {
         return { localId, file, status: 'uploading' };
       });
       setPendingAttachments((current) => [...current, ...selected]);
-      for (const item of selected) await uploadOne(item.localId, item.file);
+      for (const item of selected) {
+        if (conversationScopeRef.current.version !== scopeVersion) break;
+        await uploadOne(item.localId, item.file, scopeVersion);
+      }
     } catch (error) {
-      Alert.alert('无法添加附件', error instanceof Error ? error.message : '请稍后重试。');
+      if (conversationScopeRef.current.version === scopeVersion) {
+        Alert.alert('无法添加附件', error instanceof Error ? error.message : '请稍后重试。');
+      }
     } finally {
-      setIsPicking(false);
+      if (conversationScopeRef.current.version === scopeVersion) setIsPicking(false);
     }
   }, [isPicking, pendingAttachments.length, uploadOne]);
 
