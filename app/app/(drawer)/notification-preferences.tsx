@@ -91,7 +91,14 @@ export default function NotificationPreferencesScreen() {
 
 
   useEffect(() => {
-    if (authStatus === 'loading') return;
+    if (authStatus === 'loading') {
+      setPreferences(null);
+      setSavedPreferences(null);
+      setLoading(true);
+      setSaving(false);
+      setAuthRequired(false);
+      return;
+    }
     if (authStatus !== 'authenticated') {
       setAuthRequired(true);
       setPreferences(null);
