@@ -17,6 +17,7 @@ on:
       - 'scripts/cloudflare/verify-neon-worker-hyperdrive-staging.mjs'
       - 'scripts/cloudflare/verify-neon-worker-hyperdrive-staging.test.mjs'
       - '.github/workflows/media-runtime-e2e.yml'
+      - '.github/workflows/w01-media-owner-migration-execution.yml'
       - '.github/workflows/neon-worker-hyperdrive-staging-ci.yml'
 
 permissions:
