@@ -401,3 +401,18 @@ test('session invalidation guards awaited cleanup and state publication against 
   expect(block.match(/generation !== authLifecycleGeneration/g)?.length).toBeGreaterThanOrEqual(5);
   expect(block).toContain('const accounts = await listStoredAccounts()');
 });
+
+
+test('a newer bootstrap supersedes an older deferred bootstrap response', async () => {
+  await useAuthStore.getState().login('bootstrap@example.com', 'password');
+  deferNextSessionResponse = true;
+  const olderBootstrap = useAuthStore.getState().bootstrap();
+  await Promise.resolve();
+  const newerBootstrap = useAuthStore.getState().bootstrap();
+  await newerBootstrap;
+  resolveDeferredSessionResponse?.();
+  await olderBootstrap;
+  expect(useAuthStore.getState().status).toBe('authenticated');
+  expect(useAuthStore.getState().user?.id).toBe('user-bootstrap@example.com');
+  expect(activeAccountId).toBe('user-bootstrap@example.com');
+});
