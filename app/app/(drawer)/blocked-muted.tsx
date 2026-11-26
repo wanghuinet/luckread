@@ -71,7 +71,7 @@ export default function BlockedMutedScreen() {
   const requestRef = useRef<AbortController | null>(null);
 
   const loadPage = useCallback(async (nextCursor: string | null, append: boolean, pullRefresh = false) => {
-    if (authStatus !== 'authenticated') {
+    if (authStatus !== 'authenticated' || !accountId) {
       setRows([]);
       loadedAccountIdRef.current = null;
       setLoadedAccountId(null);
@@ -102,6 +102,7 @@ export default function BlockedMutedScreen() {
         cursor: nextCursor,
         limit: 20,
         signal: controller.signal,
+        expectedAccountId: accountId,
       });
       if (result.response.status === 401) {
         if (!controller.signal.aborted && accountIdRef.current === accountId && authUserRef.current === authUser) {

@@ -160,6 +160,7 @@ export async function setProfilePin(
       {
         method: pinned ? 'POST' : 'DELETE',
         idempotencyKey: createIdempotencyKey(),
+        expectedAccountId: userId,
       },
     );
     if (generation !== loadGeneration || !isCurrentViewer(userId)) {

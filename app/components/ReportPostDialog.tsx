@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+
+import { useAuthStore } from '~/store/auth-store';
 
 import {
   CONTENT_REPORT_REASONS,
@@ -33,9 +35,18 @@ const reasonOptions: Array<{ value: ContentReportReason; label: string; hint: st
 ];
 
 export default function ReportPostDialog({ visible, contentId, onClose }: ReportPostDialogProps) {
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
+  const viewerIdRef = useRef<string | null>(viewerId);
+  viewerIdRef.current = viewerId;
   const [reasonCode, setReasonCode] = useState<ContentReportReason>('SPAM');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setReasonCode('SPAM');
+    setDescription('');
+    setSubmitting(false);
+  }, [viewerId]);
 
   const close = () => {
     if (submitting) return;
@@ -46,6 +57,11 @@ export default function ReportPostDialog({ visible, contentId, onClose }: Report
 
   const submit = async () => {
     if (submitting) return;
+    const requestViewerId = viewerId;
+    if (!requestViewerId) {
+      Alert.alert('Sign in required', 'Sign in to report this post.');
+      return;
+    }
     if (!contentId?.trim()) {
       Alert.alert('Cannot report post', 'This post is not connected to a valid LuckRead content ID.');
       return;
@@ -53,12 +69,15 @@ export default function ReportPostDialog({ visible, contentId, onClose }: Report
     setSubmitting(true);
     let result: Awaited<ReturnType<typeof submitContentReport>>;
     try {
-      result = await submitContentReport(contentId, reasonCode, description);
+      result = await submitContentReport(contentId, reasonCode, description, requestViewerId);
+      if (viewerIdRef.current !== requestViewerId) return;
     } catch {
-      Alert.alert('Report failed', 'Could not submit this report. Please check your connection and try again.');
+      if (viewerIdRef.current === requestViewerId) {
+        Alert.alert('Report failed', 'Could not submit this report. Please check your connection and try again.');
+      }
       return;
     } finally {
-      setSubmitting(false);
+      if (viewerIdRef.current === requestViewerId) setSubmitting(false);
     }
     if (!result.ok) {
       Alert.alert('Report failed', result.message || 'Could not submit this report. Please try again.');
