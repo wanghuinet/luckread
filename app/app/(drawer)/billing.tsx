@@ -377,9 +377,9 @@ export default function BillingScreen() {
 
     try {
       const [documentResult, paymentResult, refundResult] = await Promise.all([
-        fetchBillingDocumentsPage({ limit: PAGE_SIZE, signal: controller.signal }),
-        fetchPaymentHistoryPage({ limit: PAGE_SIZE, signal: controller.signal }),
-        fetchRefundHistoryPage({ limit: PAGE_SIZE, signal: controller.signal }),
+        fetchBillingDocumentsPage({ limit: PAGE_SIZE, signal: controller.signal, expectedAccountId: requestViewerId }),
+        fetchPaymentHistoryPage({ limit: PAGE_SIZE, signal: controller.signal, expectedAccountId: requestViewerId }),
+        fetchRefundHistoryPage({ limit: PAGE_SIZE, signal: controller.signal, expectedAccountId: requestViewerId }),
       ]);
       if (!isCurrentRequest()) return;
 
@@ -473,7 +473,7 @@ export default function BillingScreen() {
     setLoadingMore(true);
     setError('');
     try {
-      const options = { limit: PAGE_SIZE, cursor, signal: controller.signal };
+      const options = { limit: PAGE_SIZE, cursor, signal: controller.signal, expectedAccountId: requestViewerId };
       const result = requestTab === 'documents'
         ? await fetchBillingDocumentsPage(options)
         : requestTab === 'payments'
