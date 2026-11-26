@@ -53,10 +53,12 @@ function parseErrorCode(value: unknown): string | undefined {
 
 export async function fetchNotificationPreferences(
   signal?: AbortSignal,
+  expectedAccountId?: string,
 ): Promise<NotificationPreferences> {
   const result = await apiRequest<unknown>('/notification-preferences', {
     method: 'GET',
     signal,
+    ...(expectedAccountId ? { expectedAccountId } : {}),
   });
   if (!result.response.ok) {
     throw new NotificationPreferencesApiError(
@@ -78,6 +80,7 @@ export async function fetchNotificationPreferences(
 
 export async function saveNotificationPreferences(
   preferences: NotificationPreferences,
+  expectedAccountId: string,
 ): Promise<NotificationPreferences> {
   for (const key of preferenceKeys) {
     if (typeof preferences[key] !== 'boolean') {
@@ -87,6 +90,7 @@ export async function saveNotificationPreferences(
 
   const result = await apiRequest<unknown>('/notification-preferences', {
     method: 'PATCH',
+    expectedAccountId,
     body: JSON.stringify({
       follow: preferences.follow,
       like: preferences.like,
