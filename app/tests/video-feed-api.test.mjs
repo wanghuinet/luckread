@@ -119,7 +119,8 @@ test('renders video list projections immediately and hydrates only the visible v
   expect(videoScreen).toContain('recordsByIdRef.current.get(currentId)');
   expect(videoScreen).toContain('signal: controller.signal');
   expect(videoScreen).toContain('setCursor(page.nextCursor || null)');
-  expect(videoScreen).toContain('playback: () => resolveVideoSource(record, sessionToken, controller.signal)');
+  expect(videoScreen).toContain('playback: () => resolveVideoSource(record, sessionToken, controller.signal, viewerId ?? undefined)');
+  expect(videoScreen).toContain('getMediaPlayback(reference, signal, expectedAccountId)');
   expect(videoScreen).toContain('readContentAuthor(record, controller.signal)');
   expect(videoScreen).toContain('controller.abort()');
   expect(videoScreen).toContain('videoSource: null, mediaLoading: false');
