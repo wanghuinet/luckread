@@ -1,4 +1,5 @@
 import { apiRequest, getApiErrorMessage } from './api-client';
+import { useAuthStore } from '../store/auth-store';
 
 export const COMMENT_REPORT_REASONS = [
   { code: 'ABUSE', label: 'Abuse or harassment' },
@@ -42,6 +43,7 @@ export async function reportComment(input: {
   reasonCode: string;
   description?: string;
   idempotencyKey: string;
+  expectedViewerId: string;
 }): Promise<CommentReportResult> {
   const commentId = normalizeId(input.commentId);
   const reasonCode = normalizeReason(input.reasonCode);
@@ -54,10 +56,14 @@ export async function reportComment(input: {
   if (!key || key.length > 256) {
     throw new TypeError('A valid idempotency key is required.');
   }
+  if (!input.expectedViewerId || useAuthStore.getState().user?.id !== input.expectedViewerId) {
+    throw new CommentReportApiError('Your account changed before this report could be submitted.', undefined, 'VIEWER_CHANGED');
+  }
 
   const result = await apiRequest<unknown>('/reports', {
     method: 'POST',
     idempotencyKey: key,
+    expectedAccountId: input.expectedViewerId,
     body: JSON.stringify({
       targetType: 'comment',
       targetId: commentId,
