@@ -544,7 +544,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                     void (async () => {
                         try {
                             const readLatest = async () => {
-                                const result = await apiRequest<any>('/contents/' + encodeURIComponent(contentId), { method: 'GET' });
+                                const result = await apiRequest<any>('/contents/' + encodeURIComponent(contentId), { method: 'GET', expectedAccountId: currentUser?.id });
                                 if (!result.response.ok) throw new Error(result.error?.message || getApiErrorMessage(result.data, '无法读取动态当前状态。', result.response.status));
                                 const envelope = result.data as any;
                                 const record = envelope?.data?.id ? envelope.data : envelope?.doc?.id ? envelope.doc : envelope;
@@ -614,7 +614,9 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
         }
         void (async () => {
             try {
-                const result = await muteUser(targetUserId);
+                assertActiveOwner();
+                const result = await muteUser(targetUserId, currentUser?.id);
+                assertActiveOwner();
                 if (!result.response.ok) {
                     throw new Error(result.error?.message || getApiErrorMessage(result.data, '静音用户失败，请稍后重试。', result.response.status));
                 }
@@ -641,7 +643,9 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                     onPress: () => {
                         void (async () => {
                             try {
-                                const result = await blockUser(targetUserId);
+                                assertActiveOwner();
+                                const result = await blockUser(targetUserId, currentUser?.id);
+                                assertActiveOwner();
                                 if (!result.response.ok) {
                                     throw new Error(result.error?.message || getApiErrorMessage(result.data, '屏蔽用户失败，请稍后重试。', result.response.status));
                                 }
@@ -666,7 +670,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                     try {
                         // Always read the current ETag; the timeline version may be stale.
                         assertActiveOwner();
-                        const latest = await apiRequest<any>('/contents/' + encodeURIComponent(contentId), { method: 'GET' });
+                        const latest = await apiRequest<any>('/contents/' + encodeURIComponent(contentId), { method: 'GET', expectedAccountId: currentUser?.id });
                         assertActiveOwner();
                         if (!latest.response.ok) {
                             throw new Error(latest.error?.message || getApiErrorMessage(latest.data, '无法读取动态当前状态。', latest.response.status));
@@ -687,6 +691,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                             method: 'DELETE',
                             headers: { 'If-Match': etag },
                             idempotencyKey: 'native-content-delete:' + contentId + ':' + etag,
+                            expectedAccountId: currentUser?.id,
                         });
                         assertActiveOwner();
                         if (!result.response.ok) {
