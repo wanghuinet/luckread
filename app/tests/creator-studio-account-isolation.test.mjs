@@ -44,3 +44,15 @@ test('creator studio binds every authenticated read and write to its initiating 
   assert.match(source, /publishMyCreatorPlan\(p\.planId, p\.etag, owner\)/);
   assert.match(source, /changeMyCreatorPlanLifecycle\(p\.planId, p\.etag, action, owner\)/);
 });
+
+
+test('creator studio hides prior account data and resets its editor when the viewer changes', async () => {
+  const source = await readFile(sourcePath, 'utf8');
+  assert.match(source, /const previousViewerIdRef = useRef<string \| null>\(viewerId\)/);
+  assert.match(source, /setApplication\(null\);\s*setPlans\(\[\]\);\s*setLoadedViewerId\(null\)/);
+  assert.match(source, /setEditing\(null\);\s*setCreatorType\('PERSONAL'\);\s*setStatement\(''\)/);
+  assert.match(source, /const currentViewerDataReady = loadedViewerId === viewerId/);
+  assert.match(source, /const visibleApplication = currentViewerDataReady \? application : null/);
+  assert.match(source, /const visiblePlans = currentViewerDataReady \? plans : \[\]/);
+  assert.doesNotMatch(source.slice(source.indexOf('const currentViewerDataReady')), /\{application\?\.status/);
+});
