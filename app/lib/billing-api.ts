@@ -76,6 +76,7 @@ type PageOptions = {
   limit?: number;
   cursor?: string | null;
   signal?: AbortSignal;
+  expectedAccountId?: string;
 };
 
 const PAYMENT_ID_PATTERN = /^pay_[A-Za-z0-9]{26}$/;
@@ -104,6 +105,7 @@ export function fetchBillingDocumentsPage(options: PageOptions = {}) {
   return apiRequest<unknown>('/billing/documents' + buildPageQuery(options), {
     method: 'GET',
     signal: options.signal,
+    expectedAccountId: options.expectedAccountId,
   });
 }
 
@@ -112,6 +114,7 @@ export function fetchPaymentHistoryPage(options: PageOptions = {}) {
   return apiRequest<unknown>('/payments/history' + buildPageQuery(options), {
     method: 'GET',
     signal: options.signal,
+    expectedAccountId: options.expectedAccountId,
   });
 }
 
@@ -120,6 +123,7 @@ export function fetchRefundHistoryPage(options: PageOptions = {}) {
   return apiRequest<unknown>('/payments/refunds' + buildPageQuery(options), {
     method: 'GET',
     signal: options.signal,
+    expectedAccountId: options.expectedAccountId,
   });
 }
 
