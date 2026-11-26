@@ -25,8 +25,8 @@ test('React Native lifecycle binds app focus and Expo network connectivity to Ta
   expect(provider).toContain('onlineManager.setEventListener');
 });
 
-test('viewer changes remove cached Following pages to prevent account-to-account timeline leakage', () => {
-  expect(provider).toContain("queryClient.removeQueries({ queryKey: ['native-feed', 'following'] })");
+test('viewer changes purge all query and mutation cache to prevent account-to-account leakage', () => {
+  expect(provider).toContain('queryClient.clear();');
   expect(feed).toContain("nativeFeedQueryKey(kind, viewerId)");
   expect(feed).toContain("enabled: kind === 'for-you' || (authStatus === 'authenticated' && Boolean(viewerId))");
   // The public For You query is shared, but per-post social.viewer hydration must be viewer-scoped.
