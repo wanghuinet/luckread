@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY_W07_NEON_ONLY' }}
+    if: ${{ github.ref == 'refs/heads/main' && github.ref_protected == true && github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY_W07_NEON_ONLY' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
