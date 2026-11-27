@@ -187,11 +187,11 @@ export function isRemoteApplyReleased(manifestContract, ledgerContractValue) {
 function validateManifest(checksums) {
   const releaseBlocked = manifest.remoteApplyReady === false &&
     manifest.execution?.remoteApplyReady === false &&
-    (manifest.execution?.runnerStatus === 'IMPLEMENTED_NOT_REVIEWED' &&
-      ledgerContract.execution?.domainReadiness?.['D1-01']?.runnerStatus === 'IMPLEMENTED_NOT_REVIEWED' &&
-      ledgerContract.execution?.domainReadiness?.['D1-01']?.remoteApplyReady === false) ||
-    (manifest.execution?.runnerStatus === 'NOT_IMPLEMENTED' &&
-      ledgerContract.execution?.runnerStatus === 'NOT_IMPLEMENTED')
+    ledgerContract.remoteApplyReady === false &&
+    ledgerContract.execution?.remoteApplyReady === false &&
+    (manifest.execution?.runnerStatus === 'IMPLEMENTED_NOT_REVIEWED' ||
+      (manifest.execution?.runnerStatus === 'NOT_IMPLEMENTED' &&
+       ledgerContract.execution?.runnerStatus === 'NOT_IMPLEMENTED'))
   const releaseEnabled = isRemoteApplyReleased(manifest, ledgerContract)
   if (manifest.domainId !== 'D1-01' || manifest.databaseName !== 'luckread' ||
       manifest.postgresMajor !== 18 || manifest.entries?.length !== 16 ||
