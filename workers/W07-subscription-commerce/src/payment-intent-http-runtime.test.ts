@@ -287,6 +287,21 @@ describe('W07 internal payment-intent runtime', () => {
     expect(body).not.toContain('cHJvZmlsZV9pZD10ZXN0');
   });
 
+  it('rejects production payment intents while seller-of-record remains unapproved', async () => {
+    const fixture = createFixture({ env: { HYPERSWITCH_ENVIRONMENT: 'production' } });
+    const response = await handleCommercePaymentIntentRequest(
+      request({ idempotencyKey: CLIENT_IDEMPOTENCY_KEY }),
+      CUSTOMER_ID,
+      fixture.env,
+      fixture.dependencies,
+    );
+    expect(response?.status).toBe(503);
+    expect(await response?.json()).toMatchObject({ error: { code: 'SERVICE_UNAVAILABLE' } });
+    expect(fixture.calls.createAttempt).toHaveLength(0);
+    expect(fixture.calls.createProviderIntent).toHaveLength(0);
+    expect(fixture.calls.recordIntent).toHaveLength(0);
+  });
+
   it('fails closed before creating a local payment attempt when provider config is missing', async () => {
     const fixture = createFixture({ env: { HYPERSWITCH_API_KEY: undefined } });
     const response = await handleCommercePaymentIntentRequest(
