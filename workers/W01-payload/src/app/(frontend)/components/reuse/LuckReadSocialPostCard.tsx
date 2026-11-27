@@ -7,6 +7,7 @@ import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import { buildPublicContentHref } from '../../../../lib/public-content-url.js'
 import { getCachedPublicProfile, type PublicProfile } from '../../../../lib/social-post-profile-cache.js'
 import { resolveSocialPostMedia } from '../../../../lib/social-post-media.js'
+import { getSharedViewerRequest } from '../../../../lib/viewer-request-coalescer.js'
 import SocialPoll from './SocialPoll'
 import type { PublicLocale } from '../../i18n/public-locale'
 
@@ -213,12 +214,7 @@ export default function LuckReadSocialPostCard({
           signal: controller.signal,
         },
       )
-      const viewerRequest = fetchJson<{ id?: string }>('/api/v1/users/me', {
-        credentials: 'include',
-        headers: { accept: 'application/json' },
-        cache: 'no-store',
-        signal: controller.signal,
-      })
+      const viewerRequest = getSharedViewerRequest()
       const socialRequest = fetchJson<SocialSummary>(
         '/api/v1/contents/' + encodeURIComponent(contentId) + '/social',
         {
