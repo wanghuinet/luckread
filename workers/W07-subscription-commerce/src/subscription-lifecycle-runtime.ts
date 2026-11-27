@@ -203,7 +203,7 @@ async function hasUnresolvedRenewal(
       "SELECT cycle_id FROM subscription_renewal_cycles WHERE subscription_id = $1 AND (" +
       "state IN ('SUBMITTING','SUBMITTED','RECONCILIATION_REQUIRED') OR " +
       "(state = 'SUCCEEDED' AND subscription_sync_state = 'PENDING') OR " +
-      "(state = 'FAILED' AND payment_id IS NOT NULL AND provider_response_status IS NULL)) " +
+      "(state = 'FAILED' AND payment_id IS NOT NULL AND (provider_response_status IS NULL OR provider_response_status NOT IN ('failed','cancelled','expired','cancelled_post_capture')))) " +
       'ORDER BY updated_at DESC, cycle_id ASC LIMIT 1',
       [subscriptionId],
     )
@@ -262,6 +262,9 @@ async function beginLifecycleOperation(
 
     const row = await readLifecycleSubscription(client, input.subscriptionId, input.subscriberId)
     if (!row) throw new SubscriptionRuntimeError('NOT_FOUND', 404)
+    if (!existing && row.status === 'PAUSING') {
+      throw new SubscriptionRuntimeError('CONFLICT', 409)
+    }
     if (!existing && row.version !== input.expectedVersion) {
       throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
     }
