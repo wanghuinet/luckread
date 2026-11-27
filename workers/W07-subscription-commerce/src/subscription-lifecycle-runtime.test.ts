@@ -177,11 +177,10 @@ class MemoryLifecyclePool implements W07WebhookPostgresPool {
       return { rows: [structuredClone(this.row)], rowCount: 1 }
     }
     if (sql.includes('UPDATE membership_subscription_lifecycle_operation_receipts') && sql.includes('result_subscription_version')) {
-      const [version, status, response, , subscriberId, idempotencyHash] = values
-      const key = String(subscriberId) + ':' + String(idempotencyHash)
-      const receipt = this.receipts.get(key)
-      if (!receipt || receipt.result_status !== 'PENDING') return { rows: [], rowCount: 0 }
-      this.receipts.set(key, { ...receipt, result_status: String(status), response_json: String(response) })
+      const [version, status, response] = values
+      const entry = [...this.receipts.entries()].find(([, receipt]) => receipt.result_status === 'PENDING')
+      if (!entry) return { rows: [], rowCount: 0 }
+      this.receipts.set(entry[0], { ...entry[1], result_status: String(status), response_json: String(response) })
       return { rows: [{ result_subscription_version: version }], rowCount: 1 }
     }
     throw new Error('Unhandled test SQL: ' + sql)
