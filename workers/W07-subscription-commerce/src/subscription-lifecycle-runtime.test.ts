@@ -111,7 +111,7 @@ class MemoryLifecyclePool implements W07WebhookPostgresPool {
       this.audits.push({ sql, values })
       return { rows: [], rowCount: 1 }
     }
-    if (sql.startsWith('UPDATE membership_subscriptions SET status = $1, pause_started_at')) {
+    if (sql.startsWith('UPDATE membership_subscriptions SET status = $1, pause_started_at = $2')) {
       const [status, now, subscriptionId, subscriberId, expectedVersion] = values
       if (this.row.subscription_id !== subscriptionId || this.row.subscriber_id !== subscriberId ||
           this.row.status !== 'ACTIVE' || this.row.cancel_at !== null || this.row.version !== expectedVersion) {
