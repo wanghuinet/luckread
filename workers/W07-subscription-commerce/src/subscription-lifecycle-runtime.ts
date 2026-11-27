@@ -261,7 +261,7 @@ async function beginLifecycleOperation(
     }
 
     const row = await readLifecycleSubscription(client, input.subscriptionId, input.subscriberId)
-    if (!row) throw new SubscriptionRuntimeError('NOT_FOUND', 404)
+    if (!row) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
     if (!existing && row.status === 'PAUSING') {
       throw new SubscriptionRuntimeError('CONFLICT', 409)
     }
@@ -312,7 +312,7 @@ async function updateLifecycleFence(
     await client.query('BEGIN')
     transaction = true
     const row = await readLifecycleSubscription(client, input.row.subscription_id, input.subscriberId)
-    if (!row) throw new SubscriptionRuntimeError('NOT_FOUND', 404)
+    if (!row) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
     if (input.action === 'pause' && row.status === 'PAUSING') {
       await client.query('COMMIT')
       transaction = false
@@ -465,7 +465,7 @@ async function finishCancel(
     await client.query('BEGIN')
     transaction = true
     const row = await readLifecycleSubscription(client, input.subscriptionId, input.subscriberId)
-    if (!row) throw new SubscriptionRuntimeError('NOT_FOUND', 404)
+    if (!row) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
     const response = responseFromRow(row)
     await completeReceipt(client, input.subscriberId, input.idempotencyHash, response, input.now)
     await client.query('COMMIT')
@@ -496,7 +496,7 @@ async function applySimpleLifecycle(
     await client.query('BEGIN')
     transaction = true
     const row = await readLifecycleSubscription(client, input.row.subscription_id, input.subscriberId)
-    if (!row) throw new SubscriptionRuntimeError('NOT_FOUND', 404)
+    if (!row) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
     let updated: LifecycleSubscriptionRow | undefined
     if (input.action === 'cancel') {
       if (row.status === 'PAUSING') throw new SubscriptionRuntimeError('CONFLICT', 409)
