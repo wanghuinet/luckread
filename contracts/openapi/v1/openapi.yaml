@@ -2770,11 +2770,19 @@ paths:
       tags: [Users]
       summary: Cancel a subscription
       operationId: cancelSubscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
         - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
-        '200': { description: Subscription canceled. }
+        '200': { description: Subscription cancellation scheduled for the end of the current period; an in-flight renewal may return 202 while the cancellation fence remains active. }
+        '202': { description: Lifecycle transition is pending renewal reconciliation. }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
@@ -2789,11 +2797,19 @@ paths:
       tags: [Users]
       summary: Pause a subscription
       operationId: pauseSubscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
         - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
-        '200': { description: Subscription paused. }
+        '200': { description: Subscription paused after confirming no renewal submission is in flight. }
+        '409': { description: Pause is not completed while a renewal submission is in flight; retry after reconciliation. }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
@@ -2808,11 +2824,19 @@ paths:
       tags: [Users]
       summary: Resume a paused subscription
       operationId: resumeSubscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
         - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
-        '200': { description: Subscription resumed. }
+        '200': { description: Subscription resumed and the remaining paid period restored. }
+        '202': { description: Lifecycle transition is pending renewal reconciliation. }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
