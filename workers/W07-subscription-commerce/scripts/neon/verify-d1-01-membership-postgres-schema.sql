@@ -6,7 +6,7 @@ DECLARE
   actual_columns TEXT[];
   expected_columns TEXT[];
   actual_count INTEGER;
-  -- The verifier checks W07's exact seven-table owner slice, while allowing
+  -- The verifier checks W07's exact nine-table owner slice, while allowing
   -- only the registered W01/W02/W07/W08 owner tables in the integrated D1-01 rehearsal.
   known_d1_01_tables TEXT[] := ARRAY[
     'users_sessions',
@@ -42,6 +42,8 @@ DECLARE
     'membership_subscription_plan_change_attempts',
     'membership_subscription_scheduled_plan_changes',
     'membership_subscription_renewal_cycle_applications',
+    'membership_subscription_lifecycle_audit',
+    'membership_subscription_lifecycle_operation_receipts',
     'membership_subscriptions',
     'creator_applications',
     'creators',
@@ -52,6 +54,8 @@ DECLARE
     'membership_plan_versions',
     'membership_plans',
     'membership_revenuecat_product_bindings',
+    'membership_subscription_lifecycle_audit',
+    'membership_subscription_lifecycle_operation_receipts',
     'membership_subscription_plan_change_attempts',
     'membership_subscription_renewal_cycle_applications',
     'membership_subscription_scheduled_plan_changes',
@@ -72,7 +76,7 @@ BEGIN
       AND table_type = 'BASE TABLE'
       AND table_name = ANY(expected_tables);
   IF actual_columns IS DISTINCT FROM expected_tables THEN
-    RAISE EXCEPTION 'W07 expected seven D1-01 membership tables; found %', actual_columns;
+    RAISE EXCEPTION 'W07 expected nine D1-01 membership tables; found %', actual_columns;
   END IF;
   SELECT COUNT(*)::INTEGER INTO actual_count
     FROM information_schema.tables
@@ -85,7 +89,8 @@ BEGIN
 
   expected_columns := ARRAY[
     'cancel_at', 'created_at', 'creator_id', 'current_period_end',
-    'current_period_start', 'entitlement_snapshot_ref', 'plan_id', 'plan_version',
+    'current_period_start', 'entitlement_snapshot_ref', 'pause_period_end_snapshot',
+    'pause_remaining_seconds', 'pause_started_at', 'plan_id', 'plan_version',
     'started_at', 'status', 'subscriber_id', 'subscription_id',
     'trial_converted_at', 'trial_ends_at', 'trial_started_at', 'updated_at', 'version'
   ];
@@ -103,7 +108,7 @@ BEGIN
       AND (
         (table_name = 'membership_subscriptions'
           AND column_name IN ('started_at', 'current_period_start', 'current_period_end',
-            'cancel_at', 'created_at', 'updated_at', 'trial_started_at', 'trial_ends_at', 'trial_converted_at')
+            'cancel_at', 'created_at', 'updated_at', 'trial_started_at', 'trial_ends_at', 'trial_converted_at', 'pause_started_at', 'pause_period_end_snapshot')
           AND data_type <> 'timestamp with time zone')
         OR
         (table_name = 'membership_plan_versions'
@@ -125,6 +130,12 @@ BEGIN
         OR
         (table_name = 'membership_subscription_renewal_cycle_applications'
           AND column_name IN ('cycle_start', 'cycle_end', 'applied_at') AND data_type <> 'timestamp with time zone')
+        OR
+        (table_name = 'membership_subscription_lifecycle_operation_receipts'
+          AND column_name IN ('created_at', 'completed_at') AND data_type <> 'timestamp with time zone')
+        OR
+        (table_name = 'membership_subscription_lifecycle_audit'
+          AND column_name = 'occurred_at' AND data_type <> 'timestamp with time zone')
       )
   ) THEN
     RAISE EXCEPTION 'D1 ISO-8601 timestamp fields must map to PostgreSQL TIMESTAMPTZ';
@@ -135,7 +146,9 @@ BEGIN
      OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_revenuecat_product_bindings') <> 8
      OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscription_plan_change_attempts') <> 19
      OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscription_scheduled_plan_changes') <> 17
-     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscription_renewal_cycle_applications') <> 10 THEN
+     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscription_renewal_cycle_applications') <> 10
+     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscription_lifecycle_operation_receipts') <> 12
+     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscription_lifecycle_audit') <> 10 THEN
     RAISE EXCEPTION 'W07 plan, RevenueCat, upgrade-attempt or scheduled-change column counts drifted';
   END IF;
 
@@ -146,6 +159,16 @@ BEGIN
       WHERE table_schema = 'public' AND table_name = 'membership_subscriptions'
         AND column_name = 'version') <> '1' THEN
     RAISE EXCEPTION 'membership_subscriptions.version must be INTEGER DEFAULT 1';
+  END IF;
+
+  IF (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscriptions') <> 20 THEN
+    RAISE EXCEPTION 'membership_subscriptions must expose exactly twenty columns';
+  END IF;
+
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'membership_subscriptions'
+        AND column_name = 'pause_remaining_seconds') <> 'bigint' THEN
+    RAISE EXCEPTION 'pause_remaining_seconds must be BIGINT';
   END IF;
 
   IF (SELECT data_type FROM information_schema.columns
@@ -177,8 +200,12 @@ BEGIN
           'ux_membership_scheduled_plan_changes_idempotency',
           'ux_membership_scheduled_plan_changes_pending_subscription',
           'ix_membership_scheduled_plan_changes_effective',
-          'ix_membership_renewal_cycle_applications_subscription'
-        )) <> 18 THEN
+          'ix_membership_renewal_cycle_applications_subscription',
+          'ux_membership_lifecycle_receipts_subscriber_idempotency',
+          'ix_membership_lifecycle_receipts_subscription_created',
+          'ix_membership_lifecycle_audit_subscription_time',
+          'ix_membership_lifecycle_audit_subscriber_time'
+        )) <> 22 THEN
     RAISE EXCEPTION 'W07 secondary index set is incomplete';
   END IF;
 
@@ -194,8 +221,10 @@ BEGIN
           'membership_revenuecat_bindings_immutable_update',
           'membership_revenuecat_bindings_immutable_delete',
           'membership_subscriptions_trial_window_immutable',
-          'membership_subscriptions_trial_conversion_write_once'
-        )) <> 8 THEN
+          'membership_subscriptions_trial_conversion_write_once',
+          'membership_subscription_lifecycle_audit_no_update_delete',
+          'membership_subscription_lifecycle_audit_no_truncate'
+        )) <> 10 THEN
     RAISE EXCEPTION 'W07 immutable/lifecycle trigger set is incomplete';
   END IF;
 
@@ -554,6 +583,77 @@ BEGIN
       WHERE change_id = 'w07-schema-fixture-schedule') <> 'BILLING_INTERVAL_CHANGE' THEN
     RAISE EXCEPTION 'Scheduled change type discriminator failed';
   END IF;
+
+  UPDATE membership_subscriptions
+  SET pause_started_at = '2026-01-15T00:00:00Z',
+      pause_period_end_snapshot = '2026-02-01T00:00:00Z',
+      pause_remaining_seconds = 1468800
+  WHERE subscription_id = 'w07-schema-fixture-active-a';
+  IF (SELECT pause_remaining_seconds FROM membership_subscriptions
+      WHERE subscription_id = 'w07-schema-fixture-active-a') <> 1468800 THEN
+    RAISE EXCEPTION 'Pause snapshot fields did not persist';
+  END IF;
+  BEGIN
+    UPDATE membership_subscriptions
+    SET pause_remaining_seconds = NULL
+    WHERE subscription_id = 'w07-schema-fixture-active-a';
+    RAISE EXCEPTION 'Expected incomplete pause snapshot to fail';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO membership_subscription_lifecycle_operation_receipts
+    (operation_id, subscription_id, subscriber_id, operation, idempotency_key_hash,
+     request_fingerprint, expected_subscription_version, result_subscription_version,
+     result_status, response_json, created_at, completed_at)
+  VALUES
+    ('w07-schema-fixture-lifecycle-op', 'w07-schema-fixture-active-a',
+     'w07-fixture-active-subscriber', 'PAUSE', 'sha256-lifecycle-idempotency-a',
+     'sha256-lifecycle-request-a', 1, 2, 'PAUSED', '{"status":"PAUSED"}',
+     '2026-01-15T00:00:00Z', '2026-01-15T00:00:01Z');
+  BEGIN
+    INSERT INTO membership_subscription_lifecycle_operation_receipts
+      (operation_id, subscription_id, subscriber_id, operation, idempotency_key_hash,
+       request_fingerprint, expected_subscription_version, result_subscription_version,
+       result_status, response_json, created_at, completed_at)
+    VALUES
+      ('w07-schema-fixture-lifecycle-op-duplicate', 'w07-schema-fixture-active-b',
+       'w07-fixture-active-subscriber', 'PAUSE', 'sha256-lifecycle-idempotency-a',
+       'sha256-lifecycle-request-b', 1, 2, 'PAUSED', '{"status":"PAUSED"}',
+       '2026-01-15T00:00:00Z', '2026-01-15T00:00:01Z');
+    RAISE EXCEPTION 'Expected subscriber idempotency key uniqueness';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO membership_subscription_lifecycle_audit
+    (event_id, subscription_id, subscriber_id, operation, from_status, to_status,
+     from_subscription_version, to_subscription_version, metadata_json, occurred_at)
+  VALUES
+    ('w07-schema-fixture-lifecycle-event', 'w07-schema-fixture-active-a',
+     'w07-fixture-active-subscriber', 'PAUSE', 'ACTIVE', 'PAUSING',
+     1, 2, '{"reason":"fixture"}', '2026-01-15T00:00:00Z');
+  BEGIN
+    UPDATE membership_subscription_lifecycle_audit
+    SET to_status = 'PAUSED'
+    WHERE event_id = 'w07-schema-fixture-lifecycle-event';
+    RAISE EXCEPTION 'Expected lifecycle audit update to fail';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+  BEGIN
+    DELETE FROM membership_subscription_lifecycle_audit
+    WHERE event_id = 'w07-schema-fixture-lifecycle-event';
+    RAISE EXCEPTION 'Expected lifecycle audit delete to fail';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+  BEGIN
+    TRUNCATE TABLE membership_subscription_lifecycle_audit;
+    RAISE EXCEPTION 'Expected lifecycle audit truncate to fail';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
 END;
 $w07_membership_schema_verify$;
 
@@ -562,11 +662,11 @@ ROLLBACK;
 SELECT jsonb_build_object(
   'status', 'W07_D1_01_MEMBERSHIP_POSTGRES_SCHEMA_PASS',
   'postgresMajor', 18,
-  'tablesVerified', 7,
-  'secondaryIndexesVerified', 18,
-  'triggersVerified', 8,
+  'tablesVerified', 9,
+  'secondaryIndexesVerified', 22,
+  'triggersVerified', 10,
   'checks', jsonb_build_array(
-    'exact Subscription 17-column contract',
+    'exact Subscription 20-column contract and PAUSE-A snapshot constraints',
     'TIMESTAMPTZ timestamp mapping',
     'source-defined plan and RevenueCat foreign keys only',
     'no speculative active-subscription uniqueness',
@@ -578,6 +678,8 @@ SELECT jsonb_build_object(
     'durable renewal-cycle receipt identity and timestamp constraints',
     'DOWNGRADE/BILLING_INTERVAL_CHANGE discriminator',
     'opaque D1-04 order reference only',
+    'subscriber-scoped lifecycle idempotency receipts',
+    'append-only lifecycle audit rejects update/delete/truncate',
     'all synthetic writes rolled back'
   ),
   'businessRowsAfterRollback', jsonb_build_object(
@@ -587,7 +689,9 @@ SELECT jsonb_build_object(
     'membership_revenuecat_product_bindings', (SELECT COUNT(*) FROM membership_revenuecat_product_bindings),
     'membership_subscription_plan_change_attempts', (SELECT COUNT(*) FROM membership_subscription_plan_change_attempts),
     'membership_subscription_scheduled_plan_changes', (SELECT COUNT(*) FROM membership_subscription_scheduled_plan_changes),
-    'membership_subscription_renewal_cycle_applications', (SELECT COUNT(*) FROM membership_subscription_renewal_cycle_applications)
+    'membership_subscription_renewal_cycle_applications', (SELECT COUNT(*) FROM membership_subscription_renewal_cycle_applications),
+    'membership_subscription_lifecycle_operation_receipts', (SELECT COUNT(*) FROM membership_subscription_lifecycle_operation_receipts),
+    'membership_subscription_lifecycle_audit', (SELECT COUNT(*) FROM membership_subscription_lifecycle_audit)
   ),
   'productionDatabaseTouched', false,
   'businessDataImported', false
