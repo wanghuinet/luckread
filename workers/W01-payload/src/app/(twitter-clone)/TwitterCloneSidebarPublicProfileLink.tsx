@@ -48,6 +48,7 @@ export default function TwitterCloneSidebarPublicProfileLink({
   return (
     <Link
       href={href}
+      aria-label={copy.home.profile}
       aria-current={isActive ? 'page' : undefined}
       className={'custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start' + (isActive ? ' font-bold' : '')}
     >
