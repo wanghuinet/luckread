@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 
 import { apiRequest } from '~/lib/api-client';
 import { readContentBody, unwrapApiData, type ApiContentRecord } from '~/lib/content-adapter';
+import { useAuthStore } from '~/store/auth-store';
 
 type ThreadItem = {
   id: string;
@@ -32,6 +33,7 @@ const VISIBLE_THREAD_ITEMS = 5;
 
 export default function PostThreadPreview({ contentId }: { contentId: string }) {
   const router = useRouter();
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
   const [retryNonce, setRetryNonce] = useState(0);
   const [state, setState] = useState<ThreadPreviewState>({ status: 'loading' });
 
@@ -43,7 +45,7 @@ export default function PostThreadPreview({ contentId }: { contentId: string }) 
     void (async () => {
       const result = await apiRequest<unknown>(
         '/contents/' + encodeURIComponent(contentId) + '/thread',
-        { method: 'GET', signal: controller.signal },
+        { method: 'GET', signal: controller.signal, ...(viewerId ? { expectedAccountId: viewerId } : {}) },
       );
       if (!result.response.ok) throw new Error('Unable to load post thread.');
       const payload = unwrapApiData<ThreadPayload>(result.data);
@@ -89,7 +91,11 @@ export default function PostThreadPreview({ contentId }: { contentId: string }) 
         };
         return { ...item, body: await readContentBody(record, controller.signal) };
       }));
-      if (!active || controller.signal.aborted) return;
+      if (
+        !active ||
+        controller.signal.aborted ||
+        (useAuthStore.getState().user?.id ?? null) !== viewerId
+      ) return;
       setState({
         status: 'ready',
         rootContentId: payload.rootContentId,
@@ -98,14 +104,18 @@ export default function PostThreadPreview({ contentId }: { contentId: string }) 
         hiddenAfter: Math.max(0, ordered.length - start - visible.length),
       });
     })().catch(() => {
-      if (active && !controller.signal.aborted) setState({ status: 'error' });
+      if (
+        active &&
+        !controller.signal.aborted &&
+        (useAuthStore.getState().user?.id ?? null) === viewerId
+      ) setState({ status: 'error' });
     });
 
     return () => {
       active = false;
       controller.abort();
     };
-  }, [contentId, retryNonce]);
+  }, [contentId, retryNonce, viewerId]);
 
   if (state.status === 'none') return null;
 
