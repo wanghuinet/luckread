@@ -191,13 +191,18 @@ describe('v1 subscription adapter', () => {
     expect(route).not.toContain("requireHeader(request, 'If-Match')")
   })
 
-  it('keeps subscription management read-only while verified provider synchronization is gated', () => {
+  it('exposes subscriber lifecycle controls through the authenticated W01-to-W07 mutation boundary', () => {
+    // Unsupported POST operations remain fail-closed, while the three
+    // explicitly admitted lifecycle operations use the existing W08/W07 path.
     expect(route).toContain('Subscription writes are disabled until a verified subscription mutation flow is available.')
-    expect(mySubscriptionsPage).toContain('mutationsUnavailable')
-    expect(mySubscriptionsPage).not.toContain("transition(item, 'pause')")
-    expect(mySubscriptionsPage).not.toContain("transition(item, 'resume')")
-    expect(mySubscriptionsPage).not.toContain("transition(item, 'cancel')")
-    expect(mySubscriptionsPage).toContain('payment-provider synchronization')
+    expect(route).toContain("['cancel', 'pause', 'resume'].includes(parts[1]!)")
+    expect(route).toContain('authorizeSubscriptionLifecycle')
+    expect(route).toContain('callW07Subscription')
+    expect(mySubscriptionsPage).toContain("transition(item, 'pause')")
+    expect(mySubscriptionsPage).toContain("transition(item, 'resume')")
+    expect(mySubscriptionsPage).toContain("transition(item, 'cancel')")
+    expect(mySubscriptionsPage).toContain("'Idempotency-Key': idempotencyKey")
+    expect(mySubscriptionsPage).toContain("'If-Match': item.etag")
     expect(mySubscriptionsPage).toContain("fetchJson<ListResponse>('/api/v1/memberships/subscriptions?limit=20&page='")
   })
 
