@@ -18,7 +18,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   const [nextCursor,setNextCursor] = useState<string|null>(initialPage.nextCursor)
   const [hasMore,setHasMore] = useState(initialPage.hasMore)
   const [loading,setLoading] = useState(feedMode === 'following')
-  const [error,setError] = useState(initialPage.initialLoadError ? copy.feed.loadMoreError : '')
+  const [error,setError] = useState(initialPage.initialLoadError ? copy.feed.loadError : '')
   const [retryInitial,setRetryInitial] = useState(initialPage.initialLoadError === true || feedMode === 'following')
   const [requiresAuth,setRequiresAuth] = useState(false)
   const [candidateWindowTruncated,setCandidateWindowTruncated] = useState(initialPage.candidateWindowTruncated === true)
@@ -50,7 +50,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
         setHasMore(false)
         return
       }
-      if (!response.ok || !data?.data) throw new Error(getApiErrorMessage(data, copy.feed.loadMoreError))
+      if (!response.ok || !data?.data) throw new Error(getApiErrorMessage(data, copy.feed.loadError))
       const page = data.data
       setRequiresAuth(false)
       setRetryInitial(false)
@@ -63,7 +63,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
     } catch (cause) {
       if (!controller.signal.aborted) {
         setRetryInitial(true)
-        setError(cause instanceof Error ? cause.message : copy.feed.loadMoreError)
+        setError(cause instanceof Error ? cause.message : copy.feed.loadError)
       }
     } finally {
       if (activeRequestRef.current === controller) {
