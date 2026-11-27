@@ -531,15 +531,26 @@ function PublishScreenContent() {
   const quoteViewerId = user?.id ?? null;
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     const isCurrentQuoteViewer = () =>
       active && (useAuthStore.getState().user?.id ?? null) === quoteViewerId;
     if (!quoteContentId) {
       setQuoteTarget(null);
       setLoadingQuote(false);
-      return () => { active = false; };
+      return () => { active = false; controller.abort(); };
+    }
+    if (!quoteViewerId) {
+      setQuoteTarget(null);
+      setLoadingQuote(false);
+      setErrorMessage('请先登录后再引用动态。');
+      return () => { active = false; controller.abort(); };
     }
     setLoadingQuote(true);
-    void apiRequest<Record<string, unknown>>('/contents/' + encodeURIComponent(quoteContentId), { method: 'GET' })
+    void apiRequest<Record<string, unknown>>('/contents/' + encodeURIComponent(quoteContentId), {
+      method: 'GET',
+      expectedAccountId: quoteViewerId,
+      signal: controller.signal,
+    })
       .then((result) => {
         if (!isCurrentQuoteViewer()) return;
         if (!result.response.ok) throw new Error(apiFailureDiagnostic(result, '无法加载要引用的原帖。'));
@@ -551,12 +562,12 @@ function PublishScreenContent() {
         setErrorMessage('');
       })
       .catch((error) => {
-        if (!isCurrentQuoteViewer()) return;
+        if (!isCurrentQuoteViewer() || controller.signal.aborted) return;
         setQuoteTarget(null);
         setErrorMessage(error instanceof Error ? error.message : '无法加载要引用的原帖。');
       })
       .finally(() => { if (isCurrentQuoteViewer()) setLoadingQuote(false); });
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [quoteContentId, quoteViewerId]);
 
   const uploadAsset = useCallback(async (asset: ComposerAsset) => {

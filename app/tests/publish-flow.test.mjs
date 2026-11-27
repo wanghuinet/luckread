@@ -128,6 +128,19 @@ test('native quote composer preserves and validates the canonical public post ta
   expect(feedItem).toContain("params: { quoteContentId: itemData.contentId }");
 });
 
+test('quote target reads are bound to the initiating account and canceled when the target or account changes', () => {
+  const quoteEffectStart = composer.indexOf('const quoteViewerId = user?.id ?? null;');
+  const quoteEffectEnd = composer.indexOf('const uploadAsset = useCallback', quoteEffectStart);
+  const quoteEffect = composer.slice(quoteEffectStart, quoteEffectEnd);
+
+  expect(quoteEffect).toContain('const controller = new AbortController()');
+  expect(quoteEffect).toContain('expectedAccountId: quoteViewerId');
+  expect(quoteEffect).toContain('signal: controller.signal');
+  expect(quoteEffect).toContain('controller.abort()');
+  expect(quoteEffect).toContain('if (!quoteViewerId)');
+  expect(quoteEffect).toContain('controller.signal.aborted');
+});
+
 test('edit and delete controls are only shown for the authenticated owner and use authoritative checks', () => {
   expect(feedItem).toContain('itemData.ownerUserId === currentUser.id');
   expect(feedItem).toContain("'/contents/' + encodeURIComponent(contentId) + '/state'");
