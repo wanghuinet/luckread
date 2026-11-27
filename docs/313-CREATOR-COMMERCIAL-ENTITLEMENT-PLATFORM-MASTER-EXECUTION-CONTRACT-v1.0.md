@@ -66,6 +66,25 @@ GPT 必须先阅读上述适用合同及其最新准入文件，再核对仓库�
 - W11：分析事件接收、去重和分析查询/聚合边界；不作为支付、订阅或 Ledger 的事实来源。
 - W68：不可变财务事实、钱包投影、结算与提现权威。
 
+### 3.1 销售方、平台角色与资金边界（用户已确认：创作者为销售方）
+
+**产品决策：各创作者是其所发布付费内容、会员方案及数字商品的 Seller of Record（销售方）；LuckRead 是提供发现、交易界面、订单编排、支付技术接入、内容交付和平台服务的 marketplace / technology platform，不默认作为创作者商品的转售方或主要销售方。**
+
+强制边界：
+
+1. 每笔交易必须绑定唯一 seller/creator legal entity、seller account、商品/方案 owner、交易地区、币种和适用税务上下文；不得只记录 LuckRead 平台主体。
+2. 创作者必须完成支付服务商要求的身份/KYC、受益所有人、制裁筛查、收款账户、税务资料和地区准入。未完成 onboarding 或 seller account 未获 provider 放行时，不得开放真实收费。
+3. 支付集成必须验证当前支付服务商及 Hyperswitch 所配置 connector 是否真实支持 marketplace / connected-account 场景、创作者作为 merchant/seller、资金分配、退款/拒付责任、余额负数、reserve、payout 和对账。不得仅凭 API 字段或 Sandbox mock 宣称支持。
+4. 交易必须保存 seller-of-record 快照、provider account / payment reference、gross amount、currency、platform fee、processor fee、tax amount、refund/chargeback、seller net proceeds、payout/settlement 状态。历史订单不得因创作者资料或平台费率变化而改写。
+5. LuckRead 平台服务费必须作为独立、可审计的 fee line / application fee 处理；费率、计算基数、税务处理、退款时是否退回平台费，必须由合同和 provider 能力明确。不得把平台收入与创作者销售额混为同一笔收入。
+6. W68 是平台及创作者资金分录/余额/结算的财务事实权威；支付服务商报告是外部资金事实输入；W11 仅作分析。不得由 W07 或 W01 直接改钱包余额。
+7. 发票/收据、税务计算/代收/申报、消费者退款权、chargeback、VAT/GST/sales tax、平台报告义务和 marketplace facilitator 义务必须按 seller 与 buyer 所在司法辖区、商品分类及 provider 合同逐项核验。创作者作为销售方不自动免除 LuckRead 可能承担的平台法定义务。
+8. 生产准入前必须有法律/税务专业审核及支付服务商书面/可验证能力证据；未完成前仅可开发和测试不触发真实资金移动的技术路径。不得将 TaxJar demo/sandbox 或其他演示税务适配视为生产税务。
+9. 若当前 provider / connector 无法支持创作者作为销售方、独立创作者收款、退款/拒付和账务对账，必须 STOP 并报告差距；不得静默回退为 LuckRead 自营销售方。
+
+本决策不指定某一家 PSP，也不代表税务/法律合规已完成。具体 provider 产品、交易模型和司法辖区仍须通过独立准入。
+
+
 数据库使用当前批准的 Neon PostgreSQL 五库边界和既有 Worker 数据归属。严禁把旧文档中的 D1/Cloudflare 运行示例当成当前迁移目标；不得新增 D1、Worker、Queue、Service Binding 或数据库。不得改变 Payload Core。所有新表、迁移、索引必须归属正确 Worker 的现有数据库，迁移必须可重复执行、可验证并有前向恢复方案。
 
 ## 4. 商业产品目录与权益模式
@@ -217,7 +236,7 @@ GPT 必须先阅读上述适用合同及其最新准入文件，再核对仓库�
 
 升级/降级必须定义即时生效或周期结束生效、剩余金额抵扣/补差价、税额、续费日期和失败补偿；不允许重复订阅、重复收费或重复 grant。所有金额、周期边界和时区规则必须可确定、可测试。
 
-用户取消订阅后，UI 必须说明是否仍可访问至周期结束。取消自动续费与立即撤销权益是两个不同动作。暂停必须说明是否继续收费、是否冻结权益以及最长暂停时间。
+用户取消订阅后，UI 必须说明是否仍可访问至周期结束。取消自动续费与立即撤销权益是两个不同动作。\n\n**暂停规则（用户已确认：A）**：暂停生效后立即停止后续自动扣费，并冻结该订阅来源授予的付费权益；暂停期间不得继续访问该订阅所覆盖的付费内容。暂停时记录 pause_effective_at、当时 current_period_end、remaining_entitlement_duration（按统一 UTC 时间计算）及订阅 version。恢复时，只有在支付 mandate / seller account 仍有效且 provider 侧不会在暂停期间补扣的前提下，才可恢复订阅；恢复后将暂停时剩余有效时长顺延，即新的权益到期时间为 resumed_at + frozen_remaining_duration，后续续费时间与之对齐。暂停期间不得产生续费扣款；恢复不得重复收费或重置剩余时长。已经完成的当前周期扣款默认不自动退款，退款须走独立退款政策与订单流程。若暂停时剩余时长为零、provider 不支持安全暂停/恢复、mandate 已撤销或恢复需要重新授权/收费，必须按明确的重新付款流程处理，不得免费激活或静默补扣。暂停次数、最长暂停期限、是否允许无限期暂停尚未由用户决定，实施前须通过产品策略限制并明确展示。
 
 ## 7. 订单、支付、退款和财务边界
 
