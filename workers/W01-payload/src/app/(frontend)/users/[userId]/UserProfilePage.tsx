@@ -761,7 +761,7 @@ export default function PublicProfilePage({
           onSelect={(value) => { void reloadContents(value) }}
         />
 
-        <section className="min-w-0 w-full" id="profile-tabpanel" role="tabpanel" aria-labelledby={`profile-tab-${filter}`} tabIndex={0} aria-label={`作者内容：${filterLabels[filter]}`}>
+        <section className="min-w-0 w-full" id="works" role="tabpanel" aria-labelledby={`profile-tab-${filter}`} tabIndex={0} aria-label={`作者内容：${filterLabels[filter]}`}>
           <header className="flex justify-end px-4 py-2">
             {contentHasMore && contentCursor ? (
               <button
