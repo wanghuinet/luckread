@@ -25,6 +25,8 @@ describe('v1 subscription adapter', () => {
   const updatePlanRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/[planId]/route.ts'), 'utf8')
   const w08CreatorClient = readFileSync(resolve(process.cwd(), 'src/auth/w08-creator-client.ts'), 'utf8')
   const w08Worker = readFileSync(resolve(process.cwd(), '../W08-creator/src/worker.ts'), 'utf8')
+  const w07Worker = readFileSync(resolve(process.cwd(), '../W07-subscription-commerce/src/index.ts'), 'utf8')
+  const w07LifecycleRuntime = readFileSync(resolve(process.cwd(), '../W07-subscription-commerce/src/subscription-lifecycle-runtime.ts'), 'utf8')
   const w08Casl = readFileSync(resolve(process.cwd(), '../W08-creator/src/authz/casl-policy.ts'), 'utf8')
   const w06Worker = readFileSync(resolve(process.cwd(), '../W06-governance/src/index.ts'), 'utf8')
   const w06Client = readFileSync(resolve(process.cwd(), 'src/moderation/w06-moderation-client.ts'), 'utf8')
@@ -197,6 +199,32 @@ describe('v1 subscription adapter', () => {
     expect(mySubscriptionsPage).not.toContain("transition(item, 'cancel')")
     expect(mySubscriptionsPage).toContain('payment-provider synchronization')
     expect(mySubscriptionsPage).toContain("fetchJson<ListResponse>('/api/v1/memberships/subscriptions?limit=20&page='")
+  })
+
+  it('authorizes and forwards cancel/pause/resume to the W07 lifecycle authority with CAS and idempotency', () => {
+    expect(openapi).toContain('operationId: cancelSubscription')
+    expect(openapi).toContain('operationId: pauseSubscription')
+    expect(openapi).toContain('operationId: resumeSubscription')
+    for (const path of [
+      'POST /v1/memberships/subscriptions/{subscriptionId}/cancel',
+      'POST /v1/memberships/subscriptions/{subscriptionId}/pause',
+      'POST /v1/memberships/subscriptions/{subscriptionId}/resume',
+    ]) expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups).toContain(path)
+    expect(route).toContain('authorizeSubscriptionLifecycle')
+    expect(route).toContain("action: 'subscription.' + action")
+    expect(route).toContain("['cancel', 'pause', 'resume']")
+    expect(route).toContain('Object.keys(body).length !== 0')
+    expect(route).toContain("request.headers.get('If-Match')")
+    expect(route).toContain("request.headers.get('Idempotency-Key')")
+    expect(w08Casl).toContain("grant('subscription.cancel', 'Subscription', selfOwnerCondition(input.subjectId))")
+    expect(w08Casl).toContain("grant('subscription.pause', 'Subscription', selfOwnerCondition(input.subjectId))")
+    expect(w08Casl).toContain("grant('subscription.resume', 'Subscription', selfOwnerCondition(input.subjectId))")
+    expect(w07Worker).toContain("operation: 'subscriptionLifecycle'")
+    expect(w07Worker).toContain('transitionSubscriptionLifecycle')
+    expect(w07LifecycleRuntime).toContain("status = 'PAUSING'")
+    expect(w07LifecycleRuntime).toContain('hasUnresolvedRenewal')
+    expect(w07LifecycleRuntime).toContain('membership_subscription_lifecycle_operation_receipts')
+    expect(w07LifecycleRuntime).toContain('membership_subscription_lifecycle_audit')
   })
 
   it('declares the existing subscription collection list operation', () => {
