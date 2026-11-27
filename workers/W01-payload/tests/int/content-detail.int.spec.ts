@@ -255,6 +255,8 @@ it('retries a missing UUID-backed stable slug through W01 content detail by cont
     expect(page).toContain("content.accessMode === 'MEMBERS_ONLY' && content.accessGranted !== true")
     expect(page).toContain('订阅创作者，解锁完整内容')
     expect(page).toContain('查看订阅方案')
+    expect(page).toContain("credentials: 'include'")
+    expect(page).toContain('memberResult.response.ok && memberResult.data?.id === resolved.id')
   })
 
 })
