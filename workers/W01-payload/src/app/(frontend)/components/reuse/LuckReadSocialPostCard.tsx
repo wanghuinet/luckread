@@ -8,6 +8,7 @@ import { getSharedFollowRelationship } from '../../../../lib/social-follow-reque
 import { buildPublicContentHref } from '../../../../lib/public-content-url.js'
 import { getCachedPublicProfile, type PublicProfile } from '../../../../lib/social-post-profile-cache.js'
 import { resolveSocialPostMedia } from '../../../../lib/social-post-media.js'
+import { getSharedViewerRequest } from '../../../../lib/viewer-request-coalescer.js'
 import { getSharedSocialSummary } from '../../../../lib/social-summary-request-coalescer.js'
 import SocialPoll from './SocialPoll'
 import type { PublicLocale } from '../../i18n/public-locale'
@@ -215,12 +216,7 @@ function LuckReadSocialPostCard({
           signal: controller.signal,
         },
       )
-      const viewerRequest = fetchJson<{ id?: string }>('/api/v1/users/me', {
-        credentials: 'include',
-        headers: { accept: 'application/json' },
-        cache: 'no-store',
-        signal: controller.signal,
-      })
+      const viewerRequest = getSharedViewerRequest()
       const socialRequest = getSharedSocialSummary(contentId)
 
       const [detailResult, socialResult, viewerResult] = await Promise.allSettled([
