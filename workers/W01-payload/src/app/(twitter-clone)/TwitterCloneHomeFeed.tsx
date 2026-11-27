@@ -24,6 +24,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   const sentinelRef = useRef<HTMLDivElement|null>(null)
   const loadingRef = useRef(false)
   const requestedCursorsRef = useRef(new Set<string>())
+  const itemIdsRef = useRef(new Set(initialPage.items.map(item => item.id)))
   const activeRequestRef = useRef<AbortController | null>(null)
 
   const loadInitialFollowing = useCallback(async () => {
@@ -49,7 +50,9 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       if (!response.ok || !data?.data) throw new Error(getApiErrorMessage(data, copy.feed.loadMoreError))
       const page = data.data
       setRequiresAuth(false)
-      setItems(page.items ?? [])
+      const initialItems = page.items ?? []
+      itemIdsRef.current = new Set(initialItems.map(item => item.id))
+      setItems(initialItems)
       setNextCursor(page.nextCursor ?? null)
       setHasMore(page.hasMore === true)
       setCandidateWindowTruncated(page.candidateWindowTruncated === true)
@@ -85,7 +88,12 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       }
       if(!response.ok||!data?.data)throw new Error(getApiErrorMessage(data,copy.feed.loadMoreError))
       const page=data.data
-      setItems(current=>{const seen=new Set(current.map(item=>item.id));const unique:HomeContentItem[]=[];for(const item of page.items??[]){if(!seen.has(item.id)){seen.add(item.id);unique.push(item)}}return [...current,...unique]})
+      const uniqueItems = (page.items ?? []).filter(item => {
+        if (itemIdsRef.current.has(item.id)) return false
+        itemIdsRef.current.add(item.id)
+        return true
+      })
+      if (uniqueItems.length > 0) setItems(current => [...current, ...uniqueItems])
       const next = page.nextCursor ?? null
       const cursorAlreadyRequested = next !== null && requestedCursorsRef.current.has(next)
       setNextCursor(cursorAlreadyRequested ? null : next)
