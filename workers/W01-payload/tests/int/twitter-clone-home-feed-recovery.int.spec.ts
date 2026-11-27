@@ -1,4 +1,4 @@
-import { createElement } from 'react'
+import { createElement, type ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -6,14 +6,14 @@ import TwitterCloneHomeFeed from '../../src/app/(twitter-clone)/TwitterCloneHome
 import { getTwitterCloneCopy } from '../../src/app/(twitter-clone)/twitter-clone-copy'
 
 vi.mock('next/link', () => ({
-  default: ({ href, children }: { href: string; children: unknown }) => createElement('a', { href }, children),
+  default: ({ href, children }: { href: string; children: ReactNode }): ReactNode => createElement('a', { href }, children),
 }))
 
 vi.mock('../../src/app/(frontend)/components/reuse/LuckReadSocialPostCard', () => ({
-  default: () => null,
+  default: (): null => null,
 }))
 
-const emptyPage = { items: [], nextCursor: null, hasMore: false }
+const emptyPage = { items: [] as never[], nextCursor: null as string | null, hasMore: false }
 
 describe('H5 home feed initial-load recovery', () => {
   const fetchMock = vi.fn<typeof fetch>()
