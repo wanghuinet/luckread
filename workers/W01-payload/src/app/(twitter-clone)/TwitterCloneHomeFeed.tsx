@@ -40,6 +40,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
         '/api/v1/feed/following?' + params.toString(),
         { headers: { accept: 'application/json' }, cache: 'no-store', credentials: 'include', signal: controller.signal },
       )
+      if (controller.signal.aborted) return
       if (response.status === 401 || data?.error?.code === 'UNAUTHENTICATED') {
         setRequiresAuth(true)
         setItems([])
@@ -79,6 +80,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
         endpoint + params.toString(),
         {headers:{accept:'application/json'},cache:'no-store',credentials:feedMode==='following'?'include':'omit',signal:controller.signal},
       )
+      if (controller.signal.aborted) return
       if (response.status === 401 && feedMode === 'following') {
         setRequiresAuth(true)
         setItems([])
