@@ -567,6 +567,77 @@ BEGIN
       WHERE change_id = 'w07-schema-fixture-schedule') <> 'BILLING_INTERVAL_CHANGE' THEN
     RAISE EXCEPTION 'Scheduled change type discriminator failed';
   END IF;
+
+  UPDATE membership_subscriptions
+  SET pause_started_at = '2026-01-15T00:00:00Z',
+      pause_period_end_snapshot = '2026-02-01T00:00:00Z',
+      pause_remaining_seconds = 1468800
+  WHERE subscription_id = 'w07-schema-fixture-active-a';
+  IF (SELECT pause_remaining_seconds FROM membership_subscriptions
+      WHERE subscription_id = 'w07-schema-fixture-active-a') <> 1468800 THEN
+    RAISE EXCEPTION 'Pause snapshot fields did not persist';
+  END IF;
+  BEGIN
+    UPDATE membership_subscriptions
+    SET pause_remaining_seconds = NULL
+    WHERE subscription_id = 'w07-schema-fixture-active-a';
+    RAISE EXCEPTION 'Expected incomplete pause snapshot to fail';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO membership_subscription_lifecycle_operation_receipts
+    (operation_id, subscription_id, subscriber_id, operation, idempotency_key_hash,
+     request_fingerprint, expected_subscription_version, result_subscription_version,
+     result_status, response_json, created_at, completed_at)
+  VALUES
+    ('w07-schema-fixture-lifecycle-op', 'w07-schema-fixture-active-a',
+     'w07-fixture-active-subscriber', 'PAUSE', 'sha256-lifecycle-idempotency-a',
+     'sha256-lifecycle-request-a', 1, 2, 'PAUSED', '{"status":"PAUSED"}',
+     '2026-01-15T00:00:00Z', '2026-01-15T00:00:01Z');
+  BEGIN
+    INSERT INTO membership_subscription_lifecycle_operation_receipts
+      (operation_id, subscription_id, subscriber_id, operation, idempotency_key_hash,
+       request_fingerprint, expected_subscription_version, result_subscription_version,
+       result_status, response_json, created_at, completed_at)
+    VALUES
+      ('w07-schema-fixture-lifecycle-op-duplicate', 'w07-schema-fixture-active-b',
+       'w07-fixture-active-subscriber', 'PAUSE', 'sha256-lifecycle-idempotency-a',
+       'sha256-lifecycle-request-b', 1, 2, 'PAUSED', '{"status":"PAUSED"}',
+       '2026-01-15T00:00:00Z', '2026-01-15T00:00:01Z');
+    RAISE EXCEPTION 'Expected subscriber idempotency key uniqueness';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO membership_subscription_lifecycle_audit
+    (event_id, subscription_id, subscriber_id, operation, from_status, to_status,
+     from_subscription_version, to_subscription_version, metadata_json, occurred_at)
+  VALUES
+    ('w07-schema-fixture-lifecycle-event', 'w07-schema-fixture-active-a',
+     'w07-fixture-active-subscriber', 'PAUSE', 'ACTIVE', 'PAUSING',
+     1, 2, '{"reason":"fixture"}', '2026-01-15T00:00:00Z');
+  BEGIN
+    UPDATE membership_subscription_lifecycle_audit
+    SET to_status = 'PAUSED'
+    WHERE event_id = 'w07-schema-fixture-lifecycle-event';
+    RAISE EXCEPTION 'Expected lifecycle audit update to fail';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+  BEGIN
+    DELETE FROM membership_subscription_lifecycle_audit
+    WHERE event_id = 'w07-schema-fixture-lifecycle-event';
+    RAISE EXCEPTION 'Expected lifecycle audit delete to fail';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+  BEGIN
+    TRUNCATE TABLE membership_subscription_lifecycle_audit;
+    RAISE EXCEPTION 'Expected lifecycle audit truncate to fail';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
 END;
 $w07_membership_schema_verify$;
 
