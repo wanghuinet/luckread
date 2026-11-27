@@ -60,6 +60,13 @@ test('renders the Following timeline without horizontal overflow on H5 and PC wi
   await expect(mobileNavigation.locator('a').last()).toBeVisible()
   await mobileNavigation.evaluate((nav) => { nav.scrollLeft = 0 })
 
+  await page.setViewportSize({ width: 499, height: 900 })
+  const narrowNavigationMetrics = await mobileNavigation.evaluate((nav) => ({
+    clientWidth: nav.clientWidth,
+    scrollWidth: nav.scrollWidth,
+  }))
+  expect(narrowNavigationMetrics.scrollWidth).toBeGreaterThan(narrowNavigationMetrics.clientWidth)
+
   const skipLink = page.getByRole('link', { name: /主要内容|main content/ })
   await page.keyboard.press('Tab')
   await expect(skipLink).toBeFocused()
