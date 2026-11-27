@@ -106,6 +106,37 @@ async function authorizeSubscriptionPlanChange(
   return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization response could not be verified')
 }
 
+async function authorizeSubscriptionLifecycle(
+  request: Request,
+  principalUserId: string,
+  subscriptionId: string,
+  action: 'cancel' | 'pause' | 'resume',
+): Promise<Response | null> {
+  const headers = new Headers(request.headers)
+  headers.delete('host')
+  headers.delete('content-length')
+  headers.set('content-type', 'application/json; charset=utf-8')
+  const permissionRequest = new Request(request.url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action: 'subscription.' + action,
+      resourceType: 'Subscription',
+      resourceAttributes: { ownerId: principalUserId, subscriptionId },
+    }),
+  })
+  const response = await callW08Creator(permissionRequest, '/internal/authz/check-permission', 'POST')
+  if (!response.ok) return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization unavailable')
+  const value: unknown = await response.json().catch((): null => null)
+  const decision = value && typeof value === 'object'
+    ? (value as { decision?: unknown; data?: { decision?: unknown } }).data?.decision ??
+      (value as { decision?: unknown }).decision
+    : undefined
+  if (decision === 'ALLOW') return null
+  if (decision === 'DENY') return errorResponse(403, 'PERMISSION_DENIED', 'Subscription lifecycle permission required')
+  return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization response could not be verified')
+}
+
 async function authorizeSubscriptionCreate(
   request: Request,
   principalUserId: string,
@@ -233,8 +264,11 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
     const isBillingIntervalSchedule = request.method === 'POST' && parts.length === 3 &&
       parts[1] === 'change-plan' && parts[2] === 'interval-schedule'
     const isTrialStart = request.method === 'POST' && parts.length === 1 && parts[0] === 'trial'
+    const isSubscriptionLifecycle = request.method === 'POST' && parts.length === 2 &&
+      ['cancel', 'pause', 'resume'].includes(parts[1]!)
     if (request.method === 'POST') {
-      if (!isPlanUpgradeCheckout && !isPlanDowngradeSchedule && !isBillingIntervalSchedule && !isTrialStart) {
+      if (!isPlanUpgradeCheckout && !isPlanDowngradeSchedule && !isBillingIntervalSchedule &&
+          !isTrialStart && !isSubscriptionLifecycle) {
         return errorResponse(
           503,
           'SERVICE_UNAVAILABLE',
@@ -243,7 +277,11 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       }
       const body = await readBoundedJson(request)
       if (body instanceof Response) return body
-      if (!body || typeof body !== 'object' || Array.isArray(body) ||
+      if (isSubscriptionLifecycle) {
+        if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 0) {
+          return errorResponse(400, 'VALIDATION_FAILED', 'Subscription lifecycle operations require an empty JSON object')
+        }
+      } else if (!body || typeof body !== 'object' || Array.isArray(body) ||
           Object.keys(body).length !== 1 || !Object.hasOwn(body, 'planId') ||
           typeof (body as Record<string, unknown>).planId !== 'string' ||
           !PLAN_ID_PATTERN.test((body as Record<string, unknown>).planId as string)) {
@@ -264,9 +302,13 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       }
       const denied = isTrialStart
         ? await authorizeSubscriptionCreate(request, principal.userId, (body as { planId: string }).planId)
-        : await authorizeSubscriptionPlanChange(request, principal.userId, parts[0]!)
+        : isSubscriptionLifecycle
+          ? await authorizeSubscriptionLifecycle(
+              request, principal.userId, parts[0]!, parts[1] as 'cancel' | 'pause' | 'resume',
+            )
+          : await authorizeSubscriptionPlanChange(request, principal.userId, parts[0]!)
       if (denied) return denied
-      if (isTrialStart) {
+      if (isTrialStart || isSubscriptionLifecycle) {
         return await callW07Subscription({
           request,
           pathname: operation.pathname,
