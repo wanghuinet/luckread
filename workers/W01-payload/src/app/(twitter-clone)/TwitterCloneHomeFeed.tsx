@@ -24,17 +24,20 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   const sentinelRef = useRef<HTMLDivElement|null>(null)
   const loadingRef = useRef(false)
   const requestedCursorsRef = useRef(new Set<string>())
+  const activeRequestRef = useRef<AbortController | null>(null)
 
   const loadInitialFollowing = useCallback(async () => {
     if (feedMode !== 'following' || loadingRef.current) return
     loadingRef.current = true
+    const controller = new AbortController()
+    activeRequestRef.current = controller
     setLoading(true)
     setError('')
     try {
       const params = new URLSearchParams({ limit: '20' })
       const { response, data } = await fetchJson<{data?:HomeContentPage;error?:{code?:string;message?:string}}>(
         '/api/v1/feed/following?' + params.toString(),
-        { headers: { accept: 'application/json' }, cache: 'no-store', credentials: 'include' },
+        { headers: { accept: 'application/json' }, cache: 'no-store', credentials: 'include', signal: controller.signal },
       )
       if (response.status === 401 || data?.error?.code === 'UNAUTHENTICATED') {
         setRequiresAuth(true)
@@ -51,10 +54,11 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       setHasMore(page.hasMore === true)
       setCandidateWindowTruncated(page.candidateWindowTruncated === true)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : copy.feed.loadMoreError)
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : copy.feed.loadMoreError)
     } finally {
+      if (activeRequestRef.current === controller) activeRequestRef.current = null
       loadingRef.current = false
-      setLoading(false)
+      if (!controller.signal.aborted) setLoading(false)
     }
   }, [copy.feed.loadMoreError, feedMode])
 
@@ -62,13 +66,15 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
     if(loadingRef.current||!hasMore||!nextCursor||requiresAuth)return
     if (requestedCursorsRef.current.has(nextCursor)) return
     requestedCursorsRef.current.add(nextCursor)
+    const controller = new AbortController()
+    activeRequestRef.current = controller
     loadingRef.current=true;setLoading(true);setError('')
     try {
       const params=new URLSearchParams({limit:'20',cursor:nextCursor})
       const endpoint = feedMode === 'following' ? '/api/v1/feed/following?' : '/api/v1/contents?'
       const {response,data}=await fetchJson<{data?:HomeContentPage;error?:{code?:string;message?:string}}>(
         endpoint + params.toString(),
-        {headers:{accept:'application/json'},cache:'no-store',credentials:feedMode==='following'?'include':'omit'},
+        {headers:{accept:'application/json'},cache:'no-store',credentials:feedMode==='following'?'include':'omit',signal:controller.signal},
       )
       if (response.status === 401 && feedMode === 'following') {
         setRequiresAuth(true)
@@ -85,9 +91,13 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       setNextCursor(cursorAlreadyRequested ? null : next)
       setHasMore(page.hasMore === true && next !== null && !cursorAlreadyRequested)
       setCandidateWindowTruncated(current => current || page.candidateWindowTruncated === true)
-    } catch(cause) {requestedCursorsRef.current.delete(nextCursor);setError(cause instanceof Error?cause.message:copy.feed.loadMoreError)}
-    finally {loadingRef.current=false;setLoading(false)}
+    } catch(cause) {requestedCursorsRef.current.delete(nextCursor);if(!controller.signal.aborted)setError(cause instanceof Error?cause.message:copy.feed.loadMoreError)}
+    finally {if(activeRequestRef.current===controller)activeRequestRef.current=null;loadingRef.current=false;if(!controller.signal.aborted)setLoading(false)}
   }, [copy.feed.loadMoreError, feedMode, hasMore, nextCursor, requiresAuth])
+
+  useEffect(() => () => {
+    activeRequestRef.current?.abort()
+  }, [])
 
   useEffect(() => {
     if (feedMode !== 'following') return
