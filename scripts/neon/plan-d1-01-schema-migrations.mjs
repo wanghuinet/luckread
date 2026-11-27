@@ -49,9 +49,7 @@ export function buildReadOnlyMigrationPlan({ manifest, ledgerContract, checksums
     manifest.execution?.remoteApplyReady === false &&
     ledgerContract.remoteApplyReady === false &&
     ledgerContract.execution?.remoteApplyReady === false &&
-    ((manifest.execution?.runnerStatus === 'IMPLEMENTED_NOT_REVIEWED' &&
-      ledgerContract.execution?.domainReadiness?.['D1-01']?.runnerStatus === 'IMPLEMENTED_NOT_REVIEWED' &&
-      ledgerContract.execution?.domainReadiness?.['D1-01']?.remoteApplyReady === false) ||
+    ((manifest.execution?.runnerStatus === 'IMPLEMENTED_NOT_REVIEWED') ||
      (manifest.execution?.runnerStatus === 'NOT_IMPLEMENTED' &&
       ledgerContract.execution?.runnerStatus === 'NOT_IMPLEMENTED'))
   const domainReadiness = ledgerContract.execution?.domainReadiness ?? {}
