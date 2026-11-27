@@ -843,7 +843,7 @@ function LuckReadSocialPostCard({
               <SensitiveMediaNotice warning={mediaWarning} locale={locale} onReveal={() => setRevealedMediaKey(mediaRevealKey)} />
             ) : singleMedia ? (
               <div className="mt-3 overflow-hidden rounded-2xl border border-light-border dark:border-dark-border">
-                {singleMedia.kind === 'video' ? <video aria-label={title} className="block max-h-[510px] w-full bg-black object-contain" controls muted playsInline preload="none" poster={singleMedia.poster} src={singleMedia.src} /> : <img alt={title} className="block max-h-[510px] w-full object-cover" loading="lazy" src={singleMedia.src} />}
+                {singleMedia.kind === 'video' ? <video aria-label={title} className="block aspect-video max-h-[510px] w-full bg-black object-contain" controls muted playsInline preload="none" poster={singleMedia.poster} src={singleMedia.src} /> : <img alt={title} className="block aspect-video max-h-[510px] w-full bg-black object-contain" decoding="async" height={675} loading="lazy" src={singleMedia.src} width={1200} />}
               </div>
             ) : mediaItems.length > 1 ? (
               <div className="mt-3 grid grid-cols-2 gap-0.5 overflow-hidden rounded-2xl border border-light-border dark:border-dark-border" role="group" aria-label={label('Post media', '动态媒体', '動態媒體')}>
