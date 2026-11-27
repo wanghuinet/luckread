@@ -366,6 +366,7 @@ async function finalizePause(
     subscriberId: string
     idempotencyHash: string
     now: string
+    deferReceiptCompletion?: boolean
   },
 ): Promise<LifecycleResponse> {
   const client = await membershipStore.connect()
@@ -565,7 +566,9 @@ async function applySimpleLifecycle(
       })
     }
     const response = responseFromRow(updated)
-    await completeReceipt(client, input.subscriberId, input.idempotencyHash, response, input.now)
+    if (!input.deferReceiptCompletion) {
+      await completeReceipt(client, input.subscriberId, input.idempotencyHash, response, input.now)
+    }
     await client.query('COMMIT')
     transaction = false
     return response
@@ -641,8 +644,10 @@ export async function transitionSubscriptionLifecycle(
   }
 
   if (input.action === 'cancel') {
+    const deferReceiptCompletion = !['PAUSED', 'CANCELED', 'EXPIRED'].includes(started.row.status)
     const result = await applySimpleLifecycle(membershipStore, {
       action: 'cancel', row: started.row, subscriberId, idempotencyHash, now,
+      deferReceiptCompletion,
     })
     if (result.status === 'CANCELED' || result.cancelAt === null) {
       return { data: result, status: 200 }
