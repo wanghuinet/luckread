@@ -634,7 +634,7 @@ html.frontend-legacy-root main[style*="max-width"] p[style*="#666"] {
 }
 @media (min-width: 901px) { .mobile-nav { display: none; } }
 
-/* Keyboard access and mobile safe-area behavior for the shared social shell. */
+/* Keyboard access for the shared social shell. */
 .lr-skip-link {
   position: fixed;
   top: 12px;
