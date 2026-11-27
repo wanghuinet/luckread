@@ -23,7 +23,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   const [candidateWindowTruncated,setCandidateWindowTruncated] = useState(initialPage.candidateWindowTruncated === true)
   const sentinelRef = useRef<HTMLDivElement|null>(null)
   const loadingRef = useRef(false)
-  const requestedCursorRef = useRef<string | null>(null)
+  const requestedCursorsRef = useRef(new Set<string>())
 
   const loadInitialFollowing = useCallback(async () => {
     if (feedMode !== 'following' || loadingRef.current) return
@@ -60,8 +60,8 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
 
   const loadMore = useCallback(async () => {
     if(loadingRef.current||!hasMore||!nextCursor||requiresAuth)return
-    if (requestedCursorRef.current === nextCursor) return
-    requestedCursorRef.current = nextCursor
+    if (requestedCursorsRef.current.has(nextCursor)) return
+    requestedCursorsRef.current.add(nextCursor)
     loadingRef.current=true;setLoading(true);setError('')
     try {
       const params=new URLSearchParams({limit:'20',cursor:nextCursor})
@@ -81,10 +81,11 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       const page=data.data
       setItems(current=>{const seen=new Set(current.map(item=>item.id));const unique:HomeContentItem[]=[];for(const item of page.items??[]){if(!seen.has(item.id)){seen.add(item.id);unique.push(item)}}return [...current,...unique]})
       const next = page.nextCursor ?? null
-      setNextCursor(next)
-      setHasMore(page.hasMore === true && next !== null && next !== nextCursor)
+      const cursorAlreadyRequested = next !== null && requestedCursorsRef.current.has(next)
+      setNextCursor(cursorAlreadyRequested ? null : next)
+      setHasMore(page.hasMore === true && next !== null && !cursorAlreadyRequested)
       setCandidateWindowTruncated(current => current || page.candidateWindowTruncated === true)
-    } catch(cause) {requestedCursorRef.current = null;setError(cause instanceof Error?cause.message:copy.feed.loadMoreError)}
+    } catch(cause) {requestedCursorsRef.current.delete(nextCursor);setError(cause instanceof Error?cause.message:copy.feed.loadMoreError)}
     finally {loadingRef.current=false;setLoading(false)}
   }, [copy.feed.loadMoreError, feedMode, hasMore, nextCursor, requiresAuth])
 
