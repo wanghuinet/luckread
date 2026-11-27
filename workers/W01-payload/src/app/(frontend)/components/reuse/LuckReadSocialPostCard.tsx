@@ -395,6 +395,8 @@ function LuckReadSocialPostCard({
         body: JSON.stringify({ targetType: 'content', targetId: contentId }),
       })
       if (response.status === 401) {
+        setLiked(previousLiked)
+        setLikeCount((current) => current === null ? null : Math.max(0, current + (previousLiked ? 1 : -1)))
         requireLogin()
         return
       }
@@ -434,6 +436,8 @@ function LuckReadSocialPostCard({
         },
       )
       if (response.status === 401) {
+        setReposted(previousReposted)
+        setRepostCount((current) => current === null ? null : Math.max(0, current + (previousReposted ? 1 : -1)))
         requireLogin()
         return
       }
@@ -476,6 +480,8 @@ function LuckReadSocialPostCard({
         body: JSON.stringify({ targetType: 'content', targetId: contentId }),
       })
       if (response.status === 401) {
+        setBookmarked(previousBookmarked)
+        onBookmarkChanged?.(previousBookmarked)
         requireLogin()
         return
       }
