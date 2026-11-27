@@ -77,7 +77,7 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
           <div className="fixed bottom-0 z-20 flex w-full flex-col justify-between border-t border-light-border bg-main-background py-0 dark:border-dark-border xs:top-0 xs:h-full xs:w-auto xs:border-0 xs:bg-transparent xs:px-2 xs:py-3 xs:pt-2 md:px-4 xl:w-72">
             <section className="flex flex-col justify-center gap-2 xs:items-center xl:items-stretch">
               <h1 className="hidden xs:flex"><Link className="custom-button main-tab text-accent-blue dark:text-twitter-icon" href="/home" aria-label={copy.home}><TwitterLogo className="h-7 w-7" /></Link></h1>
-              <nav className="flex items-center justify-around xs:flex-col xs:justify-center xl:block" aria-label={locale === 'en' ? 'Main navigation' : '主导航'}>
+              <nav className="lr-mobile-bottom-nav flex items-center justify-around xs:flex-col xs:justify-center xl:block" aria-label={locale === 'en' ? 'Main navigation' : '主导航'}>
                 {links.map((item) => (
                   <Link key={item.key} aria-current={active === item.key ? 'page' : undefined} aria-label={copy[item.key]} className={'custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start' + (active === item.key ? ' font-bold' : '')} data-umami-event={item.key === 'bookmarks' ? 'bookmarks-open' : undefined} href={item.href}>
                     <SidebarIcon name={item.icon} /><span className="hidden text-xl xl:inline">{copy[item.key]}</span>
