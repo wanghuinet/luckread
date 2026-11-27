@@ -331,6 +331,9 @@ function LuckReadSocialPostCard({
     const previousLiked = liked
     setLikeBusy(true)
     setMessage('')
+    const nextLiked = !previousLiked
+    setLiked(nextLiked)
+    setLikeCount((current) => current === null ? null : Math.max(0, current + (nextLiked ? 1 : -1)))
     try {
       const { response, data } = await fetchJson<ApiResponse<unknown>>('/api/v1/interactions/likes', {
         method: previousLiked ? 'DELETE' : 'POST',
@@ -349,11 +352,9 @@ function LuckReadSocialPostCard({
       if (!response.ok && response.status !== 204) {
         throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Like failed.' : '点赞失败，请稍后重试。'))
       }
-      setLiked(!previousLiked)
-      setLikeCount((current) => current === null
-        ? null
-        : Math.max(0, current + (previousLiked ? -1 : 1)))
     } catch (cause) {
+      setLiked(previousLiked)
+      setLikeCount((current) => current === null ? null : Math.max(0, current + (previousLiked ? 1 : -1)))
       setMessage(cause instanceof Error
         ? cause.message
         : locale === 'en' ? 'Like failed.' : '点赞失败，请稍后重试。')
