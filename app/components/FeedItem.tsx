@@ -774,8 +774,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
     };
 
     const feedCard = (
-        <TouchableOpacity
-            onPress={onPress}
+        <View
             style={{
                 paddingHorizontal: X_DESIGN_TOKENS.spacing.feedHorizontal,
                 paddingVertical: X_DESIGN_TOKENS.spacing.feedVertical,
@@ -838,12 +837,29 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                             <Text className="text-xs font-semibold text-amber-800 dark:text-amber-300">会员专享</Text>
                         </View>
                     ) : null}
-                    <Text style={{
-                        marginTop: X_DESIGN_TOKENS.spacing.bodyTop,
-                        fontSize: X_DESIGN_TOKENS.typography.body,
-                        lineHeight: X_DESIGN_TOKENS.typography.bodyLineHeight,
-                        color: palette.text,
-                    }}>{itemData.message}</Text>
+                    {onPress ? (
+                        <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel="打开动态详情"
+                            accessibilityHint="打开这条动态的完整内容和回复"
+                            activeOpacity={0.85}
+                            onPress={onPress}
+                            style={{ marginTop: X_DESIGN_TOKENS.spacing.bodyTop }}
+                        >
+                            <Text style={{
+                                fontSize: X_DESIGN_TOKENS.typography.body,
+                                lineHeight: X_DESIGN_TOKENS.typography.bodyLineHeight,
+                                color: palette.text,
+                            }}>{itemData.message}</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <Text style={{
+                            marginTop: X_DESIGN_TOKENS.spacing.bodyTop,
+                            fontSize: X_DESIGN_TOKENS.typography.body,
+                            lineHeight: X_DESIGN_TOKENS.typography.bodyLineHeight,
+                            color: palette.text,
+                        }}>{itemData.message}</Text>
+                    )}
                     {detailView && itemData.contentType === 'post' && itemData.contentId ? (
                         <>
                             <QuotePostPreview contentId={itemData.contentId} />
@@ -857,7 +873,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                     <EngagementActions itemData={itemData} detailView={Boolean(detailView)} onCommentPress={onCommentPress} replyDisabled={effectiveReplyDisabled} onReplySubmitted={onReplySubmitted} />
                 </View>
             </View>
-        </TouchableOpacity>
+        </View>
     );
 
     return (
