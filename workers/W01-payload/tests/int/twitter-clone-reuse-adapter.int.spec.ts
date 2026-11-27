@@ -233,6 +233,7 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(homeFeed).toContain('author={item.creator ?? item.author}')
     expect(component).toContain("presentation?: 'content' | 'x-timeline'")
     expect(component).toContain('const displayedProfile = profile || author || null')
+    expect(component).toContain('displayedProfile?.avatar ? <img')
     expect(component).toContain("const profileName = displayedProfile?.displayName?.trim() || displayedProfile?.username || ''")
     expect(component).toContain("const username = displayedProfile?.username ? '@' + displayedProfile.username : ''")
     expect(component).toContain("const profileHref = displayedProfile?.username ? '/@' + encodeURIComponent(displayedProfile.username) : null")
