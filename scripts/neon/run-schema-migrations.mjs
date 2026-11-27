@@ -186,15 +186,18 @@ export function isRemoteApplyReleased(manifestContract, ledgerContractValue) {
 
 function validateManifest(checksums) {
   const releaseBlocked = manifest.remoteApplyReady === false &&
-    ledgerContract.remoteApplyReady === false &&
-    manifest.execution?.runnerStatus === 'NOT_IMPLEMENTED' &&
-    ledgerContract.execution?.runnerStatus === 'NOT_IMPLEMENTED'
+    manifest.execution?.remoteApplyReady === false &&
+    (manifest.execution?.runnerStatus === 'IMPLEMENTED_NOT_REVIEWED' &&
+      ledgerContract.execution?.domainReadiness?.['D1-01']?.runnerStatus === 'IMPLEMENTED_NOT_REVIEWED' &&
+      ledgerContract.execution?.domainReadiness?.['D1-01']?.remoteApplyReady === false) ||
+    (manifest.execution?.runnerStatus === 'NOT_IMPLEMENTED' &&
+      ledgerContract.execution?.runnerStatus === 'NOT_IMPLEMENTED')
   const releaseEnabled = isRemoteApplyReleased(manifest, ledgerContract)
   if (manifest.domainId !== 'D1-01' || manifest.databaseName !== 'luckread' ||
-      manifest.postgresMajor !== 18 || manifest.entries?.length !== 15 ||
+      manifest.postgresMajor !== 18 || manifest.entries?.length !== 16 ||
       manifest.businessDataImport !== false || manifest.productionCutoverAuthorized !== false ||
       (!releaseBlocked && !releaseEnabled)) {
-    fail('D1-01 manifest must remain the reviewed 15-entry schema-only contract with a consistent remote release gate')
+    fail('D1-01 manifest must remain the 16-entry schema-only contract with a consistent remote release gate')
   }
   if (!Array.isArray(checksums) || checksums.length !== manifest.entries.length) {
     fail('canonical checksums must cover every manifest entry')
