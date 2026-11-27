@@ -91,6 +91,25 @@ test('keeps the public profile and timeline inside the responsive X-style center
   await expect(profileTabs.nth(0)).toBeFocused()
   await expect(profileTabs.nth(0)).toHaveAttribute('aria-selected', 'true')
 
+  const actionsTrigger = page.getByRole('button', { name: '更多操作' })
+  await actionsTrigger.click()
+  await expect(actionsTrigger).toHaveAttribute('aria-expanded', 'true')
+  await expect(actionsTrigger).toHaveAttribute('aria-controls', 'profile-actions-options')
+  const actionsOptions = page.getByRole('group', { name: '更多操作选项' })
+  await expect(actionsOptions).toBeVisible()
+  await expect(actionsOptions.getByRole('button', { name: '分享' })).toBeVisible()
+
+  await page.keyboard.press('Escape')
+  await expect(actionsOptions).toBeHidden()
+  await expect(actionsTrigger).toBeFocused()
+  await expect(actionsTrigger).toHaveAttribute('aria-expanded', 'false')
+
+  await actionsTrigger.click()
+  await expect(actionsOptions).toBeVisible()
+  await page.locator('#creator-profile-title').click()
+  await expect(actionsOptions).toBeHidden()
+  await expect(actionsTrigger).toHaveAttribute('aria-expanded', 'false')
+
   for (const width of [390, 500, 768, 1024, 1280]) {
     await page.setViewportSize({ width, height: 900 })
     const bounds = await page.evaluate(() => {

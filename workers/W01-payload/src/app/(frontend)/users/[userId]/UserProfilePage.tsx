@@ -152,6 +152,26 @@ export default function PublicProfilePage({
   const [error, setError] = useState('')
   const contentRequestRef = useRef<AbortController | null>(null)
   const contentRequestIdRef = useRef(0)
+  const actionsContainerRef = useRef<HTMLDivElement | null>(null)
+  const actionsTriggerRef = useRef<HTMLButtonElement | null>(null)
+
+  useEffect(() => {
+    if (!actionsOpen) return
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !actionsContainerRef.current?.contains(event.target)) setActionsOpen(false)
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setActionsOpen(false)
+      actionsTriggerRef.current?.focus()
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [actionsOpen])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -655,23 +675,22 @@ export default function PublicProfilePage({
                 <span aria-hidden="true">✉</span>
               </button>
             ) : null}
-            <div className="relative">
+            <div className="relative" ref={actionsContainerRef}>
               <button
+                ref={actionsTriggerRef}
                 className="main-tab grid h-10 w-10 place-items-center rounded-full border border-light-border hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10"
                 type="button"
                 aria-label="更多操作"
                 aria-expanded={actionsOpen}
-                aria-haspopup="menu"
+                aria-controls="profile-actions-options"
                 onClick={() => setActionsOpen((open) => !open)}
               >
                 <span aria-hidden="true">•••</span>
               </button>
-              {actionsOpen ? (
-                <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-36 rounded-2xl border border-light-border bg-main-background p-1 shadow-lg dark:border-dark-border" role="menu" aria-label="更多操作">
+              <div id="profile-actions-options" hidden={!actionsOpen} className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-36 rounded-2xl border border-light-border bg-main-background p-1 shadow-lg dark:border-dark-border" role="group" aria-label="更多操作选项">
                   <button
                     className="block min-h-10 w-full rounded-lg px-3 text-left text-sm font-medium hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-dark-primary/10"
                     type="button"
-                    role="menuitem"
                     onClick={() => {
                       setActionsOpen(false)
                       void shareProfile()
@@ -684,7 +703,6 @@ export default function PublicProfilePage({
                       <button
                         className="block min-h-10 w-full rounded-lg px-3 text-left text-sm font-medium hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-dark-primary/10"
                         type="button"
-                        role="menuitem"
                         disabled={muteBusy}
                         onClick={() => {
                           setActionsOpen(false)
@@ -696,7 +714,6 @@ export default function PublicProfilePage({
                       <button
                         className="block min-h-10 w-full rounded-lg px-3 text-left text-sm font-medium hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-dark-primary/10"
                         type="button"
-                        role="menuitem"
                         disabled={blockBusy}
                         onClick={() => {
                           setActionsOpen(false)
@@ -708,7 +725,6 @@ export default function PublicProfilePage({
                       <button
                         className="block min-h-10 w-full rounded-lg px-3 text-left text-sm font-medium hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-dark-primary/10"
                         type="button"
-                        role="menuitem"
                         disabled={reportBusy}
                         onClick={() => {
                           setActionsOpen(false)
@@ -720,8 +736,7 @@ export default function PublicProfilePage({
                       </button>
                     </>
                   ) : null}
-                </div>
-              ) : null}
+              </div>
             </div>
           </div>
 
