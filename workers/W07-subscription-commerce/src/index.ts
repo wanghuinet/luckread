@@ -331,7 +331,7 @@ export default {
         if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input as Record<string, unknown>).length !== 0) {
           throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         }
-        let financeStore
+        let financeStore: ReturnType<typeof getW07RenewalCycleStore>
         try {
           financeStore = getW07RenewalCycleStore(runtimeEnv)
         } catch {
