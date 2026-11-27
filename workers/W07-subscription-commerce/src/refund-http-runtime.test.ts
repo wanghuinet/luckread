@@ -81,6 +81,7 @@ function createFixture(options: {
     retrieveProviderRefund: [] as unknown[][],
     createProviderRefund: [] as unknown[][],
     recordAcknowledgement: [] as unknown[][],
+    getPostgresPool: [] as unknown[][],
   };
 
   const reservation: RefundReservation = options.reservation ?? {
@@ -121,7 +122,10 @@ function createFixture(options: {
   } as Parameters<typeof handleCommerceRefundRequest>[2];
 
   const dependencies: RuntimeDependencies = {
-    getPostgresPool: () => pool,
+    getPostgresPool: (...args) => {
+      calls.getPostgresPool.push(args);
+      return pool;
+    },
     resolvePayment: async (...args) => {
       calls.resolvePayment.push(args);
       return options.reference ?? paymentReference;
@@ -175,6 +179,32 @@ function request(options: {
 }
 
 describe('W07 internal customer refund runtime', () => {
+  it('rejects production refunds before database access, provider reads, reservations, or provider writes', async () => {
+    const fixture = createFixture({ env: { HYPERSWITCH_ENVIRONMENT: 'production' } });
+    const response = await handleCommerceRefundRequest(
+      request({
+        idempotencyKey: IDEMPOTENCY_KEY,
+        body: { paymentId: PAYMENT_ID, amountMinor: 300, currency: 'USD', reason: 'Customer request' },
+      }),
+      CUSTOMER_ID,
+      fixture.env,
+      fixture.dependencies,
+    );
+
+    expect(response?.status).toBe(503);
+    expect(await response?.json()).toMatchObject({
+      error: { code: 'SERVICE_UNAVAILABLE' },
+    });
+    expect(fixture.calls.getPostgresPool).toHaveLength(0);
+    expect(fixture.calls.resolvePayment).toHaveLength(0);
+    expect(fixture.calls.findExistingReservation).toHaveLength(0);
+    expect(fixture.calls.retrievePayment).toHaveLength(0);
+    expect(fixture.calls.reserve).toHaveLength(0);
+    expect(fixture.calls.retrieveProviderRefund).toHaveLength(0);
+    expect(fixture.calls.createProviderRefund).toHaveLength(0);
+    expect(fixture.calls.recordAcknowledgement).toHaveLength(0);
+  });
+
   it('does not claim unrelated routes', async () => {
     const fixture = createFixture();
     await expect(
