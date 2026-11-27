@@ -159,6 +159,7 @@ function LuckReadSocialPostCard({
   const [pinned, setPinned] = useState(false)
   const [pinBusy, setPinBusy] = useState(false)
   const [shareBusy, setShareBusy] = useState(false)
+  const [shareLink, setShareLink] = useState<string | null>(null)
   const [reportBusy, setReportBusy] = useState(false)
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
   const [reportReasonCode, setReportReasonCode] = useState('ABUSE')
@@ -173,9 +174,10 @@ function LuckReadSocialPostCard({
   const [revealedMediaKey, setRevealedMediaKey] = useState<string | null>(null)
   const mediaRevealed = !mediaWarning || revealedMediaKey === mediaRevealKey
   const singleMedia = mediaItems.length === 1 ? mediaItems[0] : undefined
-  const profileName = profile?.displayName?.trim() || profile?.username || ''
-  const username = profile?.username ? '@' + profile.username : ''
-  const profileHref = profile?.username ? '/@' + encodeURIComponent(profile.username) : null
+  const displayedProfile = profile || author || null
+  const profileName = displayedProfile?.displayName?.trim() || displayedProfile?.username || ''
+  const username = displayedProfile?.username ? '@' + displayedProfile.username : ''
+  const profileHref = displayedProfile?.username ? '/@' + encodeURIComponent(displayedProfile.username) : null
   const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
   const isOwnPost = Boolean(viewerUserId && resolvedCreatorId && viewerUserId === resolvedCreatorId)
   const canManagePost = Boolean(
@@ -733,6 +735,7 @@ function LuckReadSocialPostCard({
     if (shareBusy) return
     setShareBusy(true)
     setMessage('')
+    setShareLink(null)
     try {
       const { response, data } = await fetchJson<ApiResponse<{ shareId?: string }>>(
         '/api/v1/content/' + encodeURIComponent(contentId) + '/shares',
@@ -767,8 +770,13 @@ function LuckReadSocialPostCard({
           // Fall back to the clipboard if native sharing is unavailable.
         }
       }
-      await navigator.clipboard.writeText(shareUrl)
-      setMessage(locale === 'en' ? 'Share link copied.' : locale === 'tw' ? '已複製分享連結。' : '已复制分享链接。')
+      try {
+        await navigator.clipboard.writeText(shareUrl)
+        setMessage(locale === 'en' ? 'Share link copied.' : locale === 'tw' ? '已複製分享連結。' : '已复制分享链接。')
+      } catch {
+        setShareLink(shareUrl)
+        setMessage(locale === 'en' ? 'Clipboard unavailable. Select the link below to copy it.' : locale === 'tw' ? '無法使用剪貼簿，請選取下方連結並複製。' : '无法使用剪贴板，请选中下方链接并复制。')
+      }
     } catch (cause) {
       setMessage(cause instanceof Error
         ? cause.message
@@ -866,6 +874,7 @@ function LuckReadSocialPostCard({
               </button>
             </footer>
             {message ? <p className="mt-2 rounded-lg bg-main-sidebar-background px-3 py-2 text-xs text-light-secondary dark:text-dark-secondary" role="status">{message}</p> : null}
+            {shareLink ? <label className="mt-2 block text-xs text-light-secondary dark:text-dark-secondary">{locale === 'en' ? 'Share link' : locale === 'tw' ? '分享連結' : '分享链接'}<input aria-label={locale === 'en' ? 'Share link' : locale === 'tw' ? '分享連結' : '分享链接'} className="mt-1 w-full rounded-lg border border-light-border bg-main-background px-3 py-2 text-sm text-light-primary dark:border-dark-border dark:text-dark-primary" onFocus={(event) => event.currentTarget.select()} readOnly value={shareLink} /></label> : null}
           </div>
         </div>
       </article>
@@ -1073,6 +1082,7 @@ function LuckReadSocialPostCard({
             </div>
           ) : null}
           {message && !reportDialogOpen ? <span className="content-detail-action-status" role="status">{message}</span> : null}
+          {shareLink ? <label className="mt-2 block w-full text-xs text-light-secondary dark:text-dark-secondary">{locale === 'en' ? 'Share link' : locale === 'tw' ? '分享連結' : '分享链接'}<input aria-label={locale === 'en' ? 'Share link' : locale === 'tw' ? '分享連結' : '分享链接'} className="mt-1 w-full rounded-lg border border-light-border bg-main-background px-3 py-2 text-sm text-light-primary dark:border-dark-border dark:text-dark-primary" onFocus={(event) => event.currentTarget.select()} readOnly value={shareLink} /></label> : null}
         </footer>
       </div>
       {reportDialogOpen ? (
