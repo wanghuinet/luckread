@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import PublicLanguageToggle from '../(frontend)/i18n/PublicLanguageToggle'
+import TwitterCloneThemeToggle from './TwitterCloneThemeToggle'
 import type { PublicLocale } from '../(frontend)/i18n/public-locale'
 import TwitterClonePostComposerModal, { TwitterClonePostComposerTrigger } from './TwitterClonePostComposerModal'
 import TwitterCloneSidebarProfile from './TwitterCloneSidebarProfile'
@@ -93,7 +94,10 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
         <main className="hover-animation flex min-h-screen w-full min-w-0 max-w-xl flex-col border-x border-light-border pb-32 dark:border-dark-border xs:pb-8">
           <header className="sticky top-0 z-10 flex items-center justify-between gap-6 bg-main-background/60 px-4 py-3 backdrop-blur-md">
             <h1 className="text-xl font-bold">{title}</h1>
-            {showLanguageToggle ? <PublicLanguageToggle locale={locale} /> : null}
+            <div className="flex shrink-0 items-center gap-2">
+              <TwitterCloneThemeToggle locale={locale} />
+              {showLanguageToggle ? <PublicLanguageToggle locale={locale} /> : null}
+            </div>
           </header>
           {children}
         </main>
