@@ -18,7 +18,7 @@ The generator reads the eight canonical D1-01 migration files (0001 through 0008
 
 SQLite ISO-8601 timestamp TEXT fields are mapped to PostgreSQL TIMESTAMPTZ. benefits_json remains TEXT; PostgreSQL JSONB is used only to check that its contents form a JSON array. SQLite typeof, GLOB, RAISE(ABORT) and trigger syntax are replaced with PostgreSQL types, regular-expression checks and PL/pgSQL trigger functions.
 
-The initial generated schema preserves:
+The combined 0001 + 0002 schema preserves:
 - all 20 Subscription columns, including version, trial timestamps and the PAUSE-A remaining-period snapshot;
 - immutable MembershipPlan versions and forward-only current-version changes;
 - immutable RevenueCat product identity with only a one-way retirement transition;
