@@ -22,8 +22,17 @@ test('persists light and dark theme choices and reflects the selected document l
   await expect(page.locator('html')).not.toHaveClass(/dark/)
   await expect(page.locator('html')).toHaveAttribute('lang', 'zh-TW')
 
+  await page.getByRole('button', { name: '选择语言 / Choose language' }).click()
+  await page.getByRole('button', { name: 'English', exact: true }).click()
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en')
+  await expect.poll(async () => context.cookies()).toContainEqual(expect.objectContaining({
+    name: 'luckread-ui-locale',
+    value: 'en',
+  }))
+
   await toggle.click()
   await expect(page.locator('html')).toHaveClass(/dark/)
   await page.reload()
   await expect(page.locator('html')).toHaveClass(/dark/)
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en')
 })
