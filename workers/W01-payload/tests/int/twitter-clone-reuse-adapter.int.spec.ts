@@ -47,6 +47,19 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(component).toContain('className="content-detail-follow"')
   })
 
+  it('offers a manual share-link copy fallback only after clipboard writing fails', () => {
+    const component = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
+    const shareHandler = component.slice(
+      component.indexOf('const shareContent = async () =>'),
+      component.indexOf('if (isDeleted) return null'),
+    )
+
+    expect(shareHandler).toContain('await navigator.clipboard.writeText(shareUrl)')
+    expect(shareHandler).toContain('window.prompt(')
+    expect(shareHandler).toContain('Share link ready to copy.')
+    expect(shareHandler).toContain('分享链接已准备好复制。')
+  })
+
   it('uses an accessible reason dialog instead of a browser prompt for social post reports', () => {
     const component = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
 
@@ -60,7 +73,11 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(component).toContain("value: 'OTHER'")
     expect(component).toContain("setReportDialogOpen(true)")
     expect(component).toContain("reasonCode: reportReasonCode")
-    expect(component).not.toContain('window.prompt(')
+    const reportHandler = component.slice(
+      component.indexOf('const reportContent = async () =>'),
+      component.indexOf('const toggleProfilePin = async () =>'),
+    )
+    expect(reportHandler).not.toContain('window.prompt(')
   })
 
   it('uses the reusable social post card in both homepage and discovery for dynamic content', () => {
