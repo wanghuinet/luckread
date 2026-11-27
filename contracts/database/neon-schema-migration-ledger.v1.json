@@ -92,9 +92,8 @@
     "runnerEntryPoint": "scripts/neon/run-schema-migrations.mjs",
     "domainReadiness": {
       "D1-01": {
-        "runnerStatus": "IMPLEMENTED_AND_REVIEWED",
-        "remoteApplyReady": true,
-        "reviewEvidenceRef": "contracts/database/neon-d1-01-remote-runner-review.v1.json"
+        "runnerStatus": "IMPLEMENTED_NOT_REVIEWED",
+        "remoteApplyReady": false
       },
       "D1-02": {
         "runnerStatus": "IMPLEMENTED_AND_REVIEWED",
@@ -130,4 +129,4 @@
     "productionCutoverAuthorized": false
   },
   "remoteApplyReady": false
-}
+}\n
