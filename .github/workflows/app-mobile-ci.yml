@@ -71,12 +71,8 @@ jobs:
         run: |
           node scripts/apply-hyperswitch-rn88-compat.mjs
           bun run test:hyperswitch-compat
-      - name: Verify versions bundled for the Expo SDK
-        run: bunx expo install --check
-      - name: Run Expo compatibility doctor
-        run: bunx expo-doctor@latest
-      - name: Check public Expo config with OTA test project
-        run: bunx expo config --type public
+      - name: Test native feed card interaction isolation
+        run: bun test tests/feed-card-interaction-isolation.test.mjs
       - name: Test EAS Update configuration and runtime guards
         run: bun test tests/ota-config.test.mjs
       - name: Test Android OTA build provenance verification
@@ -257,6 +253,14 @@ jobs:
         run: bun run test:auth-flow
       - name: Enforce shared API client boundary
         run: bun run check:api-boundary
+      # Run SDK/doctor checks after source-level tests so registry metadata drift
+      # cannot hide the actual regression-test and typecheck results.
+      - name: Verify versions bundled for the Expo SDK
+        run: bunx expo install --check
+      - name: Run Expo compatibility doctor
+        run: bunx expo-doctor@latest
+      - name: Check public Expo config with OTA test project
+        run: bunx expo config --type public
 
   android-build:
     name: Android debug build
