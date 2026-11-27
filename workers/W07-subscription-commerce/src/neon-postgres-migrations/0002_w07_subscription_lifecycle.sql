@@ -1,6 +1,6 @@
 -- GENERATED FILE. Do not hand-edit.
 -- Regenerate with scripts/neon/generate-w07-lifecycle-postgres-migration.mjs.
--- Source template: scripts/neon/templates/w07-subscription-lifecycle-postgres.sql
+-- Source template: scripts/neon/templates/w07-subscription-lifecycle-postgres.sql.
 
 -- W07 D1-01 subscription lifecycle incremental schema migration.
 -- Adds pause snapshots, idempotent lifecycle receipts and append-only audit events.
