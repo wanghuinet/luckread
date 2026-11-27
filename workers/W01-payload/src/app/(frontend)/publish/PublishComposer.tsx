@@ -57,6 +57,7 @@ type ContentResponse = {
   mediaRefs?: string[]
   coverRef?: string | null
   mediaWarning?: 'NUDITY' | 'VIOLENCE' | 'SENSITIVE' | null
+  accessMode?: 'PUBLIC' | 'MEMBERS_ONLY'
 }
 
 type PollOptionView = { optionId: string; text: string; position: number; votes: number }
@@ -206,6 +207,7 @@ export default function PublishComposer({
   const [replyAudienceOpen, setReplyAudienceOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [accessMode, setAccessMode] = useState<'PUBLIC' | 'MEMBERS_ONLY'>('PUBLIC')
   const [articleDocument, setArticleDocument] = useState<ArticleDocument>(() => createArticleDocument())
   const [savedArticleSerialized, setSavedArticleSerialized] = useState('')
   const [assets, setAssets] = useState<UploadedAsset[]>([])
@@ -304,6 +306,7 @@ export default function PublishComposer({
         setType(recovered.contentType ?? 'article')
         setReplyAudience(recoveredReplyAudience)
         setTitle(recovered.title ?? '')
+        setAccessMode(recovered.accessMode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC')
         if ((recovered.contentType ?? 'article') === 'article') {
           const recoveredDocument = articleDocumentFromBody(recoveredBody)
           const wasStructured = tryDeserializeArticleDocument(recoveredBody) !== null
@@ -617,6 +620,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
         ),
         mediaWarning: type === 'post' ? mediaWarning : null,
+        accessMode: type === 'article' || type === 'video' ? accessMode : 'PUBLIC',
       }
 
       const isUpdate = Boolean(currentDraft?.id && currentDraft.etag)
@@ -786,6 +790,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     setArticleDocument(createArticleDocument())
     setTitle('')
     setBody('')
+    setAccessMode('PUBLIC')
     setAssets([])
     setCoverRef('')
     setMediaWarning(null)
@@ -862,6 +867,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
       ),
       mediaWarning: type === 'post' ? mediaWarning : null,
+      accessMode: type === 'article' || type === 'video' ? accessMode : 'PUBLIC',
       ...(type === 'article' ? {
         aiMode,
         humanContribution: humanConfirmed ? 'substantial' : 'light',
@@ -968,6 +974,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       setArticleDocument(createArticleDocument())
       setTitle('')
       setBody('')
+      setAccessMode('PUBLIC')
       setAssets([])
       setCoverRef('')
       setMediaWarning(null)
@@ -1126,6 +1133,17 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             value={title}
           />
         </label>
+      ) : null}
+
+      {type === 'article' || type === 'video' ? (
+        <section aria-label="内容访问权限" className={isXWorkspace ? 'mx-4 mb-4 rounded-xl border border-light-border p-4 dark:border-dark-border' : 'lr-field rounded-xl border border-light-border p-4 dark:border-dark-border'}>
+          <div className="mb-2 text-sm font-semibold text-light-primary dark:text-dark-primary">内容访问权限</div>
+          <div className="flex flex-wrap gap-2">
+            <button aria-pressed={accessMode === 'PUBLIC'} className={accessMode === 'PUBLIC' ? xButtonPrimary : xButtonGhost} disabled={busy || reviewLocked} onClick={() => { setAccessMode('PUBLIC'); markDirty() }} type="button">免费公开</button>
+            <button aria-pressed={accessMode === 'MEMBERS_ONLY'} className={accessMode === 'MEMBERS_ONLY' ? xButtonPrimary : xButtonGhost} disabled={busy || reviewLocked} onClick={() => { setAccessMode('MEMBERS_ONLY'); markDirty() }} type="button">仅订阅会员</button>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-light-secondary dark:text-dark-secondary">会员专属内容仅向拥有有效创作者订阅权益的用户开放。访问权限由服务端验证，不能通过客户端状态绕过。</p>
+        </section>
       ) : null}
 
       {type === 'article' ? (

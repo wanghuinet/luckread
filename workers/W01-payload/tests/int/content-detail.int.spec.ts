@@ -247,3 +247,15 @@ it('retries a missing UUID-backed stable slug through W01 content detail by cont
   expect(routes).toContain('response = await fetchContentById(fallbackId, headersForRequest)')
   expect(routes).toContain("new Request('https://luckread.com/api/v1/contents/'")
 })
+
+it('fails closed for subscriber-only article bodies and renders a creator membership entry', () => {
+  const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+  expect(page).toContain("accessMode?: 'PUBLIC' | 'MEMBERS_ONLY'")
+  expect(page).toContain('accessGranted?: boolean')
+  expect(page).toContain("resolved.accessMode !== 'MEMBERS_ONLY' || resolved.accessGranted === true")
+  expect(page).toContain("content.accessMode === 'MEMBERS_ONLY' && content.accessGranted !== true")
+  expect(page).toContain('订阅创作者，解锁完整内容')
+  expect(page).toContain('查看订阅方案')
+  expect(page).toContain("credentials: 'include'")
+  expect(page).toContain('memberResult.response.ok && memberResult.data?.id === resolved.id')
+})
