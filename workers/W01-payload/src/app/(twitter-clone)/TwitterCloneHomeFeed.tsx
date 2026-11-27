@@ -83,7 +83,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       setNextCursor(next)
       setHasMore(page.hasMore === true && next !== null && next !== nextCursor)
       setCandidateWindowTruncated(current => current || page.candidateWindowTruncated === true)
-    } catch(cause) {setError(cause instanceof Error?cause.message:copy.feed.loadMoreError)}
+    } catch(cause) {requestedCursorRef.current = null;setError(cause instanceof Error?cause.message:copy.feed.loadMoreError)}
     finally {loadingRef.current=false;setLoading(false)}
   }, [copy.feed.loadMoreError, feedMode, hasMore, nextCursor, requiresAuth])
 
