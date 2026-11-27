@@ -410,6 +410,9 @@ export default function LuckReadSocialPostCard({
     const previousBookmarked = bookmarked
     setBookmarkBusy(true)
     setMessage('')
+    const nextBookmarked = !previousBookmarked
+    setBookmarked(nextBookmarked)
+    onBookmarkChanged?.(nextBookmarked)
     try {
       const { response, data } = await fetchJson<ApiResponse<unknown>>('/api/v1/interactions/bookmarks', {
         method: previousBookmarked ? 'DELETE' : 'POST',
@@ -428,9 +431,9 @@ export default function LuckReadSocialPostCard({
       if (!response.ok) {
         throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Bookmark failed.' : '收藏失败，请稍后重试。'))
       }
-      setBookmarked(!previousBookmarked)
-      onBookmarkChanged?.(!previousBookmarked)
     } catch (cause) {
+      setBookmarked(previousBookmarked)
+      onBookmarkChanged?.(previousBookmarked)
       setMessage(cause instanceof Error
         ? cause.message
         : locale === 'en' ? 'Bookmark failed.' : '收藏失败，请稍后重试。')
