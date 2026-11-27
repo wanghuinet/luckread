@@ -3,13 +3,13 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-01-migration-manifest.v1.json",
   "title": "LuckRead D1-01 Neon PostgreSQL Schema Migration Manifest",
   "version": "1.0.0",
-  "status": "MANIFEST_REVIEWED_SHARED_RUNNER_REMOTE_READY",
+  "status": "MANIFEST_INCREMENTAL_CHANGE_PENDING_REVIEW",
   "domainId": "D1-01",
   "databaseName": "luckread",
   "postgresMajor": 18,
   "businessDataImport": false,
   "productionCutoverAuthorized": false,
-  "remoteApplyReady": true,
+  "remoteApplyReady": false,
   "ordering": "Strictly ascending unique order values; no lexical filename ordering is inferred.",
   "entries": [
     {
@@ -317,6 +317,29 @@
       }
     },
     {
+      "order": 510,
+      "ownerWorker": "W07",
+      "migrationId": "D1-01-W07-SUBSCRIPTION-LIFECYCLE-0002",
+      "kind": "POSTGRESQL_SQL",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W07-subscription-commerce/src/neon-postgres-migrations/0002_w07_subscription_lifecycle.sql"
+      ],
+      "sourcePaths": [
+        "workers/W07-subscription-commerce/scripts/neon/generate-w07-lifecycle-postgres-migration.mjs",
+        "workers/W07-subscription-commerce/scripts/neon/templates/w07-subscription-lifecycle-postgres.sql"
+      ],
+      "dependsOn": [
+        "D1-01-W07-MEMBERSHIP-SCHEMA-0001"
+      ],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "packageDirectory": "workers/W07-subscription-commerce",
+        "generatorFamily": "w07-subscription-lifecycle-generator",
+        "transactionPolicy": "RUNNER_MUST_STRIP_EXACT_OUTER_BEGIN_COMMIT_AND_OWN_TRANSACTION"
+      }
+    },
+    {
       "order": 600,
       "ownerWorker": "W08",
       "migrationId": "D1-01-W08-CREATOR-AUTHORIZATION-0001",
@@ -368,10 +391,10 @@
   "executionRequiresSharedLedger": true,
   "sourceCommitRecordedAtExecution": true,
   "execution": {
-    "runnerStatus": "IMPLEMENTED_AND_REVIEWED",
+    "runnerStatus": "IMPLEMENTED_NOT_REVIEWED",
     "runnerEntryPoint": "scripts/neon/run-schema-migrations.mjs",
     "reviewEvidenceRef": "contracts/database/neon-d1-01-remote-runner-review.v1.json",
     "lockExpression": "pg_advisory_xact_lock(hashtextextended('luckread:neon-schema-migration:' || current_database(), 0))",
-    "remoteApplyReady": true
+    "remoteApplyReady": false
   }
-}
+}\n
