@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/database/neon-schema-migration-ledger.v1.json",
   "title": "LuckRead Neon Schema Migration Ledger Contract",
   "version": "1.0.0",
-  "status": "LEDGER_SCHEMA_D1_02_READY_D1_01_LIFECYCLE_REVIEW_PENDING_OTHER_DOMAINS_BLOCKED",
+  "status": "LEDGER_SCHEMA_D1_01_D1_02_READY_OTHER_DOMAINS_BLOCKED",
   "scope": "Shared append-only schema migration provenance ledger installed independently inside each approved Neon database.",
   "businessData": false,
   "table": {
@@ -92,8 +92,9 @@
     "runnerEntryPoint": "scripts/neon/run-schema-migrations.mjs",
     "domainReadiness": {
       "D1-01": {
-        "runnerStatus": "IMPLEMENTED_NOT_REVIEWED",
-        "remoteApplyReady": false
+        "runnerStatus": "IMPLEMENTED_AND_REVIEWED",
+        "remoteApplyReady": true,
+        "reviewEvidenceRef": "contracts/database/neon-d1-01-remote-runner-review.v1.json"
       },
       "D1-02": {
         "runnerStatus": "IMPLEMENTED_AND_REVIEWED",
