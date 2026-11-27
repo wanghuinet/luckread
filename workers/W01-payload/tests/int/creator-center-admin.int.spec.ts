@@ -1156,5 +1156,16 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("if (type === 'post') {")
   })
 
+  
+  it('publishes member-only access mode for long articles and videos and restores it from drafts', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain("const [accessMode, setAccessMode] = useState<'PUBLIC' | 'MEMBERS_ONLY'>('PUBLIC')")
+    expect(publisher).toContain("setAccessMode(recovered.accessMode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC')")
+    expect(publisher).toContain("accessMode: type === 'article' || type === 'video' ? accessMode : 'PUBLIC'")
+    expect(publisher).toContain('aria-label="内容访问权限"')
+    expect(publisher).toContain('仅订阅会员')
+    expect(publisher).toContain('免费公开')
+  })
+
 
 })
