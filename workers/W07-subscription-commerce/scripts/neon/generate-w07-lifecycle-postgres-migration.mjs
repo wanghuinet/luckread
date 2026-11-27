@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
-const workerRoot = resolve(scriptDirectory, '..')
+const workerRoot = resolve(scriptDirectory, '../..')
 const outputPath = resolve(workerRoot, 'src/neon-postgres-migrations/0002_w07_subscription_lifecycle.sql')
 const templatePath = resolve(scriptDirectory, 'templates/w07-subscription-lifecycle-postgres.sql')
 const sql = readFileSync(templatePath, 'utf8')
