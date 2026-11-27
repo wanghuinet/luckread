@@ -47,6 +47,8 @@ DECLARE
     'membership_subscription_scheduled_plan_changes',
     'membership_subscriptions',
     'membership_subscription_renewal_cycle_applications',
+    'membership_subscription_lifecycle_audit',
+    'membership_subscription_lifecycle_operation_receipts',
     'creator_applications',
     'creator_authorization_audit',
     'creators',
