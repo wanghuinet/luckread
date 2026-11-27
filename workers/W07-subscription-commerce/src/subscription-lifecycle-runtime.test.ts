@@ -39,6 +39,14 @@ class MemoryLifecyclePool implements W07WebhookPostgresPool {
   }
   receipts = new Map<string, Receipt>()
   audits: Array<Record<string, unknown>> = []
+  scheduledChange: {
+    status: 'SCHEDULED' | 'CANCELLED'
+    expected_subscription_version: number
+    expected_plan_id: string
+    expected_plan_version: number
+    effective_at: string
+    version: number
+  } | null = null
 
   async query<RowType extends Record<string, unknown> = Record<string, unknown>>(
     sql: string,
@@ -54,14 +62,14 @@ class MemoryLifecyclePool implements W07WebhookPostgresPool {
 
   async connect(): Promise<W07WebhookPostgresClient> {
     const pool = this
-    let snapshot: { row: Row; receipts: Map<string, Receipt>; audits: Array<Record<string, unknown>> } | null = null
+    let snapshot: { row: Row; receipts: Map<string, Receipt>; audits: Array<Record<string, unknown>>; scheduledChange: MemoryLifecyclePool['scheduledChange'] } | null = null
     return {
       query: async <RowType extends Record<string, unknown> = Record<string, unknown>>(
         sql: string,
         values: unknown[] = [],
       ) => {
         if (sql === 'BEGIN') {
-          snapshot = { row: structuredClone(pool.row), receipts: structuredClone(pool.receipts), audits: structuredClone(pool.audits) }
+          snapshot = { row: structuredClone(pool.row), receipts: structuredClone(pool.receipts), audits: structuredClone(pool.audits), scheduledChange: structuredClone(pool.scheduledChange) }
           return { rows: [] as RowType[], rowCount: 0 }
         }
         if (sql === 'COMMIT') {
@@ -73,6 +81,7 @@ class MemoryLifecyclePool implements W07WebhookPostgresPool {
             pool.row = snapshot.row
             pool.receipts = snapshot.receipts
             pool.audits = snapshot.audits
+            pool.scheduledChange = snapshot.scheduledChange
           }
           snapshot = null
           return { rows: [] as RowType[], rowCount: 0 }
@@ -95,6 +104,30 @@ class MemoryLifecyclePool implements W07WebhookPostgresPool {
     if (sql.includes('FROM membership_subscriptions WHERE subscription_id = $1')) {
       const found = this.row.subscription_id === values[0] && this.row.subscriber_id === values[1]
       return { rows: found ? [structuredClone(this.row)] : [], rowCount: found ? 1 : 0 }
+    }
+    if (sql.startsWith("UPDATE membership_subscription_scheduled_plan_changes SET status = 'CANCELLED'")) {
+      const [, subscriptionId, subscriberId] = values
+      if (this.scheduledChange && this.row.subscription_id === subscriptionId &&
+          this.row.subscriber_id === subscriberId && this.scheduledChange.status === 'SCHEDULED') {
+        this.scheduledChange = { ...this.scheduledChange, status: 'CANCELLED', version: this.scheduledChange.version + 1 }
+        return { rows: [], rowCount: 1 }
+      }
+      return { rows: [], rowCount: 0 }
+    }
+    if (sql.startsWith('UPDATE membership_subscription_scheduled_plan_changes AS c')) {
+      const [expectedVersion, effectiveAt, , subscriptionId, subscriberId, priorEffectiveAt] = values
+      const change = this.scheduledChange
+      if (change && change.status === 'SCHEDULED' && this.row.subscription_id === subscriptionId &&
+          this.row.subscriber_id === subscriberId && this.row.version === expectedVersion &&
+          change.expected_plan_id === 'plan_current' && change.expected_plan_version === 1 &&
+          change.effective_at === priorEffectiveAt) {
+        this.scheduledChange = {
+          ...change, expected_subscription_version: Number(expectedVersion),
+          effective_at: String(effectiveAt), version: change.version + 1,
+        }
+        return { rows: [], rowCount: 1 }
+      }
+      return { rows: [], rowCount: 0 }
     }
     if (sql.startsWith('INSERT INTO membership_subscription_lifecycle_operation_receipts')) {
       const [operationId, subscriptionId, subscriberId, operation, idempotencyHash, fingerprint, expectedVersion, resultVersion] = values
@@ -203,13 +236,14 @@ const call = (
   key: string,
   version: number,
   finance = new MemoryFinancePool(false),
+  now = new Date(NOW),
 ) => transitionSubscriptionLifecycle(membership, finance, {
   action,
   subscriptionId: 'sub_lifecycle_1',
   subscriberId: 'user_1',
   idempotencyKey: key,
   ifMatch: '"lr-v' + version + '"',
-  now: new Date(NOW),
+  now,
 })
 
 describe('W07 subscription lifecycle runtime', () => {
@@ -245,6 +279,42 @@ describe('W07 subscription lifecycle runtime', () => {
     expect(resumed.data.currentPeriodStart).toBe(NOW)
     expect(resumed.data.currentPeriodEnd).toBe(PERIOD_END)
     expect(membership.row.pause_remaining_seconds).toBeNull()
+  })
+
+  it('moves a scheduled downgrade to the extended period boundary when a paused subscription resumes', async () => {
+    membership.scheduledChange = {
+      status: 'SCHEDULED',
+      expected_subscription_version: 7,
+      expected_plan_id: 'plan_current',
+      expected_plan_version: 1,
+      effective_at: PERIOD_END,
+      version: 1,
+    }
+    const paused = await call(membership, 'pause', 'pause-with-change', 7)
+    const resumed = await call(
+      membership, 'resume', 'resume-with-change', paused.data.version,
+      new MemoryFinancePool(false), new Date('2026-12-07T12:00:00.000Z'),
+    )
+    expect(resumed.data.currentPeriodEnd).toBe('2027-01-06T12:00:00.000Z')
+    expect(membership.scheduledChange).toMatchObject({
+      status: 'SCHEDULED',
+      expected_subscription_version: resumed.data.version,
+      effective_at: '2027-01-06T12:00:00.000Z',
+      version: 2,
+    })
+  })
+
+  it('retires a scheduled plan change when the subscriber cancels', async () => {
+    membership.scheduledChange = {
+      status: 'SCHEDULED',
+      expected_subscription_version: 7,
+      expected_plan_id: 'plan_current',
+      expected_plan_version: 1,
+      effective_at: PERIOD_END,
+      version: 1,
+    }
+    await call(membership, 'cancel', 'cancel-with-change', 7)
+    expect(membership.scheduledChange).toMatchObject({ status: 'CANCELLED', version: 2 })
   })
 
   it('cancels at period end without removing current-period entitlement', async () => {

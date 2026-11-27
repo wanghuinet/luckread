@@ -535,6 +535,14 @@ async function applySimpleLifecycle(
       } else {
         throw new SubscriptionRuntimeError('CONFLICT', 409)
       }
+      // A period-end cancellation removes the next renewal, so any pending
+      // plan change for that renewal must be retired in the same transaction.
+      await client.query(
+        "UPDATE membership_subscription_scheduled_plan_changes SET status = 'CANCELLED', " +
+        'updated_at = $1::timestamptz, version = version + 1 ' +
+        "WHERE subscription_id = $2 AND subscriber_id = $3 AND status = 'SCHEDULED'",
+        [input.now, row.subscription_id, input.subscriberId],
+      )
     } else if (input.action === 'resume') {
       if (row.status !== 'PAUSED' || row.cancel_at !== null || row.pause_remaining_seconds === null ||
           !Number.isSafeInteger(Number(row.pause_remaining_seconds)) || Number(row.pause_remaining_seconds) < 0) {
@@ -554,6 +562,23 @@ async function applySimpleLifecycle(
         ['ACTIVE', input.now, nextEnd, row.subscription_id, input.subscriberId, row.version],
       )
       updated = result.rows[0]
+      if (updated) {
+        // PAUSE-A extends the paid period by the frozen remaining duration.
+        // Carry a pending period-end plan change to that same new boundary and
+        // bind it to the post-resume subscription version. Only the still-current
+        // plan snapshot may be carried forward.
+        await client.query(
+          'UPDATE membership_subscription_scheduled_plan_changes AS c ' +
+          'SET expected_subscription_version = $1, effective_at = $2::timestamptz, ' +
+          'updated_at = $3::timestamptz, version = version + 1 ' +
+          "WHERE c.subscription_id = $4 AND c.subscriber_id = $5 AND c.status = 'SCHEDULED' " +
+          'AND c.effective_at = $6::timestamptz ' +
+          'AND EXISTS (SELECT 1 FROM membership_subscriptions s ' +
+          'WHERE s.subscription_id = $4 AND s.subscriber_id = $5 AND s.version = $1 ' +
+          'AND s.plan_id = c.expected_plan_id AND s.plan_version = c.expected_plan_version)',
+          [updated.version, nextEnd, input.now, row.subscription_id, input.subscriberId, row.current_period_end],
+        )
+      }
     } else {
       throw new SubscriptionRuntimeError('CONFLICT', 409)
     }
