@@ -19,11 +19,13 @@ async function loadInitialContent(requestHeaders: Headers, locale: PublicLocale)
   const request = new Request('https://api.luckread.com/v1/contents?limit=20', { headers: forwarded, cache: 'no-store' })
   try {
     const { response, data: payload } = await fetchJson<{ data?: HomeContentPage }>(request)
-    if (!response.ok) return { items: [], nextCursor: null, hasMore: false }
     const page = payload?.data
-    return { items: Array.isArray(page?.items) ? page.items : [], nextCursor: page?.nextCursor ?? null, hasMore: page?.hasMore === true }
+    if (!response.ok || !page || !Array.isArray(page.items)) {
+      return { items: [], nextCursor: null, hasMore: false, initialLoadError: true }
+    }
+    return { items: page.items, nextCursor: page.nextCursor ?? null, hasMore: page.hasMore === true }
   } catch {
-    return { items: [], nextCursor: null, hasMore: false }
+    return { items: [], nextCursor: null, hasMore: false, initialLoadError: true }
   }
 }
 
