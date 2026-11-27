@@ -3,44 +3,16 @@
 import { useEffect, useId, useRef, useState } from 'react'
 
 const LANGUAGES: ReadonlyArray<{ value: string; label: string }> = [
-  { value: 'zh-CN', label: '简体中文' },
+  { value: 'zh', label: '简体中文' },
   { value: 'en', label: 'English' },
-  { value: 'zh-TW', label: '繁體中文' },
-  { value: 'ja', label: '日本語' },
-  { value: 'ko', label: '한국어' },
-  { value: 'es', label: 'Español' },
-  { value: 'pt-BR', label: 'Português (Brasil)' },
-  { value: 'fr', label: 'Français' },
-  { value: 'de', label: 'Deutsch' },
-  { value: 'it', label: 'Italiano' },
-  { value: 'ru', label: 'Русский' },
-  { value: 'ar', label: 'العربية' },
-  { value: 'hi', label: 'हिन्दी' },
-  { value: 'bn', label: 'বাংলা' },
-  { value: 'th', label: 'ไทย' },
-  { value: 'vi', label: 'Tiếng Việt' },
-  { value: 'id', label: 'Bahasa Indonesia' },
-  { value: 'ms', label: 'Bahasa Melayu' },
-  { value: 'tr', label: 'Türkçe' },
-  { value: 'fa', label: 'فارسی' },
-  { value: 'uk', label: 'Українська' },
-  { value: 'pl', label: 'Polski' },
-  { value: 'nl', label: 'Nederlands' },
-  { value: 'sv', label: 'Svenska' },
-  { value: 'no', label: 'Norsk' },
-  { value: 'da', label: 'Dansk' },
-  { value: 'fi', label: 'Suomi' },
-  { value: 'el', label: 'Ελληνικά' },
-  { value: 'fil', label: 'Filipino' },
-  { value: 'sw', label: 'Kiswahili' },
-  { value: 'he', label: 'עברית' },
+  { value: 'tw', label: '繁體中文' },
 ]
 
 function normalizeInitialLanguage(locale: string): string {
-  if (locale === 'zh' || locale === 'zh-CN') return 'zh-CN'
-  if (locale === 'tw' || locale === 'zh-TW') return 'zh-TW'
+  if (locale === 'zh-CN') return 'zh'
+  if (locale === 'zh-TW') return 'tw'
   if (locale === 'en-US') return 'en'
-  return LANGUAGES.some((language) => language.value === locale) ? locale : 'zh-CN'
+  return LANGUAGES.some((language) => language.value === locale) ? locale : 'zh'
 }
 
 export default function GlobeLanguageMenu({ initialLocale = 'zh-CN' }: { initialLocale?: string }) {
@@ -73,8 +45,7 @@ export default function GlobeLanguageMenu({ initialLocale = 'zh-CN' }: { initial
     }
   }, [open])
 
-  // UI-only for now: selecting a language changes only this menu's local highlight.
-  // Page translation, cookies, storage, and reload behavior are intentionally deferred.
+  // Persist only the three locales that the public Web interface currently translates.
   return (
     <div className="relative z-30 inline-flex shrink-0" ref={containerRef}>
       <button
@@ -102,6 +73,8 @@ export default function GlobeLanguageMenu({ initialLocale = 'zh-CN' }: { initial
               onClick={() => {
                 setSelectedLanguage(language.value)
                 setOpen(false)
+                document.cookie = 'luckread-ui-locale=' + language.value + '; Path=/; Max-Age=31536000; SameSite=Lax' + (window.location.protocol === 'https:' ? '; Secure' : '')
+                window.location.reload()
               }}
               type="button"
             >

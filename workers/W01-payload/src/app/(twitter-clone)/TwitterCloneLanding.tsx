@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import PublicLanguageToggle from '../(frontend)/i18n/PublicLanguageToggle'
+import TwitterCloneThemeToggle from './TwitterCloneThemeToggle'
 import type { PublicLocale } from '../(frontend)/i18n/public-locale'
 import { getTwitterCloneCopy } from './twitter-clone-copy'
 
@@ -18,7 +19,7 @@ export default function TwitterCloneLanding({ locale }: { locale: PublicLocale }
         <i className="absolute"><TwitterLogo className="h-96 w-96 text-white" /></i>
       </div>
       <div className="flex flex-col items-center justify-between gap-6 p-8 lg:items-start lg:justify-center">
-        <div className="flex w-full max-w-xs items-center justify-between lg:max-w-sm"><i className="self-center text-accent-blue lg:self-auto dark:text-twitter-icon"><TwitterLogo className="-mt-4 h-8 w-8 lg:h-12 lg:w-12" /></i><PublicLanguageToggle locale={locale} /></div>
+        <div className="flex w-full max-w-xs items-center justify-between lg:max-w-sm"><i className="self-center text-accent-blue lg:self-auto dark:text-twitter-icon"><TwitterLogo className="-mt-4 h-8 w-8 lg:h-12 lg:w-12" /></i><div className="flex items-center gap-2"><TwitterCloneThemeToggle locale={locale} /><PublicLanguageToggle locale={locale} /></div></div>
         <div className="flex max-w-xs flex-col gap-4 font-twitter-chirp-extended lg:max-w-none lg:gap-16">
           <h1 className="text-3xl leading-tight lg:text-6xl">{copy.landing.happeningNow}</h1>
           <h2 className="hidden text-xl lg:block lg:text-3xl">{copy.landing.joinToday}</h2>

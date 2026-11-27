@@ -83,7 +83,9 @@ describe('Twitter Clone profile UI reuse on LuckRead public profile', () => {
 
     expect(profileRoute).toContain("from '../../../(frontend)/users/[userId]/UserProfilePage'")
     expect(rootLayout).toContain("import '../../styles/twitter-clone-globals.scss'")
-    expect(rootLayout).toContain('<html className="dark" lang="en">')
+    expect(rootLayout).toContain("cookieStore.get('luckread-ui-theme')")
+    expect(rootLayout).toContain("cookieStore.get('luckread-ui-locale')")
+    expect(rootLayout).toContain("className={theme === 'dark' ? 'dark' : undefined}")
   })
 
   it('reserves mobile navigation clearance without adding a large desktop blank area', () => {
