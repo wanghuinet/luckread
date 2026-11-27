@@ -807,11 +807,11 @@ function LuckReadSocialPostCard({
         <div className="grid grid-cols-[auto,minmax(0,1fr)] gap-x-3">
           {authorHref ? (
             <Link href={authorHref} aria-label={profileName} className="mt-0.5 grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-main-sidebar-background text-sm font-bold text-light-primary dark:text-dark-primary">
-              {profile?.avatar ? <img alt="" className="h-full w-full object-cover" height={40} loading="lazy" src={profile.avatar} width={40} /> : profileName ? profileName.slice(0, 1).toUpperCase() : ''}
+              {displayedProfile?.avatar ? <img alt="" className="h-full w-full object-cover" height={40} loading="lazy" src={displayedProfile.avatar} width={40} /> : profileName ? profileName.slice(0, 1).toUpperCase() : ''}
             </Link>
           ) : (
             <div aria-label={profileName} className="mt-0.5 grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-main-sidebar-background text-sm font-bold text-light-primary dark:text-dark-primary">
-              {profile?.avatar ? <img alt="" className="h-full w-full object-cover" height={40} loading="lazy" src={profile.avatar} width={40} /> : profileName ? profileName.slice(0, 1).toUpperCase() : ''}
+              {displayedProfile?.avatar ? <img alt="" className="h-full w-full object-cover" height={40} loading="lazy" src={displayedProfile.avatar} width={40} /> : profileName ? profileName.slice(0, 1).toUpperCase() : ''}
             </div>
           )}
           <div className="min-w-0">
