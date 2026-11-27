@@ -22,7 +22,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   const [requiresAuth,setRequiresAuth] = useState(false)
   const [candidateWindowTruncated,setCandidateWindowTruncated] = useState(initialPage.candidateWindowTruncated === true)
   const sentinelRef = useRef<HTMLDivElement|null>(null)
-  const loadingRef = useRef(false)
+  const loadingRef = useRef(false)\n  const requestedCursorRef = useRef<string | null>(null)
 
   const loadInitialFollowing = useCallback(async () => {
     if (feedMode !== 'following' || loadingRef.current) return
