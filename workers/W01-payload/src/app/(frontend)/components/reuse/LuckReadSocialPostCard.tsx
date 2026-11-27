@@ -1,7 +1,7 @@
 "use client"
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import { buildPublicContentHref } from '../../../../lib/public-content-url.js'
@@ -113,7 +113,7 @@ type Props = {
   onPinChanged?: (contentId: string, pinned: boolean) => void
 }
 
-export default function LuckReadSocialPostCard({
+function LuckReadSocialPostCard({
   contentId,
   slug,
   title,
@@ -1094,3 +1094,5 @@ export default function LuckReadSocialPostCard({
     </article>
   )
 }
+
+export default memo(LuckReadSocialPostCard)
