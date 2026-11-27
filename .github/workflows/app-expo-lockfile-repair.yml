@@ -32,9 +32,21 @@ jobs:
       - name: Install the committed dependency baseline
         working-directory: app
         run: bun install --frozen-lockfile
-      - name: Align dependencies to the installed Expo SDK
+      - name: Align the 11 Expo SDK packages without rewriting dynamic app config
         working-directory: app
-        run: bunx expo install --fix
+        run: >-
+          bun add
+          expo@~58.1.0
+          expo-image@~58.0.19
+          expo-router@~58.0.33
+          @sentry/react-native@~8.28.1
+          expo-updates@~58.0.23
+          expo-dev-client@~58.0.22
+          expo-splash-screen@~58.0.15
+          expo-network@~58.0.6
+          expo-notifications@~58.1.10
+          @expo/ui@~58.0.30
+          expo-file-system@~58.0.15
       - name: Regenerate the committed Bun lockfile
         working-directory: app
         run: bun install
