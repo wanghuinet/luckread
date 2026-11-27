@@ -76,7 +76,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       }
       if(!response.ok||!data?.data)throw new Error(getApiErrorMessage(data,copy.feed.loadMoreError))
       const page=data.data
-      setItems(current=>{const seen=new Set(current.map(item=>item.id));return [...current,...(page.items??[]).filter(item=>!seen.has(item.id))]})
+      setItems(current=>{const seen=new Set(current.map(item=>item.id));const unique:HomeContentItem[]=[];for(const item of page.items??[]){if(!seen.has(item.id)){seen.add(item.id);unique.push(item)}}return [...current,...unique]})
       setNextCursor(page.nextCursor??null);setHasMore(page.hasMore===true)
       setCandidateWindowTruncated(current => current || page.candidateWindowTruncated === true)
     } catch(cause) {setError(cause instanceof Error?cause.message:copy.feed.loadMoreError)}
