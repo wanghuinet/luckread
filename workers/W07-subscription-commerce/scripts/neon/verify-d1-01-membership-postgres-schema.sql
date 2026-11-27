@@ -6,7 +6,7 @@ DECLARE
   actual_columns TEXT[];
   expected_columns TEXT[];
   actual_count INTEGER;
-  -- The verifier checks W07's exact seven-table owner slice, while allowing
+  -- The verifier checks W07's exact nine-table owner slice, while allowing
   -- only the registered W01/W02/W07/W08 owner tables in the integrated D1-01 rehearsal.
   known_d1_01_tables TEXT[] := ARRAY[
     'users_sessions',
@@ -130,6 +130,12 @@ BEGIN
         OR
         (table_name = 'membership_subscription_renewal_cycle_applications'
           AND column_name IN ('cycle_start', 'cycle_end', 'applied_at') AND data_type <> 'timestamp with time zone')
+        OR
+        (table_name = 'membership_subscription_lifecycle_operation_receipts'
+          AND column_name IN ('created_at', 'completed_at') AND data_type <> 'timestamp with time zone')
+        OR
+        (table_name = 'membership_subscription_lifecycle_audit'
+          AND column_name = 'occurred_at' AND data_type <> 'timestamp with time zone')
       )
   ) THEN
     RAISE EXCEPTION 'D1 ISO-8601 timestamp fields must map to PostgreSQL TIMESTAMPTZ';
@@ -153,6 +159,16 @@ BEGIN
       WHERE table_schema = 'public' AND table_name = 'membership_subscriptions'
         AND column_name = 'version') <> '1' THEN
     RAISE EXCEPTION 'membership_subscriptions.version must be INTEGER DEFAULT 1';
+  END IF;
+
+  IF (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscriptions') <> 20 THEN
+    RAISE EXCEPTION 'membership_subscriptions must expose exactly twenty columns';
+  END IF;
+
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'membership_subscriptions'
+        AND column_name = 'pause_remaining_seconds') <> 'bigint' THEN
+    RAISE EXCEPTION 'pause_remaining_seconds must be BIGINT';
   END IF;
 
   IF (SELECT data_type FROM information_schema.columns
@@ -650,7 +666,7 @@ SELECT jsonb_build_object(
   'secondaryIndexesVerified', 22,
   'triggersVerified', 10,
   'checks', jsonb_build_array(
-    'exact Subscription 17-column contract',
+    'exact Subscription 20-column contract and PAUSE-A snapshot constraints',
     'TIMESTAMPTZ timestamp mapping',
     'source-defined plan and RevenueCat foreign keys only',
     'no speculative active-subscription uniqueness',
@@ -662,6 +678,8 @@ SELECT jsonb_build_object(
     'durable renewal-cycle receipt identity and timestamp constraints',
     'DOWNGRADE/BILLING_INTERVAL_CHANGE discriminator',
     'opaque D1-04 order reference only',
+    'subscriber-scoped lifecycle idempotency receipts',
+    'append-only lifecycle audit rejects update/delete/truncate',
     'all synthetic writes rolled back'
   ),
   'businessRowsAfterRollback', jsonb_build_object(
