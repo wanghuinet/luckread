@@ -1,7 +1,7 @@
 "use client"
 
 import Link from 'next/link'
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import { getSharedFollowRelationship } from '../../../../lib/social-follow-request-coalescer.js'
@@ -162,6 +162,8 @@ function LuckReadSocialPostCard({
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
   const [reportReasonCode, setReportReasonCode] = useState('ABUSE')
   const [message, setMessage] = useState('')
+  const timelineCardRef = useRef<HTMLElement | null>(null)
+  const [timelineCardNearViewport, setTimelineCardNearViewport] = useState(presentation !== 'x-timeline')
 
   const contentHref = buildPublicContentHref({ id: contentId, slug, contentType: 'post', creator: profile || author })
   const mediaItems = resolveSocialPostMedia(mediaRefs, coverRef)
@@ -187,6 +189,7 @@ function LuckReadSocialPostCard({
     : ''
 
   useEffect(() => {
+    if (presentation === 'x-timeline' && !timelineCardNearViewport) return
     const controller = new AbortController()
     let cancelled = false
 
@@ -303,12 +306,33 @@ function LuckReadSocialPostCard({
       cancelled = true
       controller.abort()
     }
-  }, [contentId, creatorId, author, createdAt, updatedAt, slug, presentation])
+  }, [contentId, creatorId, author, createdAt, updatedAt, slug, presentation, timelineCardNearViewport])
+
+  useEffect(() => {
+    if (presentation !== 'x-timeline') {
+      setTimelineCardNearViewport(true)
+      return
+    }
+    const target = timelineCardRef.current
+    if (!target) return
+    if (typeof IntersectionObserver === 'undefined') {
+      setTimelineCardNearViewport(true)
+      return
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setTimelineCardNearViewport(true)
+        observer.disconnect()
+      }
+    }, { rootMargin: '700px 0px' })
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [presentation, contentId])
 
   // Timeline cards defer the heavier owner-action detail read until the user opens
   // the overflow menu. The initial feed only needs the lightweight social summary.
   useEffect(() => {
-    if (presentation !== 'x-timeline' || !moreOpen) return
+    if (presentation !== 'x-timeline' || !timelineCardNearViewport || !moreOpen) return
     const controller = new AbortController()
     let cancelled = false
 
@@ -347,7 +371,7 @@ function LuckReadSocialPostCard({
       cancelled = true
       controller.abort()
     }
-  }, [presentation, moreOpen, contentId, creatorId, viewerUserId, createdAt, updatedAt])
+  }, [presentation, timelineCardNearViewport, moreOpen, contentId, creatorId, viewerUserId, createdAt, updatedAt])
 
   const requireLogin = () => {
     const returnTo = window.location.pathname + window.location.search + window.location.hash
@@ -770,7 +794,15 @@ function LuckReadSocialPostCard({
     const actionClass = 'group/action inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full p-2 text-light-secondary transition-colors hover:bg-sky-500/10 hover:text-sky-500 disabled:cursor-wait disabled:opacity-50 dark:text-dark-secondary'
     const actionText = 'min-w-[14px] text-xs tabular-nums'
     return (
-      <article className="border-b border-light-border px-4 py-3 transition-colors hover:bg-black/[0.025] dark:border-dark-border dark:hover:bg-white/[0.03]" data-testid="luckread-social-post-card">
+      <article
+        ref={timelineCardRef}
+        className="border-b border-light-border px-4 py-3 transition-colors hover:bg-black/[0.025] dark:border-dark-border dark:hover:bg-white/[0.03]"
+        data-testid="luckread-social-post-card"
+        style={{
+          contentVisibility: presentation === 'x-timeline' ? 'auto' : undefined,
+          containIntrinsicSize: presentation === 'x-timeline' ? 'auto 560px' : undefined,
+        }}
+      >
         <div className="grid grid-cols-[auto,minmax(0,1fr)] gap-x-3">
           {authorHref ? (
             <Link href={authorHref} aria-label={profileName} className="mt-0.5 grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-main-sidebar-background text-sm font-bold text-light-primary dark:text-dark-primary">
