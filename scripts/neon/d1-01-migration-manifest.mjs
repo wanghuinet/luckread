@@ -50,10 +50,9 @@ const isSafeRepositoryPath = (path) => typeof path === 'string' &&
 const releaseBlocked =
   manifest.remoteApplyReady === false &&
   manifest.execution?.remoteApplyReady === false &&
-  manifest.execution?.runnerStatus === 'NOT_IMPLEMENTED' &&
+  manifest.execution?.runnerStatus === 'IMPLEMENTED_NOT_REVIEWED' &&
   ledgerContract.remoteApplyReady === false &&
-  ledgerContract.execution?.remoteApplyReady === false &&
-  ledgerContract.execution?.runnerStatus === 'NOT_IMPLEMENTED'
+  ledgerContract.execution?.remoteApplyReady === false
 const domainReadiness = ledgerContract.execution?.domainReadiness ?? {}
 const expectedDomains = ['D1-01', 'D1-02', 'D1-03', 'D1-04', 'D1-05']
 const d1Readiness = domainReadiness['D1-01']
@@ -134,14 +133,15 @@ if (w02Package.dependencies?.['better-auth'] !== '1.7.8' ||
     w02Package.devDependencies?.pg !== '8.20.0') {
   fail('W02 Better Auth CLI/runtime and PostgreSQL driver pins drifted')
 }
-if (manifest.entries.length !== 15) {
-  fail('D1-01 must retain exactly 15 ordered migration entries (W01 Payload + W01 AUTH-001 + W02 core/custom + W07 + W08)')
+if (manifest.entries.length !== 16) {
+  fail('D1-01 must contain exactly 16 ordered migration entries including the W07 lifecycle incremental migration')
 }
 const requiredEntries = [
   [100, 'W01', 'D1-01-W01-PAYLOAD-BASELINE-20261107', 'PAYLOAD_NATIVE'],
   [700, 'W01', 'D1-01-W01-AUTH-001-REGISTRATION-BATCH-0001', 'POSTGRESQL_SQL'],
   [200, 'W02', 'D1-01-W02-BETTER-AUTH-CORE-1.7.8', 'GENERATED_POSTGRESQL_SQL'],
   [500, 'W07', 'D1-01-W07-MEMBERSHIP-SCHEMA-0001', 'POSTGRESQL_SQL'],
+  [510, 'W07', 'D1-01-W07-SUBSCRIPTION-LIFECYCLE-0002', 'POSTGRESQL_SQL'],
   [600, 'W08', 'D1-01-W08-CREATOR-AUTHORIZATION-0001', 'POSTGRESQL_SQL'],
 ]
 for (const [order, owner, migrationId, kind] of requiredEntries) {

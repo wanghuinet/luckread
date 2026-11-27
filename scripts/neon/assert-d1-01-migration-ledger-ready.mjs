@@ -59,7 +59,7 @@ if (process.argv.includes('--deny-owner-bypass')) {
 }
 if (process.argv.includes('--expect-blocked')) {
   if (ready) throw new Error('Shared runner readiness is now released; remove obsolete blocked-state assertions from downstream workflows.')
-  console.log('D1_01_REMOTE_APPLY_BLOCKED_RUNNER_NOT_IMPLEMENTED')
+  console.log('D1_01_REMOTE_APPLY_BLOCKED_IMPLEMENTED_NOT_REVIEWED')
   process.exit(0)
 }
 if (process.argv.includes('--assert-runner-ready')) {

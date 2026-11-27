@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/database/neon-d1-01-remote-runner-review.v1.json",
   "version": "1.0.0",
-  "status": "AI_REVIEW_PASS_NO_BLOCKING_FINDINGS",
+  "status": "STALE_INVALIDATED_BY_D1_01_W07_LIFECYCLE_MIGRATION",
   "repository": "wanghuinet/luckread",
   "target": {
     "domainId": "D1-01",
@@ -215,5 +215,11 @@
   },
   "limitations": [
     "The AUTH-001 PostgreSQL migration is staged in the D1-01 shared manifest and has local PostgreSQL 18 evidence only; remote Neon application and production Worker cutover are not performed by PR validation."
-  ]
+  ],
+  "supersession": {
+    "status": "PENDING_REVIEW",
+    "reason": "The D1-01 manifest, shared runner, migration rehearsal, and W07 schema artifacts changed to add D1-01-W07-SUBSCRIPTION-LIFECYCLE-0002. The reviewedFiles blob pins no longer describe the current source. This historical record is not valid release evidence for the incremental migration.",
+    "remoteApplyReady": false,
+    "remoteNeonDdlExecuted": false
+  }
 }

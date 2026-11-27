@@ -47,10 +47,11 @@ export function buildReadOnlyMigrationPlan({ manifest, ledgerContract, checksums
   const releaseBlocked =
     manifest.remoteApplyReady === false &&
     manifest.execution?.remoteApplyReady === false &&
-    manifest.execution?.runnerStatus === 'NOT_IMPLEMENTED' &&
     ledgerContract.remoteApplyReady === false &&
     ledgerContract.execution?.remoteApplyReady === false &&
-    ledgerContract.execution?.runnerStatus === 'NOT_IMPLEMENTED'
+    ((manifest.execution?.runnerStatus === 'IMPLEMENTED_NOT_REVIEWED') ||
+     (manifest.execution?.runnerStatus === 'NOT_IMPLEMENTED' &&
+      ledgerContract.execution?.runnerStatus === 'NOT_IMPLEMENTED'))
   const domainReadiness = ledgerContract.execution?.domainReadiness ?? {}
   const expectedDomains = ['D1-01', 'D1-02', 'D1-03', 'D1-04', 'D1-05']
   const d1Readiness = domainReadiness['D1-01']
@@ -184,7 +185,7 @@ export function buildReadOnlyMigrationPlan({ manifest, ledgerContract, checksums
       committedArtifactChecksums: 'VALIDATED',
       generatedArtifactCount: generatedCount,
       ledgerSchema: 'DEFINED_NOT_INSTALLED',
-      sharedRunner: releaseReady ? 'IMPLEMENTED_AND_REVIEWED' : 'NOT_IMPLEMENTED',
+      sharedRunner: releaseReady ? 'IMPLEMENTED_AND_REVIEWED' : (manifest.execution?.runnerStatus ?? 'NOT_IMPLEMENTED'),
       remoteReleaseGate: releaseReady ? 'READY_FOR_MANUAL_DISPATCH' : 'BLOCKED',
       remoteDatabasePreflight: 'NOT_RUN',
       ledgerState: 'NOT_INSPECTED',
