@@ -49,7 +49,7 @@ describe('bookmarks page on the reused LuckRead content UI', () => {
 
   it('removes a post after its own bookmark action succeeds, without duplicating bookmark controls', () => {
     expect(postCard).toContain('onBookmarkChanged?: (bookmarked: boolean) => void')
-    expect(postCard).toContain('onBookmarkChanged?.(!previousBookmarked)')
+    expect(postCard).toContain('onBookmarkChanged?.(nextBookmarked)')
     expect(page).toContain('onBookmarkChanged={(bookmarked) => {')
     expect(page).toContain('if (!bookmarked) removeFromPage(item.id)')
   })
