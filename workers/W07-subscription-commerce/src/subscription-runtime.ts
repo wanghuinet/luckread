@@ -3,7 +3,7 @@
 import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js';
 import type { W07WebhookPostgresClient, W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
-export type SubscriptionStatus = 'PENDING' | 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED'
+export type SubscriptionStatus = 'PENDING' | 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSING' | 'PAUSED' | 'CANCELED' | 'EXPIRED'
 
 export type SubscriptionRow = {
   subscription_id: string
