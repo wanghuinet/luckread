@@ -172,9 +172,10 @@ function LuckReadSocialPostCard({
   const [revealedMediaKey, setRevealedMediaKey] = useState<string | null>(null)
   const mediaRevealed = !mediaWarning || revealedMediaKey === mediaRevealKey
   const singleMedia = mediaItems.length === 1 ? mediaItems[0] : undefined
-  const profileName = profile?.displayName?.trim() || profile?.username || ''
-  const username = profile?.username ? '@' + profile.username : ''
-  const profileHref = profile?.username ? '/@' + encodeURIComponent(profile.username) : null
+  const displayedProfile = profile || author || null
+  const profileName = displayedProfile?.displayName?.trim() || displayedProfile?.username || ''
+  const username = displayedProfile?.username ? '@' + displayedProfile.username : ''
+  const profileHref = displayedProfile?.username ? '/@' + encodeURIComponent(displayedProfile.username) : null
   const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
   const isOwnPost = Boolean(viewerUserId && resolvedCreatorId && viewerUserId === resolvedCreatorId)
   const canManagePost = Boolean(
