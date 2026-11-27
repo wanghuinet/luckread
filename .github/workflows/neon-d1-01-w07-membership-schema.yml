@@ -74,8 +74,8 @@ jobs:
           psql --host 127.0.0.1 --port 5432 --username schema_generator \
             --dbname luckread_schema --set ON_ERROR_STOP=1 \
             --file workers/W07-subscription-commerce/src/neon-postgres-migrations/0001_w07_d1_01_membership_schema.sql
-          psql --host 127.0.0.1 --port 5432 --username schema_generator \\
-            --dbname luckread_schema --set ON_ERROR_STOP=1 \\
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
             --file workers/W07-subscription-commerce/src/neon-postgres-migrations/0002_w07_subscription_lifecycle.sql
 
       - name: Verify W07 constraints, indexes, triggers, transaction rollback and empty tables
