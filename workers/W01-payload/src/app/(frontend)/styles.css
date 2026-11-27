@@ -596,7 +596,7 @@ html.frontend-legacy-root main[style*="max-width"] button {
   font-weight: 700;
   cursor: pointer;
 }
-html.frontend-legacy-root main[style*="max-width"] button:hover:not(:disabled) { background: var(--lr-accent); }
+html.frontend-legacy-root main[style*="max-width"] button:hover:not(:disabled) { background: var(--lr-blue-700); }
 html.frontend-legacy-root main[style*="max-width"] a { color: var(--lr-blue-700); }
 
 /* Discovery / social content surfaces */
