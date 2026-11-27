@@ -20,6 +20,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   const [loading,setLoading] = useState(feedMode === 'following')
   const [error,setError] = useState('')
   const [requiresAuth,setRequiresAuth] = useState(false)
+  const [supportsIntersectionObserver,setSupportsIntersectionObserver] = useState(true)
   const [candidateWindowTruncated,setCandidateWindowTruncated] = useState(initialPage.candidateWindowTruncated === true)
   const sentinelRef = useRef<HTMLDivElement|null>(null)
   const loadingRef = useRef(false)
@@ -101,6 +102,11 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
 
   useEffect(()=>{
     const target=sentinelRef.current;if(!target||!hasMore)return
+    if (typeof IntersectionObserver === 'undefined') {
+      setSupportsIntersectionObserver(false)
+      return
+    }
+    setSupportsIntersectionObserver(true)
     const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))void loadMore()},{rootMargin:'500px 0px'})
     observer.observe(target);return()=>observer.disconnect()
   },[hasMore,nextCursor,feedMode,requiresAuth,loadMore])
@@ -112,6 +118,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
     ? 'Sign in to see posts from accounts you follow'
     : locale === 'tw' ? '登入後查看你追蹤帳號的動態' : '登录后查看你关注账号的动态'
   const signInLabel = locale === 'en' ? 'Sign in' : locale === 'tw' ? '登入' : '登录'
+  const loadMoreLabel = locale === 'en' ? 'Load more' : locale === 'tw' ? '載入更多' : '加载更多'
 
   return <section aria-busy={loading} aria-label={copy.feed.timeline}>
     {feedMode === 'following' && candidateWindowTruncated ? <p className="border-b border-light-border px-4 py-3 text-sm text-light-secondary dark:border-dark-border dark:text-dark-secondary" role="status">{locale === 'en' ? 'This timeline currently includes the most recently followed 500 accounts; posts from older follows may be missing.' : locale === 'tw' ? '目前僅載入最近追蹤的 500 個帳號；更早追蹤的帳號可能未出現在此動態中。' : '当前仅加载最近关注的 500 个账号；更早关注的账号可能未出现在此动态中。'}</p> : null}
@@ -120,6 +127,9 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
     {!requiresAuth&&items.length===0&&!loading&&!error?<div className="flex flex-col items-center gap-3 px-6 py-16 text-center"><h2 className="text-xl font-bold">{feedMode==='following'?followingEmptyTitle:copy.feed.noPublicContent}</h2><p className="text-sm text-light-secondary dark:text-dark-secondary">{feedMode==='following'?(locale==='en'?'Follow more accounts to build your timeline.':locale==='tw'?'追蹤更多帳號以建立你的動態。':'关注更多账号，开始建立你的动态。'):copy.feed.emptyDescription}</p><Link className="rounded-full bg-main-accent px-5 py-2 font-bold text-white" href="/content">{copy.feed.exploreContent}</Link></div>:null}
     {loading&&items.length===0?<div className="flex justify-center px-4 py-6 text-sm text-light-secondary dark:text-dark-secondary" role="status">{copy.feed.loading}</div>:null}
     {error?<div className="flex items-center justify-between gap-3 border-b border-light-border px-4 py-4 text-sm dark:border-dark-border" role="status"><p>{error}</p><button className="rounded-full border border-light-line-reply px-4 py-2 font-bold dark:border-dark-border" onClick={()=>feedMode==='following'&&items.length===0?void loadInitialFollowing():void loadMore()} type="button">{copy.feed.retry}</button></div>:null}
-    {hasMore?<div className="flex justify-center px-4 py-6 text-sm text-light-secondary dark:text-dark-secondary" ref={sentinelRef}>{loading?copy.feed.loading:copy.feed.loadingMore}</div>:null}
+    {hasMore ? <>
+      <div className="flex justify-center px-4 py-6 text-sm text-light-secondary dark:text-dark-secondary" ref={sentinelRef}>{loading ? copy.feed.loading : copy.feed.loadingMore}</div>
+      {!supportsIntersectionObserver ? <div className="flex justify-center px-4 pb-6"><button className="rounded-full border border-light-line-reply px-5 py-2 text-sm font-bold dark:border-dark-border" disabled={loading} onClick={() => void loadMore()} type="button">{loading ? copy.feed.loading : loadMoreLabel}</button></div> : null}
+    </> : null}
   </section>
 }
