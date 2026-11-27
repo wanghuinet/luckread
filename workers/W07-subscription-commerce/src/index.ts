@@ -331,9 +331,15 @@ export default {
         if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input as Record<string, unknown>).length !== 0) {
           throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         }
+        let financeStore
+        try {
+          financeStore = getW07RenewalCycleStore(runtimeEnv)
+        } catch {
+          throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+        }
         const result = await transitionSubscriptionLifecycle(
           getW07MembershipPostgresPool(runtimeEnv),
-          getW07RenewalCycleStore(runtimeEnv),
+          financeStore,
           {
             action: operation.action,
             subscriptionId: operation.subscriptionId,
