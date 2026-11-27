@@ -60,7 +60,7 @@ function resolveProviderConfig(env: PaymentIntentRuntimeEnv): ResolvedProviderCo
   const apiKey = env.HYPERSWITCH_API_KEY;
   const expectedMerchantId = env.HYPERSWITCH_MERCHANT_ID;
   if (
-    (environment !== 'sandbox' && environment !== 'production') ||
+    environment !== 'sandbox' ||
     !validBoundedText(apiKey, 4096) ||
     /[\r\n]/.test(apiKey) ||
     !validBoundedText(expectedMerchantId, 256)
