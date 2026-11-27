@@ -596,7 +596,7 @@ html.frontend-legacy-root main[style*="max-width"] button {
   font-weight: 700;
   cursor: pointer;
 }
-html.frontend-legacy-root main[style*="max-width"] button:hover:not(:disabled) { background: var(--lr-blue-700); }
+html.frontend-legacy-root main[style*="max-width"] button:hover:not(:disabled) { background: var(--lr-accent); }
 html.frontend-legacy-root main[style*="max-width"] a { color: var(--lr-blue-700); }
 
 /* Discovery / social content surfaces */
@@ -642,7 +642,7 @@ html.frontend-legacy-root main[style*="max-width"] p[style*="#666"] {
   z-index: 1000;
   padding: 10px 16px;
   transform: translateY(calc(-100% - 20px));
-  border: 2px solid var(--lr-blue-200);
+  border: 2px solid var(--lr-accent);
   border-radius: 999px;
   background: var(--lr-blue-700);
   color: #fff !important;
@@ -656,7 +656,7 @@ html.frontend-legacy-root main[style*="max-width"] p[style*="#666"] {
 .lr-skip-link:focus,
 .lr-skip-link:focus-visible {
   transform: translateY(0);
-  outline: 3px solid var(--lr-blue-400);
+  outline: 3px solid var(--lr-accent);
   outline-offset: 3px;
 }
 
@@ -674,3 +674,24 @@ html.frontend-legacy-root main[style*="max-width"] p[style*="#666"] {
   }
 }
 
+
+
+@media (max-width: 479px) {
+  .lr-mobile-bottom-nav {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .lr-mobile-bottom-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .lr-mobile-bottom-nav > a {
+    flex: 0 0 auto;
+  }
+}
