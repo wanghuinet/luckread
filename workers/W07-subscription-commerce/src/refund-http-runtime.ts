@@ -61,7 +61,7 @@ function validText(value: unknown, max: number): value is string {
 
 function providerConfig(env: RefundRuntimeEnv): HyperswitchClientConfig | null {
   if (
-    (env.HYPERSWITCH_ENVIRONMENT !== 'sandbox' && env.HYPERSWITCH_ENVIRONMENT !== 'production') ||
+    env.HYPERSWITCH_ENVIRONMENT !== 'sandbox' ||
     !validText(env.HYPERSWITCH_API_KEY, 4096) ||
     /[\r\n]/.test(env.HYPERSWITCH_API_KEY) ||
     !validText(env.HYPERSWITCH_MERCHANT_ID, 256)
@@ -173,6 +173,12 @@ export async function handleCommerceRefundRequest(
   if (url.pathname !== REFUND_PATH) return null;
   if (request.method !== 'POST') {
     return new Response(null, { status: 405, headers: { Allow: 'POST', 'cache-control': 'no-store' } });
+  }
+
+  // Seller-of-record is still unapproved. Reject production refund commands
+  // before database access, provider reads, local reservations, or provider POSTs.
+  if (env.HYPERSWITCH_ENVIRONMENT !== 'sandbox') {
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Production refunds are disabled pending seller-of-record approval');
   }
 
   const idempotencyKey = request.headers.get('Idempotency-Key');
