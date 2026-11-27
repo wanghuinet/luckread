@@ -52,7 +52,7 @@ const releaseBlocked =
   manifest.execution?.remoteApplyReady === false &&
   manifest.execution?.runnerStatus === 'IMPLEMENTED_NOT_REVIEWED' &&
   ledgerContract.remoteApplyReady === false &&
-  ledgerContract.execution?.remoteApplyReady === false &&
+  ledgerContract.execution?.remoteApplyReady === false
 const domainReadiness = ledgerContract.execution?.domainReadiness ?? {}
 const expectedDomains = ['D1-01', 'D1-02', 'D1-03', 'D1-04', 'D1-05']
 const d1Readiness = domainReadiness['D1-01']
