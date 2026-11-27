@@ -95,8 +95,8 @@ function assertManifestAndChecksums(checksums) {
   if (manifest.domainId !== 'D1-01' || manifest.databaseName !== 'luckread' ||
       manifest.postgresMajor !== 18 || manifest.businessDataImport !== false ||
       manifest.productionCutoverAuthorized !== false ||
-      manifest.entries.length !== 15) {
-    fail('manifest target, schema-only authorization or 15-entry contract drifted')
+      manifest.entries.length !== 16) {
+    fail('manifest target, schema-only authorization or 16-entry contract drifted')
   }
   if (!Array.isArray(checksums) || checksums.length !== manifest.entries.length) {
     fail('exactly one verified artifact/manifest checksum is required per entry')
@@ -176,7 +176,7 @@ async function run() {
       ['D1-01'],
     )
     if (ledgerResult.rows.length !== manifest.entries.length) {
-      fail('shared runner ledger must contain exactly fifteen D1-01 migration rows')
+      fail('shared runner ledger must contain exactly sixteen D1-01 migration rows')
     }
     for (let i = 0; i < manifest.entries.length; i++) {
       const entry = manifest.entries[i]
