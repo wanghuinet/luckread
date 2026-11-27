@@ -40,13 +40,13 @@ describe('H5 home feed initial-load recovery', () => {
       feedMode: 'for-you',
     }))
 
-    expect(screen.getByText(getTwitterCloneCopy('en').feed.loadMoreError)).toBeTruthy()
+    expect(screen.getByText(getTwitterCloneCopy('en').feed.loadError)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: getTwitterCloneCopy('en').feed.retry }))
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/contents?limit=20')
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: 'omit', cache: 'no-store' })
     await screen.findByRole('heading', { name: getTwitterCloneCopy('en').feed.noPublicContent })
-    expect(screen.queryByText(getTwitterCloneCopy('en').feed.loadMoreError)).toBeNull()
+    expect(screen.queryByText(getTwitterCloneCopy('en').feed.loadError)).toBeNull()
   })
 })
