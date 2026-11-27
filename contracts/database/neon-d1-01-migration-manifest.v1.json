@@ -397,4 +397,4 @@
     "lockExpression": "pg_advisory_xact_lock(hashtextextended('luckread:neon-schema-migration:' || current_database(), 0))",
     "remoteApplyReady": false
   }
-}\n
+}
