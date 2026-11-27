@@ -43,7 +43,7 @@ export default function TwitterCloneProfileNav({ selected, labels, onSelect }: P
             className="main-tab dark-bg-tab flex min-w-0 flex-1 justify-center hover:bg-light-primary/10 dark:hover:bg-dark-primary/10"
             key={type}
             id={`profile-tab-${type}`}
-            aria-controls="profile-tabpanel"
+            aria-controls="works"
             aria-selected={active}
             role="tab"
             tabIndex={active ? 0 : -1}
