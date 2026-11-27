@@ -49,6 +49,38 @@ test('renders the Following timeline without horizontal overflow on H5 and PC wi
   await expect(postCard).toBeVisible()
   await expect(postCard.getByText(post.title, { exact: true })).toBeVisible()
 
+  const mobileNavigation = page.locator('#sidebar nav')
+  await expect(mobileNavigation).toHaveClass(/lr-mobile-bottom-nav/)
+  const mobileNavigationMetrics = await mobileNavigation.evaluate((nav) => ({
+    clientWidth: nav.clientWidth,
+    scrollWidth: nav.scrollWidth,
+  }))
+  expect(mobileNavigationMetrics.scrollWidth).toBeGreaterThan(mobileNavigationMetrics.clientWidth)
+  await mobileNavigation.evaluate((nav) => { nav.scrollLeft = nav.scrollWidth })
+  await expect(mobileNavigation.locator('a').last()).toBeVisible()
+  await mobileNavigation.evaluate((nav) => { nav.scrollLeft = 0 })
+
+  await page.setViewportSize({ width: 499, height: 900 })
+  const narrowNavigationMetrics = await mobileNavigation.evaluate((nav) => ({
+    clientWidth: nav.clientWidth,
+    scrollWidth: nav.scrollWidth,
+  }))
+  expect(narrowNavigationMetrics.scrollWidth).toBeGreaterThan(narrowNavigationMetrics.clientWidth)
+
+  const skipLink = page.getByRole('link', { name: /主要内容|main content/ })
+  await page.keyboard.press('Tab')
+  await expect(skipLink).toBeFocused()
+  await expect(skipLink).toHaveAttribute('href', '#main-content')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('#main-content')).toBeFocused()
+  await expect(page.locator('main')).toHaveCount(1)
+
+  const navigationLabels = await page.locator('#sidebar nav a').evaluateAll((links) =>
+    links.map((link) => link.getAttribute('aria-label')?.trim() ?? ''),
+  )
+  expect(navigationLabels.length).toBeGreaterThan(0)
+  expect(navigationLabels.every((label) => label.length > 0)).toBe(true)
+
   for (const width of [390, 500, 768, 1024, 1280]) {
     await page.setViewportSize({ width, height: 900 })
     const bounds = await page.evaluate(() => {
