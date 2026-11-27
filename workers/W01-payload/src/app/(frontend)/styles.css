@@ -644,7 +644,7 @@ html.frontend-legacy-root main[style*="max-width"] p[style*="#666"] {
   transform: translateY(calc(-100% - 20px));
   border: 2px solid var(--lr-accent);
   border-radius: 999px;
-  background: var(--lr-blue-700);
+  background: var(--lr-accent);
   color: #fff !important;
   font-size: 14px;
   font-weight: 750;
