@@ -126,6 +126,22 @@ export default function ContentDetailPage({
           }
 
           if (cancelled || !resolved) return
+          // Public content uses the anonymous cache path. Only retry with the
+          // session cookie when a member-only item needs an authoritative
+          // entitlement decision, keeping ordinary public reads cacheable.
+          if (resolved.accessMode === 'MEMBERS_ONLY' && resolved.accessGranted !== true) {
+            const memberResult = await fetchJson<Content>(`/api/v1/contents/${encodeURIComponent(resolved.id)}`, {
+              credentials: 'include',
+              headers: { accept: 'application/json' },
+              cache: 'no-store',
+              signal: controller.signal,
+            })
+            if (memberResult.response.ok && memberResult.data?.id === resolved.id) {
+              resolved = memberResult.data
+              setContent(resolved)
+            }
+          }
+          if (cancelled) return
           setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)
           try {
             const { response: socialResponse, data: socialData } = await fetchJson<{
