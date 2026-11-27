@@ -224,6 +224,7 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
 
   it('renders the authorized X-style timeline layout on the social homepage while keeping LuckRead API authority', () => {
     const component = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
+    const visibility = read('src/lib/timeline-card-visibility.ts')
     const homeFeed = read('src/app/(twitter-clone)/TwitterCloneHomeFeed.tsx')
 
     expect(homeFeed).toContain('presentation="x-timeline"')
@@ -238,7 +239,9 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(component).not.toContain("href={'/users/' + encodeURIComponent(resolvedCreatorId)}")
     expect(component).toContain("if (presentation === 'x-timeline')")
     expect(component).toContain("if (presentation === 'x-timeline' && !timelineCardNearViewport) return")
-    expect(component).toContain("{ rootMargin: '700px 0px' }")
+    expect(component).toContain("observeTimelineCard(target, () => setTimelineCardNearViewport(true))")
+    expect(visibility).toContain("{ rootMargin: '700px 0px' }")
+    expect(visibility).toContain('const listeners = new Map<Element, VisibilityListener>()')
     expect(component).toContain("contentVisibility: presentation === 'x-timeline' ? 'auto' : undefined")
     expect(component).toContain("containIntrinsicSize: presentation === 'x-timeline' ? 'auto 560px' : undefined")
     expect(component).toContain('grid grid-cols-[auto,minmax(0,1fr)]')

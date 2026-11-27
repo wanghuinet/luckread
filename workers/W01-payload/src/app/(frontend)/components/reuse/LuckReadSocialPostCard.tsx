@@ -10,6 +10,7 @@ import { getCachedPublicProfile, type PublicProfile } from '../../../../lib/soci
 import { resolveSocialPostMedia } from '../../../../lib/social-post-media.js'
 import { getSharedViewerRequest } from '../../../../lib/viewer-request-coalescer.js'
 import { getSharedSocialSummary } from '../../../../lib/social-summary-request-coalescer.js'
+import { observeTimelineCard } from '../../../../lib/timeline-card-visibility.js'
 import SocialPoll from './SocialPoll'
 import type { PublicLocale } from '../../i18n/public-locale'
 
@@ -312,18 +313,7 @@ function LuckReadSocialPostCard({
     if (presentation !== 'x-timeline') return
     const target = timelineCardRef.current
     if (!target) return
-    if (typeof IntersectionObserver === 'undefined') {
-      const frame = requestAnimationFrame(() => setTimelineCardNearViewport(true))
-      return () => cancelAnimationFrame(frame)
-    }
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        setTimelineCardNearViewport(true)
-        observer.disconnect()
-      }
-    }, { rootMargin: '700px 0px' })
-    observer.observe(target)
-    return () => observer.disconnect()
+    return observeTimelineCard(target, () => setTimelineCardNearViewport(true))
   }, [presentation, contentId])
 
   // Timeline cards defer the heavier owner-action detail read until the user opens
