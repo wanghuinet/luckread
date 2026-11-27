@@ -445,6 +445,7 @@ test('native composer persists warning metadata and hides media until the reader
 
 
 const threadComposer = readFileSync(new URL('../components/PostThreadComposer.tsx', import.meta.url), 'utf8');
+const threadPreview = readFileSync(new URL('../components/PostThreadPreview.tsx', import.meta.url), 'utf8');
 
 test('native thread composer creates a bounded text-only thread through existing W01 APIs', () => {
   expect(threadComposer).toContain('const MAX_ITEMS = 5');
@@ -480,4 +481,14 @@ test('composer restore and quote preview are isolated from account switching', (
   expect(composer).toContain('const quoteViewerId = user?.id ?? null;');
   expect(composer).toContain('const isCurrentQuoteViewer = () =>');
   expect(composer).toContain('}, [quoteContentId, quoteViewerId]);');
+});
+
+
+test('thread preview binds owner-draft reads to the active account and discards stale viewer results', () => {
+  expect(threadPreview).toContain("import { useAuthStore } from '~/store/auth-store';");
+  expect(threadPreview).toContain('const viewerId = useAuthStore((state) => state.user?.id ?? null);');
+  expect(threadPreview).toContain('...(viewerId ? { expectedAccountId: viewerId } : {})');
+  expect(threadPreview).toContain('(useAuthStore.getState().user?.id ?? null) !== viewerId');
+  expect(threadPreview).toContain('(useAuthStore.getState().user?.id ?? null) === viewerId');
+  expect(threadPreview).toContain('}, [contentId, retryNonce, viewerId]);');
 });
