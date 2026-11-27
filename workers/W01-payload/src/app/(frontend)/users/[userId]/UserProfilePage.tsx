@@ -687,8 +687,7 @@ export default function PublicProfilePage({
               >
                 <span aria-hidden="true">•••</span>
               </button>
-              {actionsOpen ? (
-                <div id="profile-actions-options" className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-36 rounded-2xl border border-light-border bg-main-background p-1 shadow-lg dark:border-dark-border" role="group" aria-label="更多操作选项">
+              <div id="profile-actions-options" hidden={!actionsOpen} className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-36 rounded-2xl border border-light-border bg-main-background p-1 shadow-lg dark:border-dark-border" role="group" aria-label="更多操作选项">
                   <button
                     className="block min-h-10 w-full rounded-lg px-3 text-left text-sm font-medium hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-dark-primary/10"
                     type="button"
@@ -737,8 +736,7 @@ export default function PublicProfilePage({
                       </button>
                     </>
                   ) : null}
-                </div>
-              ) : null}
+              </div>
             </div>
           </div>
 
