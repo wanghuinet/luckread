@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+import { getSharedFollowRelationship } from '../../../../lib/social-follow-request-coalescer.js'
 import { buildPublicContentHref } from '../../../../lib/public-content-url.js'
 import { getCachedPublicProfile, type PublicProfile } from '../../../../lib/social-post-profile-cache.js'
 import { resolveSocialPostMedia } from '../../../../lib/social-post-media.js'
@@ -259,15 +260,7 @@ export default function LuckReadSocialPostCard({
 
       if (authorId && viewerId && authorId !== viewerId) {
         try {
-          const followResult = await fetchJson<ApiResponse<{
-            following?: boolean
-            relationship?: { blocked?: boolean; blockedBy?: boolean }
-          }>>('/api/v1/social/follows/' + encodeURIComponent(authorId), {
-            credentials: 'include',
-            headers: { accept: 'application/json' },
-            cache: 'no-store',
-            signal: controller.signal,
-          })
+          const followResult = await getSharedFollowRelationship(authorId)
           if (!cancelled && followResult.response.ok) {
             const relationship = followResult.data?.data?.relationship
             setFollowRestricted(relationship?.blocked === true || relationship?.blockedBy === true)
