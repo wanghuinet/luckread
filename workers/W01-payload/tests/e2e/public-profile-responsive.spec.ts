@@ -65,6 +65,32 @@ test('keeps the public profile and timeline inside the responsive X-style center
   await expect(page.getByTestId('luckread-social-post-card')).toHaveClass(/border-b/)
   await expect(page.getByTestId('luckread-social-post-card')).not.toHaveClass(/content-feed-card/)
 
+  const profileTabs = page.getByRole('tab')
+  await expect(page.getByRole('tablist', { name: '作者内容频道' })).toBeVisible()
+  await expect(profileTabs).toHaveCount(5)
+  await expect(profileTabs.nth(0)).toHaveAttribute('aria-selected', 'true')
+  await expect(profileTabs.nth(0)).toHaveAttribute('tabindex', '0')
+  await expect(profileTabs.nth(1)).toHaveAttribute('tabindex', '-1')
+  await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'profile-tab-posts')
+
+  await profileTabs.nth(0).focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(profileTabs.nth(1)).toBeFocused()
+  await expect(profileTabs.nth(1)).toHaveAttribute('aria-selected', 'true')
+  await expect(profileTabs.nth(1)).toHaveAttribute('tabindex', '0')
+  await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'profile-tab-replies')
+
+  await page.keyboard.press('ArrowLeft')
+  await expect(profileTabs.nth(0)).toBeFocused()
+  await expect(profileTabs.nth(0)).toHaveAttribute('aria-selected', 'true')
+  await page.keyboard.press('End')
+  await expect(profileTabs.nth(4)).toBeFocused()
+  await expect(profileTabs.nth(4)).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'profile-tab-articles')
+  await page.keyboard.press('Home')
+  await expect(profileTabs.nth(0)).toBeFocused()
+  await expect(profileTabs.nth(0)).toHaveAttribute('aria-selected', 'true')
+
   for (const width of [390, 500, 768, 1024, 1280]) {
     await page.setViewportSize({ width, height: 900 })
     const bounds = await page.evaluate(() => {
