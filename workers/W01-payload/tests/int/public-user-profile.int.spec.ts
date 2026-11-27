@@ -140,7 +140,8 @@ describe('public creator profile', () => {
     expect(page).toContain('mediaRefs={item.mediaRefs}')
     expect(page).toContain('createdAt={item.createdAt}')
     expect(page).toContain('href={getContentHref(item)}')
-    expect(card).toContain("'/api/v1/contents/' + encodeURIComponent(contentId) + '/social'")
+    expect(card).toContain("import { getSharedSocialSummary } from '../../../../lib/social-summary-request-coalescer.js'")
+    expect(card).toContain('getSharedSocialSummary(contentId)')
     expect(card).toContain('/api/v1/interactions/likes')
   })
 
