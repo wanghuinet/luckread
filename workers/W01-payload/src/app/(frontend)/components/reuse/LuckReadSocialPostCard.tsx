@@ -771,8 +771,16 @@ function LuckReadSocialPostCard({
           // Fall back to the clipboard if native sharing is unavailable.
         }
       }
-      await navigator.clipboard.writeText(shareUrl)
-      setMessage(locale === 'en' ? 'Share link copied.' : locale === 'tw' ? '已複製分享連結。' : '已复制分享链接。')
+      try {
+        await navigator.clipboard.writeText(shareUrl)
+        setMessage(locale === 'en' ? 'Share link copied.' : locale === 'tw' ? '已複製分享連結。' : '已复制分享链接。')
+      } catch {
+        window.prompt(
+          locale === 'en' ? 'Copy this share link:' : locale === 'tw' ? '請複製此分享連結：' : '请复制此分享链接：',
+          shareUrl,
+        )
+        setMessage(locale === 'en' ? 'Share link ready to copy.' : locale === 'tw' ? '分享連結已準備好複製。' : '分享链接已准备好复制。')
+      }
     } catch (cause) {
       setMessage(cause instanceof Error
         ? cause.message
