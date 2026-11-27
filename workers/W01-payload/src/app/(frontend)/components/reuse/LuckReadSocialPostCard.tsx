@@ -367,6 +367,9 @@ export default function LuckReadSocialPostCard({
     const previousReposted = reposted
     setRepostBusy(true)
     setMessage('')
+    const nextReposted = !previousReposted
+    setReposted(nextReposted)
+    setRepostCount((current) => current === null ? null : Math.max(0, current + (nextReposted ? 1 : -1)))
     try {
       const { response, data } = await fetchJson<ApiResponse<unknown>>(
         '/api/v1/content/' + encodeURIComponent(contentId) + '/reposts',
@@ -387,16 +390,14 @@ export default function LuckReadSocialPostCard({
       if (!response.ok && response.status !== 204) {
         throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Repost failed.' : '转推失败，请稍后重试。'))
       }
-      setReposted(!previousReposted)
-      setRepostCount((current) => current === null
-        ? null
-        : Math.max(0, current + (previousReposted ? -1 : 1)))
       setMessage(locale === 'en'
         ? (previousReposted ? 'Repost removed.' : 'Reposted.')
         : locale === 'tw'
           ? (previousReposted ? '已取消轉推。' : '已轉推。')
           : (previousReposted ? '已取消转推。' : '已转推。'))
     } catch (cause) {
+      setReposted(previousReposted)
+      setRepostCount((current) => current === null ? null : Math.max(0, current + (previousReposted ? 1 : -1)))
       setMessage(cause instanceof Error
         ? cause.message
         : locale === 'en' ? 'Repost failed.' : '转推失败，请稍后重试。')
