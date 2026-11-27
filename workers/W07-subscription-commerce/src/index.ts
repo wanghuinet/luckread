@@ -22,6 +22,8 @@ import {
 } from './neon/membership-database-runtime.js'
 import { resolveDemoCommercePricing, resolveDemoRenewalPricing } from './demo-commerce-pricing-resolver.js'
 import { runRenewalScheduledBatch } from './renewal-scheduler.js'
+import { getW07RenewalCycleStore } from './renewal-cycle-postgres.js'
+import { transitionSubscriptionLifecycle } from './subscription-lifecycle-runtime.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -166,6 +168,7 @@ type Operation =
   | { operation: 'planDowngradeSchedule'; subscriptionId: string }
   | { operation: 'planBillingIntervalSchedule'; subscriptionId: string }
   | { operation: 'trialStart'; subscriptionId: null }
+  | { operation: 'subscriptionLifecycle'; subscriptionId: string; action: 'cancel' | 'pause' | 'resume' }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
@@ -174,6 +177,7 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[2] === 'trial' && method === 'POST') return { operation: 'trialStart', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
+  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && ['cancel', 'pause', 'resume'].includes(segments[3]!) && method === 'POST') return { operation: 'subscriptionLifecycle', subscriptionId: segments[2]!, action: segments[3] as 'cancel' | 'pause' | 'resume' }
   if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan-preview' && method === 'GET') return { operation: 'planChangePreview', subscriptionId: segments[2] }
   if (segments.length === 5 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && segments[4] === 'checkout' && method === 'POST') return { operation: 'planUpgradeCheckout', subscriptionId: segments[2] }
   if (segments.length === 5 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && segments[4] === 'schedule' && method === 'POST') return { operation: 'planDowngradeSchedule', subscriptionId: segments[2] }
@@ -319,6 +323,26 @@ export default {
           runtimeEnv, getW07MembershipPostgresPool(runtimeEnv), principal, input, idempotencyKey,
         )
         return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 201, result.etag)
+      }
+
+      if (operation?.operation === 'subscriptionLifecycle') {
+        requireLayer(request)
+        const input = await readJsonBody(request)
+        if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input as Record<string, unknown>).length !== 0) {
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await transitionSubscriptionLifecycle(
+          getW07MembershipPostgresPool(runtimeEnv),
+          getW07RenewalCycleStore(runtimeEnv),
+          {
+            action: operation.action,
+            subscriptionId: operation.subscriptionId,
+            subscriberId: principal,
+            idempotencyKey: request.headers.get('Idempotency-Key'),
+            ifMatch: request.headers.get('If-Match'),
+          },
+        )
+        return json({ data: result.data, requestId: crypto.randomUUID() }, result.status, result.data.etag)
       }
       if (operation?.operation === 'planChangePreview') {
         const targetPlanId = new URL(request.url).searchParams.get('targetPlanId')
