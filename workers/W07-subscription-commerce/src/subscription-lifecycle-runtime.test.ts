@@ -255,6 +255,19 @@ describe('W07 subscription lifecycle runtime', () => {
     expect(membership.row.version).toBe(8)
   })
 
+  it('keeps a cancellation receipt pending while an already-submitted renewal reconciles', async () => {
+    const pending = await call(membership, 'cancel', 'cancel-inflight', 7, new MemoryFinancePool(true))
+    expect(pending.status).toBe(202)
+    expect(pending.data.pending).toBe(true)
+    expect(membership.row.cancel_at).toBe(PERIOD_END)
+    expect([...membership.receipts.values()][0]?.result_status).toBe('PENDING')
+
+    const reconciled = await call(membership, 'cancel', 'cancel-inflight', 7, new MemoryFinancePool(false))
+    expect(reconciled.status).toBe(200)
+    expect(reconciled.data.pending).toBeUndefined()
+    expect([...membership.receipts.values()][0]?.result_status).not.toBe('PENDING')
+  })
+
   it('makes cancellation of a paused subscription terminal and prevents resume', async () => {
     const paused = await call(membership, 'pause', 'pause-key-4', 7)
     const canceled = await call(membership, 'cancel', 'cancel-key-4', paused.data.version)
