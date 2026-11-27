@@ -176,7 +176,7 @@ class MemoryLifecyclePool implements W07WebhookPostgresPool {
       this.row = { ...this.row, cancel_at: this.row.current_period_end, version: this.row.version + increment }
       return { rows: [structuredClone(this.row)], rowCount: 1 }
     }
-    if (sql.startsWith('UPDATE membership_subscription_lifecycle_operation_receipts SET result_subscription_version')) {
+    if (sql.includes('UPDATE membership_subscription_lifecycle_operation_receipts') && sql.includes('result_subscription_version')) {
       const [version, status, response, , subscriberId, idempotencyHash] = values
       const key = String(subscriberId) + ':' + String(idempotencyHash)
       const receipt = this.receipts.get(key)
