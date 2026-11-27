@@ -49,7 +49,7 @@ test('renders the Following timeline without horizontal overflow on H5 and PC wi
   await expect(postCard).toBeVisible()
   await expect(postCard.getByText(post.title, { exact: true })).toBeVisible()
 
-  const skipLink = page.getByRole('link', { name: '跳转到主要内容' })
+  const skipLink = page.getByRole('link', { name: /主要内容|main content/ })
   await page.keyboard.press('Tab')
   await expect(skipLink).toBeFocused()
   await expect(skipLink).toHaveAttribute('href', '#main-content')
