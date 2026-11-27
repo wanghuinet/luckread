@@ -15,7 +15,7 @@ export default function RootLayout(props: { children: React.ReactNode }) {
     <html className="frontend-legacy-root" lang="zh-CN">
       <body>
         <UmamiAnalytics />
-        <main>{children}</main>
+        <div id="site-content">{children}</div>
       </body>
     </html>
   )
