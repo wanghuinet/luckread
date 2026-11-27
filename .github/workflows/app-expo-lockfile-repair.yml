@@ -29,6 +29,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.1.38"
+      - name: Install the committed dependency baseline
+        working-directory: app
+        run: bun install --frozen-lockfile
       - name: Align dependencies to the installed Expo SDK
         working-directory: app
         run: bunx expo install --fix
