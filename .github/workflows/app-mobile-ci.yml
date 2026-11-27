@@ -71,6 +71,8 @@ jobs:
         run: |
           node scripts/apply-hyperswitch-rn88-compat.mjs
           bun run test:hyperswitch-compat
+      - name: Test native feed card interaction isolation
+        run: bun test tests/feed-card-interaction-isolation.test.mjs
       - name: Verify versions bundled for the Expo SDK
         run: bunx expo install --check
       - name: Run Expo compatibility doctor
