@@ -70,7 +70,7 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
 
   return (
     <div className="min-h-screen bg-main-background text-light-primary dark:text-dark-primary">
-      <Link className="lr-skip-link" href="#main-content">{locale === 'en' ? 'Skip to main content' : locale === 'tw' ? '跳至主要內容' : '跳转到主要内容'}</Link>
+      <a className="lr-skip-link" href="#main-content">{locale === 'en' ? 'Skip to main content' : locale === 'tw' ? '跳至主要內容' : '跳转到主要内容'}</a>
       <TwitterClonePostComposerModal />
       <div className="mx-auto flex min-h-screen w-full max-w-[1265px] justify-center gap-0 lg:gap-4">
         <header id="sidebar" className="flex w-0 shrink-0 transition-opacity duration-200 xs:w-20 md:w-24 lg:max-w-none xl:-mr-4 xl:w-full xl:max-w-xs">
