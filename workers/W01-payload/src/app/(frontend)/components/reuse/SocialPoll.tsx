@@ -37,6 +37,8 @@ const labels = (locale: PublicLocale) => locale === 'en'
       ends: 'Poll ends',
       login: 'Sign in to vote',
       failed: 'Could not load poll.',
+      retry: 'Retry',
+      unavailable: 'Poll unavailable',
     }
   : locale === 'tw'
     ? {
@@ -49,6 +51,8 @@ const labels = (locale: PublicLocale) => locale === 'en'
         ends: '截止時間',
         login: '登入後投票',
         failed: '暫時無法載入投票。',
+      retry: '重試',
+      unavailable: '投票暫不可用',
       }
     : {
         title: '投票',
@@ -60,6 +64,8 @@ const labels = (locale: PublicLocale) => locale === 'en'
         ends: '截止时间',
         login: '登录后投票',
         failed: '暂时无法加载投票。',
+      retry: '重试',
+      unavailable: '投票暂不可用',
       }
 
 export default function SocialPoll({ contentId, locale = 'zh' }: { contentId: string; locale?: PublicLocale }) {
@@ -69,6 +75,7 @@ export default function SocialPoll({ contentId, locale = 'zh' }: { contentId: st
   const [busy, setBusy] = useState(false)
   const [requiresLogin, setRequiresLogin] = useState(false)
   const [message, setMessage] = useState('')
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const text = labels(locale)
   const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
   const returnTo = '/content/' + encodeURIComponent(contentId)
@@ -83,10 +90,11 @@ export default function SocialPoll({ contentId, locale = 'zh' }: { contentId: st
           { credentials: 'include', cache: 'no-store', signal: controller.signal, headers: { accept: 'application/json' } },
         )
         if (cancelled) return
-        if (!response.ok || !data?.data) return
+        if (!response.ok || !data?.data) throw new Error(text.failed)
         const value = data.data.poll ?? null
         setPoll(value)
         setSelectedOptionId(value?.viewerOptionId ?? '')
+        if (!value) setMessage(text.failed)
       } catch {
         if (!cancelled) setMessage(text.failed)
       } finally {
@@ -98,7 +106,7 @@ export default function SocialPoll({ contentId, locale = 'zh' }: { contentId: st
       cancelled = true
       controller.abort()
     }
-  }, [contentId, text.failed])
+  }, [contentId, text.failed, loadAttempt])
 
   async function vote() {
     if (!poll || busy || poll.closed || poll.viewerOptionId) return
@@ -141,7 +149,8 @@ export default function SocialPoll({ contentId, locale = 'zh' }: { contentId: st
     }
   }
 
-  if (loading || !poll) return null
+  if (loading) return <section className="my-3 rounded-2xl border border-light-border p-3 dark:border-dark-border" aria-busy="true" aria-label={text.title}><p className="text-sm text-light-secondary dark:text-dark-secondary" role="status">{locale === 'en' ? 'Loading poll…' : locale === 'tw' ? '載入投票中…' : '正在加载投票…'}</p></section>
+  if (!poll) return <section className="my-3 rounded-2xl border border-light-border p-3 dark:border-dark-border" aria-label={text.title}><p className="text-sm" role="status">{message || text.failed}</p><button type="button" className="mt-2 rounded-full border border-light-border px-4 py-2 text-sm font-semibold dark:border-dark-border" onClick={() => { setMessage(''); setLoading(true); setLoadAttempt(current => current + 1) }}>{text.retry}</button></section>
   const showResults = Boolean(poll.viewerOptionId || poll.closed)
   const endsAt = poll.endsAt && Number.isFinite(Date.parse(poll.endsAt))
     ? new Date(poll.endsAt).toLocaleString(dateLocale)
