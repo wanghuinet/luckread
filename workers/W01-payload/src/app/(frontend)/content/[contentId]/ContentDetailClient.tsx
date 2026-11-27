@@ -17,6 +17,8 @@ type Content = {
   id: string
   slug?: string
   creatorId?: string | null
+  accessMode?: 'PUBLIC' | 'MEMBERS_ONLY'
+  accessGranted?: boolean
   contentType: ContentType
   state: string
   title: string
@@ -170,7 +172,7 @@ export default function ContentDetailPage({
               // Follow state is optional; content remains readable when the status query fails.
             }
           }
-          if (resolved.bodyRef) {
+          if (resolved.bodyRef && (resolved.accessMode !== 'MEMBERS_ONLY' || resolved.accessGranted === true)) {
             try {
               const bodyResponse = await apiFetch(resolved.bodyRef, { cache: 'no-store', signal: controller.signal })
               if (bodyResponse.ok && !cancelled) setBody(await bodyResponse.text())
@@ -547,7 +549,15 @@ export default function ContentDetailPage({
           </section>
         ) : null}
 
-        {!(content.contentType === 'post' && body.trim() === content.title.trim()) ? (
+        {content.accessMode === 'MEMBERS_ONLY' && content.accessGranted !== true ? (
+          <section aria-label={locale === 'en' ? 'Subscriber-only content' : '订阅会员专属内容'} className="mx-4 my-5 rounded-2xl border border-light-border bg-main-sidebar-background p-5 dark:border-dark-border">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-main-accent">{locale === 'en' ? 'MEMBERS ONLY' : '会员专属'}</div>
+            <h2 className="text-lg font-bold text-light-primary dark:text-dark-primary">{locale === 'en' ? 'Subscribe to unlock this article' : '订阅创作者，解锁完整内容'}</h2>
+            <p className="mt-2 text-sm leading-6 text-light-secondary dark:text-dark-secondary">{locale === 'en' ? 'This article is reserved for active members. Visit the creator profile to review available monthly and yearly plans.' : '本文仅向有效订阅会员开放。前往创作者主页，查看可用的月度和年度订阅方案。'}</p>
+            {content.creatorId ? <Link className="mt-4 inline-flex min-h-10 items-center justify-center rounded-full bg-main-accent px-5 py-2 text-sm font-bold text-white" href={'/users/' + encodeURIComponent(content.creatorId)}>{locale === 'en' ? 'View membership plans' : '查看订阅方案'}</Link> : null}
+          </section>
+        ) : null}
+        {content.accessMode !== 'MEMBERS_ONLY' || content.accessGranted === true ? (!(content.contentType === 'post' && body.trim() === content.title.trim()) ? (
           <div className="px-4 py-4 sm:py-6">
             {structuredArticle ? (
               <ArticleStructuredRenderer document={structuredArticle} mentions={socialMentions} />
@@ -561,7 +571,7 @@ export default function ContentDetailPage({
               <p className="text-sm text-light-secondary dark:text-dark-secondary">{copy.detail.bodyPreparing}</p>
             )}
           </div>
-        ) : null}
+        ) : null) : null}
       </article>
       <ContentComments
         contentId={content.id}
