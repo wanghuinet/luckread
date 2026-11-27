@@ -309,15 +309,12 @@ function LuckReadSocialPostCard({
   }, [contentId, creatorId, author, createdAt, updatedAt, slug, presentation, timelineCardNearViewport])
 
   useEffect(() => {
-    if (presentation !== 'x-timeline') {
-      setTimelineCardNearViewport(true)
-      return
-    }
+    if (presentation !== 'x-timeline') return
     const target = timelineCardRef.current
     if (!target) return
     if (typeof IntersectionObserver === 'undefined') {
-      setTimelineCardNearViewport(true)
-      return
+      const frame = requestAnimationFrame(() => setTimelineCardNearViewport(true))
+      return () => cancelAnimationFrame(frame)
     }
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
