@@ -14,7 +14,8 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     const notice = read('src/app/(frontend)/components/reuse/THIRD_PARTY_NOTICES.md')
 
     expect(component).toContain('Tweet, TweetStats and user')
-    expect(component).toContain("'/api/v1/contents/' + encodeURIComponent(contentId) + '/social'")
+    expect(component).toContain("import { getSharedSocialSummary } from '../../../../lib/social-summary-request-coalescer.js'")
+    expect(component).toContain('getSharedSocialSummary(contentId)')
     expect(component).toContain('/api/v1/interactions/likes')
     expect(component).toContain("const reportContent = async () =>")
     expect(component).toContain("'/api/v1/reports'")
@@ -109,7 +110,7 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
 
     expect(component).toContain('resolveSocialPostMedia(mediaRefs, coverRef)')
     expect(component).toContain('media.kind === \'video\'')
-    expect(component).toContain('preload="metadata"')
+    expect(component).toContain('preload="none"')
     expect(component).toContain('mediaItems.length === 1')
     expect(component).toContain('className="content-feed-cover"')
     expect(component).toContain('className="lr-preview-media"')
@@ -173,7 +174,7 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     const component = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
     const cache = read('src/lib/social-post-profile-cache.ts')
 
-    expect(component).toContain("'/api/v1/contents/' + encodeURIComponent(contentId) + '/social'")
+    expect(component).toContain('getSharedSocialSummary(contentId)')
     expect(component).toContain("credentials: 'include'")
     expect(component).toContain('getCachedPublicProfile(authorId)')
     expect(cache).not.toContain('/api/v1/contents/')
