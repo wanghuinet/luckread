@@ -21,7 +21,9 @@ const required = [
 for (const token of required) {
   if (!sql.includes(token)) throw new Error('W07 lifecycle PostgreSQL template missing: ' + token)
 }
-if (!/^BEGIN;[\s\S]*COMMIT;\s*$/.test(sql.trim())) {
+const executableLines = sql.split(/\r?\n/).map((line) => line.trim())
+  .filter((line) => line.length > 0 && !line.startsWith('--'))
+if (executableLines[0] !== 'BEGIN;' || executableLines.at(-1) !== 'COMMIT;') {
   throw new Error('W07 lifecycle migration must retain one exact outer transaction wrapper')
 }
 if (/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?(?:orders?|order_items?|payments?|refunds?|wallets?|ledger|ledger_entries)\b/i.test(sql)) {
