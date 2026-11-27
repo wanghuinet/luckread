@@ -366,7 +366,6 @@ async function finalizePause(
     subscriberId: string
     idempotencyHash: string
     now: string
-    deferReceiptCompletion?: boolean
   },
 ): Promise<LifecycleResponse> {
   const client = await membershipStore.connect()
@@ -489,6 +488,7 @@ async function applySimpleLifecycle(
     subscriberId: string
     idempotencyHash: string
     now: string
+    deferReceiptCompletion?: boolean
   },
 ): Promise<LifecycleResponse> {
   const client = await membershipStore.connect()
