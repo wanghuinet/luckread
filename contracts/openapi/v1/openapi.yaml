@@ -2808,8 +2808,8 @@ paths:
         - $ref: '#/components/parameters/IfMatchRequired'
         - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
-        '200': { description: Subscription paused after confirming no renewal submission is in flight; a pending renewal may return 409. }
-        '202': { description: Lifecycle transition is pending renewal reconciliation. }
+        '200': { description: Subscription paused after confirming no renewal submission is in flight. }
+        '409': { description: Pause is not completed while a renewal submission is in flight; retry after reconciliation. }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
