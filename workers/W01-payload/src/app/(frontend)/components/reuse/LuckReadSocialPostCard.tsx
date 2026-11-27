@@ -779,12 +779,12 @@ function LuckReadSocialPostCard({
               <SensitiveMediaNotice warning={mediaWarning} locale={locale} onReveal={() => setRevealedMediaKey(mediaRevealKey)} />
             ) : singleMedia ? (
               <div className="mt-3 overflow-hidden rounded-2xl border border-light-border dark:border-dark-border">
-                {singleMedia.kind === 'video' ? <video aria-label={title} className="block max-h-[510px] w-full bg-black object-contain" controls muted playsInline preload="metadata" poster={singleMedia.poster} src={singleMedia.src} /> : <img alt={title} className="block max-h-[510px] w-full object-cover" loading="lazy" src={singleMedia.src} />}
+                {singleMedia.kind === 'video' ? <video aria-label={title} className="block max-h-[510px] w-full bg-black object-contain" controls muted playsInline preload="none" poster={singleMedia.poster} src={singleMedia.src} /> : <img alt={title} className="block max-h-[510px] w-full object-cover" loading="lazy" src={singleMedia.src} />}
               </div>
             ) : mediaItems.length > 1 ? (
               <div className="mt-3 grid grid-cols-2 gap-0.5 overflow-hidden rounded-2xl border border-light-border dark:border-dark-border" role="group" aria-label={label('Post media', '动态媒体', '動態媒體')}>
                 {mediaItems.map((media) => media.kind === 'video' ? (
-                  <video key={media.src} aria-label={title} className="aspect-square max-h-[300px] w-full bg-black object-cover" controls muted playsInline preload="metadata" poster={media.poster} src={media.src} />
+                  <video key={media.src} aria-label={title} className="aspect-square max-h-[300px] w-full bg-black object-cover" controls muted playsInline preload="none" poster={media.poster} src={media.src} />
                 ) : <img key={media.src} alt="" className="aspect-square max-h-[300px] w-full object-cover" loading="lazy" src={media.src} />)}
               </div>
             ) : null}
