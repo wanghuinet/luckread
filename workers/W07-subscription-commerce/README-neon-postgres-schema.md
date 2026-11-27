@@ -18,17 +18,19 @@ The generator reads the eight canonical D1-01 migration files (0001 through 0008
 
 SQLite ISO-8601 timestamp TEXT fields are mapped to PostgreSQL TIMESTAMPTZ. benefits_json remains TEXT; PostgreSQL JSONB is used only to check that its contents form a JSON array. SQLite typeof, GLOB, RAISE(ABORT) and trigger syntax are replaced with PostgreSQL types, regular-expression checks and PL/pgSQL trigger functions.
 
-The generated schema preserves:
-- all 17 Subscription columns, including version and the three trial timestamps;
+The initial generated schema preserves:
+- all 20 Subscription columns, including version, trial timestamps and the PAUSE-A remaining-period snapshot;
 - immutable MembershipPlan versions and forward-only current-version changes;
 - immutable RevenueCat product identity with only a one-way retirement transition;
 - idempotent plan-change attempt and scheduled-change keys;
 - single pending upgrade/scheduled-change rows per subscription;
 - one lifetime trial per non-null subscriber/creator pair and write-once trial-window/conversion timestamps.
 
+A separate `0002_w07_subscription_lifecycle.sql` migration adds the pause snapshot (`pause_started_at`, `pause_period_end_snapshot`, `pause_remaining_seconds`), subscriber-scoped idempotency receipts for CANCEL/PAUSE/RESUME, and append-only lifecycle audit events. It is generated from `scripts/neon/templates/w07-subscription-lifecycle-postgres.sql`; the historical `0001` artifact is unchanged.
+
 ## Verification and apply gate
 
-The GitHub Actions workflow .github/workflows/neon-d1-01-w07-membership-schema.yml generates this DDL and applies it only to a disposable PostgreSQL 18 CI service. The SQL verifier runs synthetic inserts and negative probes inside one transaction, rolls everything back, then records zero rows across the six W07 tables.
+The GitHub Actions workflow .github/workflows/neon-d1-01-w07-membership-schema.yml generates this DDL and applies it only to a disposable PostgreSQL 18 CI service. The SQL verifier runs synthetic inserts and negative probes inside one transaction, rolls everything back, and verifies nine W07 tables including lifecycle operation receipts and append-only audit.
 
 The generated SQL and disposable PostgreSQL rehearsal verify the schema shape locally; they are not evidence of a remote Neon DDL operation. Read the bootstrap/ledger contracts and deployment evidence for actual remote schema and Worker rollout status. This source file does not authorize remote DDL or production cutover.
 
