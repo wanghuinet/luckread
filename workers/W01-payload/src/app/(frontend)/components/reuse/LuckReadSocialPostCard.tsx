@@ -249,7 +249,7 @@ function LuckReadSocialPostCard({
         setViewerUserId(viewerId)
       }
 
-      if (authorId && viewerId && authorId !== viewerId) {
+      if (presentation !== 'x-timeline' && authorId && viewerId && authorId !== viewerId) {
         try {
           const followResult = await getSharedFollowRelationship(authorId)
           if (!cancelled && followResult.response.ok) {
@@ -303,7 +303,7 @@ function LuckReadSocialPostCard({
       cancelled = true
       controller.abort()
     }
-  }, [contentId, creatorId, author, createdAt, updatedAt, slug])
+  }, [contentId, creatorId, author, createdAt, updatedAt, slug, presentation])
 
   // Timeline cards defer the heavier owner-action detail read until the user opens
   // the overflow menu. The initial feed only needs the lightweight social summary.
