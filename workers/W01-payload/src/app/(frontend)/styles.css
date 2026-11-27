@@ -633,3 +633,44 @@ html.frontend-legacy-root main[style*="max-width"] p[style*="#666"] {
   .mobile-nav { display: grid; grid-template-columns: repeat(4,1fr); }
 }
 @media (min-width: 901px) { .mobile-nav { display: none; } }
+
+/* Keyboard access and mobile safe-area behavior for the shared social shell. */
+.lr-skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 1000;
+  padding: 10px 16px;
+  transform: translateY(calc(-100% - 20px));
+  border: 2px solid var(--lr-blue-200);
+  border-radius: 999px;
+  background: var(--lr-blue-700);
+  color: #fff !important;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.3;
+  text-decoration: none;
+  box-shadow: 0 8px 24px rgba(30, 64, 175, .22);
+}
+
+.lr-skip-link:focus,
+.lr-skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 3px solid var(--lr-blue-400);
+  outline-offset: 3px;
+}
+
+#main-content {
+  scroll-margin-top: 5rem;
+}
+
+#main-content:focus {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lr-skip-link {
+    transition: none !important;
+  }
+}
+
