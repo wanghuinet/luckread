@@ -70,6 +70,7 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
 
   return (
     <div className="min-h-screen bg-main-background text-light-primary dark:text-dark-primary">
+      <Link className="lr-skip-link" href="#main-content">{locale === 'en' ? 'Skip to main content' : locale === 'tw' ? '跳至主要內容' : '跳转到主要内容'}</Link>
       <TwitterClonePostComposerModal />
       <div className="mx-auto flex min-h-screen w-full max-w-[1265px] justify-center gap-0 lg:gap-4">
         <header id="sidebar" className="flex w-0 shrink-0 transition-opacity duration-200 xs:w-20 md:w-24 lg:max-w-none xl:-mr-4 xl:w-full xl:max-w-xs">
@@ -78,7 +79,7 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
               <h1 className="hidden xs:flex"><Link className="custom-button main-tab text-accent-blue dark:text-twitter-icon" href="/home" aria-label={copy.home}><TwitterLogo className="h-7 w-7" /></Link></h1>
               <nav className="flex items-center justify-around xs:flex-col xs:justify-center xl:block" aria-label={locale === 'en' ? 'Main navigation' : '主导航'}>
                 {links.map((item) => (
-                  <Link key={item.key} aria-current={active === item.key ? 'page' : undefined} className={'custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start' + (active === item.key ? ' font-bold' : '')} data-umami-event={item.key === 'bookmarks' ? 'bookmarks-open' : undefined} href={item.href}>
+                  <Link key={item.key} aria-current={active === item.key ? 'page' : undefined} aria-label={copy[item.key]} className={'custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start' + (active === item.key ? ' font-bold' : '')} data-umami-event={item.key === 'bookmarks' ? 'bookmarks-open' : undefined} href={item.href}>
                     <SidebarIcon name={item.icon} /><span className="hidden text-xl xl:inline">{copy[item.key]}</span>
                   </Link>
                 ))}
@@ -91,7 +92,7 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
             <TwitterCloneSidebarProfile locale={locale} />
           </div>
         </header>
-        <main className="hover-animation flex min-h-screen w-full min-w-0 max-w-xl flex-col border-x border-light-border pb-32 dark:border-dark-border xs:pb-8">
+        <main id="main-content" tabIndex={-1} className="hover-animation flex min-h-screen w-full min-w-0 max-w-xl flex-col border-x border-light-border pb-32 dark:border-dark-border xs:pb-8">
           <header className="sticky top-0 z-10 flex items-center justify-between gap-6 bg-main-background/60 px-4 py-3 backdrop-blur-md">
             <h1 className="text-xl font-bold">{title}</h1>
             <div className="flex shrink-0 items-center gap-2">
