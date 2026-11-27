@@ -676,7 +676,7 @@ html.frontend-legacy-root main[style*="max-width"] p[style*="#666"] {
 
 
 
-@media (max-width: 479px) {
+@media (max-width: 499px) {
   .lr-mobile-bottom-nav {
     justify-content: flex-start;
     flex-wrap: nowrap;
