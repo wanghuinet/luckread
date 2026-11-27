@@ -137,7 +137,23 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
     {requiresAuth ? <div className="flex flex-col items-center gap-3 px-6 py-16 text-center" role="status"><h2 className="text-xl font-bold">{signInTitle}</h2><Link className="rounded-full bg-main-accent px-5 py-2 font-bold text-white" href={'/login?returnTo=' + encodeURIComponent('/home?feed=following')}>{signInLabel}</Link></div> : null}
     {!requiresAuth ? items.map(item=><LuckReadSocialPostCard key={item.id} contentId={item.id} slug={item.slug} title={item.title} creatorId={item.creatorId ?? (feedMode === 'following' ? item.ownerUserId : undefined)} author={item.creator ?? item.author} coverRef={item.coverRef} mediaRefs={item.mediaRefs} mediaWarning={item.mediaWarning} createdAt={item.createdAt} updatedAt={item.updatedAt} presentation="x-timeline" locale={locale}/>) : null}
     {!requiresAuth&&items.length===0&&!loading&&!error?<div className="flex flex-col items-center gap-3 px-6 py-16 text-center"><h2 className="text-xl font-bold">{feedMode==='following'?followingEmptyTitle:copy.feed.noPublicContent}</h2><p className="text-sm text-light-secondary dark:text-dark-secondary">{feedMode==='following'?(locale==='en'?'Follow more accounts to build your timeline.':locale==='tw'?'追蹤更多帳號以建立你的動態。':'关注更多账号，开始建立你的动态。'):copy.feed.emptyDescription}</p><Link className="rounded-full bg-main-accent px-5 py-2 font-bold text-white" href="/content">{copy.feed.exploreContent}</Link></div>:null}
-    {loading&&items.length===0?<div className="flex justify-center px-4 py-6 text-sm text-light-secondary dark:text-dark-secondary" role="status">{copy.feed.loading}</div>:null}
+    {loading&&items.length===0?<div className="space-y-0" role="status" aria-label={copy.feed.loading}>
+      <span className="sr-only">{copy.feed.loading}</span>
+      {[0, 1, 2].map((skeleton) => <article aria-hidden="true" className="animate-pulse border-b border-light-border px-4 py-4 dark:border-dark-border" key={skeleton}>
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 shrink-0 rounded-full bg-light-line-reply dark:bg-dark-border" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-3 w-32 rounded bg-light-line-reply dark:bg-dark-border" />
+            <div className="h-3 w-20 rounded bg-light-line-reply dark:bg-dark-border" />
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          <div className="h-3 w-full rounded bg-light-line-reply dark:bg-dark-border" />
+          <div className="h-3 w-4/5 rounded bg-light-line-reply dark:bg-dark-border" />
+          {skeleton === 1 ? <div className="mt-3 aspect-video rounded-2xl bg-light-line-reply dark:bg-dark-border" /> : null}
+        </div>
+      </article>)}
+    </div>:null}
     {error?<div className="flex items-center justify-between gap-3 border-b border-light-border px-4 py-4 text-sm dark:border-dark-border" role="status"><p>{error}</p><button className="rounded-full border border-light-line-reply px-4 py-2 font-bold dark:border-dark-border" onClick={()=>feedMode==='following'&&items.length===0?void loadInitialFollowing():void loadMore()} type="button">{copy.feed.retry}</button></div>:null}
     {hasMore?<div className="flex justify-center px-4 py-6 text-sm text-light-secondary dark:text-dark-secondary" ref={sentinelRef}><button className="rounded-full border border-light-line-reply px-4 py-2 font-bold dark:border-dark-border disabled:opacity-50" disabled={loading} onClick={()=>void loadMore()} type="button">{loading?copy.feed.loading:copy.feed.loadingMore}</button></div>:null}
   </section>
