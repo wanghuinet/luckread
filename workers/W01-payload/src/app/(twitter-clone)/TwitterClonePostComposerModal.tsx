@@ -34,9 +34,11 @@ export default function TwitterClonePostComposerModal() {
   const [open, setOpen] = useState(false)
   const [hasOpened, setHasOpened] = useState(false)
   const panelRef = useRef<HTMLElement | null>(null)
+  const openerRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     const showComposer = () => {
+      openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
       setHasOpened(true)
       setOpen(true)
     }
@@ -56,6 +58,7 @@ export default function TwitterClonePostComposerModal() {
     return () => {
       document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', handleKeyDown)
+      if (openerRef.current?.isConnected) openerRef.current.focus()
     }
   }, [open])
 
