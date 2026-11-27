@@ -8,9 +8,10 @@ const review = JSON.parse(readFileSync(
   'utf8',
 ))
 
-test('accepts the reviewed D1-01 shared runner and current success evidence', () => {
+test('rejects the historical D1-01 review after the lifecycle manifest and runner sources change', () => {
   const result = validateRemoteRunnerReview({ review })
-  assert.equal(result.valid, true, result.errors.join('; '))
+  assert.equal(result.valid, false)
+  assert.ok(result.errors.some((message) => message.includes('invalidates the review')))
 })
 
 test('rejects any changed runner or ledger source after the review', () => {
