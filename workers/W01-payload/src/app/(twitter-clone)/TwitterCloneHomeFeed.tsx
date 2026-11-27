@@ -9,7 +9,7 @@ import { getTwitterCloneCopy } from './twitter-clone-copy'
 
 export type HomeContentAuthor = { id:string; username?:string; displayName?:string|null; avatar?:string|null }
 export type HomeContentItem = { id:string; slug?:string; ownerUserId?:string; creatorId?:string|null; creator?:HomeContentAuthor|null; author?:HomeContentAuthor|null; createdAt?:string; updatedAt?:string; contentType:'article'|'post'|'video'; title:string; bodyRef?:string; mediaRefs?:string[]; coverRef?:string|null; mediaWarning?:'NUDITY'|'VIOLENCE'|'SENSITIVE'|null }
-export type HomeContentPage = { items:HomeContentItem[]; nextCursor:string|null; hasMore:boolean; candidateWindowTruncated?:boolean }
+export type HomeContentPage = { items:HomeContentItem[]; nextCursor:string|null; hasMore:boolean; candidateWindowTruncated?:boolean; initialLoadError?:boolean }
 export type HomeFeedMode = 'for-you' | 'following'
 
 export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{initialPage:HomeContentPage;locale:PublicLocale;feedMode:HomeFeedMode}) {
@@ -18,7 +18,8 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   const [nextCursor,setNextCursor] = useState<string|null>(initialPage.nextCursor)
   const [hasMore,setHasMore] = useState(initialPage.hasMore)
   const [loading,setLoading] = useState(feedMode === 'following')
-  const [error,setError] = useState('')
+  const [error,setError] = useState(initialPage.initialLoadError ? copy.feed.loadMoreError : '')
+  const [retryInitial,setRetryInitial] = useState(initialPage.initialLoadError === true || feedMode === 'following')
   const [requiresAuth,setRequiresAuth] = useState(false)
   const [candidateWindowTruncated,setCandidateWindowTruncated] = useState(initialPage.candidateWindowTruncated === true)
   const sentinelRef = useRef<HTMLDivElement|null>(null)
@@ -27,8 +28,8 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   const itemIdsRef = useRef(new Set(initialPage.items.map(item => item.id)))
   const activeRequestRef = useRef<AbortController | null>(null)
 
-  const loadInitialFollowing = useCallback(async () => {
-    if (feedMode !== 'following' || loadingRef.current) return
+  const loadInitial = useCallback(async () => {
+    if (loadingRef.current) return
     loadingRef.current = true
     const controller = new AbortController()
     activeRequestRef.current = controller
@@ -36,12 +37,13 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
     setError('')
     try {
       const params = new URLSearchParams({ limit: '20' })
+      const endpoint = feedMode === 'following' ? '/api/v1/feed/following?' : '/api/v1/contents?'
       const { response, data } = await fetchJson<{data?:HomeContentPage;error?:{code?:string;message?:string}}>(
-        '/api/v1/feed/following?' + params.toString(),
-        { headers: { accept: 'application/json' }, cache: 'no-store', credentials: 'include', signal: controller.signal },
+        endpoint + params.toString(),
+        { headers: { accept: 'application/json' }, cache: 'no-store', credentials: feedMode === 'following' ? 'include' : 'omit', signal: controller.signal },
       )
       if (controller.signal.aborted) return
-      if (response.status === 401 || data?.error?.code === 'UNAUTHENTICATED') {
+      if (feedMode === 'following' && (response.status === 401 || data?.error?.code === 'UNAUTHENTICATED')) {
         setRequiresAuth(true)
         setItems([])
         setNextCursor(null)
@@ -51,6 +53,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       if (!response.ok || !data?.data) throw new Error(getApiErrorMessage(data, copy.feed.loadMoreError))
       const page = data.data
       setRequiresAuth(false)
+      setRetryInitial(false)
       const initialItems = page.items ?? []
       itemIdsRef.current = new Set(initialItems.map(item => item.id))
       setItems(initialItems)
@@ -58,7 +61,10 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       setHasMore(page.hasMore === true)
       setCandidateWindowTruncated(page.candidateWindowTruncated === true)
     } catch (cause) {
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : copy.feed.loadMoreError)
+      if (!controller.signal.aborted) {
+        setRetryInitial(true)
+        setError(cause instanceof Error ? cause.message : copy.feed.loadMoreError)
+      }
     } finally {
       if (activeRequestRef.current === controller) {
         activeRequestRef.current = null
@@ -74,7 +80,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
     requestedCursorsRef.current.add(nextCursor)
     const controller = new AbortController()
     activeRequestRef.current = controller
-    loadingRef.current=true;setLoading(true);setError('')
+    loadingRef.current=true;setLoading(true);setRetryInitial(false);setError('')
     try {
       const params=new URLSearchParams({limit:'20',cursor:nextCursor})
       const endpoint = feedMode === 'following' ? '/api/v1/feed/following?' : '/api/v1/contents?'
@@ -103,7 +109,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       setNextCursor(cursorAlreadyRequested ? null : next)
       setHasMore(page.hasMore === true && next !== null && !cursorAlreadyRequested)
       setCandidateWindowTruncated(current => current || page.candidateWindowTruncated === true)
-    } catch(cause) {requestedCursorsRef.current.delete(nextCursor);if(!controller.signal.aborted)setError(cause instanceof Error?cause.message:copy.feed.loadMoreError)}
+    } catch(cause) {requestedCursorsRef.current.delete(nextCursor);if(!controller.signal.aborted){setRetryInitial(false);setError(cause instanceof Error?cause.message:copy.feed.loadMoreError)}}
     finally {if(activeRequestRef.current===controller){activeRequestRef.current=null;loadingRef.current=false;if(!controller.signal.aborted)setLoading(false)}}
   }, [copy.feed.loadMoreError, feedMode, hasMore, nextCursor, requiresAuth])
 
@@ -116,10 +122,10 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
     let cancelled = false
     // Defer the fetch to the microtask queue; it synchronously updates loading state.
     void Promise.resolve().then(() => {
-      if (!cancelled) void loadInitialFollowing()
+      if (!cancelled) void loadInitial()
     })
     return () => { cancelled = true }
-  }, [feedMode, loadInitialFollowing])
+  }, [feedMode, loadInitial])
 
   useEffect(()=>{
     if (typeof IntersectionObserver === 'undefined') return
@@ -158,7 +164,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
         </div>
       </article>)}
     </div>:null}
-    {error?<div className="flex items-center justify-between gap-3 border-b border-light-border px-4 py-4 text-sm dark:border-dark-border" role="status"><p>{error}</p><button className="rounded-full border border-light-line-reply px-4 py-2 font-bold dark:border-dark-border" onClick={()=>feedMode==='following'&&items.length===0?void loadInitialFollowing():void loadMore()} type="button">{copy.feed.retry}</button></div>:null}
+    {error?<div className="flex items-center justify-between gap-3 border-b border-light-border px-4 py-4 text-sm dark:border-dark-border" role="status"><p>{error}</p><button className="rounded-full border border-light-line-reply px-4 py-2 font-bold dark:border-dark-border" onClick={()=>retryInitial?void loadInitial():void loadMore()} type="button">{copy.feed.retry}</button></div>:null}
     {hasMore?<div className="flex justify-center px-4 py-6 text-sm text-light-secondary dark:text-dark-secondary" ref={sentinelRef}><button className="rounded-full border border-light-line-reply px-4 py-2 font-bold dark:border-dark-border disabled:opacity-50" disabled={loading} onClick={()=>void loadMore()} type="button">{loading?copy.feed.loading:copy.feed.loadingMore}</button></div>:null}
   </section>
 }
