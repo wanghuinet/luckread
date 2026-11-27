@@ -110,6 +110,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   }, [feedMode, loadInitialFollowing])
 
   useEffect(()=>{
+    if (typeof IntersectionObserver === 'undefined') return
     const target=sentinelRef.current;if(!target||!hasMore)return
     const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))void loadMore()},{rootMargin:'500px 0px'})
     observer.observe(target);return()=>observer.disconnect()
@@ -130,6 +131,6 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
     {!requiresAuth&&items.length===0&&!loading&&!error?<div className="flex flex-col items-center gap-3 px-6 py-16 text-center"><h2 className="text-xl font-bold">{feedMode==='following'?followingEmptyTitle:copy.feed.noPublicContent}</h2><p className="text-sm text-light-secondary dark:text-dark-secondary">{feedMode==='following'?(locale==='en'?'Follow more accounts to build your timeline.':locale==='tw'?'追蹤更多帳號以建立你的動態。':'关注更多账号，开始建立你的动态。'):copy.feed.emptyDescription}</p><Link className="rounded-full bg-main-accent px-5 py-2 font-bold text-white" href="/content">{copy.feed.exploreContent}</Link></div>:null}
     {loading&&items.length===0?<div className="flex justify-center px-4 py-6 text-sm text-light-secondary dark:text-dark-secondary" role="status">{copy.feed.loading}</div>:null}
     {error?<div className="flex items-center justify-between gap-3 border-b border-light-border px-4 py-4 text-sm dark:border-dark-border" role="status"><p>{error}</p><button className="rounded-full border border-light-line-reply px-4 py-2 font-bold dark:border-dark-border" onClick={()=>feedMode==='following'&&items.length===0?void loadInitialFollowing():void loadMore()} type="button">{copy.feed.retry}</button></div>:null}
-    {hasMore?<div className="flex justify-center px-4 py-6 text-sm text-light-secondary dark:text-dark-secondary" ref={sentinelRef}>{loading?copy.feed.loading:copy.feed.loadingMore}</div>:null}
+    {hasMore?<div className="flex justify-center px-4 py-6 text-sm text-light-secondary dark:text-dark-secondary" ref={sentinelRef}><button className="rounded-full border border-light-line-reply px-4 py-2 font-bold dark:border-dark-border disabled:opacity-50" disabled={loading} onClick={()=>void loadMore()} type="button">{loading?copy.feed.loading:copy.feed.loadingMore}</button></div>:null}
   </section>
 }
