@@ -447,6 +447,31 @@ describe('CASL L0-L8 authorization policy', () => {
     })).toMatchObject({ decision: 'DENY', reasonCode: 'ACCOUNT_FROZEN_READ_ONLY' })
   })
 
+  it('authorizes subscription lifecycle mutations only for the authenticated subscriber at L2+', () => {
+    for (const action of ['subscription.cancel', 'subscription.pause', 'subscription.resume']) {
+      expect(evaluate({
+        layer: 'L2',
+        action,
+        resourceType: 'Subscription',
+        resourceAttributes: { ownerId: 'user-1', subscriptionId: 'sub-1' },
+      })).toMatchObject({ decision: 'ALLOW' })
+
+      expect(evaluate({
+        layer: 'L3',
+        action,
+        resourceType: 'Subscription',
+        resourceAttributes: { ownerId: 'user-2', subscriptionId: 'sub-1' },
+      })).toMatchObject({ decision: 'DENY', reasonCode: 'PERMISSION_DENIED' })
+
+      expect(evaluate({
+        layer: 'L1',
+        action,
+        resourceType: 'Subscription',
+        resourceAttributes: { ownerId: 'user-1', subscriptionId: 'sub-1' },
+      })).toMatchObject({ decision: 'DENY' })
+    }
+  })
+
   it('authorizes payment history reads only for the authenticated customer-owned Payment', () => {
     expect(evaluate({
       layer: 'L2',

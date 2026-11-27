@@ -361,6 +361,9 @@ function buildLayerAbility(input: CaslPermissionInput) {
     grant('payment.read', 'Payment', selfOwnerCondition(input.subjectId))
     grant('payment.refund', 'Payment', selfOwnerCondition(input.subjectId))
     grant('subscription.create', 'Subscription', selfOwnerCondition(input.subjectId))
+    grant('subscription.cancel', 'Subscription', selfOwnerCondition(input.subjectId))
+    grant('subscription.pause', 'Subscription', selfOwnerCondition(input.subjectId))
+    grant('subscription.resume', 'Subscription', selfOwnerCondition(input.subjectId))
     grant('subscription.change_plan', 'Subscription', selfOwnerCondition(input.subjectId))
   }
 
