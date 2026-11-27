@@ -40,7 +40,8 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
         '/api/v1/feed/following?' + params.toString(),
         { headers: { accept: 'application/json' }, cache: 'no-store', credentials: 'include', signal: controller.signal },
       )
-      if (controller.signal.aborted) return\n      if (response.status === 401 || data?.error?.code === 'UNAUTHENTICATED') {
+      if (controller.signal.aborted) return
+      if (response.status === 401 || data?.error?.code === 'UNAUTHENTICATED') {
         setRequiresAuth(true)
         setItems([])
         setNextCursor(null)
@@ -59,9 +60,11 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
     } catch (cause) {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : copy.feed.loadMoreError)
     } finally {
-      if (activeRequestRef.current === controller) activeRequestRef.current = null
-      loadingRef.current = false
-      if (!controller.signal.aborted) setLoading(false)
+      if (activeRequestRef.current === controller) {
+        activeRequestRef.current = null
+        loadingRef.current = false
+        if (!controller.signal.aborted) setLoading(false)
+      }
     }
   }, [copy.feed.loadMoreError, feedMode])
 
@@ -79,7 +82,8 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
         endpoint + params.toString(),
         {headers:{accept:'application/json'},cache:'no-store',credentials:feedMode==='following'?'include':'omit',signal:controller.signal},
       )
-      if (controller.signal.aborted) return\n      if (response.status === 401 && feedMode === 'following') {
+      if (controller.signal.aborted) return
+      if (response.status === 401 && feedMode === 'following') {
         setRequiresAuth(true)
         setItems([])
         setNextCursor(null)
