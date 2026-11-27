@@ -207,15 +207,17 @@ function LuckReadSocialPostCard({
       setCommentCount(null)
       setLikeStateLoading(true)
 
-      const detailRequest = fetchJson<ContentDetail>(
-        '/api/v1/contents/' + encodeURIComponent(contentId),
-        {
-          credentials: 'include',
-          headers: { accept: 'application/json' },
-          cache: 'no-store',
-          signal: controller.signal,
-        },
-      )
+      const detailRequest = presentation === 'x-timeline'
+        ? Promise.resolve(null)
+        : fetchJson<ContentDetail>(
+            '/api/v1/contents/' + encodeURIComponent(contentId),
+            {
+              credentials: 'include',
+              headers: { accept: 'application/json' },
+              cache: 'no-store',
+              signal: controller.signal,
+            },
+          )
       const viewerRequest = getSharedViewerRequest()
       const socialRequest = getSharedSocialSummary(contentId)
 
@@ -227,7 +229,7 @@ function LuckReadSocialPostCard({
       if (cancelled) return
 
       let authorId = creatorId ?? null
-      if (detailResult.status === 'fulfilled' && detailResult.value.response.ok) {
+      if (detailResult.status === 'fulfilled' && detailResult.value?.response.ok) {
         const detail = detailResult.value.data
         authorId = authorId || (typeof detail?.creatorId === 'string' ? detail.creatorId : null)
         setContentState(typeof detail?.state === 'string' ? detail.state : null)
@@ -247,7 +249,7 @@ function LuckReadSocialPostCard({
         setViewerUserId(viewerId)
       }
 
-      if (authorId && viewerId && authorId !== viewerId) {
+      if (presentation !== 'x-timeline' && authorId && viewerId && authorId !== viewerId) {
         try {
           const followResult = await getSharedFollowRelationship(authorId)
           if (!cancelled && followResult.response.ok) {
@@ -301,7 +303,51 @@ function LuckReadSocialPostCard({
       cancelled = true
       controller.abort()
     }
-  }, [contentId, creatorId, author, createdAt, updatedAt, slug])
+  }, [contentId, creatorId, author, createdAt, updatedAt, slug, presentation])
+
+  // Timeline cards defer the heavier owner-action detail read until the user opens
+  // the overflow menu. The initial feed only needs the lightweight social summary.
+  useEffect(() => {
+    if (presentation !== 'x-timeline' || !moreOpen) return
+    const controller = new AbortController()
+    let cancelled = false
+
+    void fetchJson<ContentDetail>(
+      '/api/v1/contents/' + encodeURIComponent(contentId),
+      {
+        credentials: 'include',
+        headers: { accept: 'application/json' },
+        cache: 'no-store',
+        signal: controller.signal,
+      },
+    ).then(async ({ response, data }) => {
+      if (cancelled || !response.ok) return
+      const authorId = creatorId || (typeof data?.creatorId === 'string' ? data.creatorId : null)
+      setResolvedCreatorId(authorId)
+      setContentState(typeof data?.state === 'string' ? data.state : null)
+      setContentVersion(typeof data?.version === 'number' ? data.version : null)
+      setContentEtag(typeof data?.etag === 'string' ? data.etag : null)
+      setPostTimestamp(createdAt || updatedAt || data?.createdAt || data?.updatedAt || '')
+      if (authorId && viewerUserId && authorId !== viewerUserId) {
+        try {
+          const relationship = await getSharedFollowRelationship(authorId)
+          if (cancelled || !relationship.response.ok) return
+          const state = relationship.data?.data?.relationship
+          setFollowRestricted(state?.blocked === true || state?.blockedBy === true)
+          setFollowing(state?.blocked !== true && state?.blockedBy !== true && relationship.data?.data?.following === true)
+        } catch {
+          // The menu remains usable when relationship status cannot be loaded.
+        }
+      }
+    }).catch(() => {
+      // Detail metadata is optional until an owner-only action is requested.
+    })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [presentation, moreOpen, contentId, creatorId, viewerUserId, createdAt, updatedAt])
 
   const requireLogin = () => {
     const returnTo = window.location.pathname + window.location.search + window.location.hash
