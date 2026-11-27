@@ -61,6 +61,8 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(component).toContain("setReportDialogOpen(true)")
     expect(component).toContain("reasonCode: reportReasonCode")
     expect(component).not.toContain('window.prompt(')
+    expect(component).toContain('setShareLink(shareUrl)')
+    expect(component).toContain('onFocus={(event) => event.currentTarget.select()}')
   })
 
   it('uses the reusable social post card in both homepage and discovery for dynamic content', () => {
@@ -230,9 +232,10 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(homeFeed).toContain('presentation="x-timeline"')
     expect(homeFeed).toContain('author={item.creator ?? item.author}')
     expect(component).toContain("presentation?: 'content' | 'x-timeline'")
-    expect(component).toContain("const profileName = profile?.displayName?.trim() || profile?.username || ''")
-    expect(component).toContain("const username = profile?.username ? '@' + profile.username : ''")
-    expect(component).toContain("const profileHref = profile?.username ? '/@' + encodeURIComponent(profile.username) : null")
+    expect(component).toContain('const displayedProfile = profile || author || null')
+    expect(component).toContain("const profileName = displayedProfile?.displayName?.trim() || displayedProfile?.username || ''")
+    expect(component).toContain("const username = displayedProfile?.username ? '@' + displayedProfile.username : ''")
+    expect(component).toContain("const profileHref = displayedProfile?.username ? '/@' + encodeURIComponent(displayedProfile.username) : null")
     expect(component).toContain("const authorHref = profileHref")
     expect(component).not.toContain('LuckRead creator')
     expect(component).not.toContain('LuckRead 创作者')
