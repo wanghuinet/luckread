@@ -21,10 +21,10 @@ const required = [
 for (const token of required) {
   if (!sql.includes(token)) throw new Error('W07 lifecycle PostgreSQL template missing: ' + token)
 }
-if (!/^BEGIN;[\\s\\S]*COMMIT;\\s*$/.test(sql.trim())) {
+if (!/^BEGIN;[\s\S]*COMMIT;\s*$/.test(sql.trim())) {
   throw new Error('W07 lifecycle migration must retain one exact outer transaction wrapper')
 }
-if (/CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(?:public\\.)?(?:orders?|order_items?|payments?|refunds?|wallets?|ledger|ledger_entries)\\b/i.test(sql)) {
+if (/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?(?:orders?|order_items?|payments?|refunds?|wallets?|ledger|ledger_entries)\b/i.test(sql)) {
   throw new Error('D1-04 financial/order tables must not enter W07 D1-01')
 }
 mkdirSync(dirname(outputPath), { recursive: true })
@@ -33,6 +33,6 @@ const header = [
   '-- Regenerate with scripts/neon/generate-w07-lifecycle-postgres-migration.mjs.',
   '-- Source template: scripts/neon/templates/w07-subscription-lifecycle-postgres.sql.',
   '',
-].join('\\n')
-writeFileSync(outputPath, header + '\\n' + sql)
+].join('\n')
+writeFileSync(outputPath, header + '\n' + sql)
 console.log('W07_SUBSCRIPTION_LIFECYCLE_POSTGRES_MIGRATION_GENERATION_PASS')
