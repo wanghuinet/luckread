@@ -49,4 +49,41 @@ describe('H5 home feed initial-load recovery', () => {
     await screen.findByRole('heading', { name: getTwitterCloneCopy('en').feed.noPublicContent })
     expect(screen.queryByText(getTwitterCloneCopy('en').feed.loadError)).toBeNull()
   })
+  it('preserves the return scroll position after an initial failure and restores it after retry', async () => {
+    window.history.replaceState({}, '', '/home?feed=following')
+    sessionStorage.setItem('luckread:home-feed:return-scroll', JSON.stringify({
+      href: '/home?feed=following',
+      y: 640,
+    }))
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: 'Feed temporarily unavailable' } }), {
+        status: 503,
+        headers: { 'content-type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: {
+        items: [{ id: 'restored-post', title: 'Restored post', contentType: 'post' }],
+        nextCursor: null,
+        hasMore: false,
+      } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }))
+
+    render(createElement(TwitterCloneHomeFeed, {
+      initialPage: emptyPage,
+      locale: 'en',
+      feedMode: 'following',
+    }))
+
+    await screen.findByText('Feed temporarily unavailable')
+    expect(sessionStorage.getItem('luckread:home-feed:return-scroll')).not.toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: getTwitterCloneCopy('en').feed.retry }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith({ top: 640, behavior: 'auto' }))
+    await waitFor(() => expect(sessionStorage.getItem('luckread:home-feed:return-scroll')).toBeNull())
+    scrollTo.mockRestore()
+  })
+
 })
