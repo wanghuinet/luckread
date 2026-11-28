@@ -19,6 +19,8 @@ const required = [
   'CREATE TABLE membership_founding_reservations',
   'UNIQUE (subscriber_id, idempotency_key)',
   'membership_founding_reservation_payment_events',
+  'membership_founding_reservations_plan_version_fkey',
+  "state = 'HELD' AND committed_at IS NULL AND released_at IS NULL",
   'BEGIN;',
   'COMMIT;',
 ]
