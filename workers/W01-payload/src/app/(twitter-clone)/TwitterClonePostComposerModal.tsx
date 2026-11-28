@@ -33,17 +33,35 @@ export function TwitterClonePostComposerTrigger({
 export default function TwitterClonePostComposerModal() {
   const [open, setOpen] = useState(false)
   const [hasOpened, setHasOpened] = useState(false)
+  const [quoteContentId, setQuoteContentId] = useState<string | null>(null)
+  const [quoteRelationshipPending, setQuoteRelationshipPending] = useState(false)
   const panelRef = useRef<HTMLElement | null>(null)
   const openerRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    const showComposer = () => {
+    const showComposer = (event: Event) => {
+      setQuoteRelationshipPending(false)
+      const detail = event instanceof CustomEvent && event.detail && typeof event.detail === 'object'
+        ? event.detail as { quoteContentId?: unknown }
+        : null
+      const requestedQuoteId = typeof detail?.quoteContentId === 'string' ? detail.quoteContentId.trim() : ''
+      setQuoteContentId(requestedQuoteId || null)
       openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
       setHasOpened(true)
       setOpen(true)
     }
+    const updateQuotePending = (event: Event) => {
+      const detail = event instanceof CustomEvent && event.detail && typeof event.detail === 'object'
+        ? event.detail as { pending?: unknown }
+        : null
+      setQuoteRelationshipPending(detail?.pending === true)
+    }
     window.addEventListener(OPEN_POST_COMPOSER_EVENT, showComposer)
-    return () => window.removeEventListener(OPEN_POST_COMPOSER_EVENT, showComposer)
+    window.addEventListener('luckread:quote-relationship-pending', updateQuotePending)
+    return () => {
+      window.removeEventListener(OPEN_POST_COMPOSER_EVENT, showComposer)
+      window.removeEventListener('luckread:quote-relationship-pending', updateQuotePending)
+    }
   }, [])
 
   useEffect(() => {
@@ -52,7 +70,7 @@ export default function TwitterClonePostComposerModal() {
     document.body.style.overflow = 'hidden'
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setOpen(false)
+        if (!quoteRelationshipPending) setOpen(false)
         return
       }
       if (event.key !== 'Tab') return
@@ -83,7 +101,7 @@ export default function TwitterClonePostComposerModal() {
       window.removeEventListener('keydown', handleKeyDown)
       if (openerRef.current?.isConnected) openerRef.current.focus()
     }
-  }, [open])
+  }, [open, quoteRelationshipPending])
 
   if (!hasOpened || typeof document === 'undefined') return null
 
@@ -94,7 +112,7 @@ export default function TwitterClonePostComposerModal() {
         ? 'fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 p-0 sm:items-center sm:p-4'
         : 'hidden'}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) setOpen(false)
+        if (event.target === event.currentTarget && !quoteRelationshipPending) setOpen(false)
       }}
     >
       <section
@@ -106,7 +124,17 @@ export default function TwitterClonePostComposerModal() {
         role="dialog"
         tabIndex={-1}
       >
-        <PublishComposer initialType="post" presentation="tweet-modal" onClose={() => setOpen(false)} />
+        <PublishComposer
+          key={quoteContentId ?? 'new-post'}
+          initialType="post"
+          presentation="tweet-modal"
+          quoteContentId={quoteContentId ?? undefined}
+          onClose={() => {
+            if (quoteRelationshipPending) return
+            setOpen(false)
+            setQuoteContentId(null)
+          }}
+        />
       </section>
     </div>,
     document.body,

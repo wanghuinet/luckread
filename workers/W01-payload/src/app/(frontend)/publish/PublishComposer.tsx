@@ -7,6 +7,7 @@ import { articleDocumentFromBody, plainTextFromArticleDocument, mediaRefsFromArt
 import ArticleStructuredEditor from '../../../components/ArticleStructuredEditor.js'
 import ArticleStructuredRenderer from '../../../components/ArticleStructuredRenderer.js'
 import { articleEditorPlugins } from '../../../components/article-editor-plugins.js'
+import { isPublicQuotePostTarget } from './quote-post.js'
 import { useRouter } from 'next/navigation'
 
 type ContentType = 'article' | 'post' | 'video'
@@ -184,6 +185,7 @@ type PublishComposerProps = {
   contentBasePath?: string
   initialType?: ContentType
   presentation?: 'workspace' | 'tweet-modal' | 'x-workspace'
+  quoteContentId?: string
   onClose?: () => void
 }
 
@@ -191,6 +193,7 @@ export default function PublishComposer({
   contentBasePath = '/api/v1/contents',
   initialType = 'article',
   presentation = 'workspace',
+  quoteContentId,
   onClose,
 }: PublishComposerProps) {
   const router = useRouter()
@@ -222,6 +225,10 @@ export default function PublishComposer({
   const [pollDurationMinutes, setPollDurationMinutes] = useState(1440)
   const [videoMetadataByAssetId, setVideoMetadataByAssetId] = useState<Record<string, VideoMetadata>>({})
   const [draft, setDraft] = useState<ContentResponse | null>(null)
+  const [quoteTarget, setQuoteTarget] = useState<ContentResponse | null>(null)
+  const [loadingQuote, setLoadingQuote] = useState(Boolean(quoteContentId))
+  const [quoteRelationshipPending, setQuoteRelationshipPending] = useState(false)
+  const quoteRelationshipKeyRef = useRef<string | null>(null)
   // Keep the latest server etag outside render closures so a publish queued behind autosave uses the new version.
   const latestDraftRef = useRef<ContentResponse | null>(null)
   const [savedBody, setSavedBody] = useState('')
@@ -1002,6 +1009,9 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     cancelPendingAutoSave()
     setBusy(true); setError(''); setMessage('')
     try {
+      if (quoteContentId && (type !== 'post' || loadingQuote || !quoteTarget || quoteTarget.id !== quoteContentId)) {
+        throw new Error('请先加载并确认可公开引用的原帖。')
+      }
       const { report, input, draft: savedDraft } = await runPreflight()
       if (type !== 'post') {
         if (!report) throw new Error('发布前检查未返回结果，请稍后重试。')
@@ -1033,6 +1043,19 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       setDraft(transitionedDraft)
       autoSaveDirtyRef.current = false
       window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))
+      if (type === 'post' && quoteContentId) {
+        try {
+          await saveQuoteRelationship(savedDraft.id, quoteContentId)
+        } catch (caught) {
+          setQuoteRelationshipPending(true)
+          window.dispatchEvent(new CustomEvent('luckread:quote-relationship-pending', { detail: { pending: true } }))
+          setError(caught instanceof Error
+            ? '动态已发布，但引用关系尚未保存：' + caught.message
+            : '动态已发布，但引用关系尚未保存。请重试完成引用。')
+          setMessage('')
+          return
+        }
+      }
       setMessage(type === 'post'
         ? '动态已发布，已进入公开信息流。'
         : '发布前检查通过，已提交审核。审核通过后将进入正式发布状态。')
@@ -1044,6 +1067,46 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         const loginPath = window.location.pathname.startsWith('/admin/') ? '/admin/login' : '/login'
         router.replace(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
       }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function saveQuoteRelationship(sourceContentId: string, targetContentId = quoteContentId) {
+    if (!targetContentId) throw new Error('引用原帖信息已失效。')
+    const idempotencyKey = quoteRelationshipKeyRef.current ?? crypto.randomUUID()
+    quoteRelationshipKeyRef.current = idempotencyKey
+    const { response, data } = await authorizedFetch<{ error?: { message?: string } }>(
+      '/api/v1/contents/' + encodeURIComponent(sourceContentId) + '/relationships',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify({ targetContentId, relationType: 'quote-post' }),
+      },
+    )
+    if (!response.ok) {
+      throw new Error(getApiErrorMessage(data, '请稍后重试完成引用。'))
+    }
+    quoteRelationshipKeyRef.current = null
+    setQuoteRelationshipPending(false)
+    window.dispatchEvent(new CustomEvent('luckread:quote-relationship-pending', { detail: { pending: false } }))
+    window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))
+  }
+
+  async function retryQuoteRelationship() {
+    const sourceContentId = draft?.id
+    if (!sourceContentId || !quoteContentId || busy) return
+    setBusy(true)
+    setError('')
+    setMessage('')
+    try {
+      await saveQuoteRelationship(sourceContentId, quoteContentId)
+      setMessage('引用关系已保存，原帖关联已完成。')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '引用关系保存失败，请稍后重试。')
     } finally {
       setBusy(false)
     }
@@ -1066,6 +1129,50 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     return () => { cancelled = true }
   }, [isTweetModal])
 
+  useEffect(() => {
+    let active = true
+    const controller = new AbortController()
+    queueMicrotask(() => {
+      if (!active) return
+      setQuoteTarget(null)
+      setQuoteRelationshipPending(false)
+      window.dispatchEvent(new CustomEvent('luckread:quote-relationship-pending', { detail: { pending: false } }))
+      quoteRelationshipKeyRef.current = null
+    })
+    queueMicrotask(() => {
+      if (!active) return
+      if (!quoteContentId) {
+        setLoadingQuote(false)
+        return
+      }
+      setLoadingQuote(true)
+      void authorizedFetch<ContentResponse | { data?: ContentResponse }>(
+        '/api/v1/contents/' + encodeURIComponent(quoteContentId),
+        { method: 'GET', cache: 'no-store', headers: { accept: 'application/json' }, signal: controller.signal },
+      ).then(({ response, data }) => {
+        if (!active) return
+        const target = data && typeof data === 'object' && 'data' in data
+          ? (data as { data?: ContentResponse }).data
+          : data as ContentResponse | null
+        if (
+          !response.ok ||
+          !isPublicQuotePostTarget(target, quoteContentId)
+        ) {
+          throw new Error(getApiErrorMessage(data, '这条动态目前不可引用。'))
+        }
+        setQuoteTarget(target)
+        setError('')
+      }).catch((caught) => {
+        if (!active || controller.signal.aborted) return
+        setQuoteTarget(null)
+        setError(caught instanceof Error ? caught.message : '无法加载要引用的原帖。')
+      }).finally(() => {
+        if (active) setLoadingQuote(false)
+      })
+    })
+    return () => { active = false; controller.abort() }
+  }, [quoteContentId])
+
   return (
     <div
       className={isTweetModal ? "m-0 flex h-full min-h-0 w-full flex-1 flex-col overflow-y-auto rounded-none border-0 bg-black p-0 text-[#e7e9ea] shadow-none" : isXWorkspace ? "min-w-0 bg-main-background text-light-primary dark:text-dark-primary" : "lr-composer-card"}
@@ -1085,7 +1192,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           </button>
           <button
             className="rounded-full accent-tab bg-main-accent px-4 py-1.5 text-[13px] font-bold text-white transition enabled:hover:bg-main-accent/90 enabled:active:bg-main-accent/75 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={busy || autoSaveStatus === 'saving' || reviewLocked || (!body.trim() && assets.length === 0)}
+            disabled={busy || autoSaveStatus === 'saving' || reviewLocked || loadingQuote || Boolean(quoteContentId && !quoteTarget) || (!body.trim() && assets.length === 0)}
             onClick={submitForReview}
             type="button"
           >
@@ -1167,6 +1274,25 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                 ? <img alt="" className="h-full w-full object-cover" src={profile.avatar} />
                 : (profile?.displayName?.trim() || profile?.username || 'L').slice(0, 1).toUpperCase()}
             </div>
+          ) : null}
+          {quoteContentId ? (
+            <section
+              aria-label="引用原帖"
+              className="mx-5 mb-3 rounded-xl border border-[#2f3336] px-3 py-3 text-[#e7e9ea]"
+              aria-busy={loadingQuote}
+            >
+              <strong className="mb-2 block text-xs text-[#71767b]">引用原帖</strong>
+              {loadingQuote ? (
+                <p className="text-sm text-[#71767b]" role="status">正在加载原帖…</p>
+              ) : quoteTarget ? (
+                <div>
+                  <p className="whitespace-pre-wrap break-words text-sm leading-5">{quoteTarget.title || '原帖内容'}</p>
+                  <p className="mt-2 text-xs text-[#71767b]">仅保存引用关系，不复制原帖内容</p>
+                </div>
+              ) : (
+                <p className="text-sm text-red-400" role="alert">原帖不可引用，请返回信息流重新选择。</p>
+              )}
+            </section>
           ) : null}
           <label className={isTweetModal ? 'm-0 grid min-w-0 flex-1 gap-0' : isXWorkspace ? 'mb-4 grid gap-2 px-4 text-sm font-semibold text-light-primary dark:text-dark-primary' : 'lr-field'}>
             <span className={isTweetModal ? 'sr-only' : undefined}>{type === 'post' ? '推文正文' : '视频文案'}</span>
@@ -1791,6 +1917,16 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               </button>
             </div>
             <div className="flex min-w-10 items-center justify-end gap-2">
+              {quoteRelationshipPending ? (
+                <button
+                  className="rounded-full border border-[#536471] px-3 py-1.5 text-xs font-semibold text-[#e7e9ea] disabled:opacity-50"
+                  disabled={busy}
+                  onClick={() => void retryQuoteRelationship()}
+                  type="button"
+                >
+                  {busy ? '处理中…' : '重试保存引用关系'}
+                </button>
+              ) : null}
               {body.length > 0 ? <span className="text-[11px] tabular-nums text-[#71767b]" aria-live="polite">{body.length}/500</span> : null}
             </div>
           </>
@@ -1822,6 +1958,16 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             {draft?.state === 'DRAFT' ? (
               <button className={isXWorkspace ? xButtonDanger : "danger"} disabled={busy} onClick={discardDraft} type="button">
                 放弃草稿
+              </button>
+            ) : null}
+            {quoteRelationshipPending && draft?.id ? (
+              <button
+                className={isXWorkspace ? xButtonSecondary : "secondary"}
+                disabled={busy}
+                onClick={() => void retryQuoteRelationship()}
+                type="button"
+              >
+                {busy ? '处理中…' : '重试保存引用关系'}
               </button>
             ) : null}
             <button className={isXWorkspace ? xButtonSecondary : "secondary"} disabled={busy || autoSaveStatus === 'saving' || reviewLocked} onClick={saveDraft} type="button">
