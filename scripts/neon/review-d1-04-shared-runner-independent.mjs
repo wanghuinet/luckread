@@ -184,7 +184,7 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
       review.review?.reviewKind !== 'AUTOMATED_INDEPENDENT_READ_ONLY_CODE_PATH_REVIEW' ||
       review.review?.sharedExecutorPullRequest !== 1660 ||
       review.review?.sharedExecutorHeadCommit !== '5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de' ||
-      review.review?.sharedPostgres18WorkflowRunId !== 42509822425 ||
+      review.review?.sharedPostgres18WorkflowRunId !== 46157726166 ||
       review.review?.reviewedMainCommit !== '3d08f094ad263fe03ff6e122a9bfef2ffe62ad09') {
     fail('review evidence must bind to the merged shared executor and completed three-domain PG18 run')
   }

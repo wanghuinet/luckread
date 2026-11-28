@@ -30,7 +30,7 @@
     "businessDataImport": false,
     "productionCutoverAuthorized": false,
     "workflow": ".github/workflows/neon-shared-d1-03-05-schema-rehearsal.yml",
-    "successfulPostflightRunId": 42509822425,
+    "successfulPostflightRunId": 46157726166,
     "independentReviewEvidence": {
       "D1-03": "contracts/database/neon-d1-03-shared-runner-independent-review.v1.json",
       "D1-04": "contracts/database/neon-d1-04-shared-runner-independent-review.v1.json",
@@ -41,7 +41,7 @@
     "D1-03": {
       "localStatus": "LOCAL_SHARED_SCHEMA_REVIEW_PASSED_REMOTE_APPLY_BLOCKED",
       "reviewEvidenceRef": "contracts/database/neon-d1-03-shared-runner-independent-review.v1.json",
-      "sharedPostflightRunId": 42509822425,
+      "sharedPostflightRunId": 46157726166,
       "remoteApplyReady": false,
       "remoteApplyBlockers": [
         "W06 Appeal remains a logical capability without an admitted persistence contract and source migration.",
@@ -52,7 +52,7 @@
     "D1-04": {
       "localStatus": "LOCAL_SHARED_SCHEMA_REVIEW_PASSED_REMOTE_APPLY_BLOCKED",
       "reviewEvidenceRef": "contracts/database/neon-d1-04-shared-runner-independent-review.v1.json",
-      "sharedPostflightRunId": 42509822425,
+      "sharedPostflightRunId": 46157726166,
       "remoteApplyReady": false,
       "remoteApplyBlockers": [
         "The seven-entry D1-04 manifest and Merchant/Seller schema have local PostgreSQL 18.6 rehearsals; remote release remains separately gated and requires exact source-pinned validation.",
@@ -72,7 +72,7 @@
     "D1-05": {
       "localStatus": "LOCAL_SHARED_SCHEMA_REVIEW_PASSED_ADMISSION_BLOCKED",
       "reviewEvidenceRef": "contracts/database/neon-d1-05-shared-runner-independent-review.v1.json",
-      "sharedPostflightRunId": 42509822425,
+      "sharedPostflightRunId": 46157726166,
       "standalonePostgres18RunId": 42508098818,
       "remoteApplyReady": false,
       "remoteApplyBlockers": [

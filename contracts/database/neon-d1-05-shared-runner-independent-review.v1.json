@@ -10,7 +10,7 @@
     "reviewedMainCommit": "2bae4a5384cb86d7a754c9dde63d88515d5d020f",
     "sharedExecutorPullRequest": 1660,
     "sharedExecutorHeadCommit": "5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de",
-    "sharedPostgres18WorkflowRunId": 42509822425,
+    "sharedPostgres18WorkflowRunId": 46157726166,
     "sharedPostgres18WorkflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42509822425",
     "d105StandalonePostgres18WorkflowRunId": 42508098818,
     "d105StandalonePostgres18WorkflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42508098818",
@@ -31,7 +31,13 @@
       "utcTimeTextColumnsWithBinaryCollation": 15,
       "remoteNeonTouched": false,
       "cloudflareD1Touched": false,
-      "remoteApplyReady": false
+      "remoteApplyReady": false,
+      "workflowRunId": 46157726166,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/46157726166",
+      "verifiedHeadSha": "ba6e1ead751a2407252b2d058a7e33e72072fcb5",
+      "artifactId": 15268785702,
+      "artifactName": "neon-D1-05-shared-schema-postflight-127029dc8770250a777ed0e259a45f47013d90ea",
+      "artifactZipSha256": "sha256:e92db5b5d9887de7796093bc2958d4cb9141ed9e2b12d32c97f3e24a24de8a50"
     },
     "privacyBoundary": {
       "actorIdPersisted": false,

@@ -321,7 +321,7 @@ export function validateSharedRunnerLedgerReadiness({ledger,readiness,reviews,d1
       localRunner?.businessDataImport !== false ||
       localRunner?.productionCutoverAuthorized !== false ||
       localRunner?.workflow !== '.github/workflows/neon-shared-d1-03-05-schema-rehearsal.yml' ||
-      localRunner?.successfulPostflightRunId !== 42509822425) {
+      localRunner?.successfulPostflightRunId !== 46157726166) {
     fail('the shared D1-03/D1-04/D1-05 executor must remain independently reviewed and local-only')
   }
   if (!sameSet(Object.keys(localRunner?.independentReviewEvidence ?? {}),['D1-03','D1-04','D1-05'])) {
