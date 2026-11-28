@@ -43,6 +43,6 @@ describe('H5 quote-post flow', () => {
     expect(preview).toContain("'/api/v1/contents/' + encodeURIComponent(targetId)")
     expect(preview).toContain("targetPayload.accessMode !== 'PUBLIC'")
     expect(card).toContain('<QuotePostRelationshipPreview')
-    expect(card).toContain('timelineCardNearViewport')
+    expect(preview).toContain('new IntersectionObserver')
   })
 })
