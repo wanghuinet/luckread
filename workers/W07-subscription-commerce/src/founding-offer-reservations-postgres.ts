@@ -145,15 +145,13 @@ export async function reserveFoundingOfferCapacity(
       throw new SubscriptionRuntimeError('INVALID_STATE', 409);
     }
 
-    await client.query(
-      "UPDATE membership_founding_reservations SET state = 'EXPIRED', updated_at = $2, released_at = $2, release_reason = 'HOLD_EXPIRED' " +
-      "WHERE plan_id = $1 AND state = 'HELD' AND expires_at <= $2",
-      [planId, now.toISOString()],
-    );
+    // Expiry alone does not release a seat: a provider success may be confirmed
+    // before expiry but its signed webhook can arrive later. A separate reconciler
+    // releases only holds proven unpaid by the finance authority.
     const usage = await client.query<{ occupied: number }>(
       "SELECT COUNT(*)::integer AS occupied FROM membership_founding_reservations " +
-      "WHERE plan_id = $1 AND (state = 'COMMITTED' OR (state = 'HELD' AND expires_at > $2))",
-      [planId, now.toISOString()],
+      "WHERE plan_id = $1 AND state IN ('HELD', 'COMMITTED')",
+      [planId],
     );
     if ((usage.rows[0]?.occupied ?? 0) >= (offerRow.founding_capacity as number)) {
       throw new SubscriptionRuntimeError('FOUNDING_CAPACITY_EXHAUSTED', 409);
