@@ -35,6 +35,11 @@ const MAX_ID = 256
 const MAX_IDEMPOTENCY_KEY = 256
 
 export type ActiveMembershipPlanRow = {
+  price_minor: number | null
+  price_mode?: 'FIXED' | 'FLEXIBLE'
+  minimum_price_minor?: number | null
+  suggested_price_minor?: number | null
+  maximum_price_minor?: number | null
   trial_period_days: number
   plan_id: string
   owner_id: string
@@ -419,11 +424,7 @@ export type MembershipPlanDraftInput = {
   name: string
   tier: string
   billingInterval: 'MONTHLY' | 'YEARLY'
-  priceMinor: number | null
-  priceMode: 'FIXED' | 'FLEXIBLE'
-  minimumPriceMinor: number | null
-  suggestedPriceMinor: number | null
-  maximumPriceMinor: number | null
+  priceMinor: number
   currency: string
   benefits: string[]
   trialPeriodDays: number
@@ -616,7 +617,9 @@ const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed?: boolean) => 
     row.benefits_json.length > 8192 ||
     !Number.isSafeInteger(row.current_version) || row.current_version < 1 ||
     !Number.isSafeInteger(row.version) || row.version < 1 ||
-    !Number.isSafeInteger(row.price_minor) || row.price_minor < 0 || row.price_minor > 2_147_483_647 ||
+    ((row.price_mode ?? 'FIXED') === 'FIXED' && (!Number.isSafeInteger(row.price_minor) || (row.price_minor as number) < 0 || (row.price_minor as number) > 2_147_483_647)) ||
+    ((row.price_mode ?? 'FIXED') === 'FLEXIBLE' && (row.price_minor !== null || !Number.isSafeInteger(row.minimum_price_minor) || (row.minimum_price_minor as number) < 1 || !Number.isSafeInteger(row.suggested_price_minor) || (row.suggested_price_minor as number) < (row.minimum_price_minor as number) || !Number.isSafeInteger(row.maximum_price_minor) || (row.maximum_price_minor as number) < (row.suggested_price_minor as number) || (row.maximum_price_minor as number) > 2_147_483_647)) ||
+    !['FIXED', 'FLEXIBLE'].includes(row.price_mode ?? 'FIXED') ||
     !/^[A-Z]{3}$/.test(row.currency) ||
     !Number.isSafeInteger(trialPeriodDays) || trialPeriodDays < 0 || trialPeriodDays > 30 ||
     (row.billing_interval !== 'MONTHLY' && row.billing_interval !== 'YEARLY') ||
