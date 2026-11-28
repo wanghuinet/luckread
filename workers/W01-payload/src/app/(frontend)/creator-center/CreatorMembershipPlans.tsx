@@ -20,6 +20,8 @@ type MembershipPlan = {
   minimumPriceMinor: number | null
   suggestedPriceMinor: number | null
   maximumPriceMinor: number | null
+  offerKind: 'STANDARD' | 'FOUNDING'
+  foundingCapacity: number | null
   currency: string
   benefits: string[]
   status: PlanStatus
@@ -46,6 +48,9 @@ const isPlan = (value: unknown): value is MembershipPlan => {
     (plan.priceMode === 'FIXED'
       ? Number.isSafeInteger(plan.priceMinor) && Number(plan.priceMinor) >= 0 && Number(plan.priceMinor) <= 2_147_483_647 && plan.minimumPriceMinor === null && plan.suggestedPriceMinor === null && plan.maximumPriceMinor === null
       : plan.priceMode === 'FLEXIBLE' && plan.priceMinor === null && Number.isSafeInteger(plan.minimumPriceMinor) && Number(plan.minimumPriceMinor) >= 1 && Number.isSafeInteger(plan.suggestedPriceMinor) && Number(plan.suggestedPriceMinor) >= Number(plan.minimumPriceMinor) && Number.isSafeInteger(plan.maximumPriceMinor) && Number(plan.maximumPriceMinor) >= Number(plan.suggestedPriceMinor) && Number(plan.maximumPriceMinor) <= 2_147_483_647) &&
+    (plan.offerKind === 'STANDARD' ? plan.foundingCapacity === null :
+      plan.offerKind === 'FOUNDING' && plan.priceMode === 'FIXED' &&
+      Number.isSafeInteger(plan.foundingCapacity) && Number(plan.foundingCapacity) >= 1 && Number(plan.foundingCapacity) <= 2_147_483_647) &&
     typeof plan.currency === 'string' && /^[A-Z]{3}$/.test(plan.currency) &&
     Array.isArray(plan.benefits) && plan.benefits.length <= 20 &&
     plan.benefits.every((benefit) => typeof benefit === 'string' && benefit.length > 0 && benefit.length <= 180) &&
@@ -105,6 +110,11 @@ const copy = (locale: StudioLocale) => locale === 'en-US' ? {
   minimumPrice: 'Minimum price (USD)',
   suggestedPrice: 'Suggested price (USD)',
   maximumPrice: 'Maximum price (USD)',
+  offerKind: 'Offer type',
+  standardOffer: 'Standard membership',
+  foundingOffer: 'Founding Member',
+  foundingCapacity: 'Founding member capacity',
+  foundingCapacityLabel: 'Founding seats',
   interval: 'Billing interval',
   monthly: 'Monthly',
   yearly: 'Yearly',
@@ -161,6 +171,11 @@ const copy = (locale: StudioLocale) => locale === 'en-US' ? {
   minimumPrice: '最低价格（USD）',
   suggestedPrice: '建议价格（USD）',
   maximumPrice: '最高价格（USD）',
+  offerKind: '方案类型',
+  standardOffer: '普通会员',
+  foundingOffer: '创始会员',
+  foundingCapacity: '创始会员名额',
+  foundingCapacityLabel: '创始名额',
   interval: '计费周期',
   monthly: '每月',
   yearly: '每年',
@@ -211,6 +226,8 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
   const [tier, setTier] = useState('supporter')
   const [price, setPrice] = useState('5.00')
   const [priceMode, setPriceMode] = useState<'FIXED' | 'FLEXIBLE'>('FIXED')
+  const [offerKind, setOfferKind] = useState<'STANDARD' | 'FOUNDING'>('STANDARD')
+  const [foundingCapacity, setFoundingCapacity] = useState('100')
   const [minimumPrice, setMinimumPrice] = useState('5.00')
   const [suggestedPrice, setSuggestedPrice] = useState('10.00')
   const [maximumPrice, setMaximumPrice] = useState('25.00')
@@ -222,6 +239,8 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
   const [editTier, setEditTier] = useState('')
   const [editPrice, setEditPrice] = useState('')
   const [editPriceMode, setEditPriceMode] = useState<'FIXED' | 'FLEXIBLE'>('FIXED')
+  const [editOfferKind, setEditOfferKind] = useState<'STANDARD' | 'FOUNDING'>('STANDARD')
+  const [editFoundingCapacity, setEditFoundingCapacity] = useState('')
   const [editMinimumPrice, setEditMinimumPrice] = useState('')
   const [editSuggestedPrice, setEditSuggestedPrice] = useState('')
   const [editMaximumPrice, setEditMaximumPrice] = useState('')
@@ -286,6 +305,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
     setError('')
     setMessage('')
     const normalizedTier = tier.trim()
+    const parsedFoundingCapacity = offerKind === 'FOUNDING' ? Number(foundingCapacity) : null
     const rawBenefits = benefitsText.split('\n').map((value) => value.trim()).filter(Boolean)
     if (!planName.trim() || planName.trim().length > 120 ||
         !/^[a-z][a-z0-9_-]{0,63}$/.test(normalizedTier)) {
@@ -296,9 +316,10 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
     const minimumAmount = priceMode === 'FLEXIBLE' ? parseMoneyMinor(minimumPrice) : null
     const suggestedAmount = priceMode === 'FLEXIBLE' ? parseMoneyMinor(suggestedPrice) : null
     const maximumAmount = priceMode === 'FLEXIBLE' ? parseMoneyMinor(maximumPrice) : null
-    if (priceMode === 'FIXED' ? fixedAmount === null :
+    if ((offerKind === 'FOUNDING' && (priceMode !== 'FIXED' || !Number.isSafeInteger(parsedFoundingCapacity) || parsedFoundingCapacity! < 1 || parsedFoundingCapacity! > 2_147_483_647)) ||
+        (priceMode === 'FIXED' ? fixedAmount === null :
       minimumAmount === null || minimumAmount < 1 || suggestedAmount === null || maximumAmount === null ||
-      minimumAmount > suggestedAmount || suggestedAmount > maximumAmount) {
+      minimumAmount > suggestedAmount || suggestedAmount > maximumAmount)) {
       setError(labels.validation)
       return
     }
@@ -321,7 +342,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
         headers: { accept: 'application/json', 'content-type': 'application/json', 'Idempotency-Key': key },
         body: JSON.stringify({
           name: planName.trim(), tier: normalizedTier, billingInterval: interval,
-          ...pricing, currency: 'USD', benefits: rawBenefits,
+          ...pricing, offerKind, foundingCapacity: parsedFoundingCapacity, currency: 'USD', benefits: rawBenefits,
         }),
       })
       if (response.status === 401) { redirectToLogin(); return }
@@ -346,6 +367,8 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
     setEditTier(plan.tier)
     setEditPrice(plan.priceMinor === null ? '' : String(Math.floor(plan.priceMinor / 100)) + '.' + String(plan.priceMinor % 100).padStart(2, '0'))
     setEditPriceMode(plan.priceMode)
+    setEditOfferKind(plan.offerKind)
+    setEditFoundingCapacity(plan.foundingCapacity === null ? '' : String(plan.foundingCapacity))
     setEditMinimumPrice(plan.minimumPriceMinor === null ? '' : (plan.minimumPriceMinor / 100).toFixed(2))
     setEditSuggestedPrice(plan.suggestedPriceMinor === null ? '' : (plan.suggestedPriceMinor / 100).toFixed(2))
     setEditMaximumPrice(plan.maximumPriceMinor === null ? '' : (plan.maximumPriceMinor / 100).toFixed(2))
@@ -362,6 +385,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
     setError('')
     setMessage('')
     const normalizedTier = editTier.trim()
+    const parsedEditFoundingCapacity = editOfferKind === 'FOUNDING' ? Number(editFoundingCapacity) : null
     const rawBenefits = editBenefitsText.split('\n').map((value) => value.trim()).filter(Boolean)
     const normalizedPrice = editPrice.trim()
     if (!editName.trim() || editName.trim().length > 120 ||
@@ -373,9 +397,10 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
     const minimumAmount = editPriceMode === 'FLEXIBLE' ? parseMoneyMinor(editMinimumPrice) : null
     const suggestedAmount = editPriceMode === 'FLEXIBLE' ? parseMoneyMinor(editSuggestedPrice) : null
     const maximumAmount = editPriceMode === 'FLEXIBLE' ? parseMoneyMinor(editMaximumPrice) : null
-    if (editPriceMode === 'FIXED' ? fixedAmount === null :
+    if ((editOfferKind === 'FOUNDING' && (editPriceMode !== 'FIXED' || !Number.isSafeInteger(parsedEditFoundingCapacity) || parsedEditFoundingCapacity! < 1 || parsedEditFoundingCapacity! > 2_147_483_647)) ||
+        (editPriceMode === 'FIXED' ? fixedAmount === null :
       minimumAmount === null || minimumAmount < 1 || suggestedAmount === null || maximumAmount === null ||
-      minimumAmount > suggestedAmount || suggestedAmount > maximumAmount) {
+      minimumAmount > suggestedAmount || suggestedAmount > maximumAmount)) {
       setError(labels.revisionValidation)
       return
     }
@@ -408,6 +433,8 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
             tier: normalizedTier,
             billingInterval: editInterval,
             ...pricing,
+            offerKind: editOfferKind,
+            foundingCapacity: parsedEditFoundingCapacity,
             currency: plan.currency,
             benefits: rawBenefits,
           }),
