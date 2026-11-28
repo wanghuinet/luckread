@@ -80,6 +80,27 @@ describe('X-style notifications page', () => {
     expect(page).toContain("'/content/' + encodeURIComponent(contentTargetId)")
   })
 
+
+  it('implements roving keyboard tabs and a labelled notification panel', () => {
+    expect(page).toContain('id="notifications-tab-all"')
+    expect(page).toContain('id="notifications-tab-mentions"')
+    expect(page).toContain('aria-controls="notifications-panel"')
+    expect(page).toContain("tabIndex={filter === 'all' ? 0 : -1}")
+    expect(page).toContain("event.key === 'ArrowRight'")
+    expect(page).toContain("event.key === 'Home'")
+    expect(page).toContain('role="tabpanel"')
+    expect(page).toContain("aria-labelledby={filter === 'all' ? 'notifications-tab-all' : 'notifications-tab-mentions'}")
+  })
+
+  it('stops notification pagination when the API repeats or omits its next cursor', () => {
+    expect(page).toContain('const consumedCursorsRef = useRef(new Set<string>())')
+    expect(page).toContain('consumedCursorsRef.current.clear()')
+    expect(page).toContain('consumedCursorsRef.current.add(cursor)')
+    expect(page).toContain('consumedCursorsRef.current.has(candidateNextCursor)')
+    expect(page).toContain('!candidateNextCursor')
+    expect(page).toContain('setHasMore(data.data.hasMore === true && !cursorCycle)')
+  })
+
   it('keeps notification UI on LuckRead auth and API boundaries without upstream backend code or bespoke CSS', () => {
     expect(page).not.toContain('firebase/')
     expect(page).not.toContain('tweetsCollection')
