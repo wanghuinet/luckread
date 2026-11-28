@@ -193,6 +193,7 @@ export async function handleCommerceOrderRequest(
       let pricingWasResolved = false;
       let foundingOfferDetected = false;
       let foundingReservationId: string | null = null;
+      let foundingReservation: Awaited<ReturnType<typeof reserveFoundingOfferCapacity>> | null = null;
       let membershipPool: W07WebhookPostgresPool | undefined;
       const getMembershipPool = () => {
         membershipPool ??= (dependencies.getMembershipPool ?? getW07MembershipPostgresPool)(env);
@@ -228,6 +229,7 @@ export async function handleCommerceOrderRequest(
           idempotencyKey: reservationKey,
         });
         foundingReservationId = reservation.reservationId;
+        foundingReservation = reservation;
         return priced;
       };
       let result: CreateOrderResult;
@@ -251,12 +253,7 @@ export async function handleCommerceOrderRequest(
         }
         throw error;
       }
-      let foundingReservation = foundingReservationId
-        ? null
-        : pricingWasResolved && !foundingOfferDetected
-          ? null
-          : await getFoundingReservationByIdempotency(getMembershipPool(), customerId, reservationKey);
-      if (foundingReservationId) {
+      if (!foundingReservation && (!pricingWasResolved || foundingOfferDetected)) {
         foundingReservation = await getFoundingReservationByIdempotency(
           getMembershipPool(), customerId, reservationKey,
         );
