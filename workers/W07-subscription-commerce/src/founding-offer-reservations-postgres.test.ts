@@ -242,6 +242,32 @@ describe('founding offer capacity reservation', () => {
     expect(client.statements.some((entry) => entry.sql.includes("UPDATE membership_founding_reservations SET state = $2"))).toBe(true);
   });
 
+  it('does not release a founding hold when another payment attempt for the same order is active or succeeded', async () => {
+    let membershipReads = 0;
+    const membershipDb = {
+      async query<T extends Row = Row>() {
+        membershipReads += 1;
+        return { rows: [{ reservation_id: heldRow.reservation_id }] as T[], rowCount: 1 };
+      },
+      async connect() { throw new Error('no membership transaction expected'); },
+    } as unknown as W07WebhookPostgresPool;
+    const financeDb = {
+      async query<T extends Row = Row>(sql: string) {
+        expect(sql).toContain('NOT EXISTS (SELECT 1 FROM payments other');
+        expect(sql).toContain("other.status NOT IN ('failed', 'cancelled', 'expired')");
+        // The target attempt failed, but another attempt is still processing;
+        // the finance guard therefore returns no releasable order.
+        return { rows: [] as T[], rowCount: 0 };
+      },
+      async connect() { throw new Error('no finance transaction expected'); },
+    } as unknown as W07WebhookPostgresPool;
+    const result = await releaseFoundingReservationForUnpaidPayment(
+      membershipDb, financeDb, 'pay_' + 'e'.repeat(26), 'merchant_test',
+    );
+    expect(result).toBeNull();
+    expect(membershipReads).toBe(0);
+  });
+
   it('fails closed when plan versions disagree on the founding capacity', async () => {
     const client = new FakeClient((sql) => {
       if (sql.includes('SELECT plan_id FROM membership_plans')) return [{ plan_id: 'plan_founder' }];
