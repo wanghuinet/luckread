@@ -107,6 +107,12 @@ export async function reserveFoundingOfferCapacity(
   const expiresAt = new Date(now.getTime() + ttlMs).toISOString();
 
   return withTransaction(db, async (client) => {
+    // Serialize the subscriber/idempotency identity across plans before any
+    // seat mutation, so a key cannot race into two distinct plan reservations.
+    await client.query(
+      'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+      [subscriberId + ':' + idempotencyKey],
+    );
     const planLock = await client.query<{ plan_id: string }>(
       'SELECT plan_id FROM membership_plans WHERE plan_id = $1 FOR UPDATE',
       [planId],
