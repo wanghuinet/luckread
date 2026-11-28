@@ -172,6 +172,41 @@ export async function reserveFoundingOfferCapacity(
   });
 }
 
+/** Find the founding reservation identity embedded in a customer-owned finance order. */
+export async function getFoundingReservationIdForOrder(
+  financeDb: W07WebhookPostgresPool,
+  customerIdInput: string,
+  orderReference: string,
+): Promise<string | null> {
+  const customerId = validatePrincipal(customerIdInput);
+  const orderId = requirePlanId(orderReference);
+  const result = await financeDb.query<{ reservation_id: string | null }>(
+    "SELECT ol.item_snapshot_json::jsonb ->> 'foundingReservationId' AS reservation_id " +
+    "FROM orders o INNER JOIN order_lines ol ON ol.order_id = o.order_id " +
+    "AND ol.item_type = 'MEMBERSHIP_PLAN' WHERE o.order_id = $1 AND o.customer_id = $2 LIMIT 1",
+    [orderId, customerId],
+  );
+  return result.rows[0]?.reservation_id ?? null;
+}
+
+/** Payment intent is denied after the founding hold expires or is released. */
+export async function isFoundingReservationActiveForOrder(
+  membershipDb: W07WebhookPostgresPool,
+  reservationId: string,
+  orderReference: string,
+  now = new Date(),
+): Promise<boolean> {
+  if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+  }
+  const result = await membershipDb.query<{ reservation_id: string }>(
+    "SELECT reservation_id FROM membership_founding_reservations " +
+    "WHERE reservation_id = $1 AND order_reference = $2 AND state = 'HELD' AND expires_at > $3 LIMIT 1",
+    [requirePlanId(reservationId), requirePlanId(orderReference), now.toISOString()],
+  );
+  return Boolean(result.rows[0]);
+}
+
 /** Resolve a pending reservation during order-create retries without consuming another seat. */
 export async function getFoundingReservationByIdempotency(
   db: W07WebhookPostgresPool,
