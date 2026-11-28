@@ -73,6 +73,11 @@ export async function resolveCommerceOrderItems(
   const resolved: ResolvedCommerceOrderItem[] = [];
 
   for (const item of validated.value.items) {
+    // Flexible selections remain fail-closed until the authoritative W07 plan
+    // reader and immutable order snapshot carry the matching price-mode version.
+    if (item.selectedAmountMinor !== undefined) {
+      throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+    }
     const plan = planById.get(item.itemRef);
     if (!plan || plan.status !== 'ACTIVE' || plan.visibility !== 'PUBLIC') {
       throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
