@@ -281,13 +281,19 @@ test('loads authoritative content like state and aggregate count from W01/W05', 
 test('invalidates like readiness when an account switch races a failed status read', async () => {
   const contentId = 'stage3-like-stale-account-read';
   let rejectRead;
-  pendingFetch = () => new Promise((_resolve, reject) => { rejectRead = reject; });
+  let markReadStarted;
+  const readStarted = new Promise((resolve) => { markReadStarted = resolve; });
+  pendingFetch = () => new Promise((_resolve, reject) => {
+    rejectRead = reject;
+    markReadStarted();
+  });
 
   const read = refreshContentLikeStatus(contentId, 'account-a');
   expect(getContentLikeSnapshot(contentId, {}, 'account-a')).toMatchObject({
     loading: true,
     loaded: false,
   });
+  await readStarted;
 
   activeViewerId = 'account-b';
   rejectRead(new Error('network unavailable'));
