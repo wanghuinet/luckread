@@ -28,8 +28,9 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   const itemIdsRef = useRef(new Set(initialPage.items.map(item => item.id)))
   const activeRequestRef = useRef<AbortController | null>(null)
 
-  const loadInitial = useCallback(async () => {
-    if (loadingRef.current) return
+  const loadInitial = useCallback(async (force = false) => {
+    if (loadingRef.current && !force) return
+    if (force) { loadingRef.current = false; activeRequestRef.current?.abort() }
     activeRequestRef.current?.abort()
     requestedCursorsRef.current.clear()
     loadingRef.current = true
@@ -146,7 +147,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   const signInLabel = locale === 'en' ? 'Sign in' : locale === 'tw' ? '登入' : '登录'
 
   return <section aria-busy={loading} aria-label={copy.feed.timeline}>
-    <div className="flex justify-end border-b border-light-border px-4 py-2 dark:border-dark-border"><button type="button" className="rounded-full border border-light-line-reply px-3 py-1.5 text-sm font-bold disabled:opacity-50 dark:border-dark-border" disabled={loading} onClick={() => void loadInitial()}>{locale === 'en' ? 'Refresh feed' : locale === 'tw' ? '重新整理動態' : '刷新动态'}</button></div>
+    <div className="flex justify-end border-b border-light-border px-4 py-2 dark:border-dark-border"><button type="button" className="rounded-full border border-light-line-reply px-3 py-1.5 text-sm font-bold disabled:opacity-50 dark:border-dark-border" disabled={loading} onClick={() => void loadInitial(true)}>{locale === 'en' ? 'Refresh feed' : locale === 'tw' ? '重新整理動態' : '刷新动态'}</button></div>
     {feedMode === 'following' && candidateWindowTruncated ? <p className="border-b border-light-border px-4 py-3 text-sm text-light-secondary dark:border-dark-border dark:text-dark-secondary" role="status">{locale === 'en' ? 'This timeline currently includes the most recently followed 500 accounts; posts from older follows may be missing.' : locale === 'tw' ? '目前僅載入最近追蹤的 500 個帳號；更早追蹤的帳號可能未出現在此動態中。' : '当前仅加载最近关注的 500 个账号；更早关注的账号可能未出现在此动态中。'}</p> : null}
     {requiresAuth ? <div className="flex flex-col items-center gap-3 px-6 py-16 text-center" role="status"><h2 className="text-xl font-bold">{signInTitle}</h2><Link className="rounded-full bg-main-accent px-5 py-2 font-bold text-white" href={'/login?returnTo=' + encodeURIComponent('/home?feed=following')}>{signInLabel}</Link></div> : null}
     {!requiresAuth ? items.map(item=><LuckReadSocialPostCard key={item.id} contentId={item.id} slug={item.slug} title={item.title} creatorId={item.creatorId ?? (feedMode === 'following' ? item.ownerUserId : undefined)} author={item.creator ?? item.author} coverRef={item.coverRef} mediaRefs={item.mediaRefs} mediaWarning={item.mediaWarning} createdAt={item.createdAt} updatedAt={item.updatedAt} presentation="x-timeline" locale={locale}/>) : null}
