@@ -35,7 +35,7 @@ Commerce/order/payments/ledger/rights/risk integrations must consume references 
 
 ## 5. Runtime Acceptance
 
-Verify Cloudflare-first execution, D1 authoritative writes, queue-based asynchronous propagation, cache invalidation and degraded downstream behavior.
+Verify W01-only public ingress, W08 authorization, W07-only Merchant/Seller reads and writes against the existing Neon finance database (logical D1-04), native PostgreSQL migrations and transaction/CAS semantics, existing W10 asynchronous handoff, cache invalidation and degraded downstream behavior. Tests must prove there is no D1 binding/fallback, direct client-to-database access, dual write, new Worker, database, Queue or Service Binding. The historical D1-04 name may appear in migration lineage but must not be treated as a live D1 runtime dependency.
 
 ## 6. STOP
 
