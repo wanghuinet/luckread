@@ -78,3 +78,16 @@ BLOCKED
 ```
 
 BLOCKED is not PASS.
+
+## 6. Phase 2 Tier & Founding Offer Acceptance
+
+- Existing fixed-price plan creation, revision, replay, publication and checkout resolution remain backward compatible.
+- Flexible pricing accepts the exact minimum, suggested and maximum; rejects below/above range, fractional, unsafe, negative and malformed values.
+- Fixed plans reject flexible range fields; flexible plans reject ambiguous fixed-price input.
+- Order creation rejects a buyer-selected amount for fixed plans and requires a valid selected amount for flexible plans.
+- The immutable order-line snapshot preserves selected amount, price mode, range, currency and plan version after later plan revisions.
+- Concurrent founding reservations at the final available seat never oversell. Duplicate reservation/commit/release attempts converge idempotently. Expired or failed unpaid holds release exactly once.
+- Creator ownership, stale If-Match, idempotency-key body mismatch and missing durable audit all fail closed.
+- Refund/chargeback/termination seat-restoration behavior remains BLOCKED until its explicit product decision is admitted; tests must prove no implicit seat restoration.
+- PostgreSQL 18 migration rehearsal verifies fresh schema, upgrade compatibility, source/template parity and rollback/recovery behavior. No remote DDL is authorized by this contract change.
+
