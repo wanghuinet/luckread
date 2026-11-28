@@ -81,3 +81,16 @@ Creator plan create/update DTOs may include `priceMode`.
 
 Creator mutations continue to require the existing authenticated W02 principal, W08-resolved creator scope, If-Match/version CAS, Idempotency-Key and durable W06 audit. W01 remains the only public API boundary.
 
+
+## 8. Phase 2 Founding Member Offer DTO Extension
+
+Creator plan create/update requests may include:
+
+- `offerKind: STANDARD | FOUNDING` (omission on legacy requests means STANDARD).
+- `foundingCapacity`: positive integer minor-independent seat count, required only for FOUNDING and null/absent for STANDARD.
+- FOUNDING is FIXED-price only. FLEXIBLE + FOUNDING is rejected.
+- Once a plan version becomes FOUNDING, subsequent versions MUST preserve offerKind and foundingCapacity; capacity cannot be reset by editing or publishing a new version.
+- Public and creator plan DTOs return both fields. W01 validates the W07 response and W06 durably audits the fields on create, update and publish.
+- A buyer cannot submit offerKind, foundingCapacity, reservation ID, or seat count. W07 derives them from its immutable current plan version.
+
+Checkout reservation is a W07-owned recoverable saga across the existing Neon D1-01 membership database and D1-04 finance database. W07 reserves a seat before writing the order, stores the reservation ID in the immutable order-line snapshot, then attaches the finance order reference. Only a verified signed success event and finance-confirmed paid order can commit the seat; failed/expired unpaid payments release the hold. The databases are not treated as one transaction.
