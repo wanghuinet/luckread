@@ -6189,6 +6189,11 @@ components:
                 type: integer
                 minimum: 1
                 maximum: 10000
+              selectedAmountMinor:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+                description: Buyer-selected amount accepted only for a FLEXIBLE membership offer; W07 validates against the authoritative immutable price range. FIXED offers reject this field.
     CommerceOrderData:
       type: object
       required: [orderId, status, version, currency, subtotalMinor, discountMinor, taxMinor, totalMinor, items, createdAt, updatedAt]
