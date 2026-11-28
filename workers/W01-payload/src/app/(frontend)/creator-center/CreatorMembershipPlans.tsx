@@ -623,7 +623,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
                   </label>
                   <label className="flex flex-col gap-1 text-sm font-semibold">
                     {labels.offerKind}
-                    <select value={editOfferKind} onChange={(event) => {
+                    <select value={editOfferKind} disabled={plan.offerKind === 'FOUNDING'} onChange={(event) => {
                       const next = event.target.value as 'STANDARD' | 'FOUNDING'
                       setEditOfferKind(next)
                       if (next === 'FOUNDING') setEditPriceMode('FIXED')
@@ -635,7 +635,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
                   {editOfferKind === 'FOUNDING' ? (
                     <label className="flex flex-col gap-1 text-sm font-semibold">
                       {labels.foundingCapacity}
-                      <input required type="number" min={1} max={2147483647} step={1} value={editFoundingCapacity} onChange={(event) => setEditFoundingCapacity(event.target.value)}
+                      <input required type="number" min={1} max={2147483647} step={1} value={editFoundingCapacity} disabled={plan.offerKind === 'FOUNDING'} onChange={(event) => setEditFoundingCapacity(event.target.value)}
                         className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
                     </label>
                   ) : null}
