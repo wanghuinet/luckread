@@ -6,6 +6,7 @@ import type {
 } from './payment-webhook-database-postgres.js';
 import {
   commitFoundingReservationAfterVerifiedPayment,
+  commitFoundingReservationForVerifiedPayment,
   releaseFoundingReservationForUnpaidPayment,
   reserveFoundingOfferCapacity,
 } from './founding-offer-reservations-postgres.js';
@@ -114,6 +115,40 @@ describe('founding offer capacity reservation', () => {
     expect(update?.values[1]).toBe('2026-11-29T12:30:00.000Z');
     expect(update?.values[2]).toBe('2026-11-29T12:10:00.000Z');
     expect(client.statements.some((entry) => entry.sql === 'COMMIT')).toBe(true);
+  });
+
+  it('commits only the reservation referenced by the finance-confirmed paid order snapshot', async () => {
+    const committed = { ...heldRow, order_reference: 'ord_paid', state: 'COMMITTED' };
+    const client = new FakeClient((sql) => {
+      if (sql.includes('FROM membership_founding_reservations WHERE reservation_id')) return [heldRow];
+      if (sql.includes("UPDATE membership_founding_reservations SET state = 'COMMITTED'")) return [committed];
+      return [];
+    });
+    const membershipDb = {
+      async query<T extends Row = Row>(sql: string) {
+        expect(sql).toContain('reservation_id = $1 AND order_reference = $2');
+        return { rows: [{ reservation_id: heldRow.reservation_id }] as T[], rowCount: 1 };
+      },
+      async connect() { return client; },
+    } as unknown as W07WebhookPostgresPool;
+    const financeDb = {
+      async query<T extends Row = Row>(sql: string) {
+        expect(sql).toContain("item_snapshot_json::jsonb ->> 'foundingReservationId'");
+        return { rows: [{
+          order_id: 'ord_paid',
+          confirmed_at: '2026-11-29T12:10:00.000Z',
+          reservation_id: heldRow.reservation_id,
+        }] as T[], rowCount: 1 };
+      },
+      async connect() { throw new Error('finance transaction is not required'); },
+    } as unknown as W07WebhookPostgresPool;
+    const result = await commitFoundingReservationForVerifiedPayment(
+      membershipDb, financeDb, 'pay_' + 'f'.repeat(26), 'merchant_test', 'evt_payment_succeeded_3',
+      new Date('2026-11-29T12:30:00.000Z'),
+    );
+    const update = client.statements.find((entry) => entry.sql.includes("UPDATE membership_founding_reservations SET state = 'COMMITTED'"));
+    expect(result?.state).toBe('COMMITTED');
+    expect(update?.values[2]).toBe('2026-11-29T12:10:00.000Z');
   });
 
   it('rejects a payment confirmed after the reservation expired', async () => {
