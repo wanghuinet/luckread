@@ -20,7 +20,39 @@
     {
       "id": "ITEM-RESOLUTION-01",
       "requirement": "W07 resolves every submitted itemRef to an authoritative purchasable item/offer, immutable version and current price; unsupported/unavailable items fail closed.",
-      "status": "PENDING"
+      "status": "ADMITTED",
+      "evidence": {
+        "implementationCommit": "81b782303802de98d08cbdeaa078699c93d808ff",
+        "source": {
+          "resolver": {
+            "path": "workers/W07-subscription-commerce/src/order-item-resolution.ts",
+            "blobSha": "075b6688c447666023696c4ffaec0ffcc6c66105"
+          },
+          "postgres18Rehearsal": {
+            "path": "workers/W07-subscription-commerce/scripts/neon/rehearse-order-item-resolution-postgres-runtime.mjs",
+            "blobSha": "aabe8a97f57ee29a322a09759e0e5d7cd571cba0"
+          }
+        },
+        "verification": {
+          "pullRequest": 2334,
+          "workflowRunId": 46110330401,
+          "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/46110330401",
+          "workflowConclusion": "success",
+          "artifactId": 15249531874,
+          "artifactDigest": "sha256:021f862aae817584f6045d09d05a95e7793691d336f3afeb450ab9479c50ae43",
+          "scenarios": {
+            "resolvesCurrentImmutableVersion": true,
+            "ignoresHistoricalPriceVersion": true,
+            "rejectsPrivateOffer": true,
+            "rejectsMissingCurrentVersion": true,
+            "rejectsUnsupportedQuantity": true,
+            "rejectsMultipleMembershipCart": true,
+            "fixtureRowsRolledBack": true
+          }
+        },
+        "scopeLimit": "Admits W07 current public membership-plan item/version/current-price resolution and its PostgreSQL 18 evidence. Does not admit production discount/tax authority, seller-of-record, real-money checkout, or production order writes.",
+        "verifiedMainSha": "77410cf968faaf9fcbc41adb647f625a8c9bf20d"
+      }
     },
     {
       "id": "ENTITY-MAPPING-01",
@@ -94,12 +126,140 @@
     {
       "id": "IDEMPOTENCY-01",
       "requirement": "Same key and same semantic request replays the original response; same key with a different request hash is rejected atomically with order creation.",
-      "status": "PENDING"
+      "status": "ADMITTED",
+      "evidence": {
+        "implementationCommit": "08340609a9510dfbd69e7d6380ddc6d7984dfa2e",
+        "source": {
+          "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-order-persistence-postgres-runtime.mjs",
+          "blobSha": "949df2afefdfe11eb1e6e235319e935528221c53"
+        },
+        "verification": {
+          "pullRequest": 2333,
+          "workflowRunId": 46110047807,
+          "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/46110047807",
+          "workflowConclusion": "success",
+          "artifactId": 15249023867,
+          "artifactDigest": "sha256:dcfe4fefaf375701541ab6c01cdf0da8ed4f5a9a12f00d155cc95f7b700f82ab",
+          "scenarios": {
+            "sameKeySamePayloadReplays": true,
+            "sameKeyDifferentPayloadConflicts": true,
+            "concurrentDifferentPayloadIsRejected": true,
+            "expiredIdempotencyCanBeReclaimed": true,
+            "lineFailureRollsBackClaimAndOrder": true,
+            "failedKeyCanBeRetried": true,
+            "fixtureRowsCleaned": true,
+            "concurrentSubmissionsConvergeToOneOrder": true,
+            "createsOrderAndImmutableLine": true
+          }
+        },
+        "scopeLimit": "Admits atomic idempotency/replay/conflict/concurrency and rollback evidence on disposable PostgreSQL 18. It does not activate production order creation or payment.",
+        "verifiedMainSha": "77410cf968faaf9fcbc41adb647f625a8c9bf20d"
+      }
     },
     {
       "id": "ABUSE-01",
       "requirement": "Route enforces bounded request-body size, item-count/quantity limits and existing W01/W07 anti-abuse controls before any D1 write.",
-      "status": "PENDING"
+      "status": "ADMITTED",
+      "evidence": {
+        "implementationCommit": "4e46e92d88be9c61f60a003a43f2a6d06b20adb5",
+        "source": {
+          "w01OrderRoute": {
+            "path": "workers/W01-payload/src/app/api/v1/commerce/orders/route.ts",
+            "blobSha": "37c2609366001a0d254c28ddecf9736aa2bf4584"
+          },
+          "w01RateLimitImplementation": {
+            "path": "workers/W01-payload/src/auth/traffic-limit.ts",
+            "blobSha": "918bf220b46d2753c3400cb77c2b406390373b03"
+          },
+          "w01RateLimitConfig": {
+            "path": "workers/W01-payload/wrangler.jsonc",
+            "blobSha": "6924740901e97f45cf2b22c65392acf0497caf22"
+          },
+          "w01RateLimitIntegrationTest": {
+            "path": "workers/W01-payload/tests/int/commerce-order-rate-limit.int.spec.ts",
+            "blobSha": "32418168976c77d7cb2fd2dfe05fecf0b291a403"
+          },
+          "w01BodyBound": {
+            "path": "workers/W01-payload/src/commerce/w07-commerce-client.ts",
+            "blobSha": "bdc02f3745ba47b638192417f7eacdac5ec93dfc"
+          },
+          "w07Route": {
+            "path": "workers/W07-subscription-commerce/src/index.ts",
+            "blobSha": "5f0eaedfd0981ff15fd6cfb885677a936fdbfcd4"
+          },
+          "w07RateLimitConfig": {
+            "path": "workers/W07-subscription-commerce/wrangler.jsonc",
+            "blobSha": "758baa37ae4b9c36b82ef06400cdb346c01bfcea"
+          },
+          "w07BodyAndValidation": {
+            "path": "workers/W07-subscription-commerce/src/order-http-runtime.ts",
+            "blobSha": "2458f021090a518977bcdee31c02067217ad8338"
+          },
+          "w07DtoValidation": {
+            "path": "workers/W07-subscription-commerce/src/order-request-validation.ts",
+            "blobSha": "79ae73a5490db1f63ab8a8db037bdd26741506cd"
+          },
+          "w07ValidationTests": {
+            "path": "workers/W07-subscription-commerce/src/order-request-validation.test.ts",
+            "blobSha": "c1d8daeecaa151693ebba843457a9dbd26faa052"
+          },
+          "w07OrderHttpAbuseTests": {
+            "path": "workers/W07-subscription-commerce/src/order-http-runtime.test.ts",
+            "blobSha": "795db6bd42957f49f6822c7231d9c3b06b408788",
+            "implementationCommit": "77410cf968faaf9fcbc41adb647f625a8c9bf20d"
+          }
+        },
+        "configuredLimits": {
+          "w01OriginPerMinute": 3000,
+          "w01IpPerMinute": 60,
+          "w01AccountAndOperationBuckets": "Existing W01_WRITE_LIMITER namespace, keyed separately by authenticated account and fixed operation",
+          "w07OriginPerMinute": 3000,
+          "w07PrincipalWritePerMinute": 30,
+          "maximumRequestBodyBytes": 16384,
+          "maximumItemLines": 50,
+          "maximumQuantityPerLine": 10000,
+          "activeMembershipResolverAdditionalLimits": "Exactly one membership plan line and quantity 1"
+        },
+        "verification": {
+          "pullRequest": 2340,
+          "workflowRunIds": [
+            46132082320,
+            46132082360,
+            46132082429,
+            46132082338,
+            46132082331,
+            46132082299,
+            46132082302,
+            46132082332,
+            46132082417,
+            46132082315,
+            46132082431,
+            46132082298
+          ],
+          "allRequiredChecksConclusion": "success",
+          "assertions": [
+            "W01 edge/origin limit executes before identity resolution",
+            "W01 account and fixed-operation limits execute before W08 authorization and W07 forwarding",
+            "Each exhausted W01 bucket returns 429 and short-circuits downstream calls",
+            "Missing rate-limit bindings fail closed",
+            "W01 and W07 enforce 16 KiB streamed request-body bounds",
+            "W07 DTO validator rejects item counts above 50 and quantities above 10000",
+            "W07 applies origin/global and principal write rate limits before the order handler"
+          ],
+          "additionalW07RuntimeValidation": {
+            "pullRequest": 2341,
+            "workflowRunId": 46132242176,
+            "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/46132242176",
+            "workflowConclusion": "success",
+            "assertions": [
+              "51 order lines are rejected before resolving Neon stores or pricing",
+              "quantity 10001 is rejected before resolving Neon stores or pricing"
+            ]
+          }
+        },
+        "scopeLimit": "Admits route-level anti-abuse controls only. No rate-limit namespace or infrastructure was added; no D1/Neon writes, real payment, or production deployment was performed.",
+        "verifiedMainSha": "77410cf968faaf9fcbc41adb647f625a8c9bf20d"
+      }
     },
     {
       "id": "E2E-SECURITY-01",
@@ -113,5 +273,5 @@
     }
   ],
   "greenRule": "This gate cannot be GREEN while any implementation evidence is PENDING; canonical contract admission is distinct from runtime/production admission, and PAY-002 remains unresolved.",
-  "nextAction": "Complete IDEMPOTENCY-01 and ITEM-RESOLUTION-01 admission against exact main (their evidence PRs remain open and unmerged), then close ABUSE-01 and E2E-SECURITY-01. Record EVIDENCE-REGISTRY-01 only after all prerequisite gates are admitted. Keep W07 live order writes fail-closed while authoritative live discount/tax pricing and seller-of-record decisions remain unresolved."
+  "nextAction": "Reconcile and independently re-review the historical D1-04 schema application against the current exact-main migration/runner source pins without executing remote DDL. Then complete the unified exact-commit create/read security E2E matrix (including unavailable-item, price-spoof, owner-isolation, replay and recovery paths) before final Evidence Registry admission. Keep live order writes fail-closed while production discount/tax authority and seller-of-record remain unresolved."
 }
