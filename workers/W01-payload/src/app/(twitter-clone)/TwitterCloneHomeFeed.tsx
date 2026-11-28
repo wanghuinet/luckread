@@ -32,6 +32,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
 
   const loadInitial = useCallback(async (force = false) => {
     if (loadingRef.current && !force) return
+    const scrollPosition = force && typeof window !== 'undefined' ? window.scrollY : null
     if (force) { loadingRef.current = false; activeRequestRef.current?.abort() }
     activeRequestRef.current?.abort()
     const generation = ++requestGenerationRef.current
@@ -67,6 +68,9 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       setNextCursor(page.nextCursor ?? null)
       setHasMore(page.hasMore === true)
       setCandidateWindowTruncated(page.candidateWindowTruncated === true)
+      if (scrollPosition !== null && scrollPosition > 0) {
+        requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: scrollPosition, behavior: 'auto' })))
+      }
     } catch (cause) {
       if (!controller.signal.aborted && generation === requestGenerationRef.current) {
         setRetryInitial(true)
