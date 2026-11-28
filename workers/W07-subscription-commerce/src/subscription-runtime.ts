@@ -328,6 +328,8 @@ export async function listActiveMembershipPlans(
     minimumPriceMinor: number | null;
     suggestedPriceMinor: number | null;
     maximumPriceMinor: number | null;
+    offerKind: 'STANDARD' | 'FOUNDING';
+    foundingCapacity: number | null;
     currency: string;
     trialPeriodDays: number;
     benefits: unknown;
