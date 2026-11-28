@@ -73,6 +73,13 @@ function validMembershipPlanPrice(plan: Record<string, unknown>): boolean {
     plan.maximumPriceMinor >= plan.suggestedPriceMinor && plan.maximumPriceMinor <= 2_147_483_647
 }
 
+function validMembershipPlanOffer(plan: Record<string, unknown>): boolean {
+  if (plan.offerKind === 'STANDARD') return plan.foundingCapacity === null
+  return plan.offerKind === 'FOUNDING' && plan.priceMode === 'FIXED' &&
+    typeof plan.foundingCapacity === 'number' && Number.isSafeInteger(plan.foundingCapacity) &&
+    plan.foundingCapacity >= 1 && plan.foundingCapacity <= 2_147_483_647
+}
+
 function validPublishedPlan(value: unknown, expectedPlanId: string, expectedCreatorId: string): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const plan = value as Record<string, unknown>
@@ -88,6 +95,7 @@ function validPublishedPlan(value: unknown, expectedPlanId: string, expectedCrea
     typeof plan.tier === 'string' && /^[a-z][a-z0-9_-]{0,63}$/.test(plan.tier) &&
     (plan.billingInterval === 'MONTHLY' || plan.billingInterval === 'YEARLY') &&
     validMembershipPlanPrice(plan) &&
+    validMembershipPlanOffer(plan) &&
     typeof plan.currency === 'string' && /^[A-Z]{3}$/.test(plan.currency) &&
     Array.isArray(plan.benefits) && plan.benefits.length <= 20 &&
     plan.benefits.every((item) => typeof item === 'string' && item.length >= 1 && item.length <= 180) &&
@@ -198,6 +206,8 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
           minimumPriceMinor: plan.minimumPriceMinor as number | null,
           suggestedPriceMinor: plan.suggestedPriceMinor as number | null,
           maximumPriceMinor: plan.maximumPriceMinor as number | null,
+          offerKind: plan.offerKind as 'STANDARD' | 'FOUNDING',
+          foundingCapacity: plan.foundingCapacity as number | null,
           currency: plan.currency as string,
         },
       })
