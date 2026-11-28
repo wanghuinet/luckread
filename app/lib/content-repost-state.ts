@@ -162,7 +162,16 @@ export async function toggleContentRepost(
     }
     if (!result.response.ok) {
       const message = result.error?.message ?? 'Could not update this repost. Please try again.';
-      publish(viewerId, id, { reposted: previousReposted, repostCount: previousCount, pending: false, loading: false, error: message });
+      const ambiguous = result.response.status === 408 || result.response.status === 429 || result.response.status >= 500;
+      publish(viewerId, id, {
+        reposted: previousReposted,
+        repostCount: previousCount,
+        loaded: ambiguous ? false : current.loaded,
+        pending: false,
+        loading: false,
+        error: message,
+      });
+      if (ambiguous) await refreshContentRepostStatus(id, viewerId);
       return { ok: false, status: result.response.status, message };
     }
     publish(viewerId, id, { pending: false, error: null });
@@ -174,7 +183,17 @@ export async function toggleContentRepost(
       return { ok: false, message: 'The active account changed while the repost was updating.' };
     }
     const message = failureMessage(cause);
-    publish(viewerId, id, { reposted: previousReposted, repostCount: previousCount, pending: false, loading: false, error: message });
+    // The write may have committed before its response was lost. Re-read W05
+    // rather than leaving the optimistic rollback as a false authoritative state.
+    publish(viewerId, id, {
+      reposted: previousReposted,
+      repostCount: previousCount,
+      loaded: false,
+      pending: false,
+      loading: false,
+      error: message,
+    });
+    await refreshContentRepostStatus(id, viewerId);
     return { ok: false, message };
   }
 }
