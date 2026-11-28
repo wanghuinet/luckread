@@ -213,7 +213,16 @@ export async function commitFoundingReservationAfterVerifiedPayment(
   }
   return withTransaction(db, async (client) => {
     const row = await requireReservation(client, reservationId);
-    if (row.state === 'COMMITTED') return toPublic(row, true);
+    if (row.state === 'COMMITTED') {
+      const priorEvent = await client.query<{ provider_event_reference: string }>(
+        'SELECT provider_event_reference FROM membership_founding_reservation_payment_events WHERE reservation_id = $1',
+        [reservationId],
+      );
+      if (priorEvent.rows[0]?.provider_event_reference !== eventId) {
+        throw new SubscriptionRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 409);
+      }
+      return toPublic(row, true);
+    }
     if (row.state !== 'HELD' || !row.order_reference || Date.parse(row.expires_at) <= now.getTime()) {
       throw new SubscriptionRuntimeError('INVALID_STATE', 409);
     }
