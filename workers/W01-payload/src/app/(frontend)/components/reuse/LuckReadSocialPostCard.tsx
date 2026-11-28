@@ -834,6 +834,19 @@ function LuckReadSocialPostCard({
                       <button className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/5" disabled={ownerActionBusy} onClick={() => void editPost()} role="menuitem" type="button">{ownerActionBusy ? label('Working…', '处理中…', '處理中…') : label('Edit post', '编辑动态', '編輯動態')}</button>
                       <button className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-500/10" disabled={ownerActionBusy} onClick={() => void deletePost()} role="menuitem" type="button">{ownerActionBusy ? label('Deleting…', '删除中…', '刪除中…') : label('Delete post', '删除动态', '刪除動態')}</button>
                     </> : null}
+                    <button
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/5"
+                      onClick={() => {
+                        setMoreOpen(false)
+                        window.dispatchEvent(new CustomEvent('luckread:open-post-composer', {
+                          detail: { quoteContentId: contentId },
+                        }))
+                      }}
+                      role="menuitem"
+                      type="button"
+                    >
+                      {label('Quote post', '引用动态', '引用動態')}
+                    </button>
                     <button className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/5" disabled={reportBusy} onClick={() => void reportContent()} role="menuitem" type="button">{reportBusy ? label('Reporting…', '举报中…', '檢舉中…') : label('Report post', '举报动态', '檢舉動態')}</button>
                     <button className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/5" onClick={() => setMoreOpen(false)} role="menuitem" type="button">{label('Close menu', '关闭菜单', '關閉選單')}</button>
                   </div>
