@@ -339,22 +339,20 @@ export async function reconcileExpiredFoundingReservations(
       continue;
     }
     const finance = await financeDb.query<{
-      order_status: string; payment_status: string | null;
+      order_status: string; payment_count: number; all_terminal_unpaid: boolean | null;
     }>(
-      "SELECT o.status AS order_status, p.status AS payment_status FROM orders o " +
-      "LEFT JOIN payments p ON p.order_id = o.order_id AND p.provider = 'hyperswitch' " +
-      "WHERE o.order_id = $1 ORDER BY p.created_at DESC NULLS LAST LIMIT 10",
+      "SELECT o.status AS order_status, COUNT(p.payment_id)::integer AS payment_count, " +
+      "BOOL_AND(p.status IN ('failed', 'cancelled', 'expired')) FILTER (WHERE p.payment_id IS NOT NULL) AS all_terminal_unpaid " +
+      "FROM orders o LEFT JOIN payments p ON p.order_id = o.order_id AND p.provider = 'hyperswitch' " +
+      "WHERE o.order_id = $1 GROUP BY o.status",
       [candidate.order_reference],
     );
-    const rows = finance.rows;
-    const orderStatus = rows[0]?.order_status;
-    const terminalUnpaid = rows.length > 0 &&
-      rows.every((row) => row.payment_status !== null &&
-        ['failed', 'cancelled', 'expired'].includes(row.payment_status));
-    const noPaymentAttempt = rows.length === 1 && rows[0]?.payment_status === null;
-    const expiredUnpaidOrder = noPaymentAttempt &&
-      (orderStatus === 'CREATED' || orderStatus === 'PENDING_PAYMENT');
-    if (rows.length === 0 || orderStatus === 'CANCELLED' || orderStatus === 'FAILED' ||
+    const order = finance.rows[0];
+    const orderStatus = order?.order_status;
+    const terminalUnpaid = Boolean(order && order.payment_count > 0 && order.all_terminal_unpaid === true);
+    const expiredUnpaidOrder = Boolean(order && order.payment_count === 0 &&
+      (orderStatus === 'CREATED' || orderStatus === 'PENDING_PAYMENT'));
+    if (!order || orderStatus === 'CANCELLED' || orderStatus === 'FAILED' ||
         terminalUnpaid || expiredUnpaidOrder) {
       await releaseUnpaidFoundingReservation(membershipDb, candidate.reservation_id, 'HOLD_EXPIRED');
       released += 1;
