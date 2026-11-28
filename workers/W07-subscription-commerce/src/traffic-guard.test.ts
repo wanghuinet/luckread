@@ -102,4 +102,54 @@ describe('W07 Neon traffic guard', () => {
     expect(response.status).toBe(503)
     expectNoNeonPoolResolution(bindings)
   })
+
+  it('rejects commerce order creation at the origin write limiter before Neon or actor work', async () => {
+    const bindings = neonBindings()
+    const originLimit = vi.fn(async () => ({ success: false }))
+    const actorLimit = vi.fn(async () => ({ success: true }))
+    const response = await runtime.fetch(
+      new Request('https://luckread-w07.internal/commerce/orders', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'Idempotency-Key': 'order_guard_01' },
+        body: JSON.stringify({ items: [{ itemRef: 'plan_test', quantity: 1 }] }),
+      }),
+      {
+        ...bindings.env,
+        SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: { limit: originLimit },
+        SUBSCRIPTION_WRITE_LIMITER: { limit: actorLimit },
+      },
+    )
+
+    expect(response.status).toBe(429)
+    expect(originLimit).toHaveBeenCalledWith({ key: 'origin:write' })
+    expect(actorLimit).not.toHaveBeenCalled()
+    expectNoNeonPoolResolution(bindings)
+  })
+
+  it('rejects commerce order creation at the actor write limiter before transport or Neon work', async () => {
+    const bindings = neonBindings()
+    const originLimit = vi.fn(async () => ({ success: true }))
+    const actorLimit = vi.fn(async () => ({ success: false }))
+    const response = await runtime.fetch(
+      new Request('https://luckread-w07.internal/commerce/orders', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'Idempotency-Key': 'order_guard_02',
+          'X-LuckRead-Principal-User-Id': 'user_guard_02',
+        },
+        body: JSON.stringify({ items: [{ itemRef: 'plan_test', quantity: 1 }] }),
+      }),
+      {
+        ...bindings.env,
+        SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: { limit: originLimit },
+        SUBSCRIPTION_WRITE_LIMITER: { limit: actorLimit },
+      },
+    )
+
+    expect(response.status).toBe(429)
+    expect(originLimit).toHaveBeenCalledWith({ key: 'origin:write' })
+    expect(actorLimit).toHaveBeenCalledWith({ key: 'write:principal:user_guard_02' })
+    expectNoNeonPoolResolution(bindings)
+  })
 })
