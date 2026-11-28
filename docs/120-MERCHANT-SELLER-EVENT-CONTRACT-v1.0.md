@@ -54,3 +54,8 @@ An event may propagate merchant/store state but must not be interpreted as payme
 ## 5. Cross-Domain Events
 
 Commerce, Payment, Ledger, Risk, Creator and Analytics consumers receive references and facts according to their own contracts; no consumer may silently rewrite Merchant authority.
+
+
+## 6. Producer / Delivery Authority
+
+W07 is the authoritative producer for Merchant/Seller state-change events. Any Merchant-specific transport to W10 must be separately admitted against the existing Queue/Service Binding inventory before implementation; this contract does not claim that such a transport is deployed. W10 executes delivery/retry only and never becomes the Merchant data owner. Event payloads carry stable Merchant/Store references and versions, not raw KYC/tax evidence. No new Queue or Service Binding is introduced.
