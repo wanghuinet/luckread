@@ -99,7 +99,127 @@
     {
       "id": "ABUSE-01",
       "requirement": "Route enforces bounded request-body size, item-count/quantity limits and existing W01/W07 anti-abuse controls before any D1 write.",
-      "status": "PENDING"
+      "status": "ADMITTED",
+      "evidence": {
+        "implementationCommit": "77410cf968faaf9fcbc41adb647f625a8c9bf20d",
+        "w01LayeredRateLimit": {
+          "pullRequest": 2340,
+          "mergeCommit": "4e46e92d88be9c61f60a003a43f2a6d06b20adb5",
+          "source": "workers/W01-payload/src/app/api/v1/commerce/orders/route.ts",
+          "sourceBlobSha": "37c2609366001a0d254c28ddecf9736aa2bf4584",
+          "integrationTest": "workers/W01-payload/tests/int/commerce-order-rate-limit.int.spec.ts",
+          "integrationTestBlobSha": "32418168976c77d7cb2fd2dfe05fecf0b291a403",
+          "ciRuns": [
+            {
+              "id": 46132082320,
+              "name": "W07 Subscription Runtime CI",
+              "conclusion": "success"
+            },
+            {
+              "id": 46132082338,
+              "name": "Worker D1 Access Boundary Gate",
+              "conclusion": "success"
+            },
+            {
+              "id": 46132082429,
+              "name": "Security Hardening Gate",
+              "conclusion": "success"
+            },
+            {
+              "id": 46132082323,
+              "name": "Payload Implementation Admission",
+              "conclusion": "success"
+            }
+          ],
+          "order": "edge/origin -> authenticated account -> fixed operation -> W08 permission -> W07 service"
+        },
+        "w07RateLimit": {
+          "pullRequest": 2339,
+          "mergeCommit": "a86a2d0d2ba4dd07096af2213abc384446594779",
+          "source": "workers/W07-subscription-commerce/src/index.ts",
+          "sourceBlobSha": "5f0eaedfd0981ff15fd6cfb885677a936fdbfcd4",
+          "test": "workers/W07-subscription-commerce/src/traffic-guard.test.ts",
+          "testBlobSha": "c487a5a952261cfee09c528b0dc24410c503290e",
+          "neonConfig": "workers/W07-subscription-commerce/wrangler.neon.jsonc",
+          "neonConfigBlobSha": "758baa37ae4b9c36b82ef06400cdb346c01bfcea",
+          "originPerMinute": 3000,
+          "principalWritePerMinute": 30,
+          "ciRuns": [
+            {
+              "id": 46131923240,
+              "name": "W07 Subscription Runtime CI",
+              "conclusion": "success"
+            },
+            {
+              "id": 46131923840,
+              "name": "1.0 D1 Traffic Guard Contract CI",
+              "conclusion": "success"
+            },
+            {
+              "id": 46131923288,
+              "name": "Contract Admission CI",
+              "conclusion": "success"
+            }
+          ]
+        },
+        "requestBounds": {
+          "w01BodyLimitBytes": 16384,
+          "w07BodyLimitBytes": 16384,
+          "maxItems": 50,
+          "maxQuantityPerItem": 10000,
+          "maxItemRefLength": 255,
+          "maxIdempotencyKeyLength": 256,
+          "w01BodyReader": "workers/W01-payload/src/commerce/w07-commerce-client.ts",
+          "w01BodyReaderBlobSha": "bdc02f3745ba47b638192417f7eacdac5ec93dfc",
+          "w07Handler": "workers/W07-subscription-commerce/src/order-http-runtime.ts",
+          "w07HandlerBlobSha": "2458f021090a518977bcdee31c02067217ad8338",
+          "requestValidator": "workers/W07-subscription-commerce/src/order-request-validation.ts",
+          "requestValidatorBlobSha": "79ae73a5490db1f63ab8a8db037bdd26741506cd",
+          "requestValidationTests": "workers/W07-subscription-commerce/src/order-request-validation.test.ts",
+          "requestValidationTestsBlobSha": "c1d8daeecaa151693ebba843457a9dbd26faa052",
+          "w01BodyLimitTests": "workers/W01-payload/tests/int/commerce-order-v1-adapter.int.spec.ts",
+          "w07BodyLimitTests": "workers/W07-subscription-commerce/src/order-http-runtime.test.ts"
+        },
+        "prePersistenceValidation": {
+          "pullRequest": 2341,
+          "mergeCommit": "77410cf968faaf9fcbc41adb647f625a8c9bf20d",
+          "handlerTest": "workers/W07-subscription-commerce/src/order-http-runtime.test.ts",
+          "handlerTestBlobSha": "795db6bd42957f49f6822c7231d9c3b06b408788",
+          "scenarios": [
+            "request body over 16 KiB rejected before order persistence",
+            "more than 50 item lines rejected before pricing, Neon pool and order store resolution",
+            "quantity 10001 rejected before pricing, Neon pool and order store resolution"
+          ],
+          "ciRuns": [
+            {
+              "id": 46132242176,
+              "name": "W07 Subscription Runtime CI",
+              "conclusion": "success"
+            },
+            {
+              "id": 46132242172,
+              "name": "1.0 D1 Traffic Guard Contract CI",
+              "conclusion": "success"
+            },
+            {
+              "id": 46132242143,
+              "name": "Contract Admission CI",
+              "conclusion": "success"
+            },
+            {
+              "id": 46132242283,
+              "name": "Security Hardening Gate",
+              "conclusion": "success"
+            },
+            {
+              "id": 46132242114,
+              "name": "Worker D1 Access Boundary Gate",
+              "conclusion": "success"
+            }
+          ]
+        },
+        "scope": "Admission covers request-size, item-count, quantity and layered W01/W07 abuse controls only. It does not enable public order writes, production pricing, real payments, refunds, payouts or settlement. PAY-002 remains unresolved."
+      }
     },
     {
       "id": "E2E-SECURITY-01",
@@ -113,5 +233,5 @@
     }
   ],
   "greenRule": "This gate cannot be GREEN while any implementation evidence is PENDING; canonical contract admission is distinct from runtime/production admission, and PAY-002 remains unresolved.",
-  "nextAction": "Complete IDEMPOTENCY-01 and ITEM-RESOLUTION-01 admission against exact main (their evidence PRs remain open and unmerged), then close ABUSE-01 and E2E-SECURITY-01. Record EVIDENCE-REGISTRY-01 only after all prerequisite gates are admitted. Keep W07 live order writes fail-closed while authoritative live discount/tax pricing and seller-of-record decisions remain unresolved."
+  "nextAction": "Continue in contract order: complete exact-main authoritative item/price/discount/tax admission and idempotency admission, then exact-commit E2E security and Evidence Registry. Keep D1-04-SCHEMA-01 pending as required by the migration-candidate contract; keep W07 live order creation fail-closed until all remaining PAY-002 gates and seller-of-record decisions are resolved."
 }
