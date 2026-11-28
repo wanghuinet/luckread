@@ -21,7 +21,7 @@ import { useColorScheme } from 'nativewind';
 import { FeedContent, FeedItem } from '~/components/FeedItem';
 import X from '~/assets/svg/aside/x.svg';
 import { mapContentToFeedContent, readContentBody, readContentSocialBatch, readContentAuthor, type ApiContentRecord } from '~/lib/content-adapter';
-import { fetchNativeFeedPage, incrementNativeFeedReplyCount, nativeFeedQueryKey, type NativeFeedKind, type NativeFeedPage } from '~/lib/feed-query';
+import { fetchNativeFeedPage, getNativeFeedNextPageParam, incrementNativeFeedReplyCount, nativeFeedQueryKey, type NativeFeedKind, type NativeFeedPage } from '~/lib/feed-query';
 import { selectVisibleFeedHydrationRecords } from '~/lib/feed-hydration';
 import { useAuthStore } from '~/store/auth-store';
 import { readSessionToken } from '~/lib/secure-session';
@@ -114,7 +114,8 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
       signal,
       viewerId,
     }),
-    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
+    getNextPageParam: (lastPage, _allPages, _lastPageParam, allPageParams) =>
+      getNativeFeedNextPageParam(lastPage, allPageParams),
     staleTime: 30_000,
   });
   const refresh = feedQuery.refetch;
