@@ -230,7 +230,16 @@ export async function handleCommerceOrderRequest(
         });
         foundingReservationId = reservation.reservationId;
         foundingReservation = reservation;
-        return priced;
+        const reservedSnapshot = JSON.stringify({ ...offer, foundingReservationId: reservation.reservationId });
+        if (new TextEncoder().encode(reservedSnapshot).byteLength > 65_536) {
+          throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+        }
+        return {
+          ...priced,
+          items: priced.items.map((item) => item === membershipItem
+            ? { ...item, itemSnapshotJson: reservedSnapshot }
+            : item),
+        };
       };
       let result: CreateOrderResult;
       try {
