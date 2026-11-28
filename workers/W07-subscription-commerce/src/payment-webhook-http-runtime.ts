@@ -28,7 +28,7 @@ import { receiveHyperswitchPaymentWebhookPostgres } from './payment-webhook-paym
 import { receiveHyperswitchMandateWebhookPostgres } from './mandate-webhook-postgres-persistence.js';
 import { issueReceiptForPaidPaymentPostgres } from './billing-document-postgres-persistence.js';
 import { expirePendingSubscriptionPlanUpgradeForPaymentPostgres } from './subscription-plan-upgrade-expiry-postgres.js';
-import { commitFoundingReservationForVerifiedPayment } from './founding-offer-reservations-postgres.js';
+import { commitFoundingReservationForVerifiedPayment, releaseFoundingReservationForUnpaidPayment } from './founding-offer-reservations-postgres.js';
 
 type HyperswitchWebhookRuntimeEnv =
   Pick<W07PaymentMethodReadRuntimeEnv, 'W07_DATABASE_DRIVER' | 'HYPERDRIVE_FINANCE_DB'> &
@@ -57,6 +57,7 @@ type HyperswitchWebhookRuntimeDependencies = Readonly<{
   syncPendingOutcomes?: typeof syncPendingRenewalOutcomes;
   fulfillPaidOrder?: typeof fulfillPaidMembershipOrder;
   commitFoundingReservation?: typeof commitFoundingReservationForVerifiedPayment;
+  releaseFoundingReservation?: typeof releaseFoundingReservationForUnpaidPayment;
   expirePendingPlanUpgradePostgres?: typeof expirePendingSubscriptionPlanUpgradeForPaymentPostgres;
 }>;
 
@@ -128,6 +129,17 @@ function isSignedPaymentSucceededEvent(rawBody: ArrayBuffer): boolean {
     const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(rawBody));
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return false;
     return (parsed as Record<string, unknown>).event_type === 'payment_succeeded';
+  } catch {
+    return false;
+  }
+}
+
+function isSignedUnpaidTerminalPaymentEvent(rawBody: ArrayBuffer): boolean {
+  try {
+    const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(rawBody));
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return false;
+    const eventType = (parsed as Record<string, unknown>).event_type;
+    return eventType === 'payment_failed' || eventType === 'payment_cancelled' || eventType === 'payment_expired';
   } catch {
     return false;
   }
@@ -267,6 +279,14 @@ export async function handleHyperswitchWebhookRequest(
       const expireUpgrade = dependencies.expirePendingPlanUpgradePostgres ??
         expirePendingSubscriptionPlanUpgradeForPaymentPostgres;
       await expireUpgrade(financePool, membershipPool, paymentId, env.HYPERSWITCH_MERCHANT_ID);
+
+      // Free an unpaid founding hold only after the finance database confirms
+      // the provider's terminal failed/cancelled/expired payment state.
+      if (isSignedUnpaidTerminalPaymentEvent(rawBody)) {
+        const releaseFounding = dependencies.releaseFoundingReservation ??
+          releaseFoundingReservationForUnpaidPayment;
+        await releaseFounding(membershipPool, financePool, paymentId, env.HYPERSWITCH_MERCHANT_ID);
+      }
 
       // Initial creator-membership purchases have no renewal-cycle row. Only a
       // verified payment_succeeded event may fulfill one, and fulfillment reads
