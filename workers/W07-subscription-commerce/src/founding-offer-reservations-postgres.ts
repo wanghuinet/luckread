@@ -192,6 +192,7 @@ export async function getFoundingReservationIdForOrder(
 /** Payment intent is denied after the founding hold expires or is released. */
 export async function isFoundingReservationActiveForOrder(
   membershipDb: W07WebhookPostgresPool,
+  financeDb: W07WebhookPostgresPool,
   reservationId: string,
   orderReference: string,
   now = new Date(),
@@ -199,12 +200,23 @@ export async function isFoundingReservationActiveForOrder(
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
   }
-  const result = await membershipDb.query<{ reservation_id: string }>(
-    "SELECT reservation_id FROM membership_founding_reservations " +
-    "WHERE reservation_id = $1 AND order_reference = $2 AND state = 'HELD' AND expires_at > $3 LIMIT 1",
-    [requirePlanId(reservationId), requirePlanId(orderReference), now.toISOString()],
+  const reservation = await membershipDb.query<{ reservation_id: string; expires_at: string }>(
+    "SELECT reservation_id, expires_at::text AS expires_at FROM membership_founding_reservations " +
+    "WHERE reservation_id = $1 AND order_reference = $2 AND state = 'HELD' LIMIT 1",
+    [requirePlanId(reservationId), requirePlanId(orderReference)],
   );
-  return Boolean(result.rows[0]);
+  const row = reservation.rows[0];
+  if (!row) return false;
+  if (Date.parse(row.expires_at) > now.getTime()) return true;
+  // A previously created nonterminal payment attempt may be retried after the
+  // reservation TTL; no new payment attempt is allowed after expiry.
+  const payments = await financeDb.query<{ status: string }>(
+    "SELECT status FROM payments WHERE order_id = $1 AND provider = 'hyperswitch' ORDER BY created_at DESC LIMIT 10",
+    [orderReference],
+  );
+  return payments.rows.some((payment) =>
+    !['succeeded', 'failed', 'cancelled', 'cancelled_post_capture', 'expired'].includes(payment.status),
+  );
 }
 
 /** Resolve a pending reservation during order-create retries without consuming another seat. */
