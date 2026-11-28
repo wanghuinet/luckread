@@ -409,7 +409,7 @@
       "requestBody": "NONE",
       "cache": "NO_STORE",
       "auditRequired": true,
-      "successRule": "W01 first validates owner authorization and obtains a durable W06 membership.plan.publish_requested intent event for the expected version; only then may W07 perform the owner-scoped DRAFT/PRIVATE to ACTIVE/PUBLIC version-CAS. W01 validates the W07 DTO and waits for W06 immutable membership.plan.published confirmation before returning success.",
+      "successRule": "W01 first validates owner authorization and obtains a durable W06 membership.plan.publish_requested intent event for the expected version; only then may W07 perform the owner-scoped DRAFT/PRIVATE to ACTIVE/PUBLIC version-CAS. W01 validates the W07 DTO and waits for W06 immutable membership.plan.published confirmation before returning success. The published audit records priceMode, priceMinor, flexible bounds, offerKind and foundingCapacity.",
       "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
       "failurePolicy": {
         "missingIfMatch": "428",
@@ -600,7 +600,7 @@
       "immutableVersioning": "Append plan_version=current_version+1; never update/delete existing membership_plan_versions rows. Existing subscriptions retain the exact prior plan version accepted.",
       "cache": "NO_STORE",
       "auditRequired": true,
-      "successRule": "W01 confirms a durable W06 update-request intent before W07 appends a version and CAS-updates the current pointer in D1-01. W01 validates the full W07 DTO and confirms the immutable W06 membership.plan.updated event before returning success. The immutable version also records offerKind and foundingCapacity; FOUNDING requires FIXED pricing and a positive integer capacity.",
+      "successRule": "W01 confirms a durable W06 update-request intent before W07 appends a version and CAS-updates the current pointer in D1-01. W01 validates the full W07 DTO and confirms the immutable W06 membership.plan.updated event before returning success. The immutable version also records offerKind and foundingCapacity; FOUNDING requires FIXED pricing and a positive integer capacity. W01 accepts legacy fixed requests as STANDARD, while explicit FOUNDING requests require a fixed price and positive capacity.",
       "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
       "failurePolicy": {
         "missingIfMatch": "428",
