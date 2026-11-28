@@ -18,6 +18,15 @@ import {
   getW07PaymentWebhookPostgresPool,
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
+import {
+  getFoundingReservationIdForOrder,
+  isFoundingReservationActiveForOrder,
+} from './founding-offer-reservations-postgres.js';
+import {
+  getW07MembershipPostgresPool,
+  type W07MembershipDatabaseRuntimeEnv,
+} from './neon/membership-database-runtime.js';
+
 
 type ResolvedProviderConfig = Readonly<{
   environment: 'sandbox' | 'production';
@@ -25,7 +34,7 @@ type ResolvedProviderConfig = Readonly<{
   expectedMerchantId: string;
 }>;
 
-type PaymentIntentRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
+type PaymentIntentRuntimeEnv = W07PaymentMethodReadRuntimeEnv & W07MembershipDatabaseRuntimeEnv & Readonly<{
   HYPERSWITCH_ENVIRONMENT?: string | null;
   HYPERSWITCH_API_KEY?: string | null;
   HYPERSWITCH_MERCHANT_ID?: string | null;
@@ -36,6 +45,7 @@ type PaymentIntentRuntimeDependencies = Readonly<{
   createProviderIntent?: typeof createHyperswitchCustomerInitiatedSetupIntent;
   recordIntent?: typeof recordUnconfirmedHyperswitchIntentPostgres;
   getPostgresPool?: (env: PaymentIntentRuntimeEnv) => W07WebhookPostgresPool | undefined;
+  getMembershipPostgresPool?: (env: PaymentIntentRuntimeEnv) => W07WebhookPostgresPool | undefined;
 }>;
 
 const ORDER_ID_MAX_LENGTH = 255;
@@ -154,6 +164,15 @@ export async function handleCommercePaymentIntentRequest(
   try {
     const pool = (dependencies.getPostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
     if (!pool) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+    const foundingReservationId = await getFoundingReservationIdForOrder(pool, customerId, route.orderId);
+    if (foundingReservationId) {
+      const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
+      if (!membershipPool || !await isFoundingReservationActiveForOrder(
+        membershipPool, foundingReservationId, route.orderId,
+      )) {
+        return errorResponse(409, 'INVALID_STATE', 'Founding membership reservation has expired or is no longer active');
+      }
+    }
     const createAttempt = dependencies.createAttempt ?? createPaymentAttemptPostgres;
     const attempt: PaymentAttemptCreation = await createAttempt(
       pool,
