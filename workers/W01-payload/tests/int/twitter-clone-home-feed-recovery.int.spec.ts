@@ -86,4 +86,37 @@ describe('H5 home feed initial-load recovery', () => {
     scrollTo.mockRestore()
   })
 
+  it('switches to sign-in recovery when Following pagination loses authentication', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      error: { code: 'UNAUTHENTICATED', message: 'Authentication required' },
+    }), {
+      status: 401,
+      headers: { 'content-type': 'application/json' },
+    }))
+
+    render(createElement(TwitterCloneHomeFeed, {
+      initialPage: {
+        items: [{ id: 'followed-post', title: 'Existing post', contentType: 'post' }],
+        nextCursor: 'cursor-page-2',
+        hasMore: true,
+      },
+      locale: 'en',
+      feedMode: 'following',
+    }))
+
+    fireEvent.click(screen.getByRole('button', { name: getTwitterCloneCopy('en').feed.loadingMore }))
+
+    await screen.findByRole('heading', {
+      name: 'Sign in to see posts from accounts you follow',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/feed/following?limit=20&cursor=cursor-page-2')
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      credentials: 'include',
+      cache: 'no-store',
+    })
+    expect(screen.queryByRole('button', { name: getTwitterCloneCopy('en').feed.loadingMore })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toContain('/login?returnTo=')
+  })
+
 })
