@@ -77,12 +77,21 @@ Identity evidence is represented by references, not copied into ordinary merchan
 
 Operational read models may be rebuilt from authoritative Merchant/Store/Staff state and domain events.
 
-## 6. Storage
+## 6. Storage and Physical Authority
 
-Cloudflare-first default:
+The logical Merchant/Seller authority belongs to the existing D1-04 Commerce / Financial domain. Its approved physical runtime target is the existing Neon finance PostgreSQL database owned exclusively by W07.
 
 ```text
-D1 = authoritative structured state
-R2 = large merchant assets/evidence references where required
-Cache/KV = derived hot views only
+W07 + existing Neon finance database (logical D1-04) = authoritative Merchant / Store / Qualification / Staff state
+R2 = merchant media and controlled evidence objects/references where required
+Cache/KV = derived hot views only; never authoritative
+W10 = existing asynchronous execution/Queue boundary only; never Merchant data owner
 ```
+
+Rules:
+- W07 is the sole writer and authoritative reader for Merchant/Seller records in this domain; other Workers consume admitted W07 APIs/events and may keep only bounded references/projections.
+- W01 is the only public API ingress; clients never access Neon, D1 or W07 internal routes directly.
+- No Cloudflare D1 binding, D1 fallback, D1 compatibility adapter, cross-database dual write, new database, Worker, Queue or Service Binding is introduced.
+- Existing `D1-04` naming in source migration history is a logical lineage label only. New physical migrations must be native PostgreSQL and follow the existing W07 Neon migration/generation/rehearsal contract.
+- Sensitive identity/KYC/tax evidence remains in its approved controlled evidence store; Merchant rows keep opaque references and status/version only. Do not copy raw evidence into order snapshots, public DTOs or ordinary logs.
+- This storage mapping does not mark Merchant implementation complete and does not authorize remote DDL or production activation.
