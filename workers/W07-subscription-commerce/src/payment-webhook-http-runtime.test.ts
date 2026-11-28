@@ -79,6 +79,7 @@ function fixture(options: {
   const postgresPool = {} as W07WebhookPostgresPool;
   const membershipPostgresPool = { marker: 'neon-membership-pool' } as unknown as W07WebhookPostgresPool;
   const nativeUpgradeExpiryCalls: Array<{ financePool: unknown; membershipPool: unknown; paymentId: string; merchantId: string }> = [];
+  const foundingCommitCalls: Array<{ membershipPool: unknown; financePool: unknown; paymentId: string; merchantId: string; eventId: string }> = [];
 
   const syncRenewalOutcome = async (
     env: OutcomeEnv,
@@ -154,7 +155,16 @@ function fixture(options: {
     syncRenewalOutcome,
     syncPendingOutcomes,
     fulfillPaidOrder,
-    commitFoundingReservation: async () => null,
+    commitFoundingReservation: async (
+      membershipPool: W07WebhookPostgresPool,
+      financePool: W07WebhookPostgresPool,
+      paymentId: string,
+      merchantId: string,
+      eventId: string,
+    ) => {
+      foundingCommitCalls.push({ membershipPool, financePool, paymentId, merchantId, eventId });
+      return null;
+    },
     expirePendingPlanUpgradePostgres: async (
       financePool: W07WebhookPostgresPool,
       membershipPool: W07WebhookPostgresPool,
@@ -177,6 +187,7 @@ function fixture(options: {
     postgresMandateCalls,
     postgresReceiptCalls,
     nativeUpgradeExpiryCalls,
+    foundingCommitCalls,
   };
 }
 
@@ -511,6 +522,28 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     const body = await response!.text();
     expect(body).toContain('INVALID_SIGNATURE');
     expect(body).not.toContain(SECRET);
+  });
+
+  it('commits a founding seat only after a verified successful initial membership payment', async () => {
+    const f = fixture({
+      result: receipt('APPLIED'),
+      syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
+    });
+    const paymentId = 'pay_' + 'h'.repeat(26);
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body: paymentEvent(paymentId), signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+    expect(response?.status).toBe(200);
+    expect(f.purchaseFulfillmentCalls).toHaveLength(1);
+    expect(f.foundingCommitCalls).toEqual([{
+      membershipPool: f.membershipPostgresPool,
+      financePool: f.postgresPool,
+      paymentId,
+      merchantId: MERCHANT,
+      eventId: 'evt_test_001',
+    }]);
   });
 
   it('returns 202 for durable reconciliation and 503 when post-commit fulfillment must retry', async () => {
