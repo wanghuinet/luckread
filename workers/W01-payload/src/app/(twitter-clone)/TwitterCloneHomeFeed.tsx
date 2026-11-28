@@ -93,7 +93,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
         {headers:{accept:'application/json'},cache:'no-store',credentials:feedMode==='following'?'include':'omit',signal:controller.signal},
       )
       if (controller.signal.aborted) return
-      if (response.status === 401 && feedMode === 'following') {
+      if (feedMode === 'following' && (response.status === 401 || data?.error?.code === 'UNAUTHENTICATED')) {
         setRequiresAuth(true)
         setItems([])
         setNextCursor(null)
