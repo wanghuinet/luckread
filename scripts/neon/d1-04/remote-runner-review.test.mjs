@@ -196,6 +196,27 @@ test('D1-04 release may use its separate runner without broadening the canonical
   assert.equal(result, true)
 })
 
+test('D1-04 code review can pass while the separate remote apply release remains disabled', () => {
+  const blocked = structuredClone(baseReview)
+  blocked.remoteApplyReady = false
+  const evidence = validateD104RemoteRunnerReview({
+    root: process.cwd(),
+    review: blocked,
+    currentHead: sha,
+    hashBlob: () => sha,
+    hashBlobAtCommit: () => sha,
+    isAncestor: () => true,
+  })
+  assert.equal(evidence.valid, true, evidence.errors.join('; '))
+  assert.equal(validateD104ReleaseState({
+    manifest: baseManifest,
+    ledgerContract: baseLedger,
+    localReadiness: baseReadiness,
+    review: blocked,
+    reviewValid: evidence.valid,
+  }), false)
+})
+
 test('D1-04 release rejects any expansion of the original shared runner ledger scope', () => {
   const changed = structuredClone(baseLedger)
   changed.execution.domainReadiness['D1-04'] = {
