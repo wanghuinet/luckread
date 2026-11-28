@@ -663,7 +663,7 @@ const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed?: boolean) => 
     row.benefits_json.length > 8192 ||
     !Number.isSafeInteger(row.current_version) || row.current_version < 1 ||
     !Number.isSafeInteger(row.version) || row.version < 1 ||
-    ((row.price_mode ?? 'FIXED') === 'FIXED' && (!Number.isSafeInteger(row.price_minor) || (row.price_minor as number) < 0 || (row.price_minor as number) > 2_147_483_647)) ||
+    ((row.price_mode ?? 'FIXED') === 'FIXED' && (!Number.isSafeInteger(row.price_minor) || (row.price_minor as number) < 0 || (row.price_minor as number) > 2_147_483_647 || (row.minimum_price_minor !== undefined && row.minimum_price_minor !== null) || (row.suggested_price_minor !== undefined && row.suggested_price_minor !== null) || (row.maximum_price_minor !== undefined && row.maximum_price_minor !== null))) ||
     ((row.price_mode ?? 'FIXED') === 'FLEXIBLE' && (row.price_minor !== null || !Number.isSafeInteger(row.minimum_price_minor) || (row.minimum_price_minor as number) < 1 || !Number.isSafeInteger(row.suggested_price_minor) || (row.suggested_price_minor as number) < (row.minimum_price_minor as number) || !Number.isSafeInteger(row.maximum_price_minor) || (row.maximum_price_minor as number) < (row.suggested_price_minor as number) || (row.maximum_price_minor as number) > 2_147_483_647)) ||
     !['FIXED', 'FLEXIBLE'].includes(row.price_mode ?? 'FIXED') ||
     !/^[A-Z]{3}$/.test(row.currency) ||
