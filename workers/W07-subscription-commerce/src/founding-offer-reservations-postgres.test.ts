@@ -8,6 +8,7 @@ import {
   commitFoundingReservationAfterVerifiedPayment,
   commitFoundingReservationForVerifiedPayment,
   releaseFoundingReservationForUnpaidPayment,
+  reconcileExpiredFoundingReservations,
   reserveFoundingOfferCapacity,
 } from './founding-offer-reservations-postgres.js';
 
@@ -165,6 +166,51 @@ describe('founding offer capacity reservation', () => {
     )).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 });
     expect(client.statements.some((entry) => entry.sql.includes("UPDATE membership_founding_reservations SET state = 'COMMITTED'"))).toBe(false);
     expect(client.statements.some((entry) => entry.sql === 'ROLLBACK')).toBe(true);
+  });
+
+  it('releases an expired unpaid order after finance confirms there is no payment attempt', async () => {
+    const client = new FakeClient((sql) => {
+      if (sql.includes('FROM membership_founding_reservations WHERE reservation_id')) return [heldRow];
+      if (sql.includes("UPDATE membership_founding_reservations SET state = $2")) return [{ ...heldRow, state: 'EXPIRED' }];
+      return [];
+    });
+    const membershipDb = {
+      async query<T extends Row = Row>(sql: string) {
+        expect(sql).toContain("expires_at <= $1::timestamptz - INTERVAL '5 minutes'");
+        return { rows: [{ reservation_id: heldRow.reservation_id, order_reference: 'ord_abandoned' }] as T[], rowCount: 1 };
+      },
+      async connect() { return client; },
+    } as unknown as W07WebhookPostgresPool;
+    const financeDb = {
+      async query<T extends Row = Row>() {
+        return { rows: [{ order_status: 'CREATED', payment_count: 0, all_terminal_unpaid: null }] as T[], rowCount: 1 };
+      },
+      async connect() { throw new Error('finance transaction is not required'); },
+    } as unknown as W07WebhookPostgresPool;
+    const result = await reconcileExpiredFoundingReservations(
+      membershipDb, financeDb, new Date('2026-11-29T12:30:00.000Z'),
+    );
+    expect(result).toEqual({ scanned: 1, released: 1, retained: 0 });
+    expect(client.statements.some((entry) => entry.sql.includes("UPDATE membership_founding_reservations SET state = $2"))).toBe(true);
+  });
+
+  it('retains an expired founding hold while any finance payment remains nonterminal or succeeded', async () => {
+    const membershipDb = {
+      async query<T extends Row = Row>() {
+        return { rows: [{ reservation_id: heldRow.reservation_id, order_reference: 'ord_processing' }] as T[], rowCount: 1 };
+      },
+      async connect() { throw new Error('no release transaction expected'); },
+    } as unknown as W07WebhookPostgresPool;
+    const financeDb = {
+      async query<T extends Row = Row>() {
+        return { rows: [{ order_status: 'PENDING_PAYMENT', payment_count: 1, all_terminal_unpaid: false }] as T[], rowCount: 1 };
+      },
+      async connect() { throw new Error('finance transaction is not required'); },
+    } as unknown as W07WebhookPostgresPool;
+    const result = await reconcileExpiredFoundingReservations(
+      membershipDb, financeDb, new Date('2026-11-29T12:30:00.000Z'),
+    );
+    expect(result).toEqual({ scanned: 1, released: 0, retained: 1 });
   });
 
   it('releases a held seat only after the finance database confirms a terminal unpaid payment', async () => {
