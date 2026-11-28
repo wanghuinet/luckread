@@ -1132,10 +1132,13 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
   useEffect(() => {
     let active = true
     const controller = new AbortController()
-    setQuoteTarget(null)
-    setQuoteRelationshipPending(false)
-    window.dispatchEvent(new CustomEvent('luckread:quote-relationship-pending', { detail: { pending: false } }))
-    quoteRelationshipKeyRef.current = null
+    queueMicrotask(() => {
+      if (!active) return
+      setQuoteTarget(null)
+      setQuoteRelationshipPending(false)
+      window.dispatchEvent(new CustomEvent('luckread:quote-relationship-pending', { detail: { pending: false } }))
+      quoteRelationshipKeyRef.current = null
+    })
     if (!quoteContentId) {
       setLoadingQuote(false)
       return () => { active = false; controller.abort() }
