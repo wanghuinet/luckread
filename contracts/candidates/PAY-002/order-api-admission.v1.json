@@ -83,11 +83,11 @@
             "matchingFiles": 27,
             "driftedFiles": 0
           },
-          "sourcePinValidationRunId": 46133048169,
-          "sourcePinValidationUrl": "https://github.com/wanghuinet/luckread/actions/runs/46133048169",
+          "sourcePinValidationRunId": 46132961129,
+          "sourcePinValidationUrl": "https://github.com/wanghuinet/luckread/actions/runs/46132961129",
           "sourcePinValidationConclusion": "success",
-          "localPostgres18ArtifactId": 15257958346,
-          "localPostgres18ArtifactDigest": "sha256:3c8588f275ca62ec6956b8c41f7ca888c152c13ad31047bc79c2e24b8ae74c77",
+          "localPostgres18ArtifactId": 15258103099,
+          "localPostgres18ArtifactDigest": "sha256:83e4b82960c4173a756370b04cab97bf569789c773d09c37c78c2e24b8ae74c77",
           "remoteApplyJob": "skipped"
         },
         "historicalRemoteSchemaPostflight": {
