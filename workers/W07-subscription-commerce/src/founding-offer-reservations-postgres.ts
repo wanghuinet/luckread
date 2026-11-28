@@ -267,3 +267,21 @@ export async function releaseUnpaidFoundingReservation(
     return toPublic(next);
   });
 }
+
+
+/** Commit the reservation associated with an already verified and durably applied paid order. */
+export async function commitFoundingReservationForPaidOrder(
+  db: W07WebhookPostgresPool,
+  orderReference: string,
+  verifiedPaymentEventId: string,
+  now = new Date(),
+): Promise<FoundingReservation | null> {
+  const orderId = requirePlanId(orderReference);
+  const selected = await db.query<{ reservation_id: string }>(
+    "SELECT reservation_id FROM membership_founding_reservations WHERE order_reference = $1 LIMIT 1",
+    [orderId],
+  );
+  const reservationId = selected.rows[0]?.reservation_id;
+  if (!reservationId) return null;
+  return commitFoundingReservationAfterVerifiedPayment(db, reservationId, verifiedPaymentEventId, now);
+}
