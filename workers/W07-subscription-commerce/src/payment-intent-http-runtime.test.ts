@@ -144,6 +144,44 @@ describe('W07 internal payment-intent runtime', () => {
     expect(fixture.calls.createProviderIntent).toHaveLength(0);
   });
 
+  it('rejects a new payment attempt after the founding reservation window has expired', async () => {
+    const fixture = createFixture();
+    const financePool: W07WebhookPostgresPool = {
+      async query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string) {
+        if (sql.includes("foundingReservationId")) {
+          return { rows: [{ reservation_id: 'fres_0123456789abcdef0123456789abcdef' }] as Row[], rowCount: 1 };
+        }
+        if (sql.includes('SELECT status FROM payments')) return { rows: [] as Row[], rowCount: 0 };
+        throw new Error('unexpected finance query: ' + sql);
+      },
+      async connect() { throw new Error('no finance transaction expected'); },
+    };
+    const membershipPool: W07WebhookPostgresPool = {
+      async query<Row extends Record<string, unknown> = Record<string, unknown>>() {
+        return { rows: [{
+          reservation_id: 'fres_0123456789abcdef0123456789abcdef',
+          expires_at: '2026-10-28T09:00:00.000Z',
+        }] as Row[], rowCount: 1 };
+      },
+      async connect() { throw new Error('no membership transaction expected'); },
+    };
+    const dependencies: RuntimeDependencies = {
+      ...fixture.dependencies,
+      getPostgresPool: () => financePool,
+      getMembershipPostgresPool: () => membershipPool,
+    };
+    const response = await handleCommercePaymentIntentRequest(
+      request({ idempotencyKey: CLIENT_IDEMPOTENCY_KEY }),
+      CUSTOMER_ID,
+      fixture.env,
+      dependencies,
+    );
+    expect(response?.status).toBe(409);
+    expect(await response?.json()).toMatchObject({ error: { code: 'INVALID_STATE' } });
+    expect(fixture.calls.createAttempt).toHaveLength(0);
+    expect(fixture.calls.createProviderIntent).toHaveLength(0);
+  });
+
   it('uses server-owned order totals and a stable provider key, persisting before returning checkout data', async () => {
     const fixture = createFixture();
     const response = await handleCommercePaymentIntentRequest(
