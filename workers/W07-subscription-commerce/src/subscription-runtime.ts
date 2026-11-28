@@ -431,7 +431,11 @@ export type MembershipPlanDraftInput = {
   name: string
   tier: string
   billingInterval: 'MONTHLY' | 'YEARLY'
-  priceMinor: number
+  priceMode: 'FIXED' | 'FLEXIBLE'
+  priceMinor: number | null
+  minimumPriceMinor: number | null
+  suggestedPriceMinor: number | null
+  maximumPriceMinor: number | null
   currency: string
   benefits: string[]
   trialPeriodDays: number
@@ -482,15 +486,16 @@ async function reviseMembershipPlanPostgres(
     inTransaction = true
     const inserted = await client.query<{ plan_id: string } & Record<string, unknown>>(
       'INSERT INTO membership_plan_versions ' +
-      '(plan_id, plan_version, name, tier, billing_interval, price_minor, currency, benefits_json, trial_period_days, created_at) ' +
-      'SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::timestamptz WHERE EXISTS (' +
+      '(plan_id, plan_version, name, tier, billing_interval, price_minor, price_mode, minimum_price_minor, suggested_price_minor, maximum_price_minor, currency, benefits_json, trial_period_days, created_at) ' +
+      'SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::timestamptz WHERE EXISTS (' +
       "SELECT 1 FROM membership_plans p WHERE p.plan_id = $11 AND p.owner_type = 'CREATOR' AND p.owner_id = $12 " +
       "AND p.status IN ('DRAFT','ACTIVE','PAUSED') AND p.current_version = $13 AND p.version = $14) " +
       'ON CONFLICT (plan_id, plan_version) DO NOTHING RETURNING plan_id',
       [
         input.planId, input.nextPlanVersion, input.revision.name, input.revision.tier,
-        input.revision.billingInterval, input.revision.priceMinor, input.revision.currency,
-        input.benefitsJson, input.revision.trialPeriodDays, input.updatedAt,
+        input.revision.billingInterval, input.revision.priceMinor, input.revision.priceMode,
+        input.revision.minimumPriceMinor, input.revision.suggestedPriceMinor, input.revision.maximumPriceMinor,
+        input.revision.currency, input.benefitsJson, input.revision.trialPeriodDays, input.updatedAt,
         input.planId, input.creatorId, input.currentPlanVersion, input.expectedVersion,
       ],
     )
@@ -505,14 +510,18 @@ async function reviseMembershipPlanPostgres(
       "AND status IN ('DRAFT','ACTIVE','PAUSED') AND current_version = $5 AND version = $6 " +
       'AND EXISTS (SELECT 1 FROM membership_plan_versions v WHERE v.plan_id = membership_plans.plan_id ' +
       'AND v.plan_version = $7 AND v.name = $8 AND v.tier = $9 AND v.billing_interval = $10 ' +
-      'AND v.price_minor = $11 AND v.currency = $12 AND v.benefits_json = $13 AND v.trial_period_days = $14) ' +
+      'AND v.price_minor IS NOT DISTINCT FROM $11 AND v.price_mode = $12 ' +
+      'AND v.minimum_price_minor IS NOT DISTINCT FROM $13 AND v.suggested_price_minor IS NOT DISTINCT FROM $14 ' +
+      'AND v.maximum_price_minor IS NOT DISTINCT FROM $15 AND v.currency = $16 ' +
+      'AND v.benefits_json = $17 AND v.trial_period_days = $18) ' +
       'RETURNING plan_id',
       [
         input.nextPlanVersion, input.updatedAt, input.planId, input.creatorId,
         input.currentPlanVersion, input.expectedVersion, input.nextPlanVersion,
         input.revision.name, input.revision.tier, input.revision.billingInterval,
-        input.revision.priceMinor, input.revision.currency, input.benefitsJson,
-        input.revision.trialPeriodDays,
+        input.revision.priceMinor, input.revision.priceMode, input.revision.minimumPriceMinor,
+        input.revision.suggestedPriceMinor, input.revision.maximumPriceMinor, input.revision.currency,
+        input.benefitsJson, input.revision.trialPeriodDays,
       ],
     )
     if (updated.rows.length !== 1) {
@@ -566,7 +575,11 @@ export function normalizeMembershipPlanDraft(value: unknown, defaultTrialPeriodD
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   }
   const source = value as Record<string, unknown>
-  const allowedKeys = new Set(['name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits', 'trialPeriodDays'])
+  const allowedKeys = new Set([
+    'name', 'tier', 'billingInterval', 'priceMode', 'priceMinor',
+    'minimumPriceMinor', 'suggestedPriceMinor', 'maximumPriceMinor',
+    'currency', 'benefits', 'trialPeriodDays',
+  ])
   if (Object.keys(source).some((key) => !allowedKeys.has(key))) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   }
@@ -575,7 +588,11 @@ export function normalizeMembershipPlanDraft(value: unknown, defaultTrialPeriodD
   const tier = typeof source.tier === 'string' ? source.tier.trim() : ''
   const billingInterval = typeof source.billingInterval === 'string' ? source.billingInterval.trim() : ''
   const currency = typeof source.currency === 'string' ? source.currency.trim() : ''
+  const priceMode = source.priceMode === undefined ? 'FIXED' : source.priceMode
   const priceMinor = source.priceMinor
+  const minimumPriceMinor = source.minimumPriceMinor
+  const suggestedPriceMinor = source.suggestedPriceMinor
+  const maximumPriceMinor = source.maximumPriceMinor
   const rawBenefits = source.benefits
   const trialPeriodDays = source.trialPeriodDays === undefined ? defaultTrialPeriodDays : source.trialPeriodDays
 
@@ -583,7 +600,22 @@ export function normalizeMembershipPlanDraft(value: unknown, defaultTrialPeriodD
   if (!/^[a-z][a-z0-9_-]{0,63}$/.test(tier)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   if (billingInterval !== 'MONTHLY' && billingInterval !== 'YEARLY') throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   if (!/^[A-Z]{3}$/.test(currency)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
-  if (typeof priceMinor !== 'number' || !Number.isSafeInteger(priceMinor) || priceMinor < 0 || priceMinor > 2_147_483_647) {
+  if (priceMode !== 'FIXED' && priceMode !== 'FLEXIBLE') {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+  if (priceMode === 'FIXED') {
+    if (typeof priceMinor !== 'number' || !Number.isSafeInteger(priceMinor) || priceMinor < 0 || priceMinor > 2_147_483_647 ||
+        minimumPriceMinor !== undefined || suggestedPriceMinor !== undefined || maximumPriceMinor !== undefined) {
+      throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+    }
+  } else if (
+    (priceMinor !== undefined && priceMinor !== null) ||
+    typeof minimumPriceMinor !== 'number' || !Number.isSafeInteger(minimumPriceMinor) || minimumPriceMinor < 1 ||
+    typeof suggestedPriceMinor !== 'number' || !Number.isSafeInteger(suggestedPriceMinor) ||
+    suggestedPriceMinor < minimumPriceMinor ||
+    typeof maximumPriceMinor !== 'number' || !Number.isSafeInteger(maximumPriceMinor) ||
+    maximumPriceMinor < suggestedPriceMinor || maximumPriceMinor > 2_147_483_647
+  ) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   }
   if (typeof trialPeriodDays !== 'number' || !Number.isSafeInteger(trialPeriodDays) || trialPeriodDays < 0 || trialPeriodDays > 30) {
@@ -598,7 +630,14 @@ export function normalizeMembershipPlanDraft(value: unknown, defaultTrialPeriodD
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   }
 
-  return { name, tier, billingInterval, priceMinor: priceMinor as number, currency, benefits, trialPeriodDays }
+  return {
+    name, tier, billingInterval, priceMode,
+    priceMinor: priceMode === 'FIXED' ? priceMinor as number : null,
+    minimumPriceMinor: priceMode === 'FLEXIBLE' ? minimumPriceMinor as number : null,
+    suggestedPriceMinor: priceMode === 'FLEXIBLE' ? suggestedPriceMinor as number : null,
+    maximumPriceMinor: priceMode === 'FLEXIBLE' ? maximumPriceMinor as number : null,
+    currency, benefits, trialPeriodDays,
+  }
 }
 
 const membershipPlanIdFromIdempotency = async (creatorId: string, idempotencyKey: string): Promise<string> => {
@@ -696,6 +735,10 @@ function membershipPlanDraftMatches(
     row.tier === plan.tier &&
     row.billing_interval === plan.billingInterval &&
     row.price_minor === plan.priceMinor &&
+    (row.price_mode ?? 'FIXED') === plan.priceMode &&
+    (row.minimum_price_minor ?? null) === plan.minimumPriceMinor &&
+    (row.suggested_price_minor ?? null) === plan.suggestedPriceMinor &&
+    (row.maximum_price_minor ?? null) === plan.maximumPriceMinor &&
     row.currency === plan.currency &&
     row.benefits_json === benefitsJson &&
     (row.trial_period_days ?? 0) === plan.trialPeriodDays
@@ -743,13 +786,14 @@ async function insertMembershipPlanDraftPostgres(
     }
     const versionInsert = await client.query<{ plan_id: string } & Record<string, unknown>>(
       'INSERT INTO membership_plan_versions ' +
-      '(plan_id, plan_version, name, tier, billing_interval, price_minor, currency, benefits_json, trial_period_days, created_at) ' +
-      'VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9::timestamptz) ' +
+      '(plan_id, plan_version, name, tier, billing_interval, price_minor, price_mode, minimum_price_minor, suggested_price_minor, maximum_price_minor, currency, benefits_json, trial_period_days, created_at) ' +
+      'VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::timestamptz) ' +
       'ON CONFLICT (plan_id, plan_version) DO NOTHING RETURNING plan_id',
       [
         input.planId, input.plan.name, input.plan.tier, input.plan.billingInterval,
-        input.plan.priceMinor, input.plan.currency, input.benefitsJson,
-        input.plan.trialPeriodDays, input.now,
+        input.plan.priceMinor, input.plan.priceMode, input.plan.minimumPriceMinor,
+        input.plan.suggestedPriceMinor, input.plan.maximumPriceMinor, input.plan.currency,
+        input.benefitsJson, input.plan.trialPeriodDays, input.now,
       ],
     )
     if (versionInsert.rows.length !== 1) {
@@ -828,6 +872,10 @@ export async function createMembershipPlanDraft(
     tier: plan.tier,
     billingInterval: plan.billingInterval,
     priceMinor: plan.priceMinor,
+    priceMode: plan.priceMode,
+    minimumPriceMinor: plan.minimumPriceMinor,
+    suggestedPriceMinor: plan.suggestedPriceMinor,
+    maximumPriceMinor: plan.maximumPriceMinor,
     currency: plan.currency,
     benefits: plan.benefits,
     trialPeriodDays: plan.trialPeriodDays,
@@ -945,6 +993,10 @@ export async function reviseMembershipPlan(
     row.tier === revision.tier &&
     row.billing_interval === revision.billingInterval &&
     row.price_minor === revision.priceMinor &&
+    (row.price_mode ?? 'FIXED') === revision.priceMode &&
+    (row.minimum_price_minor ?? null) === revision.minimumPriceMinor &&
+    (row.suggested_price_minor ?? null) === revision.suggestedPriceMinor &&
+    (row.maximum_price_minor ?? null) === revision.maximumPriceMinor &&
     row.currency === revision.currency &&
     row.benefits_json === benefitsJson &&
     (row.trial_period_days ?? 0) === revision.trialPeriodDays;
