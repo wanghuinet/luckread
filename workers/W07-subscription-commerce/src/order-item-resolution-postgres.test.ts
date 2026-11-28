@@ -18,6 +18,10 @@ const planRow = {
   tier: 'supporter',
   billing_interval: 'YEARLY',
   price_minor: 4900,
+  price_mode: 'FIXED',
+  minimum_price_minor: null,
+  suggested_price_minor: null,
+  maximum_price_minor: null,
   currency: 'USD',
   benefits_json: JSON.stringify(['Member posts', 'Archive access']),
   trial_period_days: 7,
@@ -66,6 +70,10 @@ describe('PAY-002 native PostgreSQL membership offer resolution', () => {
       tier: 'supporter',
       billingInterval: 'YEARLY',
       priceMinor: 4900,
+      priceMode: 'FIXED',
+      minimumPriceMinor: null,
+      suggestedPriceMinor: null,
+      maximumPriceMinor: null,
       currency: 'USD',
       benefits: ['Member posts', 'Archive access'],
     })
@@ -78,13 +86,47 @@ describe('PAY-002 native PostgreSQL membership offer resolution', () => {
     expect(f.calls[0]?.values).toEqual([[planId]])
   })
 
-  it('fails closed on buyer-selected amounts until authoritative flexible pricing is integrated', async () => {
-    const f = poolWith()
+  it('resolves a flexible selected amount within the immutable plan-version range', async () => {
+    const f = poolWith([{
+      ...planRow,
+      price_minor: null,
+      price_mode: 'FLEXIBLE',
+      minimum_price_minor: 1500,
+      suggested_price_minor: 2500,
+      maximum_price_minor: 5000,
+    }])
 
-    await expect(resolveCommerceOrderItems(f.pool, {
-      items: [{ itemRef: planId, quantity: 1, selectedAmountMinor: 2500 }],
-    })).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
-    expect(f.calls).toHaveLength(0)
+    const result = await resolveCommerceOrderItems(f.pool, {
+      items: [{ itemRef: planId, quantity: 1, selectedAmountMinor: 3200 }],
+    })
+
+    expect(result.items[0]).toMatchObject({ unitAmountMinor: 3200, itemVersion: '3' })
+    expect(JSON.parse(result.items[0]!.itemSnapshotJson)).toMatchObject({
+      planId,
+      planVersion: 3,
+      priceMode: 'FLEXIBLE',
+      minimumPriceMinor: 1500,
+      suggestedPriceMinor: 2500,
+      maximumPriceMinor: 5000,
+      selectedAmountMinor: 3200,
+      currency: 'USD',
+    })
+  })
+
+  it('rejects flexible amounts outside the versioned range and requires a buyer selection', async () => {
+    for (const selectedAmountMinor of [undefined, 1499, 5001]) {
+      const f = poolWith([{
+        ...planRow,
+        price_minor: null,
+        price_mode: 'FLEXIBLE',
+        minimum_price_minor: 1500,
+        suggested_price_minor: 2500,
+        maximum_price_minor: 5000,
+      }])
+      const item = { itemRef: planId, quantity: 1, ...(selectedAmountMinor === undefined ? {} : { selectedAmountMinor }) }
+      await expect(resolveCommerceOrderItems(f.pool, { items: [item] }))
+        .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    }
   })
 
   it('does not resolve a private, draft, retired or missing-current-version offer', async () => {
