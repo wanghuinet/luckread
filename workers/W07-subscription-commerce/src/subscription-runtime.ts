@@ -490,13 +490,14 @@ async function reviseMembershipPlanPostgres(
       'INSERT INTO membership_plan_versions ' +
       '(plan_id, plan_version, name, tier, billing_interval, price_minor, price_mode, minimum_price_minor, suggested_price_minor, maximum_price_minor, offer_kind, founding_capacity, currency, benefits_json, trial_period_days, created_at) ' +
       'SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::timestamptz WHERE EXISTS (' +
-      "SELECT 1 FROM membership_plans p WHERE p.plan_id = $15 AND p.owner_type = 'CREATOR' AND p.owner_id = $16 " +
-      "AND p.status IN ('DRAFT','ACTIVE','PAUSED') AND p.current_version = $17 AND p.version = $18) " +
+      "SELECT 1 FROM membership_plans p WHERE p.plan_id = $17 AND p.owner_type = 'CREATOR' AND p.owner_id = $18 " +
+      "AND p.status IN ('DRAFT','ACTIVE','PAUSED') AND p.current_version = $19 AND p.version = $20) " +
       'ON CONFLICT (plan_id, plan_version) DO NOTHING RETURNING plan_id',
       [
         input.planId, input.nextPlanVersion, input.revision.name, input.revision.tier,
         input.revision.billingInterval, input.revision.priceMinor, input.revision.priceMode,
         input.revision.minimumPriceMinor, input.revision.suggestedPriceMinor, input.revision.maximumPriceMinor,
+        input.revision.offerKind, input.revision.foundingCapacity,
         input.revision.currency, input.benefitsJson, input.revision.trialPeriodDays, input.updatedAt,
         input.planId, input.creatorId, input.currentPlanVersion, input.expectedVersion,
       ],
@@ -905,6 +906,8 @@ export async function createMembershipPlanDraft(
     minimumPriceMinor: plan.minimumPriceMinor,
     suggestedPriceMinor: plan.suggestedPriceMinor,
     maximumPriceMinor: plan.maximumPriceMinor,
+    offerKind: plan.offerKind,
+    foundingCapacity: plan.foundingCapacity,
     currency: plan.currency,
     benefits: plan.benefits,
     trialPeriodDays: plan.trialPeriodDays,
