@@ -47,3 +47,6 @@ Public endpoints must not expose private merchant evidence or staff information.
 ## 5. Reliability
 
 Create/update/invite/role/fulfillment mutations must be safe under retries. Pagination uses cursors where collections can grow large.
+## 6. Runtime Routing
+
+All public `/v1/merchants` and `/v1/stores` routes terminate at W01. W01 authenticates the caller, obtains W08/CASL authorization and forwards the trusted principal/scope to W07 over the existing internal Service Binding. W07 validates ownership and version again and reads/writes the existing Neon finance PostgreSQL database (logical D1-04). No client, APP, H5 or PC code may call W07 internals, Neon or D1 directly. No new Worker or Service Binding is introduced.
