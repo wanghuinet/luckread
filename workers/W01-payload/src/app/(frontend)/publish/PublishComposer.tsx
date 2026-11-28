@@ -1139,33 +1139,36 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       window.dispatchEvent(new CustomEvent('luckread:quote-relationship-pending', { detail: { pending: false } }))
       quoteRelationshipKeyRef.current = null
     })
-    if (!quoteContentId) {
-      setLoadingQuote(false)
-      return () => { active = false; controller.abort() }
-    }
-    setLoadingQuote(true)
-    void authorizedFetch<ContentResponse | { data?: ContentResponse }>(
-      '/api/v1/contents/' + encodeURIComponent(quoteContentId),
-      { method: 'GET', cache: 'no-store', headers: { accept: 'application/json' }, signal: controller.signal },
-    ).then(({ response, data }) => {
+    queueMicrotask(() => {
       if (!active) return
-      const target = data && typeof data === 'object' && 'data' in data
-        ? (data as { data?: ContentResponse }).data
-        : data as ContentResponse | null
-      if (
-        !response.ok ||
-        !isPublicQuotePostTarget(target, quoteContentId)
-      ) {
-        throw new Error(getApiErrorMessage(data, '这条动态目前不可引用。'))
+      if (!quoteContentId) {
+        setLoadingQuote(false)
+        return
       }
-      setQuoteTarget(target)
-      setError('')
-    }).catch((caught) => {
-      if (!active || controller.signal.aborted) return
-      setQuoteTarget(null)
-      setError(caught instanceof Error ? caught.message : '无法加载要引用的原帖。')
-    }).finally(() => {
-      if (active) setLoadingQuote(false)
+      setLoadingQuote(true)
+      void authorizedFetch<ContentResponse | { data?: ContentResponse }>(
+        '/api/v1/contents/' + encodeURIComponent(quoteContentId),
+        { method: 'GET', cache: 'no-store', headers: { accept: 'application/json' }, signal: controller.signal },
+      ).then(({ response, data }) => {
+        if (!active) return
+        const target = data && typeof data === 'object' && 'data' in data
+          ? (data as { data?: ContentResponse }).data
+          : data as ContentResponse | null
+        if (
+          !response.ok ||
+          !isPublicQuotePostTarget(target, quoteContentId)
+        ) {
+          throw new Error(getApiErrorMessage(data, '这条动态目前不可引用。'))
+        }
+        setQuoteTarget(target)
+        setError('')
+      }).catch((caught) => {
+        if (!active || controller.signal.aborted) return
+        setQuoteTarget(null)
+        setError(caught instanceof Error ? caught.message : '无法加载要引用的原帖。')
+      }).finally(() => {
+        if (active) setLoadingQuote(false)
+      })
     })
     return () => { active = false; controller.abort() }
   }, [quoteContentId])
