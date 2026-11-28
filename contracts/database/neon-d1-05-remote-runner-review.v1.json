@@ -83,11 +83,11 @@
       },
       {
         "path": "scripts/neon/shared-domain-schema-runner.mjs",
-        "gitBlobSha1": "53706e33929da41f331acf3892d223d341762817"
+        "gitBlobSha1": "7119e954bd794f47d3b8d795ceda4e93e3af86aa"
       },
       {
         "path": "scripts/neon/shared-domain-schema-runner.test.mjs",
-        "gitBlobSha1": "4620c1ce0e35ae97605d76d02b7140c0600f9857"
+        "gitBlobSha1": "89f8a1aa8e08acbb79e5bb03446468c257ca197e"
       },
       {
         "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",

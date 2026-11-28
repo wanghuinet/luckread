@@ -127,7 +127,7 @@ function ledgerRow(index) {
 test('D1-04 ledger accepts only an exact ordered manifest prefix', () => {
   assert.equal(assertD104LedgerRows(manifest, plan, []).length, 0)
   assert.equal(assertD104LedgerRows(manifest, plan, [ledgerRow(0)]).length, 1)
-  assert.equal(assertD104LedgerRows(manifest, plan, manifest.entries.map((_, index) => ledgerRow(index))).length, 6)
+  assert.equal(assertD104LedgerRows(manifest, plan, manifest.entries.map((_, index) => ledgerRow(index))).length, 7)
 })
 
 test('D1-04 ledger rejects domain contamination, wrong order, owner drift and checksum drift', () => {
