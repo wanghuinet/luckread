@@ -15,6 +15,9 @@ const required = [
   'suggested_price_minor',
   'maximum_price_minor',
   'membership_plan_versions_price_mode_values_check',
+  'minimum_price_minor IS NOT NULL',
+  'suggested_price_minor IS NOT NULL',
+  'maximum_price_minor IS NOT NULL',
   'BEGIN;',
   'COMMIT;',
 ]
