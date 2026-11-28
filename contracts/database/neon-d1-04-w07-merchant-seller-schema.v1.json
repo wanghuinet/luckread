@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-merchant-seller-schema.v1.json",
+  "title": "LuckRead W07 Merchant Seller PostgreSQL 18 Schema Contract",
+  "version": "1.0.0",
+  "status": "W07_MERCHANT_SELLER_LOCAL_POSTGRES18_REHEARSAL_PASSED",
+  "target": {
+    "domainId": "D1-04",
+    "databaseName": "luckread_finance",
+    "postgresMajor": 18,
+    "cloudflareD1DatabaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
+    "remoteSchemaApplyAuthorized": false,
+    "businessDataImportAuthorized": false,
+    "productionCutoverAuthorized": false,
+    "remoteSchemaApplied": false,
+    "businessDataImport": false,
+    "remoteApplyReady": false
+  },
+  "primaryOwner": {
+    "worker": "W07",
+    "entities": [
+      "Merchant",
+      "Store",
+      "MerchantQualification",
+      "MerchantStaff",
+      "MerchantScope"
+    ],
+    "identityAuthority": "W02",
+    "auditAuthority": "W06",
+    "migrationArtifact": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0007_w07_d1_04_merchant_seller.sql"
+  },
+  "sourceContracts": [
+    "docs/116-MERCHANT-SELLER-PLATFORM-CONTRACT-v1.0.md",
+    "docs/118-MERCHANT-SELLER-DATA-CONTRACT-v1.0.md",
+    "docs/121-MERCHANT-SELLER-PERMISSION-AND-SECURITY-CONTRACT-v1.0.md"
+  ],
+  "schema": {
+    "tables": {
+      "merchant_profiles": {
+        "primaryKey": "merchant_id",
+        "immutable": [
+          "merchant_id",
+          "merchant_type",
+          "identity_ref",
+          "created_at"
+        ],
+        "status": [
+          "PENDING",
+          "ACTIVE",
+          "RESTRICTED",
+          "SUSPENDED",
+          "CLOSED"
+        ]
+      },
+      "merchant_stores": {
+        "primaryKey": "store_id",
+        "owner": "merchant_id",
+        "ownerImmutable": true,
+        "status": [
+          "OPEN",
+          "PAUSED",
+          "CLOSED"
+        ]
+      },
+      "merchant_qualifications": {
+        "primaryKey": "qualification_id",
+        "unique": [
+          "merchant_id",
+          "capability",
+          "jurisdiction_country",
+          "jurisdiction_region"
+        ],
+        "status": [
+          "PENDING_REVIEW",
+          "APPROVED",
+          "DENIED",
+          "EXPIRED",
+          "RE_REVIEW"
+        ]
+      },
+      "merchant_staff": {
+        "primaryKey": "staff_id",
+        "identityReference": "W02 user_id; no copied identity data",
+        "activeMembershipUnique": [
+          "merchant_id",
+          "user_id"
+        ],
+        "status": [
+          "INVITED",
+          "ACTIVE",
+          "SUSPENDED",
+          "REMOVED"
+        ]
+      },
+      "merchant_scopes": {
+        "primaryKey": "scope_id",
+        "denyByDefault": true,
+        "explicitResourceScope": true,
+        "settlementView": "READ_ONLY",
+        "status": [
+          "ACTIVE",
+          "REVOKED"
+        ]
+      }
+    },
+    "explicitIndexNames": [
+      "ix_merchant_profiles_status_created",
+      "ix_merchant_stores_merchant_status_created",
+      "ux_merchant_qualifications_jurisdiction",
+      "ix_merchant_qualifications_status_expiry",
+      "ux_merchant_staff_active_user",
+      "ux_merchant_staff_active_owner",
+      "ux_merchant_scopes_active_resource",
+      "ix_merchant_scopes_staff_status"
+    ],
+    "triggerNames": [
+      "merchant_primary_store_guard",
+      "merchant_identity_immutable",
+      "merchant_version_guard",
+      "merchant_transition_guard",
+      "merchant_retained",
+      "store_requires_merchant",
+      "store_identity_immutable",
+      "store_version_guard",
+      "store_transition_guard",
+      "store_retained",
+      "qualification_requires_merchant",
+      "qualification_identity_immutable",
+      "qualification_version_guard",
+      "qualification_transition_guard",
+      "qualification_retained",
+      "staff_requires_merchant",
+      "staff_identity_immutable",
+      "staff_version_guard",
+      "staff_transition_guard",
+      "staff_retained",
+      "scope_requires_active_staff",
+      "scope_identity_immutable",
+      "scope_version_guard",
+      "scope_transition_guard",
+      "scope_retained"
+    ],
+    "totals": {
+      "tables": 5,
+      "explicitIndexes": 8,
+      "triggers": 25,
+      "triggerFunctions": 1,
+      "foreignKeys": 0
+    },
+    "cumulativeAfterThisSlice": {
+      "tables": 20,
+      "explicitIndexes": 39,
+      "triggers": 97,
+      "triggerFunctions": 7,
+      "foreignKeys": 0
+    }
+  },
+  "safety": {
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "runtimeBindingsChanged": false,
+    "productionCutoverAuthorized": false
+  },
+  "verification": {
+    "postgresImage": "postgres:18.6",
+    "database": "luckread_finance_schema",
+    "tables": 5,
+    "explicitIndexes": 8,
+    "triggers": 25,
+    "triggerFunctions": 1,
+    "foreignKeys": 0,
+    "cumulativeTables": 20,
+    "cumulativeExplicitIndexes": 39,
+    "cumulativeTriggers": 97,
+    "cumulativeTriggerFunctions": 7,
+    "cumulativeForeignKeys": 0,
+    "fixtureRowsAfterRollback": 0,
+    "localRehearsalEvidence": {
+      "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+      "workflowRunId": 46151139622,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/46151139622",
+      "verifiedHeadSha": "adcf83456b9ef273cb4a495482b722a7fc8ca57f",
+      "pullRequestMergeCommitSha": "a2b17d140ba31aa1a77b0a475fc7e495050b2a42",
+      "postgresVersion": "18.6",
+      "database": "luckread_finance_schema",
+      "newSliceTables": 5,
+      "newSliceExplicitIndexes": 8,
+      "newSliceTriggers": 25,
+      "newSliceTriggerFunctions": 1,
+      "cumulativeTables": 20,
+      "cumulativeExplicitIndexes": 39,
+      "cumulativeTriggers": 97,
+      "cumulativeTriggerFunctions": 7,
+      "foreignKeys": 0,
+      "merchantSellerFixtureRowsAfterRollback": 0,
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false,
+      "evidenceArtifactId": 15265772730,
+      "evidenceArtifactSha256": "sha256:b83b137f04c694b76e8a735e34238157cfc3043ed9e1e14f0143113e4d45c98b"
+    }
+  },
+  "scope": {
+    "includedTables": [
+      "merchant_profiles",
+      "merchant_stores",
+      "merchant_qualifications",
+      "merchant_staff",
+      "merchant_scopes"
+    ],
+    "sourceContracts": [
+      "docs/116-MERCHANT-SELLER-PLATFORM-CONTRACT-v1.0.md",
+      "docs/118-MERCHANT-SELLER-DATA-CONTRACT-v1.0.md",
+      "docs/121-MERCHANT-SELLER-PERMISSION-AND-SECURITY-CONTRACT-v1.0.md"
+    ],
+    "migrationKind": "NEW_W07_POSTGRESQL_SCHEMA_SLICE_NO_D1_SOURCE_MIGRATION"
+  }
+}

@@ -30,15 +30,15 @@ function overrideSource(pathToChange, mutate, updatePin = true) {
     : readSource(relativePath)
 }
 
-test('independently verifies W07 D1-04 owners, seven source migrations, six PG artifacts and PG18 evidence', () => {
+test('independently verifies W07 D1-04 owners, seven source migrations, seven PG artifacts and PG18 evidence', () => {
   const result = verifyD104SharedRunnerReview({ readSource })
   assert.equal(result.status, 'D1_04_SHARED_RUNNER_INDEPENDENT_LOCAL_REVIEW_PASS')
-  assert.deepEqual(result.physicalTablesByWorker, { W07: 15 })
+  assert.deepEqual(result.physicalTablesByWorker, { W07: 20 })
   assert.deepEqual(result.catalog, {
-    tables: 15,
-    explicitIndexes: 31,
-    finalTriggers: 72,
-    triggerFunctions: 6,
+    tables: 20,
+    explicitIndexes: 39,
+    finalTriggers: 97,
+    triggerFunctions: 7,
     foreignKeys: 0,
     controlSeedRows: 1,
     businessRows: 0,
@@ -203,4 +203,14 @@ test('fails closed if W07 Neon runtime is selected before D1-04 remote schema ap
     () => verifyD104SharedRunnerReview({ readSource: source }),
     /W07 Neon runtime cannot be selected before D1-04 remote schema application is recorded/,
   )
+})
+
+test('rejects a Merchant/Seller ledger entry attributed outside W07', () => {
+  const manifestPath = 'contracts/database/neon-d1-04-shared-migration-manifest.v1.json'
+  const source = overrideSource(manifestPath, (text) => {
+    const manifest = JSON.parse(text)
+    manifest.entries[6].ownerWorker = 'W10'
+    return JSON.stringify(manifest)
+  })
+  assert.throws(() => verifyD104SharedRunnerReview({ readSource: source }), new RegExp('ordered W07 schema/ledger owner mapping drifted'))
 })

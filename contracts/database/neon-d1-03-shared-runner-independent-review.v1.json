@@ -10,7 +10,7 @@
     "reviewedMainCommit": "2bae4a5384cb86d7a754c9dde63d88515d5d020f",
     "sharedExecutorPullRequest": 1660,
     "sharedExecutorHeadCommit": "5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de",
-    "sharedPostgres18WorkflowRunId": 42509822425,
+    "sharedPostgres18WorkflowRunId": 46159151653,
     "sharedPostgres18WorkflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42509822425",
     "d1Postflight": {
       "domainId": "D1-03",
@@ -26,12 +26,18 @@
       "businessRows": 0,
       "remoteNeonTouched": false,
       "cloudflareD1Touched": false,
-      "remoteApplyReady": false
+      "remoteApplyReady": false,
+      "workflowRunId": 46159151653,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/46159151653",
+      "verifiedHeadSha": "71d4ba13e15985b280f62758f42797e2a7070617",
+      "artifactId": 15268813295,
+      "artifactName": "neon-D1-03-shared-schema-postflight-ddb1bcd543d683dc588897d89e3b65d1bb923269",
+      "artifactZipSha256": "sha256:682401c58baeddc43dc7303faf5f0ba644e8ea4b013064bda3bb6814ff2a8818"
     },
     "reviewedSourcePins": [
       {
         "path": "scripts/neon/shared-domain-schema-runner.mjs",
-        "gitBlobSha1": "53706e33929da41f331acf3892d223d341762817"
+        "gitBlobSha1": "7119e954bd794f47d3b8d795ceda4e93e3af86aa"
       },
       {
         "path": "contracts/database/neon-d1-03-shared-migration-manifest.v1.json",

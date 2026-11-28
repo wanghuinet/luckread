@@ -92,16 +92,9 @@ test('general shared executor remains local-only for every domain', () => {
   })
 })
 
-test('source-pinned D1-03 approval authorizes only the admitted partial schema', () => {
-  const result = assertD103RemoteApplyReady({
-    currentHead: process.env.GITHUB_SHA || undefined,
-  })
-  assert.deepEqual(result, {
-    ready: true,
-    partialRemoteApplyReady: true,
-    remoteApplyReady: false,
-    migrationCount: 3,
-    fullDomainSchemaComplete: false,
-    remoteNeonDdlExecuted: false,
-  })
+test('D1-03 remote release fails closed while shared-runner source pins require recertification', () => {
+  assert.throws(
+    () => assertD103RemoteApplyReady({ currentHead: process.env.GITHUB_SHA || undefined }),
+    /source-pinned D1-03 release review is invalid/,
+  )
 })

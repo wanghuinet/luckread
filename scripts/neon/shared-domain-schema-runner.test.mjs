@@ -42,17 +42,17 @@ test('D1-03 manifest combines only admitted W06, W09 and W10 owner schemas', () 
   assert.equal(plan.tables.includes('growth_operations'), false)
 })
 
-test('D1-04 combines all seven admitted source migrations in six ordered PostgreSQL artifacts', () => {
+test('D1-04 combines seven admitted source migrations and a native Merchant/Seller slice in seven ordered PostgreSQL artifacts', () => {
   const manifest = loadManifest('D1-04')
   const shape = validateManifestShape(manifest)
   assert.equal(shape.valid, true, shape.errors.join('; '))
   const plan = buildDomainPlan(manifest, { readSource, readBytes })
   assert.equal(shape.sourceMigrationCount, 7)
-  assert.equal(plan.entries.length, 6)
-  assert.equal(plan.tables.length, 15)
-  assert.equal(plan.indexes.length, 31)
-  assert.equal(plan.triggers.length, 72)
-  assert.equal(plan.functions.length, 6)
+  assert.equal(plan.entries.length, 7)
+  assert.equal(plan.tables.length, 20)
+  assert.equal(plan.indexes.length, 39)
+  assert.equal(plan.triggers.length, 97)
+  assert.equal(plan.functions.length, 7)
   assert.equal(plan.references.length, 0)
   assert.equal(plan.controlSeedRows, 1)
   assert.deepEqual(plan.seedRowsByTable.get('subscription_renewal_scheduler_state'), [{
@@ -64,6 +64,13 @@ test('D1-04 combines all seven admitted source migrations in six ordered Postgre
   }])
   assert.ok(plan.entries[5].effects.triggerOperations.some((item) =>
     item.operation === 'DROP' && item.name === 'payment_provider_events_terminal_immutable'))
+  assert.equal(plan.entries[6].entry.migrationId, 'd1-04-w07-merchant-seller-schema-v1')
+  assert.deepEqual(plan.entries[6].entry.sourceMigrations, [])
+  assert.equal(plan.entries[6].effects.tables.length, 5)
+  assert.equal(shape.sourceMigrationCount, 7)
+  const missingNativeSources = structuredClone(manifest)
+  missingNativeSources.entries[6].sourceContracts = []
+  assert.equal(validateManifestShape(missingNativeSources).valid, false)
 })
 
 test('D1-05 remains local-rehearsal eligible but remote-admission blocked', () => {

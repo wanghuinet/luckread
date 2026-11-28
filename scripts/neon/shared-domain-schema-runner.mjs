@@ -152,9 +152,19 @@ export function validateManifestShape(manifest) {
         !isSafeRepositoryPath(entry.artifactPaths[0]) || !entry.artifactPaths[0].endsWith('.sql')) {
       errors.push('each migration must have exactly one safe committed PostgreSQL .sql artifact: ' + String(entry.migrationId))
     }
-    if (!Array.isArray(entry.sourceMigrations) || entry.sourceMigrations.length === 0 ||
-        entry.sourceMigrations.some((item) => !isSafeRepositoryPath(item))) {
-      errors.push('each migration must name its admitted source migration paths: ' + String(entry.migrationId))
+    const sourceMigrationsValid = Array.isArray(entry.sourceMigrations) &&
+      entry.sourceMigrations.every((item) => isSafeRepositoryPath(item))
+    const sourceContractsValid = Array.isArray(entry.sourceContracts) &&
+      entry.sourceContracts.length > 0 &&
+      entry.sourceContracts.every((item) => isSafeRepositoryPath(item))
+    const admittedNativeMerchantSellerSlice = manifest.domainId === 'D1-04' &&
+      entry.migrationId === 'd1-04-w07-merchant-seller-schema-v1' &&
+      entry.ownerWorker === 'W07' &&
+      Array.isArray(entry.sourceMigrations) && entry.sourceMigrations.length === 0 &&
+      sourceContractsValid
+    if (!sourceMigrationsValid || (entry.sourceMigrations.length === 0 && !admittedNativeMerchantSellerSlice) ||
+        (entry.sourceMigrations.length > 0 && !sourceMigrationsValid)) {
+      errors.push('each migration must name safe admitted D1 source migrations or the exact W07 Merchant/Seller source-contract set: ' + String(entry.migrationId))
     }
     if (!isSafeRepositoryPath(entry.schemaContract)) {
       errors.push('each migration must name a safe source schema contract: ' + String(entry.migrationId))
@@ -246,6 +256,13 @@ function contractArtifactPaths(contract) {
 function validateEntryContract(manifest, entry, readSource = readText) {
   if (!isSafeRepositoryPath(entry.schemaContract)) fail('unsafe schema contract path: ' + entry.schemaContract)
   const contract = JSON.parse(readSource(entry.schemaContract))
+  if (Array.isArray(entry.sourceMigrations) && entry.sourceMigrations.length === 0) {
+    const manifestSourceContracts = [...(entry.sourceContracts ?? [])].sort()
+    const contractSourceContracts = [...(contract.sourceContracts ?? [])].sort()
+    if (JSON.stringify(manifestSourceContracts) !== JSON.stringify(contractSourceContracts)) {
+      fail('native PostgreSQL schema source-contract set does not match its schema contract: ' + entry.schemaContract)
+    }
+  }
   if (contract.target?.domainId !== manifest.domainId ||
       contract.target?.databaseName !== manifest.databaseName ||
       contract.target?.postgresMajor !== 18) {

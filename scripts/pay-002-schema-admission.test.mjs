@@ -60,13 +60,14 @@ function validFixture() {
     remoteApplyReady: false,
     businessDataImport: false,
     productionCutoverAuthorized: false,
-    expected: { ...catalog },
+    expected: { ...catalog, tables: 20, explicitIndexes: 39, constraintIndexes: 34, triggers: 97, triggerFunctions: 7 },
   }
   const sharedRunnerReview = {
     status: 'LOCAL_SHARED_SCHEMA_REVIEW_PASSED_REMOTE_APPLY_BLOCKED',
     remoteApplyReady: false,
     businessDataImport: false,
     productionCutoverAuthorized: false,
+    review: { d1Postflight: { migrations: 7, sourceMigrations: 7, tables: 20, explicitIndexes: 39, triggers: 97, triggerFunctions: 7, remoteNeonTouched: false, remoteApplyReady: false } },
   }
   const schemaEvidence = {
     id: 'D1-04-SCHEMA-01',

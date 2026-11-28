@@ -174,7 +174,7 @@ describe('PAY-002 API contract admission boundary', () => {
     expect(gate.requiredEvidence.find((item: { id: string }) => item.id === 'ENTITY-MAPPING-01').status).toBe('ADMITTED')
     expect(gate.requiredEvidence.find((item: { id: string }) => item.id === 'D1-04-BINDING-01').status).toBe('ADMITTED')
     expect(gate.requiredEvidence.find((item: { id: string }) => item.id === 'D1-04-SCHEMA-01').status).toBe('ADMITTED')
-    expect(gate.requiredEvidence.find((item: { id: string }) => item.id === 'E2E-SECURITY-01').status).toBe('PENDING')
+    expect(gate.requiredEvidence.find((item: { id: string }) => item.id === 'E2E-SECURITY-01').status).toBe('ADMITTED')
     expect(gate.requiredEvidence.find((item: { id: string }) => item.id === 'EVIDENCE-REGISTRY-01').status).toBe('PENDING')
     expect(gate.status).toBe('BLOCKED_ON_RUNTIME_PERSISTENCE_AND_SECURITY_EVIDENCE')
     expect(persistence.physicalResource.databaseName).toBe('unimportant')

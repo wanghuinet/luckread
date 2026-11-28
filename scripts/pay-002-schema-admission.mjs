@@ -94,9 +94,22 @@ export function validatePay002D104SchemaEvidence({
     controlSeedRows: 1,
   }
   for (const [key, value] of Object.entries(catalogExpected)) {
-    if (!isCount(catalog[key], value) || !isCount(expected[key], value)) {
-      fail('D1-04 postflight catalog mismatch for ' + key)
-    }
+    if (!isCount(catalog[key], value)) fail('historical D1-04 remote postflight catalog mismatch for ' + key)
+  }
+
+  const currentManifestExpected = {
+    tables: 20, explicitIndexes: 39, constraintIndexes: 34, triggers: 97,
+    triggerFunctions: 7, foreignKeys: 0, businessRows: 0, controlSeedRows: 1,
+  }
+  for (const [key, value] of Object.entries(currentManifestExpected)) {
+    if (!isCount(expected[key], value)) fail('current seven-slice D1-04 manifest catalog mismatch for ' + key)
+  }
+  const reviewedLocal = sharedRunnerReview?.review?.d1Postflight ?? {}
+  if (!isCount(reviewedLocal.migrations, 7) || !isCount(reviewedLocal.sourceMigrations, 7) ||
+      !isCount(reviewedLocal.tables, 20) || !isCount(reviewedLocal.explicitIndexes, 39) ||
+      !isCount(reviewedLocal.triggers, 97) || !isCount(reviewedLocal.triggerFunctions, 7) ||
+      reviewedLocal.remoteNeonTouched !== false || reviewedLocal.remoteApplyReady !== false) {
+    fail('D1-04 shared-runner review must record the seven-slice local-only PostgreSQL 18 catalog separately from historical remote evidence')
   }
 
   if (manifest?.domainId !== 'D1-04' ||

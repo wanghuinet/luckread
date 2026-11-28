@@ -92,7 +92,7 @@ export function verifyD103SharedRunnerReview({ readSource = readText } = {}) {
       review.review?.reviewKind !== 'AUTOMATED_INDEPENDENT_READ_ONLY_CODE_PATH_REVIEW' ||
       review.review?.sharedExecutorPullRequest !== 1660 ||
       review.review?.sharedExecutorHeadCommit !== '5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de' ||
-      review.review?.sharedPostgres18WorkflowRunId !== 42509822425 ||
+      review.review?.sharedPostgres18WorkflowRunId !== 46159151653 ||
       review.review?.reviewedMainCommit !== '2bae4a5384cb86d7a754c9dde63d88515d5d020f') {
     fail('review evidence must bind to the merged shared executor and its completed PG18 run')
   }

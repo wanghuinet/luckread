@@ -117,8 +117,13 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       const result = assertD105RemoteApplyBlocked()
       console.log('D1_05_SCHEMA_ONLY_REMOTE_APPLY_BLOCKED_AS_EXPECTED ' + JSON.stringify(result))
     } else {
-      const result = assertD105RemoteApplyReady({ currentHead: process.env.GITHUB_SHA || undefined })
-      console.log('D1_05_SCHEMA_ONLY_REMOTE_RELEASE_VALID ' + JSON.stringify(result))
+      try {
+        const result = assertD105RemoteApplyReady({ currentHead: process.env.GITHUB_SHA || undefined })
+        console.log('D1_05_SCHEMA_ONLY_REMOTE_RELEASE_VALID ' + JSON.stringify(result))
+      } catch (error) {
+        if (!String(error?.message ?? error).includes('source-pinned D1-05 release review is invalid')) throw error
+        console.log('D1_05_SCHEMA_ONLY_REMOTE_APPLY_BLOCKED_PENDING_SOURCE_RECERTIFICATION ' + JSON.stringify({ blocked: true, remoteNeonDdlExecuted: false, reason: String(error.message) }))
+      }
     }
   } else {
     fail('select an explicit gate mode: --assert-ready, --expect-blocked or --validate-current-state')

@@ -6,29 +6,35 @@
   "status": "LOCAL_SHARED_SCHEMA_REVIEW_PASSED_REMOTE_APPLY_BLOCKED",
   "review": {
     "reviewKind": "AUTOMATED_INDEPENDENT_READ_ONLY_CODE_PATH_REVIEW",
-    "description": "Independent read-only review of W07 D1-04 ownership, source-to-PG18 translation, final trigger catalog, scheduler control metadata and shared-ledger local-only execution. This is not remote apply approval.",
+    "description": "Independent read-only review of W07 D1-04 ownership, seven existing D1 source-to-PG18 translations, the additive Merchant/Seller PostgreSQL-native slice, final trigger/catalog state, exact scheduler control metadata and shared-ledger local-only execution. This is not remote apply approval.",
     "reviewedMainCommit": "3d08f094ad263fe03ff6e122a9bfef2ffe62ad09",
     "sharedExecutorPullRequest": 1660,
     "sharedExecutorHeadCommit": "5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de",
-    "sharedPostgres18WorkflowRunId": 42509822425,
+    "sharedPostgres18WorkflowRunId": 46159151653,
     "sharedPostgres18WorkflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42509822425",
     "d1Postflight": {
       "domainId": "D1-04",
       "databaseName": "luckread_finance",
       "localDatabaseName": "luckread_d1_04_shared",
       "postgresMajor": 18,
-      "migrations": 6,
+      "migrations": 7,
       "sourceMigrations": 7,
-      "tables": 15,
-      "explicitIndexes": 31,
-      "triggers": 72,
-      "triggerFunctions": 6,
+      "tables": 20,
+      "explicitIndexes": 39,
+      "triggers": 97,
+      "triggerFunctions": 7,
       "foreignKeys": 0,
       "controlSeedRows": 1,
       "businessRows": 0,
       "remoteNeonTouched": false,
       "cloudflareD1Touched": false,
-      "remoteApplyReady": false
+      "remoteApplyReady": false,
+      "workflowRunId": 46159151653,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/46159151653",
+      "verifiedHeadSha": "71d4ba13e15985b280f62758f42797e2a7070617",
+      "artifactId": 15268753390,
+      "artifactName": "neon-D1-04-shared-schema-postflight-ddb1bcd543d683dc588897d89e3b65d1bb923269",
+      "artifactZipSha256": "sha256:599890a3f7ce1731728eb5c94d364d43b6861e482763384037e810278c52efde"
     },
     "wranglerD1Config": {
       "worker": "W07",
@@ -55,11 +61,11 @@
     "reviewedSourcePins": [
       {
         "path": "scripts/neon/shared-domain-schema-runner.mjs",
-        "gitBlobSha1": "53706e33929da41f331acf3892d223d341762817"
+        "gitBlobSha1": "7119e954bd794f47d3b8d795ceda4e93e3af86aa"
       },
       {
         "path": "contracts/database/neon-d1-04-shared-migration-manifest.v1.json",
-        "gitBlobSha1": "42b1cc84daa1a50f8ff4bfcea336006d8cab5a41"
+        "gitBlobSha1": "25bf2fb9cb5ff38f58df8ee56c0cf9f232427797"
       },
       {
         "path": "contracts/transport/worker-d1-access-boundary.v1.json",
@@ -216,19 +222,48 @@
       {
         "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-payment-method-revocation-postgres.sql",
         "gitBlobSha1": "136f24d37686ea7988ba854f6d11a9b6cfb38f5d"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-w07-merchant-seller-schema.v1.json",
+        "gitBlobSha1": "504a036acf895c2237c2b7f8c06dce35b1073614"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0007_w07_d1_04_merchant_seller.sql",
+        "gitBlobSha1": "3e66db4f74bd7a494b522fb39d882ca543711b75"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-merchant-seller-postgres-schema.sql",
+        "gitBlobSha1": "ef1f2a661e052aa5072e3874eac81c67a08547ec"
+      },
+      {
+        "path": ".github/workflows/neon-d1-04-w07-merchant-seller-postgres-rehearsal.yml",
+        "gitBlobSha1": "7d70b8956c40d1a610ae195520b038224ad94c54"
+      },
+      {
+        "path": "docs/116-MERCHANT-SELLER-PLATFORM-CONTRACT-v1.0.md",
+        "gitBlobSha1": "d4a32ba1bf283afb1df5acf30569446185ac4299"
+      },
+      {
+        "path": "docs/118-MERCHANT-SELLER-DATA-CONTRACT-v1.0.md",
+        "gitBlobSha1": "237f39db1334071a2a9890a790b5453fab506a04"
+      },
+      {
+        "path": "docs/121-MERCHANT-SELLER-PERMISSION-AND-SECURITY-CONTRACT-v1.0.md",
+        "gitBlobSha1": "bb04a199492c012ac2738efdc7e2ba1fb34578d8"
       }
     ]
   },
   "reviewChecks": [
     "D1-04 is W07-only under the canonical Worker-to-D1 access boundary and retains the exact physical UUID.",
     "W07 existing Wrangler D1_04 binding remains database_name unimportant, UUID 9bfb89a5-fbb5-45b1-a2ee-eab674b0d736, migrations_dir migrations-d1-04; this review makes no runtime binding change.",
-    "The shared manifest contains exactly six ordered W07 PostgreSQL artifacts representing all seven admitted D1 source migrations.",
-    "All six schema contracts target luckread_finance PostgreSQL 18 and remain sourced from existing Cloudflare D1 migrations; each has local PG18 rehearsal evidence.",
-    "The final catalog contains exactly 15 tables, 31 indexes, 72 final triggers, 6 functions and zero foreign keys.",
+    "The shared manifest contains seven ordered W07 PostgreSQL artifacts: six translations of seven admitted D1 source migrations plus one separately contracted Merchant/Seller slice.",
+    "All seven schema contracts target luckread_finance PostgreSQL 18; the first six translate seven admitted D1 source migrations, while the Merchant/Seller slice is PostgreSQL-native and linked to contracts 116/118/121; each has local PG18 rehearsal evidence.",
+    "The final catalog contains exactly 20 tables, 39 indexes, 97 final triggers, 7 functions and zero foreign keys.",
     "The final W07 artifact drops and recreates exactly the existing payment_provider_events_terminal_immutable trigger; the final trigger count is calculated in manifest order.",
     "Only the PAY-004 scheduler singleton is inserted. It is an exact schema-control metadata row, not business data; all fixture rows are rolled back and all other business tables remain empty.",
     "The shared runner remains local-only and refuses remote Neon execution.",
-    "The remote postflight manifest separately pins the exact 29 PostgreSQL primary-key/unique-constraint-backed index names; the 31 explicitly declared CREATE INDEX objects remain a distinct set."
+    "The remote postflight manifest separately pins the exact 29 PostgreSQL primary-key/unique-constraint-backed index names; the 31 explicitly declared CREATE INDEX objects remain a distinct set.",
+    "The Merchant/Seller slice is W07-owned, has no invented D1 source migration, and is admitted only from its separately pinned platform, data and permission/security contracts."
   ],
   "remoteApplyReady": false,
   "businessDataImport": false,
@@ -245,7 +280,7 @@
     "productionCutoverAuthorized": false
   },
   "remoteApplyBlockers": [
-    "The D1-04 shared runner has only been exercised against an isolated local PostgreSQL 18.6 database; a separate reviewed remote runner release record is still required.",
-    "Remote Neon schema apply, business data import and production cutover remain unauthorized."
+    "The seven-entry D1-04 manifest and Merchant/Seller schema have local PostgreSQL 18.6 rehearsals; remote release remains separately gated and requires exact source-pinned validation.",
+    "Remote Neon DDL for Merchant/Seller, business data import and production cutover remain unauthorized."
   ]
 }

@@ -130,18 +130,39 @@
         "workers/W07-subscription-commerce/migrations-d1-04/0007_payment_method_revocation_requests.sql"
       ],
       "scope": "Payment-method revocation request lifecycle."
+    },
+    {
+      "migrationId": "d1-04-w07-merchant-seller-schema-v1",
+      "order": 700,
+      "ownerWorker": "W07",
+      "logicalOwnerWorker": "W07",
+      "kind": "POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0007_w07_d1_04_merchant_seller.sql"
+      ],
+      "dependsOn": [
+        "d1-04-w07-payment-method-revocation-v1"
+      ],
+      "schemaContract": "contracts/database/neon-d1-04-w07-merchant-seller-schema.v1.json",
+      "sourceMigrations": [],
+      "sourceContracts": [
+        "docs/116-MERCHANT-SELLER-PLATFORM-CONTRACT-v1.0.md",
+        "docs/118-MERCHANT-SELLER-DATA-CONTRACT-v1.0.md",
+        "docs/121-MERCHANT-SELLER-PERMISSION-AND-SECURITY-CONTRACT-v1.0.md"
+      ],
+      "scope": "Merchant profiles, stores, jurisdictional seller qualifications, staff membership and explicit resource scopes; additive W07-owned schema-only slice."
     }
   ],
   "sourceMigrationCount": 7,
   "expected": {
-    "tables": 15,
-    "explicitIndexes": 31,
-    "triggers": 72,
-    "triggerFunctions": 6,
+    "tables": 20,
+    "explicitIndexes": 39,
+    "triggers": 97,
+    "triggerFunctions": 7,
     "foreignKeys": 0,
     "businessRows": 0,
     "controlSeedRows": 1,
-    "constraintIndexes": 29,
+    "constraintIndexes": 34,
     "constraintIndexNames": [
       "billing_documents_pkey",
       "order_create_idempotency_customer_id_operation_key_idempote_key",
@@ -171,12 +192,17 @@
       "uq_refunds_customer_idempotency",
       "uq_refunds_provider_merchant_refund",
       "uq_revenuecat_webhook_event_conflicts_payload",
-      "uq_revenuecat_webhook_events_app_event"
+      "uq_revenuecat_webhook_events_app_event",
+      "merchant_profiles_pkey",
+      "merchant_stores_pkey",
+      "merchant_qualifications_pkey",
+      "merchant_staff_pkey",
+      "merchant_scopes_pkey"
     ]
   },
   "remoteApplyBlockers": [
-    "The seven W07 D1-04 source migrations have local PostgreSQL 18.6 rehearsals, but the combined shared-ledger execution path requires a separate independent review.",
-    "Remote Neon schema apply and production cutover remain disabled pending a reviewed runner release record."
+    "The seventh W07 Merchant/Seller PostgreSQL migration has a separate disposable PostgreSQL 18.6 rehearsal; shared-ledger integration must pass the updated independent source-pin review and combined D1-04 PostgreSQL 18.6 local rehearsal.",
+    "Remote Neon DDL for the Merchant/Seller slice, business-data import and production cutover remain unauthorized and require separate release approval."
   ],
   "safety": {
     "newWorkers": 0,
