@@ -206,9 +206,11 @@ export async function commitFoundingReservationAfterVerifiedPayment(
   reservationId: string,
   verifiedPaymentEventId: string,
   now = new Date(),
+  verifiedPaidAt = now,
 ): Promise<FoundingReservation> {
   const eventId = requirePlanId(verifiedPaymentEventId);
-  if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
+  if (!(now instanceof Date) || !Number.isFinite(now.getTime()) ||
+      !(verifiedPaidAt instanceof Date) || !Number.isFinite(verifiedPaidAt.getTime())) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
   }
   return withTransaction(db, async (client) => {
@@ -223,7 +225,10 @@ export async function commitFoundingReservationAfterVerifiedPayment(
       }
       return toPublic(row, true);
     }
-    if (row.state !== 'HELD' || !row.order_reference || Date.parse(row.expires_at) <= now.getTime()) {
+    // Webhook delivery can be delayed. Seat eligibility is determined by the
+    // finance-authoritative payment confirmation time, not webhook arrival time.
+    if (row.state !== 'HELD' || !row.order_reference ||
+        Date.parse(row.expires_at) <= verifiedPaidAt.getTime()) {
       throw new SubscriptionRuntimeError('INVALID_STATE', 409);
     }
     const updated = await client.query<ReservationRow>(
@@ -275,6 +280,7 @@ export async function commitFoundingReservationForPaidOrder(
   orderReference: string,
   verifiedPaymentEventId: string,
   now = new Date(),
+  verifiedPaidAt = now,
 ): Promise<FoundingReservation | null> {
   const orderId = requirePlanId(orderReference);
   const selected = await db.query<{ reservation_id: string }>(
@@ -283,7 +289,7 @@ export async function commitFoundingReservationForPaidOrder(
   );
   const reservationId = selected.rows[0]?.reservation_id;
   if (!reservationId) return null;
-  return commitFoundingReservationAfterVerifiedPayment(db, reservationId, verifiedPaymentEventId, now);
+  return commitFoundingReservationAfterVerifiedPayment(db, reservationId, verifiedPaymentEventId, now, verifiedPaidAt);
 }
 
 
@@ -303,13 +309,18 @@ export async function commitFoundingReservationForVerifiedPayment(
   if (!/^pay_[A-Za-z0-9]{26}$/.test(paymentId) || !merchantId || merchantId.length > 256) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
   }
-  const paidOrder = await financeDb.query<{ order_id: string }>(
-    "SELECT p.order_id FROM payments p INNER JOIN orders o ON o.order_id = p.order_id " +
+  const paidOrder = await financeDb.query<{ order_id: string; confirmed_at: string }>(
+    "SELECT p.order_id, to_char(o.confirmed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\\"T\\"HH24:MI:SS.MS\\"Z\\"') AS confirmed_at " +
+    "FROM payments p INNER JOIN orders o ON o.order_id = p.order_id " +
     "AND o.customer_id = p.customer_id WHERE p.payment_id = $1 AND p.merchant_id = $2 " +
     "AND p.provider = 'hyperswitch' AND p.status = 'succeeded' AND o.status IN ('CONFIRMED', 'COMPLETED') LIMIT 1",
     [paymentId, merchantId],
   );
-  const orderId = paidOrder.rows[0]?.order_id;
-  if (!orderId) throw new SubscriptionRuntimeError('INVALID_STATE', 409);
-  return commitFoundingReservationForPaidOrder(membershipDb, orderId, verifiedPaymentEventId, now);
+  const order = paidOrder.rows[0];
+  if (!order?.order_id || !order.confirmed_at || !Number.isFinite(Date.parse(order.confirmed_at))) {
+    throw new SubscriptionRuntimeError('INVALID_STATE', 409);
+  }
+  return commitFoundingReservationForPaidOrder(
+    membershipDb, order.order_id, verifiedPaymentEventId, now, new Date(order.confirmed_at),
+  );
 }
