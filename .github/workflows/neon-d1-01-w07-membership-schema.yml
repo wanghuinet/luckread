@@ -9,6 +9,8 @@ on:
       - 'contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json'
       - 'contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json'
       - 'workers/W07-subscription-commerce/migrations/**'
+      - 'workers/W07-subscription-commerce/src/order-item-resolution.ts'
+      - 'workers/W07-subscription-commerce/scripts/neon/rehearse-order-item-resolution-postgres-runtime.mjs'
       - 'workers/W07-subscription-commerce/scripts/neon/**'
       - 'workers/W07-subscription-commerce/src/neon-postgres-migrations/**'
       - 'workers/W07-subscription-commerce/README-neon-postgres-schema.md'
@@ -78,6 +80,17 @@ jobs:
             --dbname luckread_schema --set ON_ERROR_STOP=1 \
             --file workers/W07-subscription-commerce/src/neon-postgres-migrations/0002_w07_subscription_lifecycle.sql
 
+      - name: Install W02 PostgreSQL driver and TypeScript runtime for W07 offer-resolution rehearsal
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Rehearse authoritative membership-plan price resolution on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W07_ORDER_ITEM_RESOLUTION_POSTGRES_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+          W07_ORDER_ITEM_RESOLUTION_POSTGRES_REPORT: ../../workers/W07-subscription-commerce/artifacts/neon/w07-order-item-resolution-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W07-subscription-commerce/scripts/neon/rehearse-order-item-resolution-postgres-runtime.mjs
+
       - name: Verify W07 constraints, indexes, triggers, transaction rollback and empty tables
         env:
           PGPASSWORD: schema_generator_local_only
@@ -93,6 +106,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: neon-d1-01-w07-membership-postgres-schema-${{ github.sha }}
-          path: workers/W07-subscription-commerce/artifacts/neon/w07-d1-01-membership-postgres-schema-postflight.json
+          path: |
+            workers/W07-subscription-commerce/artifacts/neon/w07-d1-01-membership-postgres-schema-postflight.json
+            workers/W07-subscription-commerce/artifacts/neon/w07-order-item-resolution-postgres-runtime-postflight.json
           if-no-files-found: error
           retention-days: 90
