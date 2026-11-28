@@ -66,21 +66,24 @@ GPT 必须先阅读上述适用合同及其最新准入文件，再核对仓库�
 - W11：分析事件接收、去重和分析查询/聚合边界；不作为支付、订阅或 Ledger 的事实来源。
 - W68：不可变财务事实、钱包投影、结算与提现权威。
 
-### 3.1 销售方、平台角色与资金边界（用户决策待确认）
+### 3.1 销售方、平台角色与资金边界（Decision: HYBRID-SELLER-OF-RECORD）
 
-**决策状态：PENDING USER DECISION。** 用户已确认订阅暂停规则 PAUSE-A，但尚未确认 Seller of Record（法律销售方）。不得把任何候选方案写成用户已确认，也不得从暂停规则推断销售方。
+**决策状态：CONFIRMED PRODUCT DIRECTION / JURISDICTION POLICY NOT YET ADMITTED。** 用户于 2026-11-28 确认采用混合销售方模式（选项 C）：根据创作者/商家所在地与业务类型，结合交易和适用法律规则，确定每笔交易的法律销售方。该决定不是“销售方暂不确定”，也不代表所有地区的具体归属规则已完成法律审核。
 
-在用户明确确认销售方前，运行时实现必须保持 seller-of-record 中立：
+混合模式必须按已批准、版本化的 Seller-of-Record Policy 执行，不允许运行时根据单一字段或 IP 地址猜测：
 
-1. 交易/订单模型应预留 seller identity、seller account、交易地区、币种、商品 owner、税务上下文及不可变交易快照所需的扩展点；但不得虚构或默认填入 LuckRead 或创作者作为法律销售方。
-2. 不得启用真实生产扣款、生产自动续费、生产税务计算/代收/申报或创作者 payout；只允许不触发真实资金移动的开发与沙箱验证。
-3. 支付集成必须核验当前 Hyperswitch connector/PSP 对 marketplace、connected account、merchant of record、资金分配、退款/拒付责任、reserve、负余额、payout 和对账的实际支持；不能凭 Sandbox mock 或字段存在宣称支持。
-4. W68 是财务分录、余额和结算的权威；W11 仅作分析。W01/W07 不得直接修改钱包余额或伪造 Ledger entry。
-5. 税务、发票/收据、消费者退款权、chargeback、VAT/GST/sales tax 和 marketplace facilitator 义务必须按最终销售方、交易双方司法辖区及商品分类进行专业核验。不得把 TaxJar demo/sandbox 或其他演示税务适配视为生产税务。
-6. 用户确认销售方后，必须补齐 seller onboarding/KYC、provider 适配、订单快照、资金流、退款/拒付责任、平台服务费、税务和 Ledger 对账的合同及准入证据，再单独批准生产启用。
-7. 若支付服务商无法支持最终确认的销售方模型，必须 STOP 并报告差距；不得静默切换为另一种销售方模型。
+1. 规则输入至少包括已验证的 Merchant/Seller 法律主体及注册司法辖区、business type / qualification、商品与服务分类、买家账单/消费司法辖区、交易币种，以及适用的 marketplace facilitator / deemed-supplier / tax nexus 规则。创作者所在地和业务类型是必要输入之一，但不能单独得出法律结论。
+2. 每笔交易只能由一个明确的规则版本确定 PLATFORM_SELLER 或 CREATOR_MERCHANT_SELLER；如无匹配规则、规则冲突、资料过期或主体未通过资格审核，必须拒绝订单创建（Fail Closed），不得回退到另一销售方。
+3. PLATFORM_SELLER 仅在 LuckRead 对应法律实体、税务登记/申报能力、支付商户账户、退款/拒付责任及资金结算配置均经核验后可用。
+4. CREATOR_MERCHANT_SELLER 仅在创作者对应 Merchant/Seller 主体完成身份/KYB/KYC、税务资料和销售资格审核，且 PSP connected-account / split settlement / payout 能力及责任分配经核验后可用。
+5. Seller 身份和资格复用既有 Merchant/Seller authority（docs/116–123）；不得在 W07 或 Commerce 中创建第二套 Merchant 主数据。订单/交易只保存不可变的主体引用和审核版本快照。
+6. 订单快照必须记录 seller type/id、Merchant/Seller 资格版本、Seller policy id/version、卖方司法辖区、买方税务司法辖区、商品税务分类版本、币种、定价/折扣/税额结果及其 provider/decision reference、支付商户引用、退款/拒付责任归属和结算路由版本。敏感 KYC/税务原始材料只保存受控引用，不复制进订单 DTO 或普通日志。
+7. 税务必须按销售方、买方位置、商品税务分类、nexus/登记状态和交易时间计算。TaxJar sandbox、synthetic demo、静态税率或仅按邮编查询的 rate endpoint 均不能作为生产税额决策。缺少覆盖该司法辖区和商品类型的生产税务能力时，订单创建 Fail Closed。
+8. Hyperswitch 的平台能力介绍或 Sandbox 成功不等于当前所选 PSP connector 已支持本项目的 connected accounts、分账、reserve、负余额、退款、拒付、payout 和对账责任。必须逐 connector、逐 seller 模式验证。
+9. W68 仍是不可变财务分录、余额投影和结算的权威；W11 仅作分析。W01/W07/Merchant 不得直接修改钱包余额或伪造 Ledger entry。
+10. 混合销售方规则、税务与 PSP 支持必须经法务/税务专业审核和对应准入证据后，才能启用相应地区/商品模式。生产扣款、自动续费、税务代收/申报、退款、payout 和结算仍需独立生产批准；本决策不构成生产启用授权。
 
-**待用户明确选择：**（A）LuckRead 平台作为销售方；（B）各创作者作为销售方；或（C）暂不确定，继续保持生产交易关闭。该决策不阻止不依赖销售方身份的订阅状态机、暂停/恢复、权益访问和接口幂等等非资金移动开发。
+**已确认的是混合模式方向；尚未确认的是各司法辖区/商品分类的具体规则矩阵和 PSP connector 能力。** 在这些规则完成审查前，所有无法确定 seller 或 tax decision 的订单必须保持 Fail Closed。
 
 
 数据库使用当前批准的 Neon PostgreSQL 五库边界和既有 Worker 数据归属。严禁把旧文档中的 D1/Cloudflare 运行示例当成当前迁移目标；不得新增 D1、Worker、Queue、Service Binding 或数据库。不得改变 Payload Core。所有新表、迁移、索引必须归属正确 Worker 的现有数据库，迁移必须可重复执行、可验证并有前向恢复方案。
