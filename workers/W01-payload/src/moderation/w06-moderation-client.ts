@@ -54,6 +54,8 @@ export async function callW06MembershipPlanAudit(input: {
     minimumPriceMinor: number | null
     suggestedPriceMinor: number | null
     maximumPriceMinor: number | null
+    offerKind: 'STANDARD' | 'FOUNDING'
+    foundingCapacity: number | null
     currency: string
   }
 }): Promise<Response> {
@@ -111,6 +113,8 @@ export async function callW06MembershipPlanPublishAudit(input: {
     minimumPriceMinor: number | null
     suggestedPriceMinor: number | null
     maximumPriceMinor: number | null
+    offerKind: 'STANDARD' | 'FOUNDING'
+    foundingCapacity: number | null
     currency: string
   }
 }): Promise<Response> {
@@ -133,6 +137,8 @@ export async function callW06MembershipPlanUpdateRequestAudit(input: {
     name: string; tier: string; billingInterval: 'MONTHLY' | 'YEARLY'
     priceMode: 'FIXED' | 'FLEXIBLE'; priceMinor: number | null
     minimumPriceMinor: number | null; suggestedPriceMinor: number | null; maximumPriceMinor: number | null
+    offerKind: 'STANDARD' | 'FOUNDING'
+    foundingCapacity: number | null
     currency: string; benefits: string[]
   }
 }): Promise<Response> {
@@ -155,6 +161,8 @@ export async function callW06MembershipPlanUpdateAudit(input: {
     version: number; occurredAt: string; name: string; tier: string
     billingInterval: 'MONTHLY' | 'YEARLY'; priceMode: 'FIXED' | 'FLEXIBLE'; priceMinor: number | null
     minimumPriceMinor: number | null; suggestedPriceMinor: number | null; maximumPriceMinor: number | null
+    offerKind: 'STANDARD' | 'FOUNDING'
+    foundingCapacity: number | null
     currency: string; benefits: string[]
   }
 }): Promise<Response> {
