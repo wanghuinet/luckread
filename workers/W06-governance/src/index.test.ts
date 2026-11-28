@@ -238,6 +238,8 @@ describe('W06 runtime', () => {
     minimumPriceMinor: null,
     suggestedPriceMinor: null,
     maximumPriceMinor: null,
+        offerKind: 'STANDARD',
+        foundingCapacity: null,
     currency: 'USD',
   }
   const planAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_audit_1', layer = 'L3') => new Request(
@@ -276,6 +278,8 @@ describe('W06 runtime', () => {
     minimumPriceMinor: null,
     suggestedPriceMinor: null,
     maximumPriceMinor: null,
+        offerKind: 'STANDARD',
+        foundingCapacity: null,
     currency: 'USD',
   }
   const planPublishAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_publish_audit_1', layer = 'L3') => new Request(
@@ -335,6 +339,8 @@ describe('W06 runtime', () => {
     minimumPriceMinor: null,
     suggestedPriceMinor: null,
     maximumPriceMinor: null,
+        offerKind: 'STANDARD',
+        foundingCapacity: null,
     currency: 'USD',
     benefits: ['member-posts', 'monthly-live'],
   }
@@ -534,6 +540,8 @@ describe('W06 runtime', () => {
         minimumPriceMinor: null,
         suggestedPriceMinor: null,
         maximumPriceMinor: null,
+        offerKind: 'STANDARD',
+        foundingCapacity: null,
         currency: 'USD',
       },
       occurredAt: planAuditInput.occurredAt,
@@ -576,6 +584,40 @@ describe('W06 runtime', () => {
     }), auditStoreTestEnv(db))
     expect(response.status).toBe(400)
     expect(await response.json()).toEqual({ error: 'INVALID_MEMBERSHIP_PLAN_AUDIT' })
+    expect(append).not.toHaveBeenCalled()
+  })
+
+  it('accepts and immutably records a founding membership offer and its capacity', async () => {
+    const { db, rows, append } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const foundingInput = {
+      ...planAuditInput,
+      name: 'Founding Member',
+      tier: 'founding',
+      priceMinor: 9900,
+      offerKind: 'FOUNDING',
+      foundingCapacity: 100,
+    }
+    const response = await runtime.default.fetch(planAuditRequest(foundingInput), auditStoreTestEnv(db))
+    expect(response.status).toBe(201)
+    expect(append).toHaveBeenCalledTimes(1)
+    expect(rows.get(planAuditInput.eventId)?.after).toMatchObject({
+      offerKind: 'FOUNDING',
+      foundingCapacity: 100,
+      priceMode: 'FIXED',
+      priceMinor: 9900,
+    })
+  })
+
+  it('rejects founding offers without a fixed price or positive capacity before persistence', async () => {
+    const { db, append } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(planAuditRequest({
+      ...planAuditInput,
+      offerKind: 'FOUNDING',
+      foundingCapacity: 0,
+    }), auditStoreTestEnv(db))
+    expect(response.status).toBe(400)
     expect(append).not.toHaveBeenCalled()
   })
 
@@ -881,6 +923,8 @@ describe('W06 runtime', () => {
         minimumPriceMinor: null,
         suggestedPriceMinor: null,
         maximumPriceMinor: null,
+        offerKind: 'STANDARD',
+        foundingCapacity: null,
         currency: 'USD',
       },
       occurredAt: publishAuditInput.occurredAt,
