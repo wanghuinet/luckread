@@ -185,7 +185,7 @@ APP / H5 / PC
 → existing Neon finance database (logical D1-04)
 
 W07-owned durable Merchant / Store / Qualification / Staff state
-→ existing W07-to-W10 event handoff / Queue workflow
+→ W10 asynchronous execution only through a separately admitted Merchant event transport using existing Queue/Service Binding capacity
 → derived Cache/KV projections only
 R2 = merchant media / controlled evidence objects where required
 ```
