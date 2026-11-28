@@ -31,7 +31,7 @@ test('Following feed paginates without duplicating overlapping post IDs', async 
   await page.goto('http://127.0.0.1:3000/home?feed=following')
   const cards = page.getByTestId('luckread-social-post-card')
   await expect(cards).toHaveCount(2)
-  await page.getByRole('button', { name: /加载更多|Load more|Loading more/i }).click()
+  await page.getByRole('button', { name: /继续滚动|加载更多|Load more|Loading more/i }).click()
   await expect(cards).toHaveCount(3)
   await expect(page.getByText('Feed post feed-2', { exact: true })).toHaveCount(1)
   await expect(page.getByText('Feed post feed-3', { exact: true })).toBeVisible()
