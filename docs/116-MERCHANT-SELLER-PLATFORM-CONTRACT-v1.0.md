@@ -174,7 +174,7 @@ Recommendation ranking
 
 ## 4. Runtime Boundary
 
-Physical runtime follows the approved five-Neon-database architecture while retaining the historical D1 domain names only as logical lineage identifiers:
+Schema-development target follows the approved five-Neon-database architecture. During this schema-only migration phase, existing Cloudflare D1 databases remain production authorities; Neon becomes production authority only after a separate, explicitly approved cutover:
 
 ```text
 APP / H5 / PC
@@ -182,7 +182,7 @@ APP / H5 / PC
 → W08 authorization (CASL)
 → existing W07_SUBSCRIPTION internal Service Binding
 → W07 Merchant / Seller authority
-→ existing Neon finance database (logical D1-04)
+→ Neon finance PostgreSQL schema target (logical D1-04; not production authority before cutover)
 
 W07-owned durable Merchant / Store / Qualification / Staff state
 → W10 asynchronous execution only through a separately admitted Merchant event transport using existing Queue/Service Binding capacity
@@ -190,7 +190,7 @@ W07-owned durable Merchant / Store / Qualification / Staff state
 R2 = merchant media / controlled evidence objects where required
 ```
 
-W07 is the sole Worker owner of logical D1-04 and the existing Neon finance database. Merchant/Seller is part of that existing authority; it does not create a sixth database or a new Worker. W01 remains the only public application API boundary. APP/H5/PC must never call W07 internals or connect to Neon directly. No D1 runtime binding, D1 compatibility facade, or dual-write path is permitted. The historical `D1-04` label may remain in migration filenames and evidence for lineage, but it does not imply a live Cloudflare D1 dependency.
+W07 is the sole logical Worker owner of D1-04 and the Merchant/Seller business authority. The existing Neon finance database is the approved PostgreSQL schema target, not yet the production runtime authority. Existing Cloudflare D1 remains the production authority until a separate cutover change control is approved and verified. During migration, do not introduce dual writes or a second Merchant store; preserve the existing production adapter until cutover. After cutover, W07 remains the sole writer to Neon finance. W01 remains the only public application API boundary. APP/H5/PC must never call W07 internals or connect directly to either database. No new D1 binding or fallback is permitted; existing production D1 bindings are retained only until separately approved cutover.
 
 External commerce engines are adapters only and cannot become platform-wide merchant authority without an explicit contract revision.
 
@@ -263,7 +263,7 @@ P0 must verify:
 7. Suspended merchants cannot perform restricted mutations.
 8. Repeated mutations are idempotent.
 9. External commerce adapter cannot become hidden authority.
-10. W07 in the existing Neon finance PostgreSQL database (logical D1-04) remains authoritative for merchant/store metadata; no live D1 runtime dependency is permitted.
+10. W07 remains the logical owner of Merchant/Seller in D1-04. Existing D1 remains the production storage authority during staged migration; Neon finance is the approved schema target. A separately approved and verified cutover is required before Neon becomes production authority.
 11. No Payload Core source is modified or copied.
 
 ## 9. STOP
