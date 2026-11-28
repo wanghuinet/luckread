@@ -39,7 +39,39 @@ function readLikeStatus(value: unknown): LikeStatus | null {
   return { liked: data.liked };
 }
 
-/** Toggle a comment like using W01/W05 as the authority instead of guessing from UI state. */
+function viewerChangedError(): CommentLikeApiError {
+  return new CommentLikeApiError(
+    'Your account changed before the reply like could be updated.',
+    undefined,
+    'VIEWER_CHANGED',
+  );
+}
+
+async function readAuthoritativeLikeStatus(
+  encodedId: string,
+  expectedViewerId: string,
+): Promise<LikeStatus> {
+  const result = await apiRequest<unknown>(
+    '/interactions/likes?targetType=comment&targetId=' + encodedId,
+    { method: 'GET', expectedAccountId: expectedViewerId },
+  );
+  if (!result.response.ok) {
+    throw new CommentLikeApiError(
+      result.error?.message || getApiErrorMessage(
+        result.data,
+        'Could not read comment like status. Please try again.',
+        result.response.status,
+      ),
+      result.response.status,
+      result.error?.code,
+    );
+  }
+  const status = readLikeStatus(result.data);
+  if (!status) throw new CommentLikeApiError('The comment like status response was invalid.');
+  return status;
+}
+
+/** Toggle a comment like through W01/W05 and reconcile ambiguous writes from authoritative state. */
 export async function toggleCommentLike(
   commentIdValue: string,
   expectedViewerId: string | null,
@@ -50,75 +82,61 @@ export async function toggleCommentLike(
   }
   const isCurrentViewer = () =>
     useAuthStore.getState().user?.id === expectedViewerId;
-  if (!isCurrentViewer()) {
-    throw new CommentLikeApiError(
-      'Your account changed before the reply like could be updated.',
-      undefined,
-      'VIEWER_CHANGED',
-    );
-  }
+  if (!isCurrentViewer()) throw viewerChangedError();
+
   const encodedId = encodeURIComponent(commentId);
-  const statusResult = await apiRequest<unknown>(
-    '/interactions/likes?targetType=comment&targetId=' + encodedId,
-    { method: 'GET', expectedAccountId: expectedViewerId },
-  );
-
-  if (!statusResult.response.ok) {
-    throw new CommentLikeApiError(
-      statusResult.error?.message || getApiErrorMessage(
-        statusResult.data,
-        'Could not read comment like status. Please try again.',
-        statusResult.response.status,
-      ),
-      statusResult.response.status,
-      statusResult.error?.code,
-    );
-  }
-
-  if (!isCurrentViewer()) {
-    throw new CommentLikeApiError(
-      'Your account changed before the reply like could be updated.',
-      undefined,
-      'VIEWER_CHANGED',
-    );
-  }
-
-  const status = readLikeStatus(statusResult.data);
-  if (!status) {
-    throw new CommentLikeApiError('The comment like status response was invalid.');
-  }
-
-  if (!isCurrentViewer()) {
-    throw new CommentLikeApiError(
-      'Your account changed before the reply like could be updated.',
-      undefined,
-      'VIEWER_CHANGED',
-    );
-  }
+  const status = await readAuthoritativeLikeStatus(encodedId, expectedViewerId);
+  if (!isCurrentViewer()) throw viewerChangedError();
 
   const nextLiked = !status.liked;
   const method = nextLiked ? 'POST' : 'DELETE';
-  const mutationResult = await apiRequest<unknown>(
-    '/comments/' + encodedId + '/likes',
-    {
-      method,
-      idempotencyKey: 'native-comment-like:' + commentId + ':' +
-        (nextLiked ? 'like' : 'unlike') + ':' + createIdempotencyKey(),
-      expectedAccountId: expectedViewerId,
-    },
-  );
+  const idempotencyKey = 'native-comment-like:' + commentId + ':' +
+    (nextLiked ? 'like' : 'unlike') + ':' + createIdempotencyKey();
 
-  if (!mutationResult.response.ok && mutationResult.response.status !== 204) {
-    throw new CommentLikeApiError(
-      mutationResult.error?.message || getApiErrorMessage(
-        mutationResult.data,
-        nextLiked ? 'Could not like this reply. Please try again.' : 'Could not remove this like. Please try again.',
-        mutationResult.response.status,
-      ),
-      mutationResult.response.status,
-      mutationResult.error?.code,
+  let mutationResult;
+  try {
+    mutationResult = await apiRequest<unknown>(
+      '/comments/' + encodedId + '/likes',
+      { method, idempotencyKey, expectedAccountId: expectedViewerId },
     );
+  } catch (cause) {
+    if (!isCurrentViewer()) throw viewerChangedError();
+    // A lost response does not prove that W05 rejected the write. Re-read the
+    // relationship before exposing an error or allowing the user to toggle again.
+    try {
+      const reconciled = await readAuthoritativeLikeStatus(encodedId, expectedViewerId);
+      if (!isCurrentViewer()) throw viewerChangedError();
+      if (reconciled.liked === nextLiked) return reconciled;
+    } catch (readError) {
+      if (readError instanceof CommentLikeApiError && readError.code === 'VIEWER_CHANGED') throw readError;
+      // Preserve the original mutation failure; the UI can retry from a fresh read.
+    }
+    throw cause;
   }
 
+  if (!mutationResult.response.ok && mutationResult.response.status !== 204) {
+    const statusCode = mutationResult.response.status;
+    const message = mutationResult.error?.message || getApiErrorMessage(
+      mutationResult.data,
+      nextLiked ? 'Could not like this reply. Please try again.' : 'Could not remove this like. Please try again.',
+      statusCode,
+    );
+    // Server/timeout responses can be ambiguous too; reconcile only statuses
+    // that may follow a committed write. Definitive authorization/input errors
+    // remain errors and are never converted into success.
+    if (statusCode === 408 || statusCode === 429 || statusCode >= 500) {
+      if (!isCurrentViewer()) throw viewerChangedError();
+      try {
+        const reconciled = await readAuthoritativeLikeStatus(encodedId, expectedViewerId);
+        if (!isCurrentViewer()) throw viewerChangedError();
+        if (reconciled.liked === nextLiked) return reconciled;
+      } catch (readError) {
+        if (readError instanceof CommentLikeApiError && readError.code === 'VIEWER_CHANGED') throw readError;
+      }
+    }
+    throw new CommentLikeApiError(message, statusCode, mutationResult.error?.code);
+  }
+
+  if (!isCurrentViewer()) throw viewerChangedError();
   return { liked: nextLiked };
 }
