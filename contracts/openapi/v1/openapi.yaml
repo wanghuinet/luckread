@@ -2464,7 +2464,7 @@ paths:
                         type: array
                         items:
                           type: object
-                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMode, priceMinor, minimumPriceMinor, suggestedPriceMinor, maximumPriceMinor, currency, benefits, trialPeriodDays, status, visibility, version, createdAt, updatedAt, etag]
+                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMode, priceMinor, minimumPriceMinor, suggestedPriceMinor, maximumPriceMinor, offerKind, foundingCapacity, currency, benefits, trialPeriodDays, status, visibility, version, createdAt, updatedAt, etag]
                           properties:
                             planId: { type: string }
                             creatorId: { type: string }
@@ -2477,6 +2477,8 @@ paths:
                             minimumPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                             suggestedPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                             maximumPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
+                            offerKind: { type: string, enum: [STANDARD, FOUNDING], default: STANDARD }
+                            foundingCapacity: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                             currency: { type: string, pattern: '^[A-Z]{3}$' }
                             benefits: { type: array, items: { type: string, minLength: 1, maxLength: 180 } }
                             trialPeriodDays: { type: integer, minimum: 0, maximum: 30 }
@@ -2517,6 +2519,8 @@ paths:
                 minimumPriceMinor: { type: integer, minimum: 1, maximum: 2147483647 }
                 suggestedPriceMinor: { type: integer, minimum: 1, maximum: 2147483647 }
                 maximumPriceMinor: { type: integer, minimum: 1, maximum: 2147483647 }
+                offerKind: { type: string, enum: [STANDARD, FOUNDING], default: STANDARD }
+                foundingCapacity: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                 currency: { type: string, pattern: '^[A-Z]{3}$' }
                 benefits:
                   type: array
@@ -2550,6 +2554,8 @@ paths:
                       minimumPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                       suggestedPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                       maximumPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
+                      offerKind: { type: string, enum: [STANDARD, FOUNDING], default: STANDARD }
+                      foundingCapacity: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                       currency: { type: string, pattern: '^[A-Z]{3}$' }
                       benefits: { type: array, items: { type: string } }
                       trialPeriodDays: { type: integer, minimum: 0, maximum: 30 }
@@ -4705,7 +4711,7 @@ paths:
                         type: array
                         items:
                           type: object
-                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMode, priceMinor, minimumPriceMinor, suggestedPriceMinor, maximumPriceMinor, currency, benefits, createdAt, updatedAt]
+                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMode, priceMinor, minimumPriceMinor, suggestedPriceMinor, maximumPriceMinor, offerKind, foundingCapacity, currency, benefits, createdAt, updatedAt]
                           properties:
                             planId: { type: string, minLength: 1, maxLength: 256 }
                             creatorId: { type: string, minLength: 1, maxLength: 256 }
@@ -4718,6 +4724,8 @@ paths:
                             minimumPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                             suggestedPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                             maximumPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
+                            offerKind: { type: string, enum: [STANDARD, FOUNDING], default: STANDARD }
+                            foundingCapacity: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                             currency: { type: string, pattern: '^[A-Z]{3}$' }
                             benefits:
                               type: array
@@ -5534,6 +5542,8 @@ paths:
                 minimumPriceMinor: { type: integer, minimum: 1, maximum: 2147483647 }
                 suggestedPriceMinor: { type: integer, minimum: 1, maximum: 2147483647 }
                 maximumPriceMinor: { type: integer, minimum: 1, maximum: 2147483647 }
+                offerKind: { type: string, enum: [STANDARD, FOUNDING], default: STANDARD }
+                foundingCapacity: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                 currency: { type: string, pattern: '^[A-Z]{3}$' }
                 benefits:
                   type: array
@@ -5557,7 +5567,7 @@ paths:
                 properties:
                   data:
                     type: object
-                    required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMode, priceMinor, minimumPriceMinor, suggestedPriceMinor, maximumPriceMinor, currency, benefits, trialPeriodDays, status, visibility, version, etag, replayed, createdAt, updatedAt]
+                    required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMode, priceMinor, minimumPriceMinor, suggestedPriceMinor, maximumPriceMinor, offerKind, foundingCapacity, currency, benefits, trialPeriodDays, status, visibility, version, etag, replayed, createdAt, updatedAt]
                     properties:
                       planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
                       creatorId: { $ref: '#/components/schemas/ResourceId' }
@@ -5570,6 +5580,8 @@ paths:
                       minimumPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                       suggestedPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                       maximumPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
+                      offerKind: { type: string, enum: [STANDARD, FOUNDING], default: STANDARD }
+                      foundingCapacity: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                       currency: { type: string, pattern: '^[A-Z]{3}$' }
                       benefits:
                         type: array
@@ -5716,6 +5728,8 @@ paths:
                       minimumPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                       suggestedPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                       maximumPriceMinor: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
+                      offerKind: { type: string, enum: [STANDARD, FOUNDING], default: STANDARD }
+                      foundingCapacity: { type: [integer, 'null'], minimum: 1, maximum: 2147483647 }
                       currency: { type: string, pattern: '^[A-Z]{3}$' }
                       benefits:
                         type: array
