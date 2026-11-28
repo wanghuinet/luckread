@@ -174,15 +174,23 @@ Recommendation ranking
 
 ## 4. Runtime Boundary
 
-Cloudflare-first:
+Physical runtime follows the approved five-Neon-database architecture while retaining the historical D1 domain names only as logical lineage identifiers:
 
 ```text
-Workers
-→ D1 authoritative merchant/store state
-→ R2 merchant media where required
-→ Queues async operational events
-→ Cache/KV hot seller/store projections
+APP / H5 / PC
+→ W01 public API
+→ W08 authorization (CASL)
+→ existing W07_SUBSCRIPTION internal Service Binding
+→ W07 Merchant / Seller authority
+→ existing Neon finance database (logical D1-04)
+
+W07-owned durable Merchant / Store / Qualification / Staff state
+→ existing W07-to-W10 event handoff / Queue workflow
+→ derived Cache/KV projections only
+R2 = merchant media / controlled evidence objects where required
 ```
+
+W07 is the sole Worker owner of logical D1-04 and the existing Neon finance database. Merchant/Seller is part of that existing authority; it does not create a sixth database or a new Worker. W01 remains the only public application API boundary. APP/H5/PC must never call W07 internals or connect to Neon directly. No D1 runtime binding, D1 compatibility facade, or dual-write path is permitted. The historical `D1-04` label may remain in migration filenames and evidence for lineage, but it does not imply a live Cloudflare D1 dependency.
 
 External commerce engines are adapters only and cannot become platform-wide merchant authority without an explicit contract revision.
 
