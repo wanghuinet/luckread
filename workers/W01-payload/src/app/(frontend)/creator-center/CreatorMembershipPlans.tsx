@@ -59,7 +59,7 @@ const isPlan = (value: unknown): value is MembershipPlan => {
 }
 
 function parseMoneyMinor(value: string): number | null {
-  if (!/^(0|[1-9]\\d*)(\\.\\d{1,2})?$/.test(value.trim())) return null
+  if (!/^(0|[1-9]\d*)(\.\d{1,2})?$/.test(value.trim())) return null
   const [whole, fraction = ''] = value.trim().split('.')
   const amount = Number(whole) * 100 + Number(fraction.padEnd(2, '0'))
   return Number.isSafeInteger(amount) && amount <= 2_147_483_647 ? amount : null
