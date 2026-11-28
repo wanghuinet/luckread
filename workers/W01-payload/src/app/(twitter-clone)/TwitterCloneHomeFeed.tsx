@@ -27,11 +27,14 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   const requestedCursorsRef = useRef(new Set<string>())
   const itemIdsRef = useRef(new Set(initialPage.items.map(item => item.id)))
   const activeRequestRef = useRef<AbortController | null>(null)
+  // Increment on every initial/refresh request so stale pagination cannot mutate newer state.
+  const requestGenerationRef = useRef(0)
 
   const loadInitial = useCallback(async (force = false) => {
     if (loadingRef.current && !force) return
     if (force) { loadingRef.current = false; activeRequestRef.current?.abort() }
     activeRequestRef.current?.abort()
+    const generation = ++requestGenerationRef.current
     requestedCursorsRef.current.clear()
     loadingRef.current = true
     const controller = new AbortController()
@@ -45,7 +48,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
         endpoint + params.toString(),
         { headers: { accept: 'application/json' }, cache: 'no-store', credentials: feedMode === 'following' ? 'include' : 'omit', signal: controller.signal },
       )
-      if (controller.signal.aborted) return
+      if (controller.signal.aborted || generation !== requestGenerationRef.current) return
       if (feedMode === 'following' && (response.status === 401 || data?.error?.code === 'UNAUTHENTICATED')) {
         setRequiresAuth(true)
         setItems([])
@@ -65,7 +68,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       setHasMore(page.hasMore === true)
       setCandidateWindowTruncated(page.candidateWindowTruncated === true)
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && generation === requestGenerationRef.current) {
         setRetryInitial(true)
         setError(cause instanceof Error ? cause.message : copy.feed.loadError)
       }
@@ -82,6 +85,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
     if(loadingRef.current||!hasMore||!nextCursor||requiresAuth)return
     if (requestedCursorsRef.current.has(nextCursor)) return
     requestedCursorsRef.current.add(nextCursor)
+    const generation = requestGenerationRef.current
     const controller = new AbortController()
     activeRequestRef.current = controller
     loadingRef.current=true;setLoading(true);setRetryInitial(false);setError('')
@@ -92,7 +96,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
         endpoint + params.toString(),
         {headers:{accept:'application/json'},cache:'no-store',credentials:feedMode==='following'?'include':'omit',signal:controller.signal},
       )
-      if (controller.signal.aborted) return
+      if (controller.signal.aborted || generation !== requestGenerationRef.current) return
       if (feedMode === 'following' && (response.status === 401 || data?.error?.code === 'UNAUTHENTICATED')) {
         setRequiresAuth(true)
         setItems([])
@@ -113,7 +117,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       setNextCursor(cursorAlreadyRequested ? null : next)
       setHasMore(page.hasMore === true && next !== null && !cursorAlreadyRequested)
       setCandidateWindowTruncated(current => current || page.candidateWindowTruncated === true)
-    } catch(cause) {requestedCursorsRef.current.delete(nextCursor);if(!controller.signal.aborted){setRetryInitial(false);setError(cause instanceof Error?cause.message:copy.feed.loadMoreError)}}
+    } catch(cause) {if(generation === requestGenerationRef.current){requestedCursorsRef.current.delete(nextCursor);if(!controller.signal.aborted){setRetryInitial(false);setError(cause instanceof Error?cause.message:copy.feed.loadMoreError)}}}
     finally {if(activeRequestRef.current===controller){activeRequestRef.current=null;loadingRef.current=false;if(!controller.signal.aborted)setLoading(false)}}
   }, [copy.feed.loadMoreError, feedMode, hasMore, nextCursor, requiresAuth])
 
