@@ -540,6 +540,45 @@ describe('W06 runtime', () => {
     })
   })
 
+  it('accepts and immutably records flexible membership price bounds', async () => {
+    const { db, rows, append } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const flexibleInput = {
+      ...planAuditInput,
+      priceMode: 'FLEXIBLE',
+      priceMinor: null,
+      minimumPriceMinor: 500,
+      suggestedPriceMinor: 1200,
+      maximumPriceMinor: 5000,
+    }
+    const response = await runtime.default.fetch(planAuditRequest(flexibleInput), auditStoreTestEnv(db))
+    expect(response.status).toBe(201)
+    expect(append).toHaveBeenCalledTimes(1)
+    expect(rows.get(planAuditInput.eventId)?.after).toMatchObject({
+      priceMode: 'FLEXIBLE',
+      priceMinor: null,
+      minimumPriceMinor: 500,
+      suggestedPriceMinor: 1200,
+      maximumPriceMinor: 5000,
+    })
+  })
+
+  it('rejects inconsistent flexible membership price bounds before persistence', async () => {
+    const { db, append } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(planAuditRequest({
+      ...planAuditInput,
+      priceMode: 'FLEXIBLE',
+      priceMinor: null,
+      minimumPriceMinor: 1500,
+      suggestedPriceMinor: 1200,
+      maximumPriceMinor: 5000,
+    }), auditStoreTestEnv(db))
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: 'INVALID_MEMBERSHIP_PLAN_AUDIT' })
+    expect(append).not.toHaveBeenCalled()
+  })
+
   it('rejects noncanonical plan commercial terms before any audit database access', async () => {
     const { db, append } = createPlanAuditDb()
     const runtime = await import('./index')
