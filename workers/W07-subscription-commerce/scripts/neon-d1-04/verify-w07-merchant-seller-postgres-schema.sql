@@ -10,20 +10,12 @@ DECLARE
   foreign_key_count INTEGER;
 BEGIN
   SELECT count(*) INTO table_count FROM pg_catalog.pg_tables WHERE schemaname='public';
-  SELECT count(*) INTO index_count FROM pg_catalog.pg_indexes WHERE schemaname='public'
-    AND indexname NOT IN (
-      'billing_documents_pkey','order_create_idempotency_customer_id_operation_key_idempote_key',
-      'order_create_idempotency_pkey','order_lines_pkey','orders_pkey','payment_mandates_pkey',
-      'payment_mandates_provider_merchant_id_source_event_id_key','payment_mandates_provider_merchant_id_source_payment_id_key',
-      'payment_method_revocation_requests_pkey','payment_provider_event_confli_provider_merchant_id_event_id_key',
-      'payment_provider_event_conflicts_pkey','payment_provider_events_pkey','payment_provider_events_provider_merchant_id_event_id_key',
-      'payments_customer_id_idempotency_key_key','payments_pkey','refunds_pkey',
-      'revenuecat_webhook_event_conflicts_pkey','revenuecat_webhook_events_pkey','saved_payment_methods_pkey',
-      'saved_payment_methods_provider_merchant_id_payment_method_i_key','subscription_renewal_cycles_pkey',
-      'subscription_renewal_scheduler_state_pkey','uq_billing_documents_number','uq_billing_documents_type_order',
-      'uq_payment_method_revocation_saved_method','uq_refunds_customer_idempotency','uq_refunds_provider_merchant_refund',
-      'uq_revenuecat_webhook_event_conflicts_payload','uq_revenuecat_webhook_events_app_event'
-    );
+  SELECT count(*) INTO index_count
+    FROM pg_catalog.pg_class idx
+    JOIN pg_catalog.pg_namespace n ON n.oid=idx.relnamespace
+    JOIN pg_catalog.pg_index i ON i.indexrelid=idx.oid
+    WHERE n.nspname='public' AND idx.relkind='i'
+      AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint c WHERE c.conindid=idx.oid);
   SELECT count(*) INTO trigger_count FROM pg_catalog.pg_trigger t
     JOIN pg_catalog.pg_class c ON c.oid=t.tgrelid
     JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace

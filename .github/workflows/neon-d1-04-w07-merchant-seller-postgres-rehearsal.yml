@@ -97,3 +97,12 @@ jobs:
           psql "$W07_D104_SCHEMA_DATABASE_URL" --set ON_ERROR_STOP=1 --no-psqlrc \
             --file workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-merchant-seller-postgres-schema.sql \
             | tee merchant-seller-postgres18-postflight.txt
+
+      - name: Upload sanitized local PostgreSQL 18 rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w07-merchant-seller-postgres18-${{ github.sha }}
+          path: merchant-seller-postgres18-postflight.txt
+          if-no-files-found: warn
+          retention-days: 90
