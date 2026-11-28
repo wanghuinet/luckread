@@ -58,3 +58,8 @@ abuse detection
 ## 5. Cross-Domain Rules
 
 Commerce verifies merchant eligibility before commercial mutations. Rights verifies legal usage where required. Risk can block high-risk actions. None of these systems may redefine Merchant identity.
+
+
+## 6. Runtime Enforcement Boundary
+
+W01 is the only public ingress and invokes W08/CASL for action and resource scope before forwarding a trusted principal to W07. W07 independently enforces merchant/store ownership, qualification state and expected-version constraints before any persistence mutation. Missing authorization context, stale principal, unresolved scope or database authority failure must fail closed. Client-supplied merchant/seller IDs, legal status, qualification state or tax evidence never establish authority.
