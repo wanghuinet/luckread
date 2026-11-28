@@ -55,7 +55,7 @@
     "reviewedSourcePins": [
       {
         "path": "scripts/neon/shared-domain-schema-runner.mjs",
-        "gitBlobSha1": "53706e33929da41f331acf3892d223d341762817"
+        "gitBlobSha1": "310d87aca5bbd67db107190c77e12ff21d59f97"
       },
       {
         "path": "contracts/database/neon-d1-04-shared-migration-manifest.v1.json",
