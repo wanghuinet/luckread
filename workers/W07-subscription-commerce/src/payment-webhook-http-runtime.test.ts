@@ -80,6 +80,7 @@ function fixture(options: {
   const membershipPostgresPool = { marker: 'neon-membership-pool' } as unknown as W07WebhookPostgresPool;
   const nativeUpgradeExpiryCalls: Array<{ financePool: unknown; membershipPool: unknown; paymentId: string; merchantId: string }> = [];
   const foundingCommitCalls: Array<{ membershipPool: unknown; financePool: unknown; paymentId: string; merchantId: string; eventId: string }> = [];
+  const foundingReleaseCalls: Array<{ membershipPool: unknown; financePool: unknown; paymentId: string; merchantId: string }> = [];
 
   const syncRenewalOutcome = async (
     env: OutcomeEnv,
@@ -165,6 +166,15 @@ function fixture(options: {
       foundingCommitCalls.push({ membershipPool, financePool, paymentId, merchantId, eventId });
       return null;
     },
+    releaseFoundingReservation: async (
+      membershipPool: W07WebhookPostgresPool,
+      financePool: W07WebhookPostgresPool,
+      paymentId: string,
+      merchantId: string,
+    ) => {
+      foundingReleaseCalls.push({ membershipPool, financePool, paymentId, merchantId });
+      return null;
+    },
     expirePendingPlanUpgradePostgres: async (
       financePool: W07WebhookPostgresPool,
       membershipPool: W07WebhookPostgresPool,
@@ -188,6 +198,7 @@ function fixture(options: {
     postgresReceiptCalls,
     nativeUpgradeExpiryCalls,
     foundingCommitCalls,
+    foundingReleaseCalls,
   };
 }
 
@@ -353,6 +364,25 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
         membershipPurchaseFulfillment: { outcome: 'APPLIED', fulfilledCount: 1 },
       },
     });
+  });
+
+  it('releases a founding hold only after a signed terminal unpaid payment outcome', async () => {
+    const f = fixture({ result: receipt('APPLIED') });
+    const paymentId = 'pay_' + 'd'.repeat(26);
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body: paymentEvent(paymentId, 'payment_failed'), signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+    expect(response?.status).toBe(200);
+    expect(f.foundingReleaseCalls).toEqual([{
+      membershipPool: f.membershipPostgresPool,
+      financePool: f.postgresPool,
+      paymentId,
+      merchantId: MERCHANT,
+    }]);
+    expect(f.foundingCommitCalls).toHaveLength(0);
+    expect(f.purchaseFulfillmentCalls).toHaveLength(0);
   });
 
   it('retries a duplicate signed success by reusing the same Neon persistence and idempotent fulfillment', async () => {
