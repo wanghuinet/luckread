@@ -20,6 +20,7 @@ import {
   attachFoundingReservationOrder,
   getFoundingReservationByIdempotency,
   releaseUnpaidFoundingReservation,
+  reconcileExpiredFoundingReservations,
   reserveFoundingOfferCapacity,
 } from './founding-offer-reservations-postgres.js';
 import { getW07MembershipPostgresPool } from './neon/membership-database-runtime.js';
@@ -222,6 +223,7 @@ export async function handleCommerceOrderRequest(
             offer.priceMode !== 'FIXED') {
           throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
         }
+        await reconcileExpiredFoundingReservations(getMembershipPool(), pool);
         const reservation = await reserveFoundingOfferCapacity(getMembershipPool(), {
           planId: membershipItem.itemRef,
           planVersion,
