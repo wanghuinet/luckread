@@ -44,4 +44,11 @@ CREATE INDEX membership_founding_reservations_order_idx
   ON membership_founding_reservations (order_reference)
   WHERE order_reference IS NOT NULL;
 
+CREATE TABLE membership_founding_reservation_payment_events (
+  reservation_id TEXT PRIMARY KEY
+    REFERENCES membership_founding_reservations (reservation_id) ON DELETE RESTRICT,
+  provider_event_reference TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 COMMIT;
