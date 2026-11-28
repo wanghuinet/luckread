@@ -520,7 +520,7 @@ async function run() {
     const finalRows = await readLedgerRows(client)
     assertManifestPrefixRows(manifest.entries, checksums, finalRows)
     if (finalRows.length !== manifest.entries.length) {
-      fail('shared D1-01 schema runner did not apply the full fourteen-entry manifest')
+      fail('shared D1-01 schema runner did not apply the full seventeen-entry manifest')
     }
     const finalSchema = await verifyOwnerSchemaState(client, appliedEntries, sqlById)
     const ledgerEvidence = {
