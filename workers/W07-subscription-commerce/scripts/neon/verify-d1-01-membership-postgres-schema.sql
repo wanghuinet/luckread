@@ -6,7 +6,7 @@ DECLARE
   actual_columns TEXT[];
   expected_columns TEXT[];
   actual_count INTEGER;
-  -- The verifier checks W07's exact nine-table owner slice, while allowing
+  -- The verifier checks W07's exact eleven-table owner slice, while allowing
   -- only the registered W01/W02/W07/W08 owner tables in the integrated D1-01 rehearsal.
   known_d1_01_tables TEXT[] := ARRAY[
     'users_sessions',
@@ -38,6 +38,8 @@ DECLARE
     'auth_007_mfa_operation_receipts',
     'membership_plan_versions',
     'membership_plans',
+    'membership_founding_reservations',
+    'membership_founding_reservation_payment_events',
     'membership_revenuecat_product_bindings',
     'membership_subscription_plan_change_attempts',
     'membership_subscription_scheduled_plan_changes',
@@ -53,6 +55,8 @@ DECLARE
   expected_tables TEXT[] := ARRAY[
     'membership_plan_versions',
     'membership_plans',
+    'membership_founding_reservations',
+    'membership_founding_reservation_payment_events',
     'membership_revenuecat_product_bindings',
     'membership_subscription_lifecycle_audit',
     'membership_subscription_lifecycle_operation_receipts',
@@ -76,7 +80,7 @@ BEGIN
       AND table_type = 'BASE TABLE'
       AND table_name = ANY(expected_tables);
   IF actual_columns IS DISTINCT FROM expected_tables THEN
-    RAISE EXCEPTION 'W07 expected nine D1-01 membership tables; found %', actual_columns;
+    RAISE EXCEPTION 'W07 expected eleven D1-01 membership tables; found %', actual_columns;
   END IF;
   SELECT COUNT(*)::INTEGER INTO actual_count
     FROM information_schema.tables
@@ -111,6 +115,13 @@ BEGIN
             'cancel_at', 'created_at', 'updated_at', 'trial_started_at', 'trial_ends_at', 'trial_converted_at', 'pause_started_at', 'pause_period_end_snapshot')
           AND data_type <> 'timestamp with time zone')
         OR
+        (table_name = 'membership_founding_reservations'
+          AND column_name IN ('expires_at', 'created_at', 'updated_at', 'committed_at', 'released_at')
+          AND data_type <> 'timestamp with time zone')
+        OR
+        (table_name = 'membership_founding_reservation_payment_events'
+          AND column_name = 'created_at' AND data_type <> 'timestamp with time zone')
+        OR
         (table_name = 'membership_plan_versions'
           AND column_name = 'created_at' AND data_type <> 'timestamp with time zone')
         OR
@@ -142,7 +153,9 @@ BEGIN
   END IF;
 
   IF (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_plans') <> 9
-     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_plan_versions') <> 10
+     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_plan_versions') <> 16
+     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_founding_reservations') <> 13
+     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_founding_reservation_payment_events') <> 3
      OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_revenuecat_product_bindings') <> 8
      OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscription_plan_change_attempts') <> 19
      OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscription_scheduled_plan_changes') <> 17
@@ -204,8 +217,10 @@ BEGIN
           'ux_membership_lifecycle_receipts_subscriber_idempotency',
           'ix_membership_lifecycle_receipts_subscription_created',
           'ix_membership_lifecycle_audit_subscription_time',
-          'ix_membership_lifecycle_audit_subscriber_time'
-        )) <> 22 THEN
+          'ix_membership_lifecycle_audit_subscriber_time',
+          'membership_founding_reservations_capacity_idx',
+          'membership_founding_reservations_order_idx'
+        )) <> 24 THEN
     RAISE EXCEPTION 'W07 secondary index set is incomplete';
   END IF;
 
@@ -216,6 +231,7 @@ BEGIN
         AND t.tgname IN (
           'membership_plan_versions_immutable_update',
           'membership_plan_versions_immutable_delete',
+          'membership_plan_versions_founding_offer_immutable',
           'membership_plans_owner_immutable_update',
           'membership_plans_current_version_forward_only',
           'membership_revenuecat_bindings_immutable_update',
@@ -224,8 +240,8 @@ BEGIN
           'membership_subscriptions_trial_conversion_write_once',
           'membership_subscription_lifecycle_audit_no_update_delete',
           'membership_subscription_lifecycle_audit_no_truncate'
-        )) <> 10 THEN
-    RAISE EXCEPTION 'W07 immutable/lifecycle trigger set is incomplete';
+        )) <> 11 THEN
+    RAISE EXCEPTION 'W07 immutable/lifecycle/founding-offer trigger set is incomplete';
   END IF;
 
   IF (SELECT COUNT(*) FROM pg_constraint
@@ -242,7 +258,7 @@ BEGIN
            'membership_subscription_scheduled_plan_changes'::regclass
          )
      ) THEN
-    RAISE EXCEPTION 'Only the two source-defined plan-version foreign keys are allowed';
+    RAISE EXCEPTION 'Only the four source-defined plan-version/reservation foreign keys are allowed';
   END IF;
 
   IF (SELECT COUNT(*) FROM pg_indexes
@@ -662,15 +678,17 @@ ROLLBACK;
 SELECT jsonb_build_object(
   'status', 'W07_D1_01_MEMBERSHIP_POSTGRES_SCHEMA_PASS',
   'postgresMajor', 18,
-  'tablesVerified', 9,
-  'secondaryIndexesVerified', 22,
-  'triggersVerified', 10,
+  'tablesVerified', 11,
+  'secondaryIndexesVerified', 24,
+  'triggersVerified', 11,
   'checks', jsonb_build_array(
     'exact Subscription 20-column contract and PAUSE-A snapshot constraints',
     'TIMESTAMPTZ timestamp mapping',
     'source-defined plan and RevenueCat foreign keys only',
     'no speculative active-subscription uniqueness',
     'immutable plan versions and forward-only plan version',
+    'fixed-price-only founding offers and immutable lifetime capacity across plan versions',
+    'founding reservation capacity indexes, plan-version FK, state timestamps and payment-event identity',
     'RevenueCat ACTIVE-to-RETIRED-only update',
     'one-trial-per-subscriber/creator and write-once trial timestamps',
     'upgrade attempt idempotency and one-pending-per-subscription',
@@ -686,6 +704,8 @@ SELECT jsonb_build_object(
     'membership_subscriptions', (SELECT COUNT(*) FROM membership_subscriptions),
     'membership_plans', (SELECT COUNT(*) FROM membership_plans),
     'membership_plan_versions', (SELECT COUNT(*) FROM membership_plan_versions),
+    'membership_founding_reservations', (SELECT COUNT(*) FROM membership_founding_reservations),
+    'membership_founding_reservation_payment_events', (SELECT COUNT(*) FROM membership_founding_reservation_payment_events),
     'membership_revenuecat_product_bindings', (SELECT COUNT(*) FROM membership_revenuecat_product_bindings),
     'membership_subscription_plan_change_attempts', (SELECT COUNT(*) FROM membership_subscription_plan_change_attempts),
     'membership_subscription_scheduled_plan_changes', (SELECT COUNT(*) FROM membership_subscription_scheduled_plan_changes),
