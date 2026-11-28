@@ -96,6 +96,8 @@ export async function resolveCommerceOrderItems(
         billingInterval: plan.billingInterval,
         priceMinor: unitAmountMinor,
         priceMode: 'FIXED',
+        offerKind: plan.offerKind ?? 'STANDARD',
+        foundingCapacity: plan.foundingCapacity ?? null,
         currency: plan.currency,
         benefits: plan.benefits,
       };
@@ -127,6 +129,8 @@ export async function resolveCommerceOrderItems(
         suggestedPriceMinor: suggested,
         maximumPriceMinor: maximum,
         selectedAmountMinor: unitAmountMinor,
+        offerKind: plan.offerKind ?? 'STANDARD',
+        foundingCapacity: plan.foundingCapacity ?? null,
         currency: plan.currency,
         benefits: plan.benefits,
       };
