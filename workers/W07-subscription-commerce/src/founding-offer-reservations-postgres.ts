@@ -415,8 +415,10 @@ export async function releaseFoundingReservationForUnpaidPayment(
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
   }
   const paidOrder = await financeDb.query<{ order_id: string }>(
-    "SELECT order_id FROM payments WHERE payment_id = $1 AND merchant_id = $2 " +
-    "AND provider = 'hyperswitch' AND status IN ('failed', 'cancelled', 'expired') LIMIT 1",
+    "SELECT p.order_id FROM payments p WHERE p.payment_id = $1 AND p.merchant_id = $2 " +
+    "AND p.provider = 'hyperswitch' AND p.status IN ('failed', 'cancelled', 'expired') " +
+    "AND NOT EXISTS (SELECT 1 FROM payments other WHERE other.order_id = p.order_id " +
+    "AND other.provider = 'hyperswitch' AND other.status NOT IN ('failed', 'cancelled', 'expired')) LIMIT 1",
     [paymentId, merchantId],
   );
   const orderId = paidOrder.rows[0]?.order_id;
