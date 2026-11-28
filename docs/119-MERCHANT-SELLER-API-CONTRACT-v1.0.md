@@ -47,3 +47,8 @@ Public endpoints must not expose private merchant evidence or staff information.
 ## 5. Reliability
 
 Create/update/invite/role/fulfillment mutations must be safe under retries. Pagination uses cursors where collections can grow large.
+
+
+## 6. Public / Internal Routing and Persistence
+
+APP/H5/PC access Merchant/Seller only through W01 public APIs. W01 invokes W08/CASL and forwards a trusted principal through the existing W01→W07 Service Binding. W07 performs ownership, qualification, version and idempotency checks before persistence. No client-supplied seller/merchant status is trusted. Physical persistence follows the approved D1-04 schema target and separately evidenced production cutover state; this contract does not authorize remote DDL, deployment or production traffic changes.
