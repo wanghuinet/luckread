@@ -95,8 +95,8 @@ function assertManifestAndChecksums(checksums) {
   if (manifest.domainId !== 'D1-01' || manifest.databaseName !== 'luckread' ||
       manifest.postgresMajor !== 18 || manifest.businessDataImport !== false ||
       manifest.productionCutoverAuthorized !== false ||
-      manifest.entries.length !== 16) {
-    fail('manifest target, schema-only authorization or 16-entry contract drifted')
+      manifest.entries.length !== 17) {
+    fail('manifest target, schema-only authorization or 17-entry contract drifted')
   }
   if (!Array.isArray(checksums) || checksums.length !== manifest.entries.length) {
     fail('exactly one verified artifact/manifest checksum is required per entry')
