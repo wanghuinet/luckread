@@ -120,7 +120,7 @@ export function verifyD105SharedRunnerReview({ readSource = readText } = {}) {
       review.review?.reviewedMainCommit !== '2bae4a5384cb86d7a754c9dde63d88515d5d020f' ||
       review.review?.sharedExecutorPullRequest !== 1660 ||
       review.review?.sharedExecutorHeadCommit !== '5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de' ||
-      review.review?.sharedPostgres18WorkflowRunId !== 46157726166 ||
+      review.review?.sharedPostgres18WorkflowRunId !== 46159151653 ||
       review.review?.d105StandalonePostgres18WorkflowRunId !== 42508098818) {
     fail('review evidence must bind to the merged shared executor and both completed D1-05 PG18 rehearsals')
   }
