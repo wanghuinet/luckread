@@ -349,14 +349,14 @@ test('opening a Following post and navigating back restores the reader position'
   const target = cards.nth(12).getByRole('link', { name: 'Feed post return-nav-12' })
   await target.click()
 
-  await expect(page).toHaveURL(/\\/content\\/return-nav-12/)
+  await expect(page).toHaveURL(/\/content\/return-nav-12/)
   await expect.poll(() => page.evaluate(() => {
     const raw = sessionStorage.getItem('luckread:home-feed:return-scroll')
     return raw ? (JSON.parse(raw) as { href?: string; y?: number }).y ?? 0 : 0
   })).toBeGreaterThan(800)
 
   await page.goBack()
-  await expect(page).toHaveURL(/\\/home\\?feed=following/)
+  await expect(page).toHaveURL(/\/home\?feed=following/)
   await expect(cards).toHaveCount(30)
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(800)
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('luckread:home-feed:return-scroll'))).toBeNull()
