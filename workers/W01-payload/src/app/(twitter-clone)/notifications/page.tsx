@@ -126,6 +126,8 @@ export default function NotificationsPage() {
   const [busyIds, setBusyIds] = useState<Set<string>>(() => new Set())
   const [actorProfiles, setActorProfiles] = useState<Record<string, PublicProfile>>({})
   const requestedActorIdsRef = useRef(new Set<string>())
+  const consumedCursorsRef = useRef(new Set<string>())
+  const notificationTabRefs = useRef<{ all: HTMLButtonElement | null; mentions: HTMLButtonElement | null }>({ all: null, mentions: null })
   const requestIdRef = useRef(0)
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -134,8 +136,15 @@ export default function NotificationsPage() {
     abortControllerRef.current?.abort()
     const controller = new AbortController()
     abortControllerRef.current = controller
+    if (append && cursor && consumedCursorsRef.current.has(cursor)) {
+      setHasMore(false)
+      setNextCursor(null)
+      setLoadingMore(false)
+      return
+    }
     if (append) setLoadingMore(true)
     else {
+      consumedCursorsRef.current.clear()
       setLoading(true)
       setItems([])
       setNextCursor(null)
@@ -170,9 +179,17 @@ export default function NotificationsPage() {
         const seen = new Set(current.map((item) => item.id))
         return [...current, ...data.data!.items.filter((item) => !seen.has(item.id))]
       })
+      if (cursor) consumedCursorsRef.current.add(cursor)
+      const candidateNextCursor = typeof data.data.nextCursor === 'string' && data.data.nextCursor.trim()
+        ? data.data.nextCursor
+        : null
+      const cursorCycle = data.data.hasMore === true && (
+        !candidateNextCursor ||
+        (candidateNextCursor !== null && consumedCursorsRef.current.has(candidateNextCursor))
+      )
       setUnreadCount(Math.max(0, Number(data.data.unreadCount) || 0))
-      setNextCursor(data.data.nextCursor ?? null)
-      setHasMore(data.data.hasMore === true)
+      setNextCursor(cursorCycle ? null : candidateNextCursor)
+      setHasMore(data.data.hasMore === true && !cursorCycle)
     } catch (cause) {
       if (requestId !== requestIdRef.current || controller.signal.aborted) return
       if (cause instanceof DOMException && cause.name === 'AbortError') return
@@ -280,9 +297,32 @@ export default function NotificationsPage() {
   return (
     <TwitterCloneSecondaryPageLayout locale={locale} title={labels.title} active="notifications">
       <section aria-busy={loading || loadingMore} aria-label={labels.title}>
-        <div className="grid grid-cols-2 border-b border-light-border dark:border-dark-border" role="tablist" aria-label={labels.filters}>
+        <div
+          className="grid grid-cols-2 border-b border-light-border dark:border-dark-border"
+          role="tablist"
+          aria-label={labels.filters}
+          onKeyDown={(event) => {
+            const nextFilter = event.key === 'ArrowRight' || event.key === 'ArrowDown'
+              ? filter === 'all' ? 'mentions' : 'all'
+              : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+                ? filter === 'mentions' ? 'all' : 'mentions'
+                : event.key === 'Home'
+                  ? 'all'
+                  : event.key === 'End'
+                    ? 'mentions'
+                    : null
+            if (!nextFilter) return
+            event.preventDefault()
+            setFilter(nextFilter)
+            notificationTabRefs.current[nextFilter]?.focus()
+          }}
+        >
           <button
+            ref={(element) => { notificationTabRefs.current.all = element }}
+            id="notifications-tab-all"
+            aria-controls="notifications-panel"
             aria-selected={filter === 'all'}
+            tabIndex={filter === 'all' ? 0 : -1}
             className={filter === 'all' ? 'main-tab relative flex min-h-14 items-center justify-center font-bold' : 'main-tab flex min-h-14 items-center justify-center text-light-secondary dark:text-dark-secondary'}
             onClick={() => setFilter('all')}
             role="tab"
@@ -292,7 +332,11 @@ export default function NotificationsPage() {
             {filter === 'all' ? <span className="absolute bottom-0 h-1 w-14 rounded-full bg-main-accent" /> : null}
           </button>
           <button
+            ref={(element) => { notificationTabRefs.current.mentions = element }}
+            id="notifications-tab-mentions"
+            aria-controls="notifications-panel"
             aria-selected={filter === 'mentions'}
+            tabIndex={filter === 'mentions' ? 0 : -1}
             className={filter === 'mentions' ? 'main-tab relative flex min-h-14 items-center justify-center font-bold' : 'main-tab flex min-h-14 items-center justify-center text-light-secondary dark:text-dark-secondary'}
             onClick={() => setFilter('mentions')}
             role="tab"
@@ -303,6 +347,7 @@ export default function NotificationsPage() {
           </button>
         </div>
 
+        <div id="notifications-panel" role="tabpanel" aria-labelledby={filter === 'all' ? 'notifications-tab-all' : 'notifications-tab-mentions'} tabIndex={0}>
         <div className="flex items-center justify-between border-b border-light-border px-4 py-3 dark:border-dark-border">
           <div>
             <p className="text-sm text-light-secondary dark:text-dark-secondary">{labels.unreadLabel}</p>
@@ -385,6 +430,7 @@ export default function NotificationsPage() {
             </button>
           </div>
         ) : null}
+        </div>
       </section>
     </TwitterCloneSecondaryPageLayout>
   )
