@@ -488,8 +488,8 @@ async function reviseMembershipPlanPostgres(
       'INSERT INTO membership_plan_versions ' +
       '(plan_id, plan_version, name, tier, billing_interval, price_minor, price_mode, minimum_price_minor, suggested_price_minor, maximum_price_minor, currency, benefits_json, trial_period_days, created_at) ' +
       'SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::timestamptz WHERE EXISTS (' +
-      "SELECT 1 FROM membership_plans p WHERE p.plan_id = $11 AND p.owner_type = 'CREATOR' AND p.owner_id = $12 " +
-      "AND p.status IN ('DRAFT','ACTIVE','PAUSED') AND p.current_version = $13 AND p.version = $14) " +
+      "SELECT 1 FROM membership_plans p WHERE p.plan_id = $15 AND p.owner_type = 'CREATOR' AND p.owner_id = $16 " +
+      "AND p.status IN ('DRAFT','ACTIVE','PAUSED') AND p.current_version = $17 AND p.version = $18) " +
       'ON CONFLICT (plan_id, plan_version) DO NOTHING RETURNING plan_id',
       [
         input.planId, input.nextPlanVersion, input.revision.name, input.revision.tier,
