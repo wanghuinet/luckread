@@ -343,7 +343,7 @@ export async function listActiveMembershipPlans(
     'SELECT p.plan_id, p.owner_id, p.current_version, ' +
     `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
     `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
-    'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+    'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.offer_kind, v.founding_capacity, v.currency, v.benefits_json, v.trial_period_days ' +
     'FROM membership_plans AS p ' +
     'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
     "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' ";
@@ -436,6 +436,8 @@ export type MembershipPlanDraftInput = {
   minimumPriceMinor: number | null
   suggestedPriceMinor: number | null
   maximumPriceMinor: number | null
+  offerKind: 'STANDARD' | 'FOUNDING'
+  foundingCapacity: number | null
   currency: string
   benefits: string[]
   trialPeriodDays: number
@@ -451,7 +453,7 @@ async function readOwnedMembershipPlanPostgres(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, ' +
       `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
       `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.offer_kind, v.founding_capacity, v.currency, v.benefits_json, v.trial_period_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.plan_id = $1 AND p.owner_type = 'CREATOR' AND p.owner_id = $2 LIMIT 1",
@@ -563,6 +565,8 @@ type MembershipPlanStoredRow = {
   minimum_price_minor?: number | null
   suggested_price_minor?: number | null
   maximum_price_minor?: number | null
+  offer_kind?: 'STANDARD' | 'FOUNDING'
+  founding_capacity?: number | null
   currency: string
   benefits_json: string
   trial_period_days: number
@@ -578,7 +582,7 @@ export function normalizeMembershipPlanDraft(value: unknown, defaultTrialPeriodD
   const allowedKeys = new Set([
     'name', 'tier', 'billingInterval', 'priceMode', 'priceMinor',
     'minimumPriceMinor', 'suggestedPriceMinor', 'maximumPriceMinor',
-    'currency', 'benefits', 'trialPeriodDays',
+    'offerKind', 'foundingCapacity', 'currency', 'benefits', 'trialPeriodDays',
   ])
   if (Object.keys(source).some((key) => !allowedKeys.has(key))) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
@@ -593,6 +597,8 @@ export function normalizeMembershipPlanDraft(value: unknown, defaultTrialPeriodD
   const minimumPriceMinor = source.minimumPriceMinor
   const suggestedPriceMinor = source.suggestedPriceMinor
   const maximumPriceMinor = source.maximumPriceMinor
+  const offerKind = source.offerKind === undefined ? 'STANDARD' : source.offerKind
+  const foundingCapacity = source.foundingCapacity
   const rawBenefits = source.benefits
   const trialPeriodDays = source.trialPeriodDays === undefined ? defaultTrialPeriodDays : source.trialPeriodDays
 
@@ -601,6 +607,17 @@ export function normalizeMembershipPlanDraft(value: unknown, defaultTrialPeriodD
   if (billingInterval !== 'MONTHLY' && billingInterval !== 'YEARLY') throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   if (!/^[A-Z]{3}$/.test(currency)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   if (priceMode !== 'FIXED' && priceMode !== 'FLEXIBLE') {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+  if (offerKind !== 'STANDARD' && offerKind !== 'FOUNDING') {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+  if (offerKind === 'STANDARD') {
+    if (foundingCapacity !== undefined && foundingCapacity !== null) {
+      throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+    }
+  } else if (priceMode !== 'FIXED' || typeof foundingCapacity !== 'number' ||
+      !Number.isSafeInteger(foundingCapacity) || foundingCapacity < 1 || foundingCapacity > 2_147_483_647) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   }
   if (priceMode === 'FIXED') {
@@ -636,6 +653,8 @@ export function normalizeMembershipPlanDraft(value: unknown, defaultTrialPeriodD
     minimumPriceMinor: priceMode === 'FLEXIBLE' ? minimumPriceMinor as number : null,
     suggestedPriceMinor: priceMode === 'FLEXIBLE' ? suggestedPriceMinor as number : null,
     maximumPriceMinor: priceMode === 'FLEXIBLE' ? maximumPriceMinor as number : null,
+    offerKind: offerKind as 'STANDARD' | 'FOUNDING',
+    foundingCapacity: offerKind === 'FOUNDING' ? foundingCapacity as number : null,
     currency, benefits, trialPeriodDays,
   }
 }
@@ -666,6 +685,11 @@ const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed?: boolean) => 
     ((row.price_mode ?? 'FIXED') === 'FIXED' && (!Number.isSafeInteger(row.price_minor) || (row.price_minor as number) < 0 || (row.price_minor as number) > 2_147_483_647 || (row.minimum_price_minor !== undefined && row.minimum_price_minor !== null) || (row.suggested_price_minor !== undefined && row.suggested_price_minor !== null) || (row.maximum_price_minor !== undefined && row.maximum_price_minor !== null))) ||
     ((row.price_mode ?? 'FIXED') === 'FLEXIBLE' && (row.price_minor !== null || !Number.isSafeInteger(row.minimum_price_minor) || (row.minimum_price_minor as number) < 1 || !Number.isSafeInteger(row.suggested_price_minor) || (row.suggested_price_minor as number) < (row.minimum_price_minor as number) || !Number.isSafeInteger(row.maximum_price_minor) || (row.maximum_price_minor as number) < (row.suggested_price_minor as number) || (row.maximum_price_minor as number) > 2_147_483_647)) ||
     !['FIXED', 'FLEXIBLE'].includes(row.price_mode ?? 'FIXED') ||
+    !['STANDARD', 'FOUNDING'].includes(row.offer_kind ?? 'STANDARD') ||
+    ((row.offer_kind ?? 'STANDARD') === 'STANDARD' && row.founding_capacity != null) ||
+    ((row.offer_kind ?? 'STANDARD') === 'FOUNDING' &&
+      ((row.price_mode ?? 'FIXED') !== 'FIXED' || !Number.isSafeInteger(row.founding_capacity) ||
+        (row.founding_capacity as number) < 1 || (row.founding_capacity as number) > 2_147_483_647)) ||
     !/^[A-Z]{3}$/.test(row.currency) ||
     !Number.isSafeInteger(trialPeriodDays) || trialPeriodDays < 0 || trialPeriodDays > 30 ||
     (row.billing_interval !== 'MONTHLY' && row.billing_interval !== 'YEARLY') ||
@@ -686,6 +710,8 @@ const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed?: boolean) => 
     minimumPriceMinor: row.minimum_price_minor ?? null,
     suggestedPriceMinor: row.suggested_price_minor ?? null,
     maximumPriceMinor: row.maximum_price_minor ?? null,
+    offerKind: row.offer_kind ?? 'STANDARD',
+    foundingCapacity: row.founding_capacity ?? null,
     currency: row.currency,
     benefits,
     trialPeriodDays,
@@ -713,7 +739,7 @@ async function readMembershipPlanDraftByIdPostgres(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, ' +
       `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
       `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.offer_kind, v.founding_capacity, v.currency, v.benefits_json, v.trial_period_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = 1 WHERE p.plan_id = $1 LIMIT 1',
       [planId],
@@ -739,6 +765,8 @@ function membershipPlanDraftMatches(
     (row.minimum_price_minor ?? null) === plan.minimumPriceMinor &&
     (row.suggested_price_minor ?? null) === plan.suggestedPriceMinor &&
     (row.maximum_price_minor ?? null) === plan.maximumPriceMinor &&
+    (row.offer_kind ?? 'STANDARD') === plan.offerKind &&
+    (row.founding_capacity ?? null) === plan.foundingCapacity &&
     row.currency === plan.currency &&
     row.benefits_json === benefitsJson &&
     (row.trial_period_days ?? 0) === plan.trialPeriodDays
@@ -997,6 +1025,8 @@ export async function reviseMembershipPlan(
     (row.minimum_price_minor ?? null) === revision.minimumPriceMinor &&
     (row.suggested_price_minor ?? null) === revision.suggestedPriceMinor &&
     (row.maximum_price_minor ?? null) === revision.maximumPriceMinor &&
+    (row.offer_kind ?? 'STANDARD') === revision.offerKind &&
+    (row.founding_capacity ?? null) === revision.foundingCapacity &&
     row.currency === revision.currency &&
     row.benefits_json === benefitsJson &&
     (row.trial_period_days ?? 0) === revision.trialPeriodDays;
@@ -1144,7 +1174,7 @@ export async function listCreatorMembershipPlans(
     'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, ' +
     `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
     `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
-    'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+    'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.offer_kind, v.founding_capacity, v.currency, v.benefits_json, v.trial_period_days ' +
     'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
     'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
     "WHERE p.owner_type = 'CREATOR' AND p.owner_id = $1 ";
@@ -1204,7 +1234,7 @@ export async function resolvePurchasableMembershipPlanOffers(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, ' +
       `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
       `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.offer_kind, v.founding_capacity, v.currency, v.benefits_json, v.trial_period_days ' +
       'FROM membership_plans AS p ' +
       'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' " +
