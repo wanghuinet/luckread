@@ -169,9 +169,21 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     if (
       !(sameKeys(legacyFixedKeys) || sameKeys(fixedKeys) || (priceMode === 'FLEXIBLE' && sameKeys(flexibleKeys)))
     ) return errorResponse(400, 'VALIDATION_FAILED', 'Only supported membership plan terms may be updated')
-    const priceFields: Record<string, unknown> = priceMode === 'FIXED'
-      ? { priceMode: 'FIXED', priceMinor: fields.priceMinor, minimumPriceMinor: null, suggestedPriceMinor: null, maximumPriceMinor: null }
-      : { priceMode, priceMinor: fields.priceMinor, minimumPriceMinor: fields.minimumPriceMinor, suggestedPriceMinor: fields.suggestedPriceMinor, maximumPriceMinor: fields.maximumPriceMinor }
+    const priceFields = priceMode === 'FIXED'
+      ? {
+          priceMode: 'FIXED' as const,
+          priceMinor: fields.priceMinor as number,
+          minimumPriceMinor: null,
+          suggestedPriceMinor: null,
+          maximumPriceMinor: null,
+        }
+      : {
+          priceMode: 'FLEXIBLE' as const,
+          priceMinor: null,
+          minimumPriceMinor: fields.minimumPriceMinor as number,
+          suggestedPriceMinor: fields.suggestedPriceMinor as number,
+          maximumPriceMinor: fields.maximumPriceMinor as number,
+        }
     if (
       typeof fields.name !== 'string' || fields.name !== fields.name.trim() || fields.name.length < 1 || fields.name.length > 120 ||
       typeof fields.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(fields.tier) ||
