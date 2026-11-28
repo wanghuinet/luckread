@@ -4,7 +4,10 @@ import type {
   W07WebhookPostgresPool,
   W07WebhookPostgresQueryResult,
 } from './payment-webhook-database-postgres.js';
-import { reserveFoundingOfferCapacity } from './founding-offer-reservations-postgres.js';
+import {
+  commitFoundingReservationAfterVerifiedPayment,
+  reserveFoundingOfferCapacity,
+} from './founding-offer-reservations-postgres.js';
 
 type Row = Record<string, unknown>;
 class FakeClient implements W07WebhookPostgresClient {
@@ -88,6 +91,44 @@ describe('founding offer capacity reservation', () => {
     });
     expect(result.replayed).toBe(true);
     expect(client.statements.some((entry) => entry.sql.includes('COUNT(*)::integer AS occupied'))).toBe(false);
+  });
+
+  it('commits a seat using finance payment time even when webhook delivery is delayed', async () => {
+    const committed = { ...heldRow, order_reference: 'ord_paid', state: 'COMMITTED' };
+    const client = new FakeClient((sql) => {
+      if (sql.includes('FROM membership_founding_reservations WHERE reservation_id')) return [heldRow];
+      if (sql.includes("UPDATE membership_founding_reservations SET state = 'COMMITTED'")) return [committed];
+      return [];
+    });
+    const result = await commitFoundingReservationAfterVerifiedPayment(
+      poolFor(client),
+      heldRow.reservation_id,
+      'evt_payment_succeeded_1',
+      new Date('2026-11-29T12:30:00.000Z'),
+      new Date('2026-11-29T12:10:00.000Z'),
+    );
+    const update = client.statements.find((entry) => entry.sql.includes("UPDATE membership_founding_reservations SET state = 'COMMITTED'"));
+    expect(result.state).toBe('COMMITTED');
+    expect(update?.sql).toContain('expires_at > $3');
+    expect(update?.values[1]).toBe('2026-11-29T12:30:00.000Z');
+    expect(update?.values[2]).toBe('2026-11-29T12:10:00.000Z');
+    expect(client.statements.some((entry) => entry.sql === 'COMMIT')).toBe(true);
+  });
+
+  it('rejects a payment confirmed after the reservation expired', async () => {
+    const client = new FakeClient((sql) => {
+      if (sql.includes('FROM membership_founding_reservations WHERE reservation_id')) return [heldRow];
+      return [];
+    });
+    await expect(commitFoundingReservationAfterVerifiedPayment(
+      poolFor(client),
+      heldRow.reservation_id,
+      'evt_payment_succeeded_2',
+      new Date('2026-11-29T12:30:00.000Z'),
+      new Date('2026-11-29T12:16:00.000Z'),
+    )).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 });
+    expect(client.statements.some((entry) => entry.sql.includes("UPDATE membership_founding_reservations SET state = 'COMMITTED'"))).toBe(false);
+    expect(client.statements.some((entry) => entry.sql === 'ROLLBACK')).toBe(true);
   });
 
   it('fails closed when plan versions disagree on the founding capacity', async () => {
