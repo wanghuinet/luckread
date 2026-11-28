@@ -1048,6 +1048,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           await saveQuoteRelationship(savedDraft.id, quoteContentId)
         } catch (caught) {
           setQuoteRelationshipPending(true)
+          window.dispatchEvent(new CustomEvent('luckread:quote-relationship-pending', { detail: { pending: true } }))
           setError(caught instanceof Error
             ? '动态已发布，但引用关系尚未保存：' + caught.message
             : '动态已发布，但引用关系尚未保存。请重试完成引用。')
@@ -1091,6 +1092,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     }
     quoteRelationshipKeyRef.current = null
     setQuoteRelationshipPending(false)
+    window.dispatchEvent(new CustomEvent('luckread:quote-relationship-pending', { detail: { pending: false } }))
     window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))
   }
 
@@ -1132,6 +1134,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     const controller = new AbortController()
     setQuoteTarget(null)
     setQuoteRelationshipPending(false)
+    window.dispatchEvent(new CustomEvent('luckread:quote-relationship-pending', { detail: { pending: false } }))
     quoteRelationshipKeyRef.current = null
     if (!quoteContentId) {
       setLoadingQuote(false)
