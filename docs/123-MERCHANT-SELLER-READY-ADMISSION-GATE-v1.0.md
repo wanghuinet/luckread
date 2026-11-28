@@ -75,7 +75,7 @@ Must reconcile with:
 
 ### G6 Runtime
 
-The physical runtime must use the existing Neon finance PostgreSQL database (logical D1-04) with W07 as sole Merchant/Seller authority and writer. Public APP/H5/PC traffic must enter through W01, authorization must use the existing W08/CASL boundary, and asynchronous propagation must use only the existing W10 Queue/workflow boundary where appropriate. R2 may hold controlled evidence/media objects; Cache/KV are derived projections only. No D1 runtime binding/fallback, direct client database access, dual-write path, new Worker, database, Queue or Service Binding is allowed. External engines remain replaceable adapters.
+The target physical schema must use the existing Neon finance PostgreSQL database (logical D1-04) with W07 as sole Merchant/Seller authority owner. Existing D1 remains production storage authority until a separate cutover is explicitly approved and verified. Public APP/H5/PC traffic must enter through W01, authorization must use the existing W08/CASL boundary, and asynchronous propagation must use only the existing W10 Queue/workflow boundary where appropriate. R2 may hold controlled evidence/media objects; Cache/KV are derived projections only. No new D1 binding/fallback, direct client database access, dual-write path, new Worker, database, Queue or Service Binding is allowed. Existing production D1 bindings remain only until the separately approved cutover. External engines remain replaceable adapters.
 
 ### G7 Acceptance
 
