@@ -146,6 +146,9 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
     // Following starts empty and hydrates asynchronously. Wait until its first page
     // has settled so the browser has enough document height to restore the offset.
     if (items.length === 0) {
+      // Keep the return position while the first page is unavailable. A successful
+      // retry can then restore the timeline instead of silently losing the position.
+      if (error || requiresAuth) return
       try { sessionStorage.removeItem('luckread:home-feed:return-scroll') } catch { /* Ignore unavailable storage. */ }
       return
     }
@@ -157,7 +160,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       })
     })
     return () => { cancelAnimationFrame(firstFrame); if (secondFrame) cancelAnimationFrame(secondFrame) }
-  }, [items.length, loading])
+  }, [error, items.length, loading, requiresAuth])
 
   useEffect(() => () => {
     activeRequestRef.current?.abort()
