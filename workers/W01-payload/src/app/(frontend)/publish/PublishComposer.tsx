@@ -1911,6 +1911,16 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               </button>
             </div>
             <div className="flex min-w-10 items-center justify-end gap-2">
+              {quoteRelationshipPending ? (
+                <button
+                  className="rounded-full border border-[#536471] px-3 py-1.5 text-xs font-semibold text-[#e7e9ea] disabled:opacity-50"
+                  disabled={busy}
+                  onClick={() => void retryQuoteRelationship()}
+                  type="button"
+                >
+                  {busy ? '处理中…' : '重试保存引用关系'}
+                </button>
+              ) : null}
               {body.length > 0 ? <span className="text-[11px] tabular-nums text-[#71767b]" aria-live="polite">{body.length}/500</span> : null}
             </div>
           </>
