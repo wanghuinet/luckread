@@ -10,7 +10,8 @@ vi.mock('next/link', () => ({
 }))
 
 vi.mock('../../src/app/(frontend)/components/reuse/LuckReadSocialPostCard', () => ({
-  default: (): null => null,
+  default: ({ contentId }: { contentId: string }): ReactNode =>
+    createElement('div', { 'data-testid': 'post-card', 'data-content-id': contentId }),
 }))
 
 const emptyPage = { items: [] as never[], nextCursor: null as string | null, hasMore: false }
@@ -129,6 +130,41 @@ describe('H5 home feed initial-load recovery', () => {
     })
     expect(screen.queryByRole('button', { name: getTwitterCloneCopy('en').feed.loadingMore })).toBeNull()
     expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toContain('/login?returnTo=')
+  })
+
+  it('deduplicates repeated post IDs and stops when pagination returns an already requested cursor', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ data: {
+      items: [
+        { id: 'existing-post', title: 'Duplicate existing post', contentType: 'post' },
+        { id: 'new-post', title: 'New post', contentType: 'post' },
+      ],
+      nextCursor: 'cursor-page-2',
+      hasMore: true,
+    } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+
+    render(createElement(TwitterCloneHomeFeed, {
+      initialPage: {
+        items: [{ id: 'existing-post', title: 'Existing post', contentType: 'post' }],
+        nextCursor: 'cursor-page-2',
+        hasMore: true,
+      },
+      locale: 'en',
+      feedMode: 'for-you',
+    }))
+
+    fireEvent.click(screen.getByRole('button', { name: getTwitterCloneCopy('en').feed.loadingMore }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.getAllByTestId('post-card')).toHaveLength(2))
+    expect(screen.getAllByTestId('post-card').map(card => card.getAttribute('data-content-id'))).toEqual([
+      'existing-post',
+      'new-post',
+    ])
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/contents?limit=20&cursor=cursor-page-2')
+    await waitFor(() => expect(screen.queryByRole('button', { name: getTwitterCloneCopy('en').feed.loadingMore })).toBeNull())
   })
 
 })
