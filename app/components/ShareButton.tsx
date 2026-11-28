@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -11,6 +11,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useColorScheme } from 'nativewind';
 import { Feather } from '@expo/vector-icons';
 import { createContentShareLink } from '~/lib/content-share';
+import { createIdempotencyKey } from '~/lib/api-client';
 
 type ShareButtonProps = {
   contentId?: string;
@@ -21,6 +22,7 @@ type ShareButtonProps = {
 export default function ShareButton({ contentId, contentText, iconColor }: ShareButtonProps) {
   const { colorScheme } = useColorScheme();
   const [sharing, setSharing] = useState(false);
+  const pendingShareKeyRef = useRef<{ contentId: string; key: string } | null>(null);
   const disabled = !contentId?.trim() || sharing;
   const activityColor = colorScheme === 'dark' ? '#8b98a5' : '#536471';
 
@@ -55,14 +57,25 @@ export default function ShareButton({ contentId, contentText, iconColor }: Share
 
     setSharing(true);
     try {
-      const result = await createContentShareLink(contentId);
+      const normalizedContentId = contentId.trim();
+      const pending = pendingShareKeyRef.current;
+      const idempotencyKey = pending?.contentId === normalizedContentId
+        ? pending.key
+        : createIdempotencyKey();
+      pendingShareKeyRef.current = { contentId: normalizedContentId, key: idempotencyKey };
+      const result = await createContentShareLink(normalizedContentId, idempotencyKey);
       if (!result.ok) {
+        const status = result.status;
+        const ambiguous = status === undefined || status === 408 || status === 429 ||
+          status >= 500 || (status >= 200 && status < 300);
+        if (!ambiguous) pendingShareKeyRef.current = null;
         Alert.alert(
           result.status === 401 ? 'Sign in required' : 'Share failed',
           result.message || 'Could not create a share link. Please try again.',
         );
         return;
       }
+      pendingShareKeyRef.current = null;
 
       const preview = contentText?.trim();
       const message = preview
