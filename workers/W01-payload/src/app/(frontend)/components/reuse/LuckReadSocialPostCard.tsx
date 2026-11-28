@@ -840,7 +840,7 @@ function LuckReadSocialPostCard({
                 ) : null}
               </div>
             </div>
-            <Link className="block whitespace-pre-wrap break-words text-[15px] leading-5 text-light-primary dark:text-dark-primary" href={contentHref} data-umami-event="content-open" data-umami-event-content-type="post">
+            <Link className="block whitespace-pre-wrap break-words text-[15px] leading-5 text-light-primary dark:text-dark-primary" href={contentHref} onClick={() => { if (presentation === 'x-timeline' && typeof window !== 'undefined') { try { sessionStorage.setItem('luckread:home-feed:return-scroll', JSON.stringify({ href: window.location.pathname + window.location.search, y: window.scrollY })) } catch { /* Native history restoration remains available. */ } } }} data-umami-event="content-open" data-umami-event-content-type="post">
               {title}
             </Link>
             {mediaWarning && !mediaRevealed ? (
@@ -857,7 +857,7 @@ function LuckReadSocialPostCard({
               </div>
             ) : null}
             <footer className="mt-2 flex items-center justify-between gap-1 text-light-secondary dark:text-dark-secondary">
-              <Link aria-label={label('Reply or discuss', '回复或讨论', '回覆或討論')} className={actionClass} href={contentHref}>
+              <Link aria-label={label('Reply or discuss', '回复或讨论', '回覆或討論')} className={actionClass} href={contentHref} onClick={() => { if (presentation === 'x-timeline' && typeof window !== 'undefined') { try { sessionStorage.setItem('luckread:home-feed:return-scroll', JSON.stringify({ href: window.location.pathname + window.location.search, y: window.scrollY })) } catch { /* Native history restoration remains available. */ } } }}>
                 <TimelineIcon name="reply" /><span className={actionText}>{commentCount === null ? '' : commentCount.toLocaleString(dateLocale)}</span>
               </Link>
               <button aria-label={reposted ? label('Undo repost', '取消转推', '取消轉推') : label('Repost', '转推', '轉推')} aria-pressed={reposted} className={actionClass} disabled={repostBusy || likeStateLoading} onClick={() => void toggleRepost()} title={reposted ? label('Undo repost', '取消转推', '取消轉推') : label('Repost', '转推', '轉推')} type="button">

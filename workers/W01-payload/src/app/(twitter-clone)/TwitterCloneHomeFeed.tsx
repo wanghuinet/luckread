@@ -27,9 +27,17 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   const requestedCursorsRef = useRef(new Set<string>())
   const itemIdsRef = useRef(new Set(initialPage.items.map(item => item.id)))
   const activeRequestRef = useRef<AbortController | null>(null)
+  // Increment on every initial/refresh request so stale pagination cannot mutate newer state.
+  const requestGenerationRef = useRef(0)
+  const scrollRestoreFramesRef = useRef<number[]>([])
 
-  const loadInitial = useCallback(async () => {
-    if (loadingRef.current) return
+  const loadInitial = useCallback(async (force = false) => {
+    if (loadingRef.current && !force) return
+    const scrollPosition = force && typeof window !== 'undefined' ? window.scrollY : null
+    if (force) { loadingRef.current = false; activeRequestRef.current?.abort() }
+    activeRequestRef.current?.abort()
+    const generation = ++requestGenerationRef.current
+    requestedCursorsRef.current.clear()
     loadingRef.current = true
     const controller = new AbortController()
     activeRequestRef.current = controller
@@ -42,7 +50,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
         endpoint + params.toString(),
         { headers: { accept: 'application/json' }, cache: 'no-store', credentials: feedMode === 'following' ? 'include' : 'omit', signal: controller.signal },
       )
-      if (controller.signal.aborted) return
+      if (controller.signal.aborted || generation !== requestGenerationRef.current) return
       if (feedMode === 'following' && (response.status === 401 || data?.error?.code === 'UNAUTHENTICATED')) {
         setRequiresAuth(true)
         setItems([])
@@ -52,6 +60,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       }
       if (!response.ok || !data?.data) throw new Error(getApiErrorMessage(data, copy.feed.loadError))
       const page = data.data
+      requestedCursorsRef.current.clear()
       setRequiresAuth(false)
       setRetryInitial(false)
       const initialItems = page.items ?? []
@@ -60,8 +69,20 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       setNextCursor(page.nextCursor ?? null)
       setHasMore(page.hasMore === true)
       setCandidateWindowTruncated(page.candidateWindowTruncated === true)
+      if (scrollPosition !== null && scrollPosition > 0) {
+        scrollRestoreFramesRef.current.forEach(frame => cancelAnimationFrame(frame))
+        scrollRestoreFramesRef.current = []
+        const firstFrame = requestAnimationFrame(() => {
+          const secondFrame = requestAnimationFrame(() => {
+            if (generation === requestGenerationRef.current) window.scrollTo({ top: scrollPosition, behavior: 'auto' })
+            scrollRestoreFramesRef.current = []
+          })
+          scrollRestoreFramesRef.current.push(secondFrame)
+        })
+        scrollRestoreFramesRef.current.push(firstFrame)
+      }
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && generation === requestGenerationRef.current) {
         setRetryInitial(true)
         setError(cause instanceof Error ? cause.message : copy.feed.loadError)
       }
@@ -72,12 +93,13 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
         if (!controller.signal.aborted) setLoading(false)
       }
     }
-  }, [copy.feed.loadMoreError, feedMode])
+  }, [copy.feed.loadError, copy.feed.loadMoreError, feedMode])
 
   const loadMore = useCallback(async () => {
     if(loadingRef.current||!hasMore||!nextCursor||requiresAuth)return
     if (requestedCursorsRef.current.has(nextCursor)) return
     requestedCursorsRef.current.add(nextCursor)
+    const generation = requestGenerationRef.current
     const controller = new AbortController()
     activeRequestRef.current = controller
     loadingRef.current=true;setLoading(true);setRetryInitial(false);setError('')
@@ -88,8 +110,8 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
         endpoint + params.toString(),
         {headers:{accept:'application/json'},cache:'no-store',credentials:feedMode==='following'?'include':'omit',signal:controller.signal},
       )
-      if (controller.signal.aborted) return
-      if (response.status === 401 && feedMode === 'following') {
+      if (controller.signal.aborted || generation !== requestGenerationRef.current) return
+      if (feedMode === 'following' && (response.status === 401 || data?.error?.code === 'UNAUTHENTICATED')) {
         setRequiresAuth(true)
         setItems([])
         setNextCursor(null)
@@ -109,12 +131,38 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       setNextCursor(cursorAlreadyRequested ? null : next)
       setHasMore(page.hasMore === true && next !== null && !cursorAlreadyRequested)
       setCandidateWindowTruncated(current => current || page.candidateWindowTruncated === true)
-    } catch(cause) {requestedCursorsRef.current.delete(nextCursor);if(!controller.signal.aborted){setRetryInitial(false);setError(cause instanceof Error?cause.message:copy.feed.loadMoreError)}}
+    } catch(cause) {if(generation === requestGenerationRef.current){requestedCursorsRef.current.delete(nextCursor);if(!controller.signal.aborted){setRetryInitial(false);setError(cause instanceof Error?cause.message:copy.feed.loadMoreError)}}}
     finally {if(activeRequestRef.current===controller){activeRequestRef.current=null;loadingRef.current=false;if(!controller.signal.aborted)setLoading(false)}}
   }, [copy.feed.loadMoreError, feedMode, hasMore, nextCursor, requiresAuth])
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || loading) return
+    let saved: { href?: string; y?: number } | null = null
+    try {
+      const raw = sessionStorage.getItem('luckread:home-feed:return-scroll')
+      if (raw) saved = JSON.parse(raw) as { href?: string; y?: number }
+    } catch { return }
+    if (!saved || saved.href !== window.location.pathname + window.location.search || typeof saved.y !== 'number' || saved.y <= 0) return
+    // Following starts empty and hydrates asynchronously. Wait until its first page
+    // has settled so the browser has enough document height to restore the offset.
+    if (items.length === 0) {
+      try { sessionStorage.removeItem('luckread:home-feed:return-scroll') } catch { /* Ignore unavailable storage. */ }
+      return
+    }
+    let secondFrame = 0
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        window.scrollTo({ top: saved!.y!, behavior: 'auto' })
+        try { sessionStorage.removeItem('luckread:home-feed:return-scroll') } catch { /* Ignore unavailable storage. */ }
+      })
+    })
+    return () => { cancelAnimationFrame(firstFrame); if (secondFrame) cancelAnimationFrame(secondFrame) }
+  }, [items.length, loading])
+
   useEffect(() => () => {
     activeRequestRef.current?.abort()
+    scrollRestoreFramesRef.current.forEach(frame => cancelAnimationFrame(frame))
+    scrollRestoreFramesRef.current = []
   }, [])
 
   useEffect(() => {
@@ -143,6 +191,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   const signInLabel = locale === 'en' ? 'Sign in' : locale === 'tw' ? '登入' : '登录'
 
   return <section aria-busy={loading} aria-label={copy.feed.timeline}>
+    <div className="flex justify-end border-b border-light-border px-4 py-2 dark:border-dark-border"><button type="button" className="rounded-full border border-light-line-reply px-3 py-1.5 text-sm font-bold disabled:opacity-50 dark:border-dark-border" onClick={() => void loadInitial(true)}>{locale === 'en' ? 'Refresh feed' : locale === 'tw' ? '重新整理動態' : '刷新动态'}</button></div>
     {feedMode === 'following' && candidateWindowTruncated ? <p className="border-b border-light-border px-4 py-3 text-sm text-light-secondary dark:border-dark-border dark:text-dark-secondary" role="status">{locale === 'en' ? 'This timeline currently includes the most recently followed 500 accounts; posts from older follows may be missing.' : locale === 'tw' ? '目前僅載入最近追蹤的 500 個帳號；更早追蹤的帳號可能未出現在此動態中。' : '当前仅加载最近关注的 500 个账号；更早关注的账号可能未出现在此动态中。'}</p> : null}
     {requiresAuth ? <div className="flex flex-col items-center gap-3 px-6 py-16 text-center" role="status"><h2 className="text-xl font-bold">{signInTitle}</h2><Link className="rounded-full bg-main-accent px-5 py-2 font-bold text-white" href={'/login?returnTo=' + encodeURIComponent('/home?feed=following')}>{signInLabel}</Link></div> : null}
     {!requiresAuth ? items.map(item=><LuckReadSocialPostCard key={item.id} contentId={item.id} slug={item.slug} title={item.title} creatorId={item.creatorId ?? (feedMode === 'following' ? item.ownerUserId : undefined)} author={item.creator ?? item.author} coverRef={item.coverRef} mediaRefs={item.mediaRefs} mediaWarning={item.mediaWarning} createdAt={item.createdAt} updatedAt={item.updatedAt} presentation="x-timeline" locale={locale}/>) : null}
