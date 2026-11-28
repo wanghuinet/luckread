@@ -244,3 +244,21 @@ test('manual refresh supersedes a slow initial Following request', async ({ page
   await expect(page.getByText('Feed post feed-stale-request',{exact:true})).toHaveCount(0)
   expect(initialRequests).toBe(2)
 })
+
+
+test('Following pagination handles an UNAUTHENTICATED error code even without HTTP 401', async ({ page }) => {
+  await page.route('**/api/v1/feed/following**', async route => {
+    const url = new URL(route.request().url())
+    if (url.searchParams.has('cursor')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Sign in required' } }) })
+      return
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { items: [post('feed-auth')], nextCursor: 'page-2', hasMore: true } }) })
+  })
+  await mockSocial(page)
+  await page.goto('http://127.0.0.1:3000/home?feed=following')
+  await expect(page.getByTestId('luckread-social-post-card')).toHaveCount(1)
+  await page.getByRole('button', { name: /继续滚动|加载更多|Load more|Loading more/i }).click()
+  await expect(page.getByRole('heading', { name: /sign in to see posts|登录后查看你关注账号|登入後查看你追蹤帳號/i })).toBeVisible()
+  await expect(page.getByTestId('luckread-social-post-card')).toHaveCount(0)
+})
