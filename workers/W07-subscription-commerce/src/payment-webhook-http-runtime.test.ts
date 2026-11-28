@@ -81,6 +81,7 @@ function fixture(options: {
   const nativeUpgradeExpiryCalls: Array<{ financePool: unknown; membershipPool: unknown; paymentId: string; merchantId: string }> = [];
   const foundingCommitCalls: Array<{ membershipPool: unknown; financePool: unknown; paymentId: string; merchantId: string; eventId: string }> = [];
   const foundingReleaseCalls: Array<{ membershipPool: unknown; financePool: unknown; paymentId: string; merchantId: string }> = [];
+  const foundingSagaOrder: string[] = [];
 
   const syncRenewalOutcome = async (
     env: OutcomeEnv,
@@ -102,6 +103,7 @@ function fixture(options: {
     paymentId: string,
     merchantId: string,
   ): Promise<PaidMembershipPurchaseFulfillmentResult> => {
+    foundingSagaOrder.push('fulfill');
     purchaseFulfillmentCalls.push({ env, paymentId, merchantId });
     return options.purchaseFulfillmentResult ?? { outcome: 'NOT_APPLICABLE', fulfilledCount: 0 };
   };
@@ -163,6 +165,7 @@ function fixture(options: {
       merchantId: string,
       eventId: string,
     ) => {
+      foundingSagaOrder.push('commit');
       foundingCommitCalls.push({ membershipPool, financePool, paymentId, merchantId, eventId });
       return null;
     },
@@ -199,6 +202,7 @@ function fixture(options: {
     nativeUpgradeExpiryCalls,
     foundingCommitCalls,
     foundingReleaseCalls,
+    foundingSagaOrder,
   };
 }
 
@@ -344,6 +348,7 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     );
     expect(response?.status).toBe(200);
     expect(f.postgresReceiptCalls).toMatchObject([{ pool: f.postgresPool, paymentId, merchantId: MERCHANT }]);
+    expect(f.foundingSagaOrder).toEqual(['commit', 'fulfill']);
     expect(f.purchaseFulfillmentCalls).toMatchObject([{
       env: {
         W07_DATABASE_DRIVER: 'neon',
