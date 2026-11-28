@@ -494,10 +494,32 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
             className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
         </label>
         <label className="flex flex-col gap-1 text-sm font-semibold">
-          {labels.price}
-          <input required inputMode="decimal" value={price} onChange={(event) => setPrice(event.target.value)} pattern="(0|[1-9][0-9]*)(\.[0-9]{1,2})?" placeholder="5.00"
-            className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+          {labels.priceMode}
+          <select value={priceMode} onChange={(event) => setPriceMode(event.target.value as 'FIXED' | 'FLEXIBLE')}
+            className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border">
+            <option value="FIXED">{labels.fixedPrice}</option>
+            <option value="FLEXIBLE">{labels.flexiblePrice}</option>
+          </select>
         </label>
+        {priceMode === 'FIXED' ? (
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            {labels.price}
+            <input required inputMode="decimal" value={price} onChange={(event) => setPrice(event.target.value)} pattern="(0|[1-9][0-9]*)(\.[0-9]{1,2})?" placeholder="5.00"
+              className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+          </label>
+        ) : (
+          <>
+            <label className="flex flex-col gap-1 text-sm font-semibold">{labels.minimumPrice}
+              <input required inputMode="decimal" value={minimumPrice} onChange={(event) => setMinimumPrice(event.target.value)} placeholder="5.00" className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-semibold">{labels.suggestedPrice}
+              <input required inputMode="decimal" value={suggestedPrice} onChange={(event) => setSuggestedPrice(event.target.value)} placeholder="10.00" className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-semibold">{labels.maximumPrice}
+              <input required inputMode="decimal" value={maximumPrice} onChange={(event) => setMaximumPrice(event.target.value)} placeholder="25.00" className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+            </label>
+          </>
+        )}
         <label className="flex flex-col gap-1 text-sm font-semibold">
           {labels.interval}
           <select value={interval} onChange={(event) => setInterval(event.target.value as 'MONTHLY' | 'YEARLY')}
@@ -534,7 +556,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
                 <span className="rounded-full bg-light-primary/10 px-3 py-1 text-xs font-bold dark:bg-dark-primary/20">{labels.status[plan.status]}</span>
               </div>
               <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
-                <p><span className="text-light-secondary dark:text-dark-secondary">{labels.priceLabel}: </span><strong>{formatPrice(plan.priceMinor, plan.currency, locale)}</strong></p>
+                <p><span className="text-light-secondary dark:text-dark-secondary">{labels.priceLabel}: </span><strong>{plan.priceMode === 'FIXED' ? formatPrice(plan.priceMinor as number, plan.currency, locale) : `${formatPrice(plan.minimumPriceMinor as number, plan.currency, locale)} – ${formatPrice(plan.maximumPriceMinor as number, plan.currency, locale)} (${labels.suggestedPrice}: ${formatPrice(plan.suggestedPriceMinor as number, plan.currency, locale)})`}</strong></p>
                 <p><span className="text-light-secondary dark:text-dark-secondary">{labels.periodLabel}: </span><strong>{plan.billingInterval === 'MONTHLY' ? labels.monthly : labels.yearly}</strong></p>
                 <p><span className="text-light-secondary dark:text-dark-secondary">{labels.version}: </span><strong>{plan.planVersion}</strong></p>
               </div>
@@ -554,9 +576,30 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
                     <input required maxLength={64} pattern="[a-z][a-z0-9_-]{0,63}" value={editTier} onChange={(event) => setEditTier(event.target.value)} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
                   </label>
                   <label className="flex flex-col gap-1 text-sm font-semibold">
-                    {labels.priceLabel} ({plan.currency})
-                    <input required inputMode="decimal" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} pattern="(0|[1-9][0-9]*)(\.[0-9]{1,2})?" className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                    {labels.priceMode}
+                    <select value={editPriceMode} onChange={(event) => setEditPriceMode(event.target.value as 'FIXED' | 'FLEXIBLE')} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border">
+                      <option value="FIXED">{labels.fixedPrice}</option>
+                      <option value="FLEXIBLE">{labels.flexiblePrice}</option>
+                    </select>
                   </label>
+                  {editPriceMode === 'FIXED' ? (
+                    <label className="flex flex-col gap-1 text-sm font-semibold">
+                      {labels.priceLabel} ({plan.currency})
+                      <input required inputMode="decimal" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} pattern="(0|[1-9][0-9]*)(\.[0-9]{1,2})?" className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                    </label>
+                  ) : (
+                    <>
+                      <label className="flex flex-col gap-1 text-sm font-semibold">{labels.minimumPrice}
+                        <input required inputMode="decimal" value={editMinimumPrice} onChange={(event) => setEditMinimumPrice(event.target.value)} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                      </label>
+                      <label className="flex flex-col gap-1 text-sm font-semibold">{labels.suggestedPrice}
+                        <input required inputMode="decimal" value={editSuggestedPrice} onChange={(event) => setEditSuggestedPrice(event.target.value)} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                      </label>
+                      <label className="flex flex-col gap-1 text-sm font-semibold">{labels.maximumPrice}
+                        <input required inputMode="decimal" value={editMaximumPrice} onChange={(event) => setEditMaximumPrice(event.target.value)} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                      </label>
+                    </>
+                  )}
                   <label className="flex flex-col gap-1 text-sm font-semibold">
                     {labels.interval}
                     <select value={editInterval} onChange={(event) => setEditInterval(event.target.value as 'MONTHLY' | 'YEARLY')} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border">
