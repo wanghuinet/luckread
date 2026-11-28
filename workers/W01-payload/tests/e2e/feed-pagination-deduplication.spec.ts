@@ -262,3 +262,34 @@ test('Following pagination handles an UNAUTHENTICATED error code even without HT
   await expect(page.getByRole('heading', { name: /sign in to see posts|登录后查看你关注账号|登入後查看你追蹤帳號/i })).toBeVisible()
   await expect(page.getByTestId('luckread-social-post-card')).toHaveCount(0)
 })
+
+
+test('refresh supersedes a slow pagination request without allowing stale posts to append', async ({ page }) => {
+  let initialRequests = 0
+  let paginationRequests = 0
+  await page.route('**/api/v1/feed/following**', async route => {
+    const url = new URL(route.request().url())
+    if (url.searchParams.has('cursor')) {
+      paginationRequests += 1
+      if (paginationRequests === 1) {
+        await new Promise(resolve => setTimeout(resolve, 1200))
+        try { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { items: [post('feed-stale-page')], nextCursor: null, hasMore: false } }) }) } catch { /* superseded request */ }
+        return
+      }
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { items: [post('feed-current-page')], nextCursor: null, hasMore: false } }) })
+      return
+    }
+    initialRequests += 1
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { items: [post(initialRequests === 1 ? 'feed-before-refresh' : 'feed-after-refresh')], nextCursor: 'page-2', hasMore: true } }) })
+  })
+  await mockSocial(page)
+  await page.goto('http://127.0.0.1:3000/home?feed=following')
+  const cards = page.getByTestId('luckread-social-post-card')
+  await expect(cards).toHaveCount(1)
+  await page.getByRole('button', { name: /继续滚动|加载更多|Load more|Loading more/i }).click()
+  await page.getByRole('button', { name: /刷新动态|Refresh feed|重新整理動態/i }).click()
+  await expect(page.getByText('Feed post feed-after-refresh', { exact: true })).toBeVisible()
+  await expect(page.getByText('Feed post feed-stale-page', { exact: true })).toHaveCount(0)
+  await expect(cards).toHaveCount(1)
+  expect(initialRequests).toBe(2)
+})
