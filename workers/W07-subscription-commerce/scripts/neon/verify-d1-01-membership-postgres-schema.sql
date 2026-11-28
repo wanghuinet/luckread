@@ -53,10 +53,10 @@ DECLARE
     'neon_schema_migration_ledger'
   ];
   expected_tables TEXT[] := ARRAY[
+    'membership_founding_reservation_payment_events',
+    'membership_founding_reservations',
     'membership_plan_versions',
     'membership_plans',
-    'membership_founding_reservations',
-    'membership_founding_reservation_payment_events',
     'membership_revenuecat_product_bindings',
     'membership_subscription_lifecycle_audit',
     'membership_subscription_lifecycle_operation_receipts',
