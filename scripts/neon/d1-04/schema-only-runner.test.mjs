@@ -23,18 +23,19 @@ const url = (overrides = '') =>
   'postgresql://neondb_owner:local-test-only@' + host +
   '/luckread_finance?sslmode=require&channel_binding=require' + overrides
 
-test('D1-04 plan is the exact six-entry W07-only shared migration manifest', () => {
+test('D1-04 plan includes six translated slices and the native W07 Merchant/Seller schema slice', () => {
   assert.equal(manifest.domainId, 'D1-04')
   assert.equal(manifest.databaseName, 'luckread_finance')
   assert.equal(manifest.cloudflareD1DatabaseUuid, '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736')
-  assert.equal(plan.entries.length, 6)
+  assert.equal(plan.entries.length, 7)
   assert.ok(plan.entries.every((item) => item.entry.ownerWorker === 'W07'))
-  assert.equal(plan.tables.length, 15)
-  assert.equal(plan.indexes.length, 31)
-  assert.equal(manifest.expected.constraintIndexes, 29)
+  assert.equal(plan.tables.length, 20)
+  assert.equal(plan.indexes.length, 39)
+  assert.equal(manifest.expected.constraintIndexes, 34)
   assert.equal(manifest.expected.constraintIndexNames.length, manifest.expected.constraintIndexes)
-  assert.equal(plan.triggers.length, 72)
-  assert.equal(plan.functions.length, 6)
+  assert.equal(plan.triggers.length, 97)
+  assert.equal(plan.functions.length, 7)
+  assert.deepEqual(plan.entries[6].entry.sourceMigrations, [])
   assert.equal(plan.references.length, 0)
   assert.equal(plan.controlSeedRows, 1)
   assert.equal(manifest.expected.businessRows, 0)
@@ -161,8 +162,8 @@ test('D1-04 final catalog separates explicit indexes from PostgreSQL constraint-
     ...manifest.expected.constraintIndexNames.map((indexname) => ({ indexname, constraint_backed: true })),
   ]
   assert.deepEqual(assertD104IndexCatalog(manifest, plan, catalogRows), {
-    explicitIndexes: 31,
-    constraintIndexes: 29,
+    explicitIndexes: 39,
+    constraintIndexes: 34,
   })
   assert.throws(
     () => assertD104IndexCatalog(manifest, plan, [
