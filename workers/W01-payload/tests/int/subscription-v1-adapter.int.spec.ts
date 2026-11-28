@@ -65,7 +65,9 @@ describe('v1 subscription adapter', () => {
   it('does not return plan creation success until W06 confirms the immutable audit event', () => {
     expect(creatorPlansRoute).toContain('callW06MembershipPlanAudit')
     expect(creatorPlansRoute).toContain("eventId: 'evt_mpl_created_' + plan.planId")
-    expect(creatorPlansRoute).toContain('priceMinor: plan.priceMinor')
+    expect(creatorPlansRoute).toContain('priceMinor: plan.priceMinor as number | null')
+    expect(creatorPlansRoute).toContain('minimumPriceMinor: plan.minimumPriceMinor as number | null')
+    expect(creatorPlansRoute).toContain('priceMode: plan.priceMode as
     expect(creatorPlansRoute).toContain('currency: plan.currency')
     expect(creatorPlansRoute).toContain('billingInterval: plan.billingInterval')
     expect(creatorPlansRoute).toContain("action?: unknown }).action !== 'membership.plan.created'")
@@ -249,6 +251,9 @@ describe('v1 subscription adapter', () => {
     expect(creatorMembershipPlans).toContain("'If-Match': plan.etag")
     expect(creatorMembershipPlans).toContain("'Idempotency-Key': key")
     expect(creatorMembershipPlans).toContain("method: 'PUT'")
+    expect(creatorMembershipPlans).toContain("labels.priceMode")
+    expect(creatorMembershipPlans).toContain("labels.minimumPrice")
+    expect(creatorMembershipPlans).toContain("priceMode === 'FLEXIBLE'")
     expect(creatorMembershipPlans).toContain("'/api/v1/membership/plans/' + encodeURIComponent(plan.planId)")
     expect(creatorMembershipPlans).toContain("data.data.status !== plan.status")
     expect(creatorMembershipPlans).toContain("setMessage(labels.successRevision)")
