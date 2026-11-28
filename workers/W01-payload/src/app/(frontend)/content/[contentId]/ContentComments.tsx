@@ -127,7 +127,7 @@ export default function ContentComments({
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [contentId])
+  }, [contentId, copy.comments.loadError])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
