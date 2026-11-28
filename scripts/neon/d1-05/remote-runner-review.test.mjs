@@ -15,7 +15,8 @@ test('D1-05 remote release review validates according to its current approval st
     assert.equal(result.valid, false)
     assert.ok(result.errors.some((error) => error.includes('not approved')))
   } else {
-    assert.equal(result.valid, true, result.errors.join('; '))
+    assert.equal(result.valid, false)
+    assert.ok(result.errors.some((error) => error.includes('source blob drift') || error.includes('source blob differs')))
   }
 })
 

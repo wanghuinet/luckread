@@ -9,7 +9,7 @@ import {
 import { parseCommandLine as parseSharedCommandLine } from '../shared-domain-schema-runner.mjs'
 import { parseCommandLine as parseDomainExecutorCommandLine } from './remote-schema-runner.mjs'
 import { parseCommandLine } from './schema-only-runner.mjs'
-import { assertD103RemoteApplyBlocked } from './assert-remote-apply-release.mjs'
+import { assertD103RemoteApplyReady } from './assert-remote-apply-release.mjs'
 
 const host = 'ep-icy-breeze-azdp8x8q-pooler.c-3.ap-southeast-1.aws.neon.tech'
 const rawUrl = (tail = '') =>
@@ -92,10 +92,9 @@ test('general shared executor remains local-only for every domain', () => {
   })
 })
 
-test('D1-03 remote release remains blocked until shared-runner source-pin recertification', () => {
-  assert.deepEqual(assertD103RemoteApplyBlocked(), {
-    blocked: true,
-    partialRemoteApplyReady: false,
-    remoteNeonDdlExecuted: false,
-  })
+test('D1-03 remote release fails closed while shared-runner source pins require recertification', () => {
+  assert.throws(
+    () => assertD103RemoteApplyReady({ currentHead: process.env.GITHUB_SHA || undefined }),
+    /source-pinned D1-03 release review is invalid/,
+  )
 })

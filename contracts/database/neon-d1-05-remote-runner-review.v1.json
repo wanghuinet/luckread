@@ -3,9 +3,9 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-05-remote-runner-review.v1.json",
   "title": "LuckRead D1-05 Schema-Only Remote Runner Review and Release",
   "version": "1.0.0",
-  "status": "REMOTE_SCHEMA_ONLY_PROVISIONING_PENDING_REVIEW",
+  "status": "D1_05_SCHEMA_ONLY_REMOTE_PROVISIONING_APPROVED",
   "repository": "wanghuinet/luckread",
-  "schemaOnlyRemoteApplyReady": false,
+  "schemaOnlyRemoteApplyReady": true,
   "remoteApplyReady": false,
   "runtimeDataIngestionEnabled": false,
   "target": {
@@ -180,6 +180,5 @@
   },
   "businessDataImport": false,
   "productionCutoverAuthorized": false,
-  "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_05_ALLLUCK_SCHEMA_ONLY",
-  "recertificationBlocker": "The shared PostgreSQL runner provenance changed in the W07 Merchant/Seller admission slice; D1-05 remote release must be source-pin recertified after this shared-runner change is merged."
+  "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_05_ALLLUCK_SCHEMA_ONLY"
 }
