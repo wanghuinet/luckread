@@ -180,13 +180,23 @@ export async function getFoundingReservationIdForOrder(
 ): Promise<string | null> {
   const customerId = validatePrincipal(customerIdInput);
   const orderId = requirePlanId(orderReference);
-  const result = await financeDb.query<{ reservation_id: string | null }>(
-    "SELECT ol.item_snapshot_json::jsonb ->> 'foundingReservationId' AS reservation_id " +
+  const result = await financeDb.query<{ offer_kind: string | null; reservation_id: string | null }>(
+    "SELECT ol.item_snapshot_json::jsonb ->> 'offerKind' AS offer_kind, " +
+    "ol.item_snapshot_json::jsonb ->> 'foundingReservationId' AS reservation_id " +
     "FROM orders o INNER JOIN order_lines ol ON ol.order_id = o.order_id " +
     "AND ol.item_type = 'MEMBERSHIP_PLAN' WHERE o.order_id = $1 AND o.customer_id = $2 LIMIT 1",
     [orderId, customerId],
   );
-  return result.rows[0]?.reservation_id ?? null;
+  const row = result.rows[0];
+  if (!row) return null;
+  if (row.offer_kind === 'FOUNDING') {
+    if (typeof row.reservation_id !== 'string' || !/^fres_[a-f0-9]{32}$/.test(row.reservation_id)) {
+      throw new SubscriptionRuntimeError('INVALID_STATE', 409);
+    }
+    return row.reservation_id;
+  }
+  if (row.reservation_id !== null) throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+  return null;
 }
 
 /** Payment intent is denied after the founding hold expires or is released. */
@@ -450,9 +460,10 @@ export async function commitFoundingReservationForVerifiedPayment(
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
   }
   const paidOrder = await financeDb.query<{
-    order_id: string; confirmed_at: string; reservation_id: string | null;
+    order_id: string; confirmed_at: string; offer_kind: string | null; reservation_id: string | null;
   }>(
     "SELECT p.order_id, o.confirmed_at::text AS confirmed_at, " +
+    "ol.item_snapshot_json::jsonb ->> 'offerKind' AS offer_kind, " +
     "ol.item_snapshot_json::jsonb ->> 'foundingReservationId' AS reservation_id " +
     "FROM payments p INNER JOIN orders o ON o.order_id = p.order_id " +
     "AND o.customer_id = p.customer_id LEFT JOIN order_lines ol ON ol.order_id = o.order_id " +
@@ -464,7 +475,13 @@ export async function commitFoundingReservationForVerifiedPayment(
   if (!order?.order_id || !order.confirmed_at || !Number.isFinite(Date.parse(order.confirmed_at))) {
     throw new SubscriptionRuntimeError('INVALID_STATE', 409);
   }
-  if (!order.reservation_id) return null;
+  if (order.offer_kind !== 'FOUNDING') {
+    if (order.reservation_id !== null) throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+    return null;
+  }
+  if (typeof order.reservation_id !== 'string' || !/^fres_[a-f0-9]{32}$/.test(order.reservation_id)) {
+    throw new SubscriptionRuntimeError('INVALID_STATE', 409);
+  }
   const linked = await membershipDb.query<{ reservation_id: string }>(
     'SELECT reservation_id FROM membership_founding_reservations WHERE reservation_id = $1 AND order_reference = $2 LIMIT 1',
     [order.reservation_id, order.order_id],
