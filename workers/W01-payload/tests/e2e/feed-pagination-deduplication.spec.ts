@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 const post = (id: string) => ({
   id, slug: id, ownerUserId: 'creator-1', creatorId: 'creator-1',
   createdAt: '2026-11-01T00:00:00.000Z', updatedAt: '2026-11-01T00:00:00.000Z',
-  contentType: 'post' as const, title: `Feed post ${id}`, mediaRefs: [], coverRef: null,
+  contentType: 'post' as const, title: `Feed post ${id}`, mediaRefs: [] as string[], coverRef: null as string | null,
 })
 
 const mockSocial = async (page: import('@playwright/test').Page) => {
@@ -104,7 +104,6 @@ test('Following feed preserves existing posts and recovers after a pagination fa
   expect(cursorRequests).toBe(2)
 })
 
-
 test('Following feed initial unauthenticated response offers sign-in recovery', async ({ page }) => {
   await page.route('**/api/v1/feed/following**', route => route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Sign in required' } }) }))
   await mockSocial(page)
@@ -112,7 +111,6 @@ test('Following feed initial unauthenticated response offers sign-in recovery', 
   await expect(page.getByRole('heading', { name: /sign in to see posts|登录后查看你关注账号|登入後查看你追蹤帳號/i })).toBeVisible()
   await expect(page.getByRole('link', { name: /sign in|登录|登入/i })).toHaveAttribute('href', /returnTo=.*home.*feed.*following/)
 })
-
 
 test('refresh replaces the Following feed and resets pagination cursor state', async ({ page }) => {
   let initialRequests = 0
