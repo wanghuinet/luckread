@@ -46,7 +46,7 @@ export default function QuotePostRelationshipPreview({
     const probe = probeRef.current
     if (!probe) return
     if (typeof IntersectionObserver === 'undefined') {
-      setVisible(true)
+      queueMicrotask(() => setVisible(true))
       return
     }
     const observer = new IntersectionObserver((entries) => {
@@ -63,7 +63,7 @@ export default function QuotePostRelationshipPreview({
     if (!visible) return
     const controller = new AbortController()
     let active = true
-    setState({ status: 'loading' })
+    queueMicrotask(() => { if (active) setState({ status: 'loading' }) })
 
     void (async () => {
       const relationshipResult = await fetchJson<{ data?: RelationshipPage } | RelationshipPage>(
