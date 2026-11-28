@@ -79,19 +79,19 @@ Operational read models may be rebuilt from authoritative Merchant/Store/Staff s
 
 ## 6. Storage and Physical Authority
 
-The logical Merchant/Seller authority belongs to the existing D1-04 Commerce / Financial domain. Its approved physical runtime target is the existing Neon finance PostgreSQL database owned exclusively by W07.
+Merchant/Seller belongs to the existing logical D1-04 Commerce / Financial domain, owned by W07. Neon `luckread_finance` is the approved PostgreSQL schema target. Existing Cloudflare D1 remains the production storage authority until a separately approved and verified cutover.
 
 ```text
-W07 + existing Neon finance database (logical D1-04) = authoritative Merchant / Store / Qualification / Staff state
+W07 + logical D1-04 = authoritative Merchant / Store / Qualification / Staff business ownership; existing D1 = current production storage; Neon finance = staged PostgreSQL schema target
 R2 = merchant media and controlled evidence objects/references where required
 Cache/KV = derived hot views only; never authoritative
 W10 = existing asynchronous execution/Queue boundary only; never Merchant data owner
 ```
 
 Rules:
-- W07 is the sole writer and authoritative reader for Merchant/Seller records in this domain; other Workers consume admitted W07 APIs/events and may keep only bounded references/projections.
+- W07 is the sole logical authority owner for Merchant/Seller records in D1-04; existing production persistence remains on the currently admitted D1 path until a separate cutover is approved. Other Workers consume admitted W07 APIs/events and may keep only bounded references/projections.
 - W01 is the only public API ingress; clients never access Neon, D1 or W07 internal routes directly.
-- No Cloudflare D1 binding, D1 fallback, D1 compatibility adapter, cross-database dual write, new database, Worker, Queue or Service Binding is introduced.
-- Existing `D1-04` naming in source migration history is a logical lineage label only. New physical migrations must be native PostgreSQL and follow the existing W07 Neon migration/generation/rehearsal contract.
+- Existing D1 production bindings remain temporarily during schema migration; do not add a new D1 binding, fallback, compatibility shim or dual-write path. No new database, Worker, Queue or Service Binding is introduced.
+- Existing `D1-04` names are logical domain/migration lineage identifiers. New Neon schema migrations must be native PostgreSQL and follow the existing W07 migration/generation/rehearsal contract. Neon is not production authority until separately approved cutover.
 - Sensitive identity/KYC/tax evidence remains in its approved controlled evidence store; Merchant rows keep opaque references and status/version only. Do not copy raw evidence into order snapshots, public DTOs or ordinary logs.
 - This storage mapping does not mark Merchant implementation complete and does not authorize remote DDL or production activation.
