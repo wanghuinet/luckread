@@ -7,13 +7,13 @@
 
 ## 1. Reason
 
-The Merchant/Seller contract chain still described Cloudflare D1 as the physical authoritative store, while the current approved runtime has migrated the five logical data domains to Neon PostgreSQL. The canonical domain map places Merchant/Seller under logical D1-04 (Commerce / Financial Authority), and the current Worker ownership map assigns D1-04 to W07. W07 already owns the existing Neon finance database. Leaving the old wording unchanged would invite a new D1 binding, a second Merchant store, or an invalid W07/W01 boundary.
+The Merchant/Seller contract chain still described Cloudflare D1 as the only physical storage target, while the approved migration track stages PostgreSQL schemas in five Neon databases. Existing D1 remains production authority until a separate cutover is approved. The canonical domain map places Merchant/Seller under logical D1-04 (Commerce / Financial Authority), and the current Worker ownership map assigns D1-04 to W07. W07 already owns the existing Neon finance database. Leaving the old wording unchanged would invite a new D1 binding, a second Merchant store, or an invalid W07/W01 boundary.
 
 ## 2. Decision Proposed
 
 - Logical domain: D1-04 remains the historical domain identifier for Commerce / Financial Authority.
-- Physical database: the existing Neon finance PostgreSQL database; no sixth database.
-- Sole Worker owner/writer: W07, using its existing runtime and database connection.
+- Physical schema target: `luckread_finance` Neon PostgreSQL; existing D1 remains production authority until separately approved cutover.
+- Logical Worker owner: W07. It owns Merchant/Seller business facts in D1-04 and is the only future Neon writer after cutover.
 - Public API ingress: W01 only; APP/H5/PC never access W07 internal routes or databases directly.
 - Authorization: existing W08/CASL boundary, with W07 rechecking trusted merchant/store ownership and qualification before writes.
 - Async propagation: existing W10 Queue/workflow boundary; W10 is execution-only.
@@ -24,7 +24,7 @@ The Merchant/Seller contract chain still described Cloudflare D1 as the physical
 
 Merchant/Seller remains authoritative for Merchant identity, lifecycle, seller qualification, store ownership, staff/delegation and merchant operating configuration. Commerce remains authoritative for product/offer/order/entitlement. Payment provider remains the external payment execution authority. W68 remains the financial Ledger/settlement authority. Creator, Rights and Risk remain in their existing owners.
 
-W07 may persist Merchant/Seller references and qualification facts in the existing finance database because D1-04 is its assigned domain; it must not become the authority for Creator identity, W02 authentication, W08 authorization, content rights, order fulfilment facts or Ledger balances.
+W07 owns Merchant/Seller references and qualification facts in logical D1-04. During schema-only migration, existing D1 remains production persistence authority; after separately approved cutover, W07 may persist them in Neon finance; it must not become the authority for Creator identity, W02 authentication, W08 authorization, content rights, order fulfilment facts or Ledger balances.
 
 ## 4. Scope and Non-Goals
 
@@ -34,19 +34,19 @@ The immediate subscription dependency is limited to reading a verified Merchant/
 
 ## 5. Safety Invariants
 
-1. No new Worker, database, Queue, Service Binding, D1 binding, D1 fallback or dual-write path.
+1. No new Worker, database, Queue, Service Binding, new D1 binding, D1 fallback or dual-write path; existing production D1 bindings remain only until approved cutover.
 2. No direct APP/H5/PC database access; all public traffic enters W01.
 3. W07 is the only Merchant/Seller authority writer in logical D1-04.
 4. Every mutation remains authenticated, authorized, scoped, idempotent, version-checked and audited.
 5. Sensitive identity/tax evidence remains in controlled storage and is referenced by opaque identifiers only.
-6. Historical D1-04 labels in migration artifacts are lineage identifiers, not live D1 dependencies.
+6. D1-04 remains the logical domain identifier. Existing D1 is current production storage authority; Neon is the staged PostgreSQL schema target until cutover.
 7. No remote DDL, production DB mutation, payment, refund, tax collection, payout or deployment is authorized.
 
 ## 6. Required Validation Before Admission
 
-- Contract chain 116–123 is internally consistent with the current Neon five-database mapping and W07 ownership.
+- Contract chain 116–123 is internally consistent with the approved five-Neon schema target, logical D1-04/W07 ownership and current D1 production authority.
 - W01 → W08 → W07 routing and the existing W07 service binding are confirmed from current transport contracts/configuration.
-- Existing W07 Neon finance schema/migration tooling is reused; no D1 compatibility adapter exists or is added.
+- Existing W07 Neon finance schema/migration tooling is reused for PostgreSQL schema work; existing D1 production persistence remains unchanged until separately approved cutover.
 - Exact-commit Contract Admission, Worker boundary, Security Hardening and relevant W07 CI pass.
 - Implementation remains BLOCKED until the Merchant data/API/event schema and its runtime implementation are separately admitted.
 
