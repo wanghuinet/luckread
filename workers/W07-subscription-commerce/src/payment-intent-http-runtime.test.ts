@@ -182,6 +182,46 @@ describe('W07 internal payment-intent runtime', () => {
     expect(fixture.calls.createProviderIntent).toHaveLength(0);
   });
 
+  it('rechecks the founding hold after payment-attempt persistence before contacting the provider', async () => {
+    const fixture = createFixture();
+    let membershipReads = 0;
+    const financePool: W07WebhookPostgresPool = {
+      async query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string) {
+        if (sql.includes("foundingReservationId")) {
+          return { rows: [{ offer_kind: 'FOUNDING', reservation_id: 'fres_0123456789abcdef0123456789abcdef' }] as Row[], rowCount: 1 };
+        }
+        throw new Error('unexpected finance query: ' + sql);
+      },
+      async connect() { throw new Error('no finance transaction expected'); },
+    };
+    const membershipPool: W07WebhookPostgresPool = {
+      async query<Row extends Record<string, unknown> = Record<string, unknown>>() {
+        membershipReads += 1;
+        return { rows: membershipReads === 1 ? [{
+          reservation_id: 'fres_0123456789abcdef0123456789abcdef',
+          expires_at: '2099-10-28T09:00:00.000Z',
+        }] as Row[] : [] as Row[], rowCount: membershipReads === 1 ? 1 : 0 };
+      },
+      async connect() { throw new Error('no membership transaction expected'); },
+    };
+    const dependencies: RuntimeDependencies = {
+      ...fixture.dependencies,
+      getPostgresPool: () => financePool,
+      getMembershipPostgresPool: () => membershipPool,
+    };
+    const response = await handleCommercePaymentIntentRequest(
+      request({ idempotencyKey: CLIENT_IDEMPOTENCY_KEY }),
+      CUSTOMER_ID,
+      fixture.env,
+      dependencies,
+    );
+    expect(response?.status).toBe(409);
+    expect(membershipReads).toBe(2);
+    expect(fixture.calls.createAttempt).toHaveLength(1);
+    expect(fixture.calls.createProviderIntent).toHaveLength(0);
+    expect(fixture.calls.recordIntent).toHaveLength(0);
+  });
+
   it('uses server-owned order totals and a stable provider key, persisting before returning checkout data', async () => {
     const fixture = createFixture();
     const response = await handleCommercePaymentIntentRequest(
