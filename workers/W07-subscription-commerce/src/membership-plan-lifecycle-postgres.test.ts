@@ -93,7 +93,7 @@ describe('native PostgreSQL membership plan lifecycle writes', () => {
       if (sql.startsWith('UPDATE membership_plans SET current_version')) {
         expect(values).toEqual([
           2, expect.any(String), planId, creatorId, 1, 2, 2,
-          'Creator Plus', 'plus', 'YEARLY', 7500, 'FIXED', null, null, null, 'USD',
+          'Creator Plus', 'plus', 'YEARLY', 7500, 'FIXED', null, null, null, 'STANDARD', null, 'USD',
           JSON.stringify(['member-posts', 'monthly-live']), 7,
         ])
         current = {
