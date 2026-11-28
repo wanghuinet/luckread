@@ -441,7 +441,7 @@ export async function commitFoundingReservationForVerifiedPayment(
     "SELECT p.order_id, o.confirmed_at::text AS confirmed_at, " +
     "ol.item_snapshot_json::jsonb ->> 'foundingReservationId' AS reservation_id " +
     "FROM payments p INNER JOIN orders o ON o.order_id = p.order_id " +
-    "AND o.customer_id = p.customer_id INNER JOIN order_lines ol ON ol.order_id = o.order_id " +
+    "AND o.customer_id = p.customer_id LEFT JOIN order_lines ol ON ol.order_id = o.order_id " +
     "AND ol.item_type = 'MEMBERSHIP_PLAN' WHERE p.payment_id = $1 AND p.merchant_id = $2 " +
     "AND p.provider = 'hyperswitch' AND p.status = 'succeeded' AND o.status IN ('CONFIRMED', 'COMPLETED') LIMIT 1",
     [paymentId, merchantId],
