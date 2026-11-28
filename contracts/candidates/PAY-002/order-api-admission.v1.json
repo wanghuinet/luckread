@@ -35,7 +35,7 @@
     {
       "id": "D1-04-SCHEMA-01",
       "requirement": "A separately reviewed D1-04 migration candidate and exact post-migration schema/constraint evidence must pass before runtime writes are enabled.",
-      "status": "ADMITTED",
+      "status": "PENDING",
       "evidence": {
         "reviewContract": "contracts/database/neon-d1-04-remote-runner-review.v1.json",
         "schemaManifest": "contracts/database/neon-d1-04-shared-migration-manifest.v1.json",
