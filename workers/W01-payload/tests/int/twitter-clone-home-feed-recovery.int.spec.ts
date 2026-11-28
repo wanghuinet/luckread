@@ -114,7 +114,9 @@ describe('H5 home feed initial-load recovery', () => {
     }))
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
-    fireEvent.click(screen.getByRole('button', { name: getTwitterCloneCopy('en').feed.loadingMore }))
+    const loadMoreButton = screen.getByRole('button', { name: getTwitterCloneCopy('en').feed.loadingMore }) as HTMLButtonElement
+    await waitFor(() => expect(loadMoreButton.disabled).toBe(false))
+    fireEvent.click(loadMoreButton)
 
     await screen.findByRole('heading', {
       name: 'Sign in to see posts from accounts you follow',
