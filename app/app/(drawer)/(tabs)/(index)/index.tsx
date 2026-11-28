@@ -229,8 +229,10 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
       socialBatchController.signal,
       viewerId ?? undefined,
     );
+    const cardControllers = new Map<string, AbortController>();
     for (const item of pendingRecords) {
       const controller = new AbortController();
+      cardControllers.set(item.id, controller);
       hydrationControllersRef.current.set(item.id, controller);
 
       void (async () => {
@@ -279,7 +281,18 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
         }
       });
     }
-    return () => socialBatchController.abort();
+    return () => {
+      socialBatchController.abort();
+      // A dependency change cancels this batch. Cancel and release every
+      // per-card request from the same effect as well, so the next effect
+      // can safely re-hydrate cards that remain visible.
+      for (const [contentId, controller] of cardControllers) {
+        controller.abort();
+        if (hydrationControllersRef.current.get(contentId) === controller) {
+          hydrationControllersRef.current.delete(contentId);
+        }
+      }
+    };
   }, [records, hydrationScope, hydrationTargets]);
 
   useEffect(() => {
