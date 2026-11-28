@@ -647,19 +647,15 @@
     "productionDeployment": "PENDING",
     "endToEndAcceptance": "PENDING"
   }
+,
+  "phase2FlexibleOfferSelection": {
+    "operation": "createCommerceOrder",
+    "buyerField": "items[].selectedAmountMinor",
+    "eligibility": "Accepted only when the authoritative current W07 MembershipPlan version has priceMode FLEXIBLE; rejected for FIXED offers.",
+    "validation": "W07 requires a safe integer minor-unit amount within the immutable version's inclusive minimum/maximum range.",
+    "authority": "W07 derives plan version, price mode, range and currency from the W07 membership database; the buyer cannot assert these values.",
+    "snapshot": "Persist the exact selected amount and immutable pricing definition in the W07 D1-04 OrderLine snapshot.",
+    "prohibitedClientAssertions": ["planVersion", "priceMode", "currency", "discount", "tax", "totals", "seller", "paymentStatus", "providerReferences"],
+    "admissionGate": "This amendment does not authorize order creation while the existing authoritative seller/tax pricing admission gate remains closed."
+  }
 }
-
-## Phase 2 — Flexible Offer Selection
-
-The `createCommerceOrder` operation may accept `items[].selectedAmountMinor` only when the referenced authoritative W07 MembershipPlan version has `priceMode = FLEXIBLE`. The field is a buyer selection, not an authoritative price assertion.
-
-W07 MUST:
-- reject `selectedAmountMinor` for FIXED offers;
-- require it for FLEXIBLE offers;
-- validate a safe integer minor-unit amount within the immutable version's inclusive minimum/maximum range;
-- derive currency, plan version, price mode and range from W07 D1-01;
-- persist the exact selected amount and immutable pricing definition in the W07 D1-04 OrderLine snapshot;
-- reject client-supplied planVersion, priceMode, currency, discount, tax, totals, seller, payment status and provider references.
-
-The public W01 DTO and W06 audit binding must be updated in the same implementation change. This amendment does not authorize order creation while the existing authoritative seller/tax pricing admission gate remains closed.
-
