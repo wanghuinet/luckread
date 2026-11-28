@@ -187,8 +187,9 @@ describe('private W07 Neon commerce order HTTP handler', () => {
         }),
       }],
     };
+    let capturedPricing: AuthoritativelyPricedOrder | undefined;
     const mockCreate = (async (...args: Parameters<typeof createCommerceOrder>) => {
-      await args[4]({ items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] });
+      capturedPricing = await args[4]({ items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] });
       return createResult;
     }) as typeof createCommerceOrder;
     const postgresPool = {} as W07WebhookPostgresPool;
@@ -213,6 +214,11 @@ describe('private W07 Neon commerce order HTTP handler', () => {
       .toBeLessThan(transactionSql.findIndex((sql) => sql.includes('COUNT(*)::integer AS occupied')));
     expect(transactionSql.some((sql) => sql.includes('INSERT INTO membership_founding_reservations'))).toBe(true);
     expect(transactionSql.some((sql) => sql.includes('UPDATE membership_founding_reservations SET order_reference'))).toBe(true);
+    expect(JSON.parse(capturedPricing!.items[0]!.itemSnapshotJson)).toMatchObject({
+      offerKind: 'FOUNDING',
+      foundingCapacity: 10,
+      foundingReservationId: reservationRow.reservation_id,
+    });
   });
 
   it('fails closed if either Neon store or finance pool is unavailable before writing an Order', async () => {
