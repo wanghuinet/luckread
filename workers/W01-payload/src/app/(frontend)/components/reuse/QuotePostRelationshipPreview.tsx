@@ -69,7 +69,7 @@ export default function QuotePostRelationshipPreview({
       const relationshipResult = await fetchJson<{ data?: RelationshipPage } | RelationshipPage>(
         '/api/v1/contents/' + encodeURIComponent(contentId) + '/relationships?direction=out&limit=20',
         {
-          credentials: 'include',
+          credentials: 'omit',
           cache: 'no-store',
           headers: { accept: 'application/json' },
           signal: controller.signal,
