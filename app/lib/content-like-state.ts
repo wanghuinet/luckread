@@ -245,7 +245,18 @@ export async function toggleContentLike(contentId?: string, viewerId?: string | 
       return { ok: false, message: 'The active account changed while the like was updating.' };
     }
     const message = failureMessage(cause);
-    publish(id, viewerId, { liked: previousLiked, likeCount: previousCount, pending: false, loading: false, error: message });
+    // A transport failure cannot tell us whether W05 committed the Like before
+    // the response was lost. Invalidate the optimistic snapshot and reconcile
+    // against the authoritative W01/W05 status endpoint.
+    publish(id, viewerId, {
+      liked: previousLiked,
+      likeCount: previousCount,
+      loaded: false,
+      pending: false,
+      loading: false,
+      error: message,
+    });
+    await refreshContentLikeStatus(id, viewerId);
     return { ok: false, message };
   }
 }
