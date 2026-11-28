@@ -2541,7 +2541,7 @@ paths:
                 properties:
                   data:
                     type: object
-                    required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, trialPeriodDays, status, visibility, version, createdAt, updatedAt, etag, replayed]
+                    required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMode, priceMinor, minimumPriceMinor, suggestedPriceMinor, maximumPriceMinor, offerKind, foundingCapacity, currency, benefits, trialPeriodDays, status, visibility, version, createdAt, updatedAt, etag, replayed]
                     properties:
                       planId: { type: string }
                       creatorId: { type: string }
@@ -5710,7 +5710,7 @@ paths:
                 properties:
                   data:
                     type: object
-                    required: [planId, creatorId, planVersion, status, visibility, version, etag, replayed, name, tier, billingInterval, priceMinor, currency, benefits, createdAt, updatedAt]
+                    required: [planId, creatorId, planVersion, status, visibility, version, etag, replayed, name, tier, billingInterval, priceMode, priceMinor, minimumPriceMinor, suggestedPriceMinor, maximumPriceMinor, offerKind, foundingCapacity, currency, benefits, createdAt, updatedAt]
                     properties:
                       planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
                       creatorId: { $ref: '#/components/schemas/ResourceId' }
