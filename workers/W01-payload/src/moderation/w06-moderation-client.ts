@@ -49,7 +49,11 @@ export async function callW06MembershipPlanAudit(input: {
     name: string
     tier: string
     billingInterval: 'MONTHLY' | 'YEARLY'
-    priceMinor: number
+    priceMode: 'FIXED' | 'FLEXIBLE'
+    priceMinor: number | null
+    minimumPriceMinor: number | null
+    suggestedPriceMinor: number | null
+    maximumPriceMinor: number | null
     currency: string
   }
 }): Promise<Response> {
@@ -123,7 +127,9 @@ export async function callW06MembershipPlanUpdateRequestAudit(input: {
   body: {
     eventId: string; planId: string; creatorId: string; expectedVersion: number; idempotencyKey: string
     name: string; tier: string; billingInterval: 'MONTHLY' | 'YEARLY'
-    priceMinor: number; currency: string; benefits: string[]
+    priceMode: 'FIXED' | 'FLEXIBLE'; priceMinor: number | null
+    minimumPriceMinor: number | null; suggestedPriceMinor: number | null; maximumPriceMinor: number | null
+    currency: string; benefits: string[]
   }
 }): Promise<Response> {
   return callW06Moderation({
@@ -143,7 +149,9 @@ export async function callW06MembershipPlanUpdateAudit(input: {
     eventId: string; planId: string; creatorId: string; expectedVersion: number
     planVersion: number; status: 'DRAFT' | 'ACTIVE' | 'PAUSED'; visibility: 'PRIVATE' | 'PUBLIC'
     version: number; occurredAt: string; name: string; tier: string
-    billingInterval: 'MONTHLY' | 'YEARLY'; priceMinor: number; currency: string; benefits: string[]
+    billingInterval: 'MONTHLY' | 'YEARLY'; priceMode: 'FIXED' | 'FLEXIBLE'; priceMinor: number | null
+    minimumPriceMinor: number | null; suggestedPriceMinor: number | null; maximumPriceMinor: number | null
+    currency: string; benefits: string[]
   }
 }): Promise<Response> {
   return callW06Moderation({
