@@ -255,7 +255,176 @@
     {
       "id": "E2E-SECURITY-01",
       "requirement": "Exact-commit tests cover create/read, malformed/unknown fields, price spoofing, missing key, replay/key-reuse conflict, owner isolation, unavailable items, concurrency and recovery.",
-      "status": "PENDING"
+      "status": "ADMITTED",
+      "evidence": {
+        "implementation": {
+          "e2eSecurityMatrixPR": 2349,
+          "e2eImplementationMergeCommit": "bbbd08df2feddf895c37e8a255f33a3086c5a567",
+          "w06AuditCIIntegrationPR": 2353,
+          "w06AuditCIMergeCommit": "093a870e6b05e44de1bcc4e1bdba24c5d256255e"
+        },
+        "verification": {
+          "workflow": "W07 Subscription Runtime CI",
+          "workflowRunId": 46137000075,
+          "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/46137000075",
+          "conclusion": "success",
+          "testedHeadSha": "1d0ebf1da1f32740e7d7f1c937c6c3b32b13438f",
+          "verifiedMainSha": "093a870e6b05e44de1bcc4e1bdba24c5d256255e",
+          "testedTreeSha": "0189c62584a110f4b7f081896cb74b3d3f37d9b9",
+          "currentMainTreeSha": "0189c62584a110f4b7f081896cb74b3d3f37d9b9",
+          "exactTreeMatch": true,
+          "testResults": {
+            "w01W07W06CommerceOrderE2E": {
+              "filesPassed": 1,
+              "testsPassed": 6,
+              "scenarios": {
+                "serverResolvedMembershipPrice": true,
+                "w08OwnerScopedCreateAndReadAuthorization": true,
+                "browserCredentialsNotForwardedToW07OrW06": true,
+                "w06AuditConfirmationRequiredBeforeSuccess": true,
+                "ownerCanReadOrder": true,
+                "nonOwnerReadReturnsNotFound": true,
+                "malformedJsonRejected": true,
+                "unknownFieldsRejected": true,
+                "clientPriceSpoofRejected": true,
+                "missingIdempotencyKeyRejected": true,
+                "privateOfferRejected": true,
+                "unavailableOfferRejected": true,
+                "sameKeyReplayReturnsSameOrder": true,
+                "sameKeyDifferentBasketRejected": true,
+                "concurrentSameKeyConvergesToOneOrder": true,
+                "databaseRollbackRecovery": true,
+                "w06AuditOutageRecoveryWithoutDuplicateOrder": true
+              }
+            },
+            "w06AuditRuntimeAndPostgresStore": {
+              "filesPassed": 4,
+              "testsPassed": 56,
+              "testFiles": [
+                "workers/W06-governance/src/audit-event.test.ts",
+                "workers/W06-governance/src/audit-event-store-postgres.test.ts",
+                "workers/W06-governance/src/audit-event-http-runtime.test.ts",
+                "workers/W06-governance/src/index.test.ts"
+              ],
+              "covered": {
+                "semanticReplay": true,
+                "immutableFactConflict": true,
+                "concurrentInsertWinner": true,
+                "appendOnlyPostgresStoreAdapter": true
+              }
+            },
+            "w07SubscriptionRuntime": {
+              "filesPassed": 61,
+              "testsPassed": 473
+            },
+            "w07NeonBridgeRegression": {
+              "filesPassed": 10,
+              "testsPassed": 61
+            },
+            "w01CommerceAdapterIntegration": {
+              "filesPassed": 9,
+              "testsPassed": 65
+            }
+          }
+        },
+        "sourcePins": {
+          "w01CreateRoute": {
+            "path": "workers/W01-payload/src/app/api/v1/commerce/orders/route.ts",
+            "blobSha": "37c2609366001a0d254c28ddecf9736aa2bf4584"
+          },
+          "w01ReadRoute": {
+            "path": "workers/W01-payload/src/app/api/v1/commerce/orders/[orderId]/route.ts",
+            "blobSha": "33d1ecf1adf9c11ce8701a28f9d73a7ef075f818"
+          },
+          "w01W07ServiceClient": {
+            "path": "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+            "blobSha": "317aeac8f6599a0c92ca180a0e5b45db127a7fcb"
+          },
+          "w01W06ServiceClient": {
+            "path": "workers/W01-payload/src/moderation/w06-moderation-client.ts",
+            "blobSha": "70d214b5c726141ef7e0c1124d71e33ed94cd1c8"
+          },
+          "w01E2EMatrix": {
+            "path": "workers/W01-payload/tests/int/commerce-order-e2e-security.int.spec.mjs",
+            "blobSha": "c3f23fe5727cc717cfb185afd3571f19a1976c3e"
+          },
+          "w01VitestConfig": {
+            "path": "workers/W01-payload/vitest.config.mts",
+            "blobSha": "6c23c8a09648c7ac3ee6c97146c7933def64cb02"
+          },
+          "w07Workflow": {
+            "path": ".github/workflows/w07-subscription-runtime-ci.yml",
+            "blobSha": "6f31a1eb76d64e0d6da251fac7aa21ec6506db36"
+          },
+          "w07OrderHttpRuntime": {
+            "path": "workers/W07-subscription-commerce/src/order-http-runtime.ts",
+            "blobSha": "2458f021090a518977bcdee31c02067217ad8338"
+          },
+          "w07ItemResolver": {
+            "path": "workers/W07-subscription-commerce/src/order-item-resolution.ts",
+            "blobSha": "075b6688c447666023696c4ffaec0ffcc6c66105"
+          },
+          "w07OrderPersistence": {
+            "path": "workers/W07-subscription-commerce/src/order-persistence.ts",
+            "blobSha": "b4072fcc18b40beb286fe4e47b655cd0a15b0ae0"
+          },
+          "w07GateAssertionTest": {
+            "path": "workers/W07-subscription-commerce/src/order-request-validation.test.ts",
+            "blobSha": "69613a353bddb0b7804e814de0cffc75babd7a16"
+          },
+          "w06AuditEventTest": {
+            "path": "workers/W06-governance/src/audit-event.test.ts",
+            "blobSha": "26b7d474f6c9a91f83f63281f5a9b1df92e1340f"
+          },
+          "w06AuditEventRuntimeTest": {
+            "path": "workers/W06-governance/src/audit-event-http-runtime.test.ts",
+            "blobSha": "005530caf53f6c629a2cac088930df9a9ec69893"
+          },
+          "w06AuditPostgresStore": {
+            "path": "workers/W06-governance/src/audit-event-store-postgres.ts",
+            "blobSha": "4f7deccf07933d949f76d6e7de4282d5798bf712"
+          },
+          "w06AuditPostgresStoreTest": {
+            "path": "workers/W06-governance/src/audit-event-store-postgres.test.ts",
+            "blobSha": "4a2887e23ad122f88b611fac245cf5566a537283"
+          },
+          "w06WorkerIndex": {
+            "path": "workers/W06-governance/src/index.ts",
+            "blobSha": "0a50b0d3afa3ed35262613c591945cf1e7e49162"
+          },
+          "w06WorkerIndexTest": {
+            "path": "workers/W06-governance/src/index.test.ts",
+            "blobSha": "891a0b3c8f5c315eb327c4776bc5e798f5c83421"
+          }
+        },
+        "supportingAdmissionGates": {
+          "ITEM-RESOLUTION-01": {
+            "status": "ADMITTED",
+            "workflowRunId": 46110330401,
+            "postgresMajor": 18
+          },
+          "IDEMPOTENCY-01": {
+            "status": "ADMITTED",
+            "workflowRunId": 46110047807,
+            "postgresMajor": 18
+          },
+          "D1-04-SCHEMA-01": {
+            "status": "ADMITTED",
+            "workflowRunId": 42555900393
+          },
+          "ABUSE-01": {
+            "status": "ADMITTED"
+          }
+        },
+        "scopeLimit": "The cross-worker E2E harness uses a test-only in-memory order persistence store, membership query pool and idempotent W06 service double. It validates the real W01 create/read route handlers and service-binding clients, the real W07 order HTTP handler and membership offer resolver, W08 owner-scoped permission requests, and W01's requirement to wait for W06 audit confirmation. The W06 runtime and PostgreSQL store adapter tests run in the same CI workflow but use test doubles; they do not represent a live Neon database write. Actual W07 PostgreSQL 18 membership price resolution and atomic order idempotency/concurrency/rollback are independently admitted under ITEM-RESOLUTION-01 and IDEMPOTENCY-01. No remote DDL, production database write, business-data import, live payment, refund, payout, settlement or production cutover was performed.",
+        "sellerOfRecordBoundary": {
+          "policyDirection": "HYBRID_SELLER_OF_RECORD_CONFIRMED",
+          "policyDecisionMergeCommit": "42d51a4c63bcf571590a6be6b34e14bbdba63e72",
+          "jurisdictionAndProductTaxMatrix": "PENDING",
+          "merchantQualificationAndPSPCapability": "PENDING",
+          "liveDiscountAndTaxAuthority": "PENDING"
+        }
+      }
     },
     {
       "id": "EVIDENCE-REGISTRY-01",
@@ -264,5 +433,5 @@
     }
   ],
   "greenRule": "This gate cannot be GREEN while any implementation evidence is PENDING; canonical contract admission is distinct from runtime/production admission, and PAY-002 remains unresolved.",
-  "nextAction": "Complete E2E-SECURITY-01 as one exact-main create/read security matrix covering request validation, price spoofing, unavailable/private items, owner isolation, idempotent replay and conflict, concurrent submission, rollback/recovery, W06 audit durability and W08 authorization. Then record EVIDENCE-REGISTRY-01 from the exact passing commit. Keep live order writes fail-closed while production discount/tax authority and seller-of-record remain unresolved."
+  "nextAction": "Complete EVIDENCE-REGISTRY-01 by aggregating all admitted schema, migration, security and runtime proofs against the exact current main tree. The hybrid seller-of-record product direction is confirmed, but the jurisdiction/product tax matrix, merchant qualification, PSP capability and live discount/tax authority remain pending. Keep production order writes, real charges, refunds, payouts and settlements fail-closed until those downstream gates are separately admitted."
 }
