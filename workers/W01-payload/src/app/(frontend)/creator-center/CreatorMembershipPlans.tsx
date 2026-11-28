@@ -521,11 +521,29 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
             className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
         </label>
         <label className="flex flex-col gap-1 text-sm font-semibold">
+          {labels.offerKind}
+          <select value={offerKind} onChange={(event) => {
+            const next = event.target.value as 'STANDARD' | 'FOUNDING'
+            setOfferKind(next)
+            if (next === 'FOUNDING') setPriceMode('FIXED')
+          }} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border">
+            <option value="STANDARD">{labels.standardOffer}</option>
+            <option value="FOUNDING">{labels.foundingOffer}</option>
+          </select>
+        </label>
+        {offerKind === 'FOUNDING' ? (
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            {labels.foundingCapacity}
+            <input required type="number" min={1} max={2147483647} step={1} value={foundingCapacity} onChange={(event) => setFoundingCapacity(event.target.value)}
+              className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+          </label>
+        ) : null}
+        <label className="flex flex-col gap-1 text-sm font-semibold">
           {labels.priceMode}
           <select value={priceMode} onChange={(event) => setPriceMode(event.target.value as 'FIXED' | 'FLEXIBLE')}
             className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border">
             <option value="FIXED">{labels.fixedPrice}</option>
-            <option value="FLEXIBLE">{labels.flexiblePrice}</option>
+            <option value="FLEXIBLE" disabled={offerKind === 'FOUNDING'}>{labels.flexiblePrice}</option>
           </select>
         </label>
         {priceMode === 'FIXED' ? (
@@ -584,6 +602,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
               </div>
               <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
                 <p><span className="text-light-secondary dark:text-dark-secondary">{labels.priceLabel}: </span><strong>{plan.priceMode === 'FIXED' ? formatPrice(plan.priceMinor as number, plan.currency, locale) : `${formatPrice(plan.minimumPriceMinor as number, plan.currency, locale)} – ${formatPrice(plan.maximumPriceMinor as number, plan.currency, locale)} (${labels.suggestedPrice}: ${formatPrice(plan.suggestedPriceMinor as number, plan.currency, locale)})`}</strong></p>
+                <p><span className="text-light-secondary dark:text-dark-secondary">{labels.offerKind}: </span><strong>{plan.offerKind === 'FOUNDING' ? labels.foundingOffer + ' · ' + labels.foundingCapacityLabel + ': ' + plan.foundingCapacity : labels.standardOffer}</strong></p>
                 <p><span className="text-light-secondary dark:text-dark-secondary">{labels.periodLabel}: </span><strong>{plan.billingInterval === 'MONTHLY' ? labels.monthly : labels.yearly}</strong></p>
                 <p><span className="text-light-secondary dark:text-dark-secondary">{labels.version}: </span><strong>{plan.planVersion}</strong></p>
               </div>
@@ -603,10 +622,28 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
                     <input required maxLength={64} pattern="[a-z][a-z0-9_-]{0,63}" value={editTier} onChange={(event) => setEditTier(event.target.value)} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
                   </label>
                   <label className="flex flex-col gap-1 text-sm font-semibold">
+                    {labels.offerKind}
+                    <select value={editOfferKind} onChange={(event) => {
+                      const next = event.target.value as 'STANDARD' | 'FOUNDING'
+                      setEditOfferKind(next)
+                      if (next === 'FOUNDING') setEditPriceMode('FIXED')
+                    }} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border">
+                      <option value="STANDARD">{labels.standardOffer}</option>
+                      <option value="FOUNDING">{labels.foundingOffer}</option>
+                    </select>
+                  </label>
+                  {editOfferKind === 'FOUNDING' ? (
+                    <label className="flex flex-col gap-1 text-sm font-semibold">
+                      {labels.foundingCapacity}
+                      <input required type="number" min={1} max={2147483647} step={1} value={editFoundingCapacity} onChange={(event) => setEditFoundingCapacity(event.target.value)}
+                        className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                    </label>
+                  ) : null}
+                  <label className="flex flex-col gap-1 text-sm font-semibold">
                     {labels.priceMode}
                     <select value={editPriceMode} onChange={(event) => setEditPriceMode(event.target.value as 'FIXED' | 'FLEXIBLE')} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border">
                       <option value="FIXED">{labels.fixedPrice}</option>
-                      <option value="FLEXIBLE">{labels.flexiblePrice}</option>
+                      <option value="FLEXIBLE" disabled={editOfferKind === 'FOUNDING'}>{labels.flexiblePrice}</option>
                     </select>
                   </label>
                   {editPriceMode === 'FIXED' ? (
