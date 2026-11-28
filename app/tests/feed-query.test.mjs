@@ -11,7 +11,7 @@ mock.module('../lib/api-client.ts', () => ({
   getApiErrorMessage: (_data, fallback) => fallback,
 }));
 
-const { fetchNativeFeedPage, incrementNativeFeedReplyCount, nativeFeedQueryKey } = await import('../lib/feed-query.ts');
+const { fetchNativeFeedPage, getNativeFeedNextPageParam, incrementNativeFeedReplyCount, nativeFeedQueryKey } = await import('../lib/feed-query.ts');
 
 beforeEach(() => {
   calls.length = 0;
@@ -79,6 +79,42 @@ test('invalid server page fails without returning a fake empty timeline', async 
     kind: 'for-you',
     cursor: null,
   })).rejects.toThrow('Could not load this timeline');
+});
+
+test('native feed pagination continues with a fresh cursor', () => {
+  expect(getNativeFeedNextPageParam(
+    { hasMore: true, nextCursor: 'cursor-2' },
+    [null],
+  )).toBe('cursor-2');
+});
+
+test('native feed pagination stops when the server repeats the current cursor', () => {
+  expect(getNativeFeedNextPageParam(
+    { hasMore: true, nextCursor: 'cursor-2' },
+    [null, 'cursor-2'],
+  )).toBeUndefined();
+});
+
+test('native feed pagination stops when the server cycles to an earlier cursor', () => {
+  expect(getNativeFeedNextPageParam(
+    { hasMore: true, nextCursor: 'cursor-1' },
+    [null, 'cursor-1', 'cursor-2', 'cursor-3'],
+  )).toBeUndefined();
+});
+
+test('native feed pagination ends for missing cursors or terminal pages', () => {
+  expect(getNativeFeedNextPageParam(
+    { hasMore: true, nextCursor: null },
+    [null],
+  )).toBeUndefined();
+  expect(getNativeFeedNextPageParam(
+    { hasMore: false, nextCursor: 'cursor-2' },
+    [null],
+  )).toBeUndefined();
+  expect(getNativeFeedNextPageParam(
+    { hasMore: true, nextCursor: '   ' },
+    [null],
+  )).toBeUndefined();
 });
 
 test('cache keys isolate Following data by viewer while keeping public For You data shared', () => {
