@@ -50,6 +50,23 @@ export function incrementNativeFeedReplyCount(item: ApiContentRecord, minimumCou
   };
 }
 
+/**
+ * TanStack Query calls this with every cursor already used by the current
+ * infinite-query chain. Stop on missing, repeated, or cyclic cursors so a
+ * malformed W01 page cannot make the native feed request the same page forever.
+ */
+export function getNativeFeedNextPageParam(
+  lastPage: Pick<NativeFeedPage, 'hasMore' | 'nextCursor'>,
+  allPageParams: readonly (string | null)[],
+): string | undefined {
+  const nextCursor = lastPage.nextCursor;
+  if (!lastPage.hasMore || typeof nextCursor !== 'string' || !nextCursor.trim()) {
+    return undefined;
+  }
+
+  return allPageParams.includes(nextCursor) ? undefined : nextCursor;
+}
+
 export function nativeFeedQueryKey(kind: NativeFeedKind, viewerId?: string | null) {
   return ['native-feed', kind, viewerId || 'anonymous'] as const;
 }
