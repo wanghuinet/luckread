@@ -11,6 +11,9 @@ type PlanVersionFixture = {
   tier: string;
   billing_interval: 'MONTHLY' | 'YEARLY';
   price_minor: number;
+  price_mode?: 'FIXED' | 'FLEXIBLE';
+  offer_kind?: 'STANDARD' | 'FOUNDING';
+  founding_capacity?: number | null;
   currency: string;
   benefits_json: string;
   created_at: string;
@@ -97,6 +100,9 @@ function fakeDb(fixtures: PlanFixture[], readError?: Error) {
             tier: version.tier,
             billing_interval: version.billing_interval,
             price_minor: version.price_minor,
+            price_mode: version.price_mode ?? 'FIXED',
+            offer_kind: version.offer_kind ?? 'STANDARD',
+            founding_capacity: version.founding_capacity ?? null,
             currency: version.currency,
             benefits_json: version.benefits_json,
           }];
@@ -151,6 +157,28 @@ describe('PAY-002 read-only membership offer resolution', () => {
     expect(queries[0]!.sql).toContain("p.status = 'ACTIVE'");
     expect(queries[0]!.sql).toContain("p.visibility = 'PUBLIC'");
     expect(queries[0]!.values).toEqual([[planA]]);
+  });
+
+  it('includes founding offer kind and immutable capacity in the order snapshot', async () => {
+    const base = fixture(planA);
+    const founding = fixture(planA, {
+      versions: [{
+        ...base.versions[0]!,
+        offer_kind: 'FOUNDING',
+        founding_capacity: 10,
+      }],
+    });
+    const { db } = fakeDb([founding]);
+    const result = await resolveCommerceOrderItems(db, {
+      items: [{ itemRef: planA, quantity: 1 }],
+    });
+    expect(JSON.parse(result.items[0]!.itemSnapshotJson)).toMatchObject({
+      planId: planA,
+      planVersion: 1,
+      priceMode: 'FIXED',
+      offerKind: 'FOUNDING',
+      foundingCapacity: 10,
+    });
   });
 
   it('normalizes PostgreSQL/schema read failures without exposing database details', async () => {
