@@ -1030,6 +1030,12 @@ export async function reviseMembershipPlan(
   if (!current) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
   if (current.status === 'RETIRED') throw new SubscriptionRuntimeError('INVALID_STATE', 409);
   const revision = normalizeMembershipPlanDraft(input, current.trial_period_days);
+  // Once a plan has become a founding offer, its lifetime capacity and offer
+  // identity cannot be revised or reset by appending another plan version.
+  if ((current.offer_kind ?? 'STANDARD') === 'FOUNDING' &&
+      (revision.offerKind !== 'FOUNDING' || revision.foundingCapacity !== current.founding_capacity)) {
+    throw new SubscriptionRuntimeError('INVALID_STATE', 409);
+  }
   const benefitsJson = canonicalBenefitsJson(revision.benefits);
   const matchesRevision = (row: MembershipPlanStoredRow): boolean =>
     row.name === revision.name &&
