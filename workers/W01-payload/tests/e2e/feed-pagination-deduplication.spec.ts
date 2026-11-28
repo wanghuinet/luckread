@@ -134,3 +134,35 @@ test('refresh replaces the Following feed and resets pagination cursor state', a
   await expect(cards).toHaveCount(1)
   expect(initialRequests).toBe(2)
 })
+
+
+test('refresh after pagination discards the old cursor and appended timeline', async ({ page }) => {
+  let initialRequests = 0
+  let cursorRequests = 0
+  await page.route('**/api/v1/feed/following**', async route => {
+    const url = new URL(route.request().url())
+    if (url.searchParams.has('cursor')) {
+      cursorRequests += 1
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { items: [post('feed-appended')], nextCursor: null, hasMore: false } }) })
+      return
+    }
+    initialRequests += 1
+    const refreshed = initialRequests > 1
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { items: [post(refreshed ? 'feed-newest' : 'feed-old')], nextCursor: refreshed ? null : 'old-cursor', hasMore: !refreshed } }) })
+  })
+  await mockSocial(page)
+  await page.goto('http://127.0.0.1:3000/home?feed=following')
+  const cards = page.getByTestId('luckread-social-post-card')
+  await expect(cards).toHaveCount(1)
+  await page.getByRole('button', { name: /继续滚动|加载更多|Load more|Loading more/i }).click()
+  await expect(page.getByText('Feed post feed-appended', { exact: true })).toBeVisible()
+  await expect(cards).toHaveCount(2)
+  await page.getByRole('button', { name: /刷新动态|Refresh feed|重新整理動態/i }).click()
+  await expect(page.getByText('Feed post feed-newest', { exact: true })).toBeVisible()
+  await expect(page.getByText('Feed post feed-old', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Feed post feed-appended', { exact: true })).toHaveCount(0)
+  await expect(cards).toHaveCount(1)
+  await expect(page.getByRole('button', { name: /继续滚动|加载更多|Load more|Loading more/i })).toHaveCount(0)
+  expect(initialRequests).toBe(2)
+  expect(cursorRequests).toBe(1)
+})
