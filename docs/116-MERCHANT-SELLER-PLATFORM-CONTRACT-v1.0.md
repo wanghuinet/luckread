@@ -174,15 +174,22 @@ Recommendation ranking
 
 ## 4. Runtime Boundary
 
-Cloudflare-first:
+Logical ownership remains D1-04 / W07. The approved physical schema target is Neon PostgreSQL `luckread_finance`; schema readiness is not production cutover evidence.
 
 ```text
-Workers
-→ D1 authoritative merchant/store state
-→ R2 merchant media where required
-→ Queues async operational events
-→ Cache/KV hot seller/store projections
+APP / H5 / PC
+→ W01 public API
+→ W08 / CASL authorization
+→ existing W07 internal Service Binding
+→ W07 Merchant / Seller authority
+→ approved D1-04 persistence adapter
 ```
+
+W07 is the sole logical Worker owner and sole Merchant/Seller business authority. The five-Neon migration contract approves schema targets only. D1-04 Neon schema artifacts and local PostgreSQL rehearsals do not prove remote schema application, Worker deployment, production connection selection, business-data migration or traffic cutover. The production storage authority must be established from deployment and environment evidence plus a separately approved cutover record; repository source configuration alone is insufficient.
+
+Until that gate is evidenced, retain the currently admitted production persistence path without adding a new D1 binding, fallback, second store or dual-write. Neon becomes production authority only after explicit cutover approval and verified deployment. No remote DDL, production data mutation or deployment is authorized by this contract.
+
+W01 remains the only public ingress. APP/H5/PC never call W07 internals or connect to either database directly. W08 provides authorization; W07 independently enforces merchant/store ownership, qualification and concurrency. W10 executes only separately admitted asynchronous work using existing infrastructure. Cache/KV are derived projections; R2 stores controlled media/evidence references only.
 
 External commerce engines are adapters only and cannot become platform-wide merchant authority without an explicit contract revision.
 
