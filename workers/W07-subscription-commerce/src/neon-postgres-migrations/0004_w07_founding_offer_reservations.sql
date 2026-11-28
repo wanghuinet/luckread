@@ -27,6 +27,9 @@ DECLARE
   existing_min_capacity INTEGER;
   existing_max_capacity INTEGER;
 BEGIN
+  -- Serialize concurrent version inserts on the owning plan, including direct SQL writers.
+  PERFORM 1 FROM membership_plans WHERE plan_id = NEW.plan_id FOR UPDATE;
+
   IF NEW.offer_kind = 'FOUNDING' AND NEW.price_mode <> 'FIXED' THEN
     RAISE EXCEPTION 'founding offers require fixed pricing'
       USING ERRCODE = '23514';
