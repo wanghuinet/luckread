@@ -1,5 +1,8 @@
--- W07 D1-01 founding offer capacity and reservation state.
--- D1-04 order/payment facts remain in their existing database.
+-- GENERATED FILE. Do not hand-edit.
+-- Regenerate with scripts/neon/generate-w07-founding-offer-reservations-postgres-migration.mjs.
+-- Source template: scripts/neon/templates/w07-founding-offer-reservations-postgres.sql.
+
+-- W07 D1-01 founding offer capacity and reservation state.\n-- D1-04 order/payment facts remain in their existing database.
 BEGIN;
 
 ALTER TABLE membership_plan_versions
