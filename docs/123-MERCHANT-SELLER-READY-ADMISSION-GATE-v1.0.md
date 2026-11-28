@@ -75,7 +75,7 @@ Must reconcile with:
 
 ### G6 Runtime
 
-Cloudflare-first runtime must use D1 for authoritative structured merchant/store state and asynchronous propagation through Queues where appropriate. External engines remain replaceable adapters.
+The physical runtime must use the existing Neon finance PostgreSQL database (logical D1-04) with W07 as sole Merchant/Seller authority and writer. Public APP/H5/PC traffic must enter through W01, authorization must use the existing W08/CASL boundary, and asynchronous propagation must use only the existing W10 Queue/workflow boundary where appropriate. R2 may hold controlled evidence/media objects; Cache/KV are derived projections only. No D1 runtime binding/fallback, direct client database access, dual-write path, new Worker, database, Queue or Service Binding is allowed. External engines remain replaceable adapters.
 
 ### G7 Acceptance
 
