@@ -30,6 +30,7 @@ const checks = {
   sameKeyDifferentPayloadConflicts: false,
   expiredIdempotencyCanBeReclaimed: false,
   concurrentSubmissionsConvergeToOneOrder: false,
+  concurrentDifferentPayloadIsRejected: false,
   lineFailureRollsBackClaimAndOrder: false,
   failedKeyCanBeRetried: false,
   fixtureRowsCleaned: false,
@@ -127,6 +128,38 @@ try {
         error.code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' && error.status === 409,
     )
     checks.sameKeyDifferentPayloadConflicts = true
+  }
+
+  // Different payloads racing for the same customer/key must not create two
+  // orders or allow both semantic requests to succeed. The winner's persisted
+  // item snapshot remains authoritative; the losing request receives 409.
+  {
+    const customerId = marker + '-customer-conflicting-race'
+    const leftRequest = requestFor('plan-conflicting-left')
+    const rightRequest = requestFor('plan-conflicting-right')
+    const outcomes = await Promise.allSettled([
+      createCommerceOrder(store, customerId, 'conflicting-race-key', leftRequest, pricingFor, dependencies('conflicting-left')),
+      createCommerceOrder(store, customerId, 'conflicting-race-key', rightRequest, pricingFor, dependencies('conflicting-right')),
+    ])
+    const fulfilled = outcomes.filter((outcome) => outcome.status === 'fulfilled')
+    const rejected = outcomes.filter((outcome) => outcome.status === 'rejected')
+    assert.equal(fulfilled.length, 1)
+    assert.equal(rejected.length, 1)
+    const winner = fulfilled[0].value
+    const loserError = rejected[0].reason
+    assert.equal(winner.replayed, false)
+    assert.ok(loserError instanceof OrderPersistenceError)
+    assert.equal(loserError.code, 'IDEMPOTENCY_KEY_REUSE_CONFLICT')
+    assert.equal(loserError.status, 409)
+    assert.equal(await count('orders', customerId), 1)
+    assert.equal(await count('order_create_idempotency', customerId), 1)
+    const persistedLines = await pool.query(
+      'SELECT item_ref FROM order_lines WHERE order_id = $1',
+      [winner.data.orderId],
+    )
+    assert.deepEqual(persistedLines.rows.map((row) => row.item_ref), winner.data.items.map((item) => item.itemRef))
+    assert.ok(['plan-conflicting-left', 'plan-conflicting-right'].includes(winner.data.items[0]?.itemRef))
+    checks.concurrentDifferentPayloadIsRejected = true
   }
 
   // An expired IN_PROGRESS claim is deleted and replaced in the same database
