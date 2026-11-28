@@ -135,6 +135,22 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
     finally {if(activeRequestRef.current===controller){activeRequestRef.current=null;loadingRef.current=false;if(!controller.signal.aborted)setLoading(false)}}
   }, [copy.feed.loadMoreError, feedMode, hasMore, nextCursor, requiresAuth])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    let saved: { href?: string; y?: number } | null = null
+    try {
+      const raw = sessionStorage.getItem('luckread:home-feed:return-scroll')
+      if (raw) saved = JSON.parse(raw) as { href?: string; y?: number }
+      sessionStorage.removeItem('luckread:home-feed:return-scroll')
+    } catch { return }
+    if (!saved || saved.href !== window.location.pathname + window.location.search || typeof saved.y !== 'number' || saved.y <= 0) return
+    let secondFrame = 0
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => window.scrollTo({ top: saved!.y!, behavior: 'auto' }))
+    })
+    return () => { cancelAnimationFrame(firstFrame); if (secondFrame) cancelAnimationFrame(secondFrame) }
+  }, [])
+
   useEffect(() => () => {
     activeRequestRef.current?.abort()
     scrollRestoreFramesRef.current.forEach(frame => cancelAnimationFrame(frame))
