@@ -3,9 +3,9 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-03-remote-runner-review.v1.json",
   "title": "LuckRead D1-03 Partial Schema-Only Remote Runner Review and Release",
   "version": "1.0.0",
-  "status": "PARTIAL_SCHEMA_REMOTE_RELEASE_APPROVED",
+  "status": "REMOTE_PARTIAL_SCHEMA_RELEASE_PENDING",
   "repository": "wanghuinet/luckread",
-  "partialRemoteApplyReady": true,
+  "partialRemoteApplyReady": false,
   "remoteApplyReady": false,
   "target": {
     "domainId": "D1-03",
@@ -79,11 +79,11 @@
       },
       {
         "path": "scripts/neon/shared-domain-schema-runner.mjs",
-        "gitBlobSha1": "7119e954bd794f47d3b8d795ceda4e93e3af86aa"
+        "gitBlobSha1": "53706e33929da41f331acf3892d223d341762817"
       },
       {
         "path": "scripts/neon/shared-domain-schema-runner.test.mjs",
-        "gitBlobSha1": "89f8a1aa8e08acbb79e5bb03446468c257ca197e"
+        "gitBlobSha1": "4620c1ce0e35ae97605d76d02b7140c0600f9857"
       },
       {
         "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
@@ -245,5 +245,6 @@
   },
   "businessDataImport": false,
   "productionCutoverAuthorized": false,
-  "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_03_GOVERNANCE_PARTIAL"
+  "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_03_GOVERNANCE_PARTIAL",
+  "recertificationBlocker": "The shared PostgreSQL runner provenance changed in the W07 Merchant/Seller admission slice; D1-03 remote release must be source-pin recertified after this shared-runner change is merged."
 }
