@@ -674,7 +674,7 @@
   "phase2FoundingOfferCapacityReservation": {
     "authority": "W07 D1-01 Neon membership database; capacity is not read from cache or analytics.",
     "eligibility": "Only an authoritative current membership plan version with offerKind FOUNDING and a positive foundingCapacity may reserve a seat. FOUNDING requires FIXED pricing.",
-    "reservation": "Before the D1-04 order write, W07 serializes on the parent membership_plans row, expires stale HELD reservations, and counts COMMITTED plus unexpired HELD reservations across all versions of the plan.",
+    "reservation": "Before the D1-04 order write, W07 serializes on the parent membership_plans row and counts every COMMITTED plus HELD reservation across all versions of the plan. TTL expiry alone never frees a seat; bounded reconciliation releases an expired HELD reservation only when finance proves the order is absent/cancelled/failed or all payment attempts are terminal unpaid.",
     "idempotency": "Reservation identity is scoped to the authenticated subscriber and the order Idempotency-Key. Exact retries reuse the existing reservation; a different plan/version conflicts.",
     "crossDatabaseSaga": "D1-01 membership and D1-04 order/payment remain separate Neon databases with no cross-database transaction or foreign key. W07 attaches the D1-04 order reference after order persistence; a retry repairs an interrupted attach.",
     "compensation": "Definite pre-write order validation/reference failures release the HELD reservation. Ambiguous database failures retain the short hold for expiry/reconciliation. A finance-confirmed terminal failed/cancelled/expired payment releases an unpaid HELD reservation.",
