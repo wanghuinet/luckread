@@ -104,7 +104,19 @@ A MembershipPlan version MUST retain its immutable pricing definition:
 - Historical rows without `priceMode` are interpreted as FIXED and retain their existing `priceMinor`; no historical snapshot is rewritten.
 - All fields are scoped to `planId + planVersion`. A revision creates a new immutable version; existing subscriptions and orders continue to reference their accepted version.
 
-A founding-offer capacity, when configured, is a positive integer on the immutable offer version. Capacity reservation records are separate mutable operational state owned by W07. Reservation records MUST include a stable reservation identity, plan/version reference, order/idempotency reference, state, expiry and timestamps. Capacity decisions MUST be serialized in the W07 membership database, not computed from caches or analytics projections.
+A MembershipPlan version MUST also retain its immutable offer definition:
 
-Payment/Order records remain in the existing W07 D1-04 authority. No cross-database foreign key or distributed transaction is introduced. The order snapshot carries only the reservation reference needed for idempotent saga reconciliation. Unpaid expired/failed reservations may be released. Whether a paid founding seat is restored after refund, chargeback or subscription termination remains an explicit unresolved product policy and MUST NOT be inferred by runtime code.
+- `offerKind`: `STANDARD` or `FOUNDING`; legacy omission means STANDARD.
+- STANDARD requires `foundingCapacity = null`.
+- FOUNDING requires FIXED pricing and a positive integer `foundingCapacity`.
+- The first FOUNDING version establishes the lifetime capacity for that plan. Every later version MUST remain FOUNDING and preserve the exact same capacity. Application validation and a PostgreSQL BEFORE INSERT guard enforce this rule; a plan cannot reset seats by publishing a new version.
+- Capacity is counted across all plan versions of the same plan.
+
+W07's `membership_founding_reservations` table is the authoritative mutable operational state. It records reservation ID, plan/version, subscriber, idempotency key, optional D1-04 order reference, state (`HELD`, `COMMITTED`, `RELEASED`, `EXPIRED`), expiry, and lifecycle timestamps/reason. The reservation references an existing immutable plan version in the same D1-01 database. A separate append-only payment-event identity row records the verified provider event used to commit a seat.
+
+Capacity decisions MUST serialize on the parent plan row and count authoritative reservation rows, never caches or analytics projections. A hold lasts at most 15 minutes; an expired hold is not released merely because its clock elapsed. After a five-minute reconciliation grace period, W07 releases it only when D1-04 proves there is no payment attempt or every payment attempt is terminally unpaid. Any succeeded, unknown or nonterminal payment retains the hold. Payment-intent creation rechecks the hold after persisting its finance attempt.
+
+Payment/Order records remain in the existing W07 D1-04 authority. No cross-database foreign key or distributed transaction is introduced. W07 creates the D1-01 hold before the D1-04 order write, places the reservation ID in the immutable order-line snapshot, then attaches the order reference. A verified signed success event plus finance-authoritative successful payment/order and the matching order snapshot commits the hold before membership fulfillment. Retries repair interrupted steps; no buyer-supplied reservation ID or capacity is trusted.
+
+Unpaid expired/failed reservations may be released. Whether a paid founding seat is restored after refund, chargeback or subscription termination remains an explicit unresolved product policy and MUST NOT be inferred by runtime code.
 
