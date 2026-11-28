@@ -176,7 +176,7 @@ export async function refreshContentLikeStatus(contentId?: string, viewerId?: st
     publish(id, viewerId, { liked: parsed.liked, likeCount: parsed.likeCount, loading: false, loaded: true, error: null });
   } catch (cause) {
     if (!isCurrentViewer(viewerId)) {
-      publish(id, viewerId, { liked: false, likeCount: null, loading: false, pending: false, error: null });
+      publish(id, viewerId, { liked: false, likeCount: null, loading: false, loaded: false, pending: false, error: null });
       return;
     }
     publish(id, viewerId, { loading: false, error: failureMessage(cause) });
