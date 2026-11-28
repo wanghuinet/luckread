@@ -1,4 +1,11 @@
 import {
+  TrafficLimitError,
+  enforceW01WriteAccountRateLimit,
+  enforceW01WriteEndpointRateLimit,
+  enforceW01WriteRateLimit,
+  rateLimitResponse,
+} from '../../../../../auth/traffic-limit.js'
+import {
   authorizeOrderPermission,
   mapOrderAdapterError,
   orderAdapterError,
@@ -13,8 +20,12 @@ import { W08CreatorClientError } from '../../../../../auth/w08-creator-client.js
 /** W01 authenticates and authorizes order creation, then requires W06 durable audit confirmation for every successful W07 result. */
 export async function POST(request: Request): Promise<Response> {
   try {
+    // Edge/origin before identity; account and fixed-operation buckets before W08/W07.
+    await enforceW01WriteRateLimit(request)
     const principal = await resolveCookieSubscriptionPrincipal(request)
     if (principal instanceof Response) return principal
+    await enforceW01WriteAccountRateLimit(principal.userId)
+    await enforceW01WriteEndpointRateLimit('createCommerceOrder')
 
     const denied = await authorizeOrderPermission(request, principal, 'order.create')
     if (denied) return denied
@@ -54,6 +65,7 @@ export async function POST(request: Request): Promise<Response> {
     }
     return w07Response
   } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     if (error instanceof W07SubscriptionClientError) {
       return orderAdapterError(error.status, error.code, error.message)
     }
