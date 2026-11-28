@@ -151,6 +151,7 @@ describe('private W07 Neon commerce order HTTP handler', () => {
       async query(sql: string) {
         transactionSql.push(sql);
         if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return { rows: [], rowCount: null };
+        if (sql.includes('pg_advisory_xact_lock')) return { rows: [], rowCount: 1 };
         if (sql.includes('SELECT plan_id FROM membership_plans')) return { rows: [{ plan_id: reservationRow.plan_id }], rowCount: 1 };
         if (sql.includes('FROM membership_founding_reservations WHERE subscriber_id')) return { rows: [], rowCount: 0 };
         if (sql.includes('SELECT p.current_version')) return { rows: [{
