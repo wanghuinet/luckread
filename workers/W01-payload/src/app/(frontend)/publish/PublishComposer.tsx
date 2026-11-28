@@ -7,6 +7,7 @@ import { articleDocumentFromBody, plainTextFromArticleDocument, mediaRefsFromArt
 import ArticleStructuredEditor from '../../../components/ArticleStructuredEditor.js'
 import ArticleStructuredRenderer from '../../../components/ArticleStructuredRenderer.js'
 import { articleEditorPlugins } from '../../../components/article-editor-plugins.js'
+import { isPublicQuotePostTarget } from './quote-post.js'
 import { useRouter } from 'next/navigation'
 
 type ContentType = 'article' | 'post' | 'video'
@@ -1147,11 +1148,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         : data as ContentResponse | null
       if (
         !response.ok ||
-        !target ||
-        target.id !== quoteContentId ||
-        target.contentType !== 'post' ||
-        target.state !== 'PUBLISHED' ||
-        target.accessMode !== 'PUBLIC'
+        !isPublicQuotePostTarget(target, quoteContentId)
       ) {
         throw new Error(getApiErrorMessage(data, '这条动态目前不可引用。'))
       }
