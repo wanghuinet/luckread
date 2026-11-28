@@ -78,6 +78,15 @@ describe('PAY-002 native PostgreSQL membership offer resolution', () => {
     expect(f.calls[0]?.values).toEqual([[planId]])
   })
 
+  it('fails closed on buyer-selected amounts until authoritative flexible pricing is integrated', async () => {
+    const f = poolWith()
+
+    await expect(resolveCommerceOrderItems(f.pool, {
+      items: [{ itemRef: planId, quantity: 1, selectedAmountMinor: 2500 }],
+    })).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    expect(f.calls).toHaveLength(0)
+  })
+
   it('does not resolve a private, draft, retired or missing-current-version offer', async () => {
     const f = poolWith([])
 
