@@ -304,7 +304,7 @@ export async function reconcileExpiredFoundingReservations(
     const terminalUnpaid = rows.length > 0 &&
       rows.every((row) => row.payment_status !== null &&
         ['failed', 'cancelled', 'expired'].includes(row.payment_status));
-    if (orderStatus === 'CANCELLED' || orderStatus === 'FAILED' || terminalUnpaid) {
+    if (rows.length === 0 || orderStatus === 'CANCELLED' || orderStatus === 'FAILED' || terminalUnpaid) {
       await releaseUnpaidFoundingReservation(membershipDb, candidate.reservation_id, 'HOLD_EXPIRED');
       released += 1;
     } else {
