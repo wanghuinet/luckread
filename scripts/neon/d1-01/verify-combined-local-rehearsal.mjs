@@ -176,7 +176,7 @@ async function run() {
       ['D1-01'],
     )
     if (ledgerResult.rows.length !== manifest.entries.length) {
-      fail('shared runner ledger must contain exactly sixteen D1-01 migration rows')
+      fail('shared runner ledger must contain exactly seventeen D1-01 migration rows')
     }
     for (let i = 0; i < manifest.entries.length; i++) {
       const entry = manifest.entries[i]
