@@ -138,6 +138,7 @@ describe('founding offer capacity reservation', () => {
         return { rows: [{
           order_id: 'ord_paid',
           confirmed_at: '2026-11-29T12:10:00.000Z',
+          offer_kind: 'FOUNDING',
           reservation_id: heldRow.reservation_id,
         }] as T[], rowCount: 1 };
       },
