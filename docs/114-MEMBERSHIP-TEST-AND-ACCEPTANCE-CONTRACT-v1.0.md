@@ -86,7 +86,12 @@ BLOCKED is not PASS.
 - Fixed plans reject flexible range fields; flexible plans reject ambiguous fixed-price input.
 - Order creation rejects a buyer-selected amount for fixed plans and requires a valid selected amount for flexible plans.
 - The immutable order-line snapshot preserves selected amount, price mode, range, currency and plan version after later plan revisions.
-- Concurrent founding reservations at the final available seat never oversell. Duplicate reservation/commit/release attempts converge idempotently. Expired or failed unpaid holds release exactly once.
+- Concurrent founding reservations at the final available seat never oversell across all plan versions; same-plan parent-row serialization and subscriber/idempotency advisory locking are verified.
+- STANDARD/FOUNDING invariants are enforced by both W07 validation and PostgreSQL: FOUNDING is FIXED-only, the first founding capacity cannot be changed/reset by later versions, and reservation rows reference an existing immutable plan version.
+- Duplicate reservation retries reuse the same reservation; reusing one subscriber/idempotency key for another plan/version conflicts. Order creation stores the reservation ID in the immutable line snapshot and attaches the D1-04 order reference; retry after an interrupted attach repairs the same order without consuming another seat.
+- A failed payment attempt must not release the hold while another payment attempt for the order is pending, succeeded, unknown or otherwise nonterminal. Reconciliation releases only orders with no payment attempt or all attempts terminally unpaid after the five-minute grace period.
+- Payment intent validates the hold before and after finance attempt persistence; a race that releases the hold prevents provider-intent creation. A delayed signed success commits only when finance `confirmed_at` is before hold expiry and the order snapshot points to the matching reservation.
+- Signed success commits the founding seat before membership fulfillment. Duplicate webhook delivery retries the commit idempotently. Released/expired/committed reservations cannot be silently reopened or double-committed.
 - Creator ownership, stale If-Match, idempotency-key body mismatch and missing durable audit all fail closed.
 - Refund/chargeback/termination seat-restoration behavior remains BLOCKED until its explicit product decision is admitted; tests must prove no implicit seat restoration.
 - PostgreSQL 18 migration rehearsal verifies fresh schema, upgrade compatibility, source/template parity and rollback/recovery behavior. No remote DDL is authorized by this contract change.
