@@ -1,4 +1,5 @@
--- W07 D1-01 founding offer capacity and reservation state.\n-- D1-04 order/payment facts remain in their existing database.
+-- W07 D1-01 founding offer capacity and reservation state.
+-- D1-04 order/payment facts remain in their existing database.
 BEGIN;
 
 ALTER TABLE membership_plan_versions
