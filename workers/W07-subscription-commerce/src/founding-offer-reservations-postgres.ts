@@ -361,7 +361,8 @@ export async function reconcileExpiredFoundingReservations(
       order_status: string; payment_count: number; all_terminal_unpaid: boolean | null;
     }>(
       "SELECT o.status AS order_status, COUNT(p.payment_id)::integer AS payment_count, " +
-      "BOOL_AND(p.status IN ('failed', 'cancelled', 'expired')) FILTER (WHERE p.payment_id IS NOT NULL) AS all_terminal_unpaid " +
+      "BOOL_AND(COALESCE(p.status IN ('failed', 'cancelled', 'expired'), false)) " +
+      "FILTER (WHERE p.payment_id IS NOT NULL) AS all_terminal_unpaid " +
       "FROM orders o LEFT JOIN payments p ON p.order_id = o.order_id AND p.provider = 'hyperswitch' " +
       "WHERE o.order_id = $1 GROUP BY o.status",
       [candidate.order_reference],
@@ -421,7 +422,8 @@ export async function releaseFoundingReservationForUnpaidPayment(
     "SELECT p.order_id FROM payments p WHERE p.payment_id = $1 AND p.merchant_id = $2 " +
     "AND p.provider = 'hyperswitch' AND p.status IN ('failed', 'cancelled', 'expired') " +
     "AND NOT EXISTS (SELECT 1 FROM payments other WHERE other.order_id = p.order_id " +
-    "AND other.provider = 'hyperswitch' AND other.status NOT IN ('failed', 'cancelled', 'expired')) LIMIT 1",
+    "AND other.provider = 'hyperswitch' AND (other.status IS NULL OR " +
+    "other.status NOT IN ('failed', 'cancelled', 'expired'))) LIMIT 1",
     [paymentId, merchantId],
   );
   const orderId = paidOrder.rows[0]?.order_id;
