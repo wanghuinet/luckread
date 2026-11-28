@@ -113,6 +113,13 @@ function validMembershipPlanPrice(plan: Record<string, unknown>): boolean {
     plan.maximumPriceMinor >= plan.suggestedPriceMinor && plan.maximumPriceMinor <= 2_147_483_647
 }
 
+function validMembershipPlanOffer(plan: Record<string, unknown>): boolean {
+  if (plan.offerKind === 'STANDARD') return plan.foundingCapacity === null
+  return plan.offerKind === 'FOUNDING' && plan.priceMode === 'FIXED' &&
+    typeof plan.foundingCapacity === 'number' && Number.isSafeInteger(plan.foundingCapacity) &&
+    plan.foundingCapacity >= 1 && plan.foundingCapacity <= 2_147_483_647
+}
+
 /** Creator plan management stays on the canonical W01 → W08/W07 paths. */
 export async function GET(request: Request): Promise<Response> {
   try {
@@ -188,6 +195,7 @@ export async function POST(request: Request): Promise<Response> {
       typeof plan.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(plan.tier) ||
       (plan.billingInterval !== 'MONTHLY' && plan.billingInterval !== 'YEARLY') ||
       !validMembershipPlanPrice(plan) ||
+      !validMembershipPlanOffer(plan) ||
       typeof plan.currency !== 'string' || !/^[A-Z]{3}$/.test(plan.currency)
     ) {
       return errorResponse(503, 'PLAN_RESPONSE_INVALID', 'Membership plan result could not be verified')
@@ -214,6 +222,8 @@ export async function POST(request: Request): Promise<Response> {
           minimumPriceMinor: plan.minimumPriceMinor as number | null,
           suggestedPriceMinor: plan.suggestedPriceMinor as number | null,
           maximumPriceMinor: plan.maximumPriceMinor as number | null,
+          offerKind: plan.offerKind as 'STANDARD' | 'FOUNDING',
+          foundingCapacity: plan.foundingCapacity as number | null,
           currency: plan.currency,
         },
       })
