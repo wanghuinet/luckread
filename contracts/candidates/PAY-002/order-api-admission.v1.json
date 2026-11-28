@@ -35,7 +35,41 @@
     {
       "id": "D1-04-SCHEMA-01",
       "requirement": "A separately reviewed D1-04 migration candidate and exact post-migration schema/constraint evidence must pass before runtime writes are enabled.",
-      "status": "PENDING"
+      "status": "ADMITTED",
+      "evidence": {
+        "reviewContract": "contracts/database/neon-d1-04-remote-runner-review.v1.json",
+        "schemaManifest": "contracts/database/neon-d1-04-shared-migration-manifest.v1.json",
+        "remoteStateEvidence": "contracts/database/neon-five-database-remote-schema-evidence.v1.json#domains.D1-04",
+        "remotePostflight": {
+          "workflowRunId": 42555900393,
+          "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42555900393",
+          "sourceCommitSha": "c18d294d3fc2acac6e9c66eb052dfed6e6c46758",
+          "appliedMigrationArtifactCommitSha": "239379e38273cec07f4eaf9da1bb3d1210a11084",
+          "artifactId": 13646957840,
+          "artifactSha256": "sha256:b35461e7b49a0131eceee3782244fd0f10d44d2c0b6f7fac90932481f9cd8228",
+          "verifiedPostflight": {
+            "migrationArtifacts": 6,
+            "sourceMigrations": 7,
+            "appendOnlyLedgerRows": 6,
+            "newlyAppliedMigrationsOnFinalReadback": 0,
+            "tables": 15,
+            "explicitIndexes": 31,
+            "constraintIndexes": 29,
+            "triggers": 72,
+            "triggerFunctions": 6,
+            "foreignKeys": 0,
+            "controlSeedRows": 1,
+            "businessRows": 0
+          }
+        },
+        "review": {
+          "status": "AI_REVIEW_PASS_NO_BLOCKING_FINDINGS",
+          "reviewedMainSha": "cc55bd48e086bf9bf4dec34bc869ebe7ada5dd2b",
+          "remoteApplyReadyAtReview": "true",
+          "currentSourcePinsVerifiedAtMainSha": "fa0a2843248f133bdcd5bf5fa2cd739d56ca9db2"
+        },
+        "scopeLimit": "Admits the existing D1-04 schema-only remote application and exact postflight evidence only. It does not authorize new remote DDL, the currently local-only shared D1-04 runner, business-data import, runtime cutover, production charging, refunds, payouts or settlements. Cloudflare D1 remains the production authority until separately authorized."
+      }
     },
     {
       "id": "IDEMPOTENCY-01",
@@ -59,5 +93,5 @@
     }
   ],
   "greenRule": "This gate cannot be GREEN while any implementation evidence is PENDING; canonical contract admission is distinct from runtime/production admission, and PAY-002 remains unresolved.",
-  "nextAction": "Reconcile the new W01 owner-scoped order create/read adapters and W06 immutable order-audit path against exact-source evidence, then close the remaining PAY-002 gates: authoritative item/price/discount/tax admission, D1-04 production schema/migration/read-back proof, atomic idempotency and concurrency/security evidence, and verified payment-to-entitlement fulfillment. Keep W07 order writes fail-closed until every required gate is admitted."
+  "nextAction": "Complete the exact-main evidence admission for IDEMPOTENCY-01 and ITEM-RESOLUTION-01; then close ABUSE-01 and E2E-SECURITY-01 before recording final evidence registry admission. Keep W07 order writes fail-closed and keep real-money operations disabled while seller-of-record and authoritative live tax/discount pricing remain unresolved."
 }
