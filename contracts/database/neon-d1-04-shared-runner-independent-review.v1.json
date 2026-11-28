@@ -219,7 +219,7 @@
       },
       {
         "path": "contracts/database/neon-d1-04-w07-merchant-seller-schema.v1.json",
-        "gitBlobSha1": "3fb72d31a68e9f99d87411086c51205378fd041c"
+        "gitBlobSha1": "504a036acf895c2237c2b7f8c06dce35b1073614"
       },
       {
         "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0007_w07_d1_04_merchant_seller.sql",

@@ -12,7 +12,9 @@
     "remoteSchemaApplyAuthorized": false,
     "businessDataImportAuthorized": false,
     "productionCutoverAuthorized": false,
-    "remoteSchemaApplied": false
+    "remoteSchemaApplied": false,
+    "businessDataImport": false,
+    "remoteApplyReady": false
   },
   "primaryOwner": {
     "worker": "W07",
