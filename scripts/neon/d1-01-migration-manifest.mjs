@@ -133,8 +133,8 @@ if (w02Package.dependencies?.['better-auth'] !== '1.7.8' ||
     w02Package.devDependencies?.pg !== '8.20.0') {
   fail('W02 Better Auth CLI/runtime and PostgreSQL driver pins drifted')
 }
-if (manifest.entries.length !== 16) {
-  fail('D1-01 must contain exactly 16 ordered migration entries including the W07 lifecycle incremental migration')
+if (manifest.entries.length !== 17) {
+  fail('D1-01 must contain exactly 17 ordered migration entries including W07 lifecycle and flexible-offer pricing migrations')
 }
 const requiredEntries = [
   [100, 'W01', 'D1-01-W01-PAYLOAD-BASELINE-20261107', 'PAYLOAD_NATIVE'],
@@ -142,6 +142,7 @@ const requiredEntries = [
   [200, 'W02', 'D1-01-W02-BETTER-AUTH-CORE-1.7.8', 'GENERATED_POSTGRESQL_SQL'],
   [500, 'W07', 'D1-01-W07-MEMBERSHIP-SCHEMA-0001', 'POSTGRESQL_SQL'],
   [510, 'W07', 'D1-01-W07-SUBSCRIPTION-LIFECYCLE-0002', 'POSTGRESQL_SQL'],
+  [520, 'W07', 'D1-01-W07-FLEXIBLE-OFFER-PRICING-0003', 'POSTGRESQL_SQL'],
   [600, 'W08', 'D1-01-W08-CREATOR-AUTHORIZATION-0001', 'POSTGRESQL_SQL'],
 ]
 for (const [order, owner, migrationId, kind] of requiredEntries) {
