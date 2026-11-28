@@ -8,6 +8,7 @@ import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import { getCachedPublicProfile, type PublicProfile } from '../../../../lib/social-post-profile-cache.js'
 import { getPublicCopy, type PublicLocale } from '../../i18n/public-locale'
 import DiscussionThread from './DiscussionThread'
+import { resolveCommentPagePagination } from './comment-pagination'
 import SocialMentionText, { type SocialMentionReference } from '../../../../components/SocialMentionText.js'
 
 type CommentItem = {
@@ -64,8 +65,17 @@ export default function ContentComments({
   const [reportBusy, setReportBusy] = useState(false)
   const commentsRequestRef = useRef<AbortController | null>(null)
   const commentsRequestIdRef = useRef(0)
+  const requestedCommentCursorsRef = useRef(new Set<string>())
 
   const loadComments = useCallback(async (nextCursor: string | null = null) => {
+    if (nextCursor && requestedCommentCursorsRef.current.has(nextCursor)) {
+      setCursor(null)
+      setHasMore(false)
+      setMessage(copy.comments.loadError)
+      return
+    }
+    if (!nextCursor) requestedCommentCursorsRef.current.clear()
+    else requestedCommentCursorsRef.current.add(nextCursor)
     commentsRequestRef.current?.abort()
     const requestId = ++commentsRequestIdRef.current
     const controller = new AbortController()
@@ -97,11 +107,19 @@ export default function ContentComments({
         const existingIds = new Set(current.map((item) => item.id))
         return [...current, ...page.items.filter((item) => !existingIds.has(item.id))]
       })
-      setCursor(page.nextCursor)
-      setHasMore(page.hasMore)
+      const pagination = resolveCommentPagePagination({
+        requestedCursor: nextCursor,
+        nextCursor: page.nextCursor,
+        hasMore: page.hasMore,
+        requestedCursors: requestedCommentCursorsRef.current,
+      })
+      setCursor(pagination.nextCursor)
+      setHasMore(pagination.hasMore)
+      if (pagination.repeatedCursor) setMessage(copy.comments.loadError)
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
       if (requestId !== commentsRequestIdRef.current) return
+      if (nextCursor) requestedCommentCursorsRef.current.delete(nextCursor)
       setMessage(error instanceof Error ? error.message : copy.comments.loadError)
     } finally {
       if (requestId !== commentsRequestIdRef.current) return
@@ -109,7 +127,7 @@ export default function ContentComments({
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [contentId])
+  }, [contentId, copy.comments.loadError])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
