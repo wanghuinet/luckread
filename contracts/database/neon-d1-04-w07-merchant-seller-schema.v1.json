@@ -11,7 +11,8 @@
     "cloudflareD1DatabaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
     "remoteSchemaApplyAuthorized": false,
     "businessDataImportAuthorized": false,
-    "productionCutoverAuthorized": false
+    "productionCutoverAuthorized": false,
+    "remoteSchemaApplied": false
   },
   "primaryOwner": {
     "worker": "W07",
@@ -198,5 +199,20 @@
       "evidenceArtifactId": 15265772730,
       "evidenceArtifactSha256": "sha256:b83b137f04c694b76e8a735e34238157cfc3043ed9e1e14f0143113e4d45c98b"
     }
+  },
+  "scope": {
+    "includedTables": [
+      "merchant_profiles",
+      "merchant_stores",
+      "merchant_qualifications",
+      "merchant_staff",
+      "merchant_scopes"
+    ],
+    "sourceContracts": [
+      "docs/116-MERCHANT-SELLER-PLATFORM-CONTRACT-v1.0.md",
+      "docs/118-MERCHANT-SELLER-DATA-CONTRACT-v1.0.md",
+      "docs/121-MERCHANT-SELLER-PERMISSION-AND-SECURITY-CONTRACT-v1.0.md"
+    ],
+    "migrationKind": "NEW_W07_POSTGRESQL_SCHEMA_SLICE_NO_D1_SOURCE_MIGRATION"
   }
 }

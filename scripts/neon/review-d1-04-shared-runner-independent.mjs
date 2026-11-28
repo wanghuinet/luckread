@@ -21,6 +21,7 @@ const contractPaths = [
   'contracts/database/neon-d1-04-w07-revenuecat-webhook-schema.v1.json',
   'contracts/database/neon-d1-04-w07-refunds-billing-documents-schema.v1.json',
   'contracts/database/neon-d1-04-w07-payment-method-revocation-schema.v1.json',
+  'contracts/database/neon-d1-04-w07-merchant-seller-schema.v1.json',
 ]
 const sourcePaths = [
   'workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql',
@@ -38,6 +39,7 @@ const artifactPaths = [
   'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0004_w07_d1_04_revenuecat_webhook_inbox.sql',
   'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0005_w07_d1_04_refunds_billing_documents.sql',
   'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0006_w07_d1_04_payment_method_revocation.sql',
+  'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0007_w07_d1_04_merchant_seller.sql',
 ]
 const generatorPaths = [
   'workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.mjs',
@@ -54,6 +56,15 @@ const testPaths = [
   'workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-revenuecat-webhook-postgres-migration.test.mjs',
   'workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-refunds-billing-documents-postgres-migration.test.mjs',
   'workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-payment-method-revocation-postgres-migration.test.mjs',
+]
+const merchantSellerSupportingPaths = [
+  'contracts/database/neon-d1-04-w07-merchant-seller-schema.v1.json',
+  'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0007_w07_d1_04_merchant_seller.sql',
+  'workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-merchant-seller-postgres-schema.sql',
+  '.github/workflows/neon-d1-04-w07-merchant-seller-postgres-rehearsal.yml',
+  'docs/116-MERCHANT-SELLER-PLATFORM-CONTRACT-v1.0.md',
+  'docs/118-MERCHANT-SELLER-DATA-CONTRACT-v1.0.md',
+  'docs/121-MERCHANT-SELLER-PERMISSION-AND-SECURITY-CONTRACT-v1.0.md',
 ]
 const templatePaths = [
   'workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-order-payment-postgres.sql',
@@ -81,6 +92,7 @@ const expectedIds = [
   'd1-04-w07-revenuecat-webhook-inbox-v1',
   'd1-04-w07-refunds-billing-documents-v1',
   'd1-04-w07-payment-method-revocation-v1',
+  'd1-04-w07-merchant-seller-schema-v1',
 ]
 const seedTable = 'subscription_renewal_scheduler_state'
 const expectedSeed = {
@@ -100,6 +112,10 @@ export function gitBlobSha1(content) {
     .update(Buffer.from('blob ' + bytes.length + '\0', 'utf8'))
     .update(bytes)
     .digest('hex')
+}
+
+function merchantSourceContractsForReview(contract) {
+  return contract.sourceContracts ?? []
 }
 
 function sameSet(actual, expected) {
@@ -186,7 +202,7 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
   }
 
   const pins = review.review?.reviewedSourcePins
-  if (!Array.isArray(pins) || pins.length !== 41) fail('review must pin all W07 contracts, seven D1 sources, six PG artifacts, generators, tests and templates')
+  if (!Array.isArray(pins) || pins.length !== 48) fail('review must pin all W07 contracts, seven D1 sources, seven PG artifacts, generators, tests, templates and Merchant/Seller source contracts')
   const pinnedPaths = new Set()
   for (const pin of pins) {
     if (!pin || typeof pin.path !== 'string' || pinnedPaths.has(pin.path) ||
@@ -201,7 +217,7 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
   }
   for (const requiredPath of [
     paths.sharedRunner,paths.manifest,paths.accessBoundary,paths.wrangler,
-    ...contractPaths,...sourcePaths,...artifactPaths,...generatorPaths,...testPaths,...templatePaths,
+    ...contractPaths,...sourcePaths,...artifactPaths,...generatorPaths,...testPaths,...templatePaths,...merchantSellerSupportingPaths,
   ]) {
     if (!pinnedPaths.has(requiredPath)) fail('review does not pin required source: ' + requiredPath)
   }
@@ -224,9 +240,9 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
     fail('D1-04 must retain the independent review and remote release blockers')
   }
   if (!sameSet(manifest.entries?.map((entry) => entry.migrationId),expectedIds) ||
-      manifest.entries.length !== 6 ||
+      manifest.entries.length !== 7 ||
       manifest.sourceMigrationCount !== 7) {
-    fail('D1-04 must retain exactly six ordered PG artifacts for the seven admitted D1 source migrations')
+    fail('D1-04 must contain seven ordered PG artifacts: six translations of seven admitted D1 source migrations plus one separately contracted W07 Merchant/Seller schema slice')
   }
   if (!Array.isArray(manifest.seedRows) || manifest.seedRows.length !== 1) {
     fail('D1-04 must admit exactly one explicit scheduler control seed')
@@ -293,6 +309,12 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
       if (!sameSet(entrySources,sourcePaths.slice(0,2))) {
         fail('W07 initial order/payment artifact must map to source migrations 0001 and 0002')
       }
+    } else if (index === 6) {
+      if (entrySources.length !== 0 ||
+          !sameSet(entry.sourceContracts ?? [],merchantSourceContractsForReview(contract)) ||
+          contract.scope?.migrationKind !== 'NEW_W07_POSTGRESQL_SCHEMA_SLICE_NO_D1_SOURCE_MIGRATION') {
+        fail('Merchant/Seller migration must be linked to its reviewed source contracts without inventing a D1 source migration')
+      }
     } else if (entrySources.length !== 1 ||
         entrySources[0] !== contract.scope?.includedSourceMigration) {
       fail('W07 slice source migration does not match its schema contract: ' + contractPaths[index])
@@ -321,7 +343,7 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
     }
   }
   if (JSON.stringify(allSourcePaths) !== JSON.stringify(sourcePaths)) {
-    fail('the seven admitted W07 D1 source migrations do not map exactly once in canonical order to the six PostgreSQL artifacts')
+    fail('the seven admitted W07 D1 source migrations do not map exactly once in canonical order to the first six PostgreSQL artifacts')
   }
 
   const renewalContract = contracts[2]
@@ -425,14 +447,15 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
     })
   }
 
-  if (allTables.length !== 15 ||
-      !sameSet(allTables,baseContract.scope.includedTables) ||
-      new Set(allIndexes).size !== 31 ||
-      finalTriggers.size !== 72 ||
-      allFunctions.length !== 6 ||
-      new Set(allFunctions).size !== 6 ||
+  const expectedFinalTables = [...baseContract.scope.includedTables,...contracts[6].scope.includedTables]
+  if (allTables.length !== 20 ||
+      !sameSet(allTables,expectedFinalTables) ||
+      new Set(allIndexes).size !== 39 ||
+      finalTriggers.size !== 97 ||
+      allFunctions.length !== 7 ||
+      new Set(allFunctions).size !== 7 ||
       allReferences.length !== 0) {
-    fail('D1-04 final SQL catalog differs from 15 tables / 31 indexes / 72 final triggers / 6 functions / zero FKs')
+    fail('D1-04 final SQL catalog differs from 20 tables / 39 indexes / 97 final triggers / 7 functions / zero FKs')
   }
   if (droppedTriggers.length !== 1 ||
       droppedTriggers[0].name !== 'payment_provider_events_terminal_immutable' ||
@@ -464,12 +487,12 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
   if (!evidence || evidence.domainId !== 'D1-04' ||
       evidence.databaseName !== 'luckread_finance' ||
       evidence.postgresMajor !== 18 ||
-      evidence.migrations !== 6 ||
+      evidence.migrations !== 7 ||
       evidence.sourceMigrations !== 7 ||
-      evidence.tables !== 15 ||
-      evidence.explicitIndexes !== 31 ||
-      evidence.triggers !== 72 ||
-      evidence.triggerFunctions !== 6 ||
+      evidence.tables !== 20 ||
+      evidence.explicitIndexes !== 39 ||
+      evidence.triggers !== 97 ||
+      evidence.triggerFunctions !== 7 ||
       evidence.foreignKeys !== 0 ||
       evidence.controlSeedRows !== 1 ||
       evidence.businessRows !== 0 ||
