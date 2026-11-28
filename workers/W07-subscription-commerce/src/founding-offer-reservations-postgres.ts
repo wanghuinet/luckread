@@ -292,6 +292,32 @@ export async function releaseUnpaidFoundingReservation(
 }
 
 
+/** Release a founding hold after the finance authority records a terminal unpaid provider outcome. */
+export async function releaseFoundingReservationForUnpaidPayment(
+  membershipDb: W07WebhookPostgresPool,
+  financeDb: W07WebhookPostgresPool,
+  paymentId: string,
+  merchantId: string,
+): Promise<FoundingReservation | null> {
+  if (!/^pay_[A-Za-z0-9]{26}$/.test(paymentId) || !merchantId || merchantId.length > 256) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+  }
+  const paidOrder = await financeDb.query<{ order_id: string }>(
+    "SELECT order_id FROM payments WHERE payment_id = $1 AND merchant_id = $2 " +
+    "AND provider = 'hyperswitch' AND status IN ('failed', 'cancelled', 'expired') LIMIT 1",
+    [paymentId, merchantId],
+  );
+  const orderId = paidOrder.rows[0]?.order_id;
+  if (!orderId) return null;
+  const reservation = await membershipDb.query<{ reservation_id: string }>(
+    'SELECT reservation_id FROM membership_founding_reservations WHERE order_reference = $1 LIMIT 1',
+    [orderId],
+  );
+  const reservationId = reservation.rows[0]?.reservation_id;
+  if (!reservationId) return null;
+  return releaseUnpaidFoundingReservation(membershipDb, reservationId, 'PAYMENT_FAILED');
+}
+
 /** Commit the reservation associated with an already verified and durably applied paid order. */
 export async function commitFoundingReservationForPaidOrder(
   db: W07WebhookPostgresPool,
