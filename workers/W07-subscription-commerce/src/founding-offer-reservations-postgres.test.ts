@@ -30,7 +30,7 @@ const poolFor = (client: FakeClient): W07WebhookPostgresPool => ({
   async connect() { return client; },
 });
 const heldRow = {
-  reservation_id: 'fres_0123456789abcdef',
+  reservation_id: 'fres_0123456789abcdef0123456789abcdef',
   plan_id: 'plan_founder',
   plan_version: 1,
   subscriber_id: 'subscriber_1',
