@@ -912,7 +912,7 @@ function LuckReadSocialPostCard({
         </div>
 
         <h3>{title}</h3>
-        <QuotePostRelationshipPreview contentId={contentId} enabled={presentation !== 'x-timeline' || timelineCardNearViewport} locale={locale} />
+        <QuotePostRelationshipPreview contentId={contentId} locale={locale} />
 
         {mediaWarning && !mediaRevealed ? (
           <SensitiveMediaNotice warning={mediaWarning} locale={locale} onReveal={() => setRevealedMediaKey(mediaRevealKey)} />
