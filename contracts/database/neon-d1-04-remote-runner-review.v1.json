@@ -153,16 +153,16 @@
       "url": "https://github.com/wanghuinet/luckread/actions/runs/42509822425"
     },
     "remoteRunnerValidation": {
-      "runId": 46132881205,
+      "runId": 46132961129,
       "conclusion": "success",
       "headSha": "57a514fdb72407dc543949bbe63846caca6c46d4",
-      "sourceCommitSha": "700103e3b9b5c079b77bb23855562d12ec588799",
+      "sourceCommitSha": "9160f7ba4bcaf586435708d99cfef532e7c8ff13",
       "headBranch": "gpt/d104-refresh-current-main-review-pins",
       "validationScope": "D1_04_SCHEMA_ONLY_LOCAL_PG18_NO_NEON_CREDENTIALS",
-      "url": "https://github.com/wanghuinet/luckread/actions/runs/46132881205",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/46132961129",
       "remoteApplyJob": "skipped",
-      "artifactId": 15257904908,
-      "artifactDigest": "sha256:bb50f9faac407a306eefc4f22e180a50752068623ec9e3be39d38aa444b4f02d"
+      "artifactId": 15258103099,
+      "artifactDigest": "sha256:83e4b82960c4173a756370b04cab97bf569789c773d09c37c78d1f21379765cd"
     },
     "catalogPostflight": {
       "postgresMajor": 18,
