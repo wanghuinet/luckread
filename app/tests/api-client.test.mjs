@@ -278,6 +278,30 @@ test('loads authoritative content like state and aggregate count from W01/W05', 
   expect(getContentLikeSnapshot(contentId, {}, activeViewerId)).toMatchObject({ liked: true, likeCount: 8, loading: false });
 });
 
+test('invalidates like readiness when an account switch races a failed status read', async () => {
+  const contentId = 'stage3-like-stale-account-read';
+  let rejectRead;
+  pendingFetch = () => new Promise((_resolve, reject) => { rejectRead = reject; });
+
+  const read = refreshContentLikeStatus(contentId, 'account-a');
+  expect(getContentLikeSnapshot(contentId, {}, 'account-a')).toMatchObject({
+    loading: true,
+    loaded: false,
+  });
+
+  activeViewerId = 'account-b';
+  rejectRead(new Error('network unavailable'));
+  await read;
+
+  expect(getContentLikeSnapshot(contentId, {}, 'account-a')).toMatchObject({
+    liked: false,
+    likeCount: null,
+    loading: false,
+    loaded: false,
+    pending: false,
+  });
+});
+
 test('resolves unknown like state before choosing the inverse mutation', async () => {
   const contentId = 'stage3-like-unknown-initial-state';
   let liked = true;
