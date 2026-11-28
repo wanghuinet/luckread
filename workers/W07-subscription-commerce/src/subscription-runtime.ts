@@ -49,7 +49,6 @@ export type ActiveMembershipPlanRow = {
   name: string
   tier: string
   billing_interval: string
-  price_minor: number
   currency: string
   benefits_json: string
 }
@@ -322,7 +321,11 @@ export async function listActiveMembershipPlans(
     name: string;
     tier: string;
     billingInterval: string;
-    priceMinor: number;
+    priceMinor: number | null;
+    priceMode: 'FIXED' | 'FLEXIBLE';
+    minimumPriceMinor: number | null;
+    suggestedPriceMinor: number | null;
+    maximumPriceMinor: number | null;
     currency: string;
     trialPeriodDays: number;
     benefits: unknown;
@@ -404,6 +407,10 @@ export async function listActiveMembershipPlans(
       tier: row.tier,
       billingInterval: row.billing_interval,
       priceMinor: row.price_minor,
+      priceMode: row.price_mode ?? 'FIXED',
+      minimumPriceMinor: row.minimum_price_minor ?? null,
+      suggestedPriceMinor: row.suggested_price_minor ?? null,
+      maximumPriceMinor: row.maximum_price_minor ?? null,
       currency: row.currency,
       trialPeriodDays,
       benefits,
