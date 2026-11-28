@@ -360,6 +360,6 @@ test('opening a Following post and navigating back restores the reader position'
   await expect(cards).toHaveCount(30)
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(800)
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('luckread:home-feed:return-scroll'))).toBeNull()
-  await expect.poll(() => page.evaluate(() => Math.abs(window.scrollY - 0))).toBeGreaterThanOrEqual(0)
-  expect(readingPosition).toBeGreaterThan(800)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThanOrEqual(readingPosition - 10)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThanOrEqual(readingPosition + 10)
 })
