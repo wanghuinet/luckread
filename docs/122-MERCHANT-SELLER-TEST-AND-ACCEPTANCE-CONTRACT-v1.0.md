@@ -35,7 +35,7 @@ Commerce/order/payments/ledger/rights/risk integrations must consume references 
 
 ## 5. Runtime Acceptance
 
-Verify Cloudflare-first execution, D1 authoritative writes, queue-based asynchronous propagation, cache invalidation and degraded downstream behavior.
+Verify W01-only public ingress, W08 authorization, W07-only Merchant/Seller business ownership, approved D1-04 schema mapping, production persistence selected only from verified deployment/cutover evidence, existing W10 asynchronous handoff, cache invalidation and degraded downstream behavior. Tests must prove no direct client-to-database access, dual write, new Worker, database, Queue or Service Binding.
 
 ## 6. STOP
 
