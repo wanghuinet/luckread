@@ -18,6 +18,25 @@ describe('Commerce Order candidate DTO validation', () => {
     }
   })
 
+  it('accepts only a bounded positive safe-integer buyer-selected amount', () => {
+    for (const selectedAmountMinor of [1, 2_147_483_647]) {
+      expect(validateCreateCommerceOrderRequest({
+        items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1, selectedAmountMinor }],
+      })).toEqual({
+        ok: true,
+        value: { items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1, selectedAmountMinor }] },
+      })
+    }
+    for (const selectedAmountMinor of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2_147_483_648, Number.MAX_SAFE_INTEGER + 1, '500']) {
+      expect(validateCreateCommerceOrderRequest({
+        items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1, selectedAmountMinor }],
+      })).toEqual({
+        ok: false,
+        error: { code: 'VALIDATION_FAILED', status: 400, field: 'items[0].selectedAmountMinor' },
+      })
+    }
+  })
+
   it('rejects non-object bodies, arrays, null, and unexpected top-level properties', () => {
     for (const value of [null, [], 'bad', 12, { items: [], customerId: 'user_victim' }, { items: [], totalMinor: 1 }]) {
       expect(validateCreateCommerceOrderRequest(value).ok).toBe(false)
