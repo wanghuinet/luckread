@@ -218,7 +218,7 @@ export async function toggleContentLike(contentId?: string, viewerId?: string | 
 
   try {
     if (!isCurrentViewer(viewerId)) {
-      publish(id, viewerId, { liked: false, likeCount: null, pending: false, loading: false, error: null });
+      publish(id, viewerId, { liked: false, likeCount: null, loaded: false, pending: false, loading: false, error: null });
       return { ok: false, message: 'Your account changed before the like request was sent.' };
     }
     const result = await apiRequest<unknown>('/interactions/likes', {
@@ -228,7 +228,7 @@ export async function toggleContentLike(contentId?: string, viewerId?: string | 
       expectedAccountId: viewerId ?? undefined,
     });
     if (!isCurrentViewer(viewerId)) {
-      publish(id, viewerId, { liked: false, likeCount: null, pending: false, loading: false, error: null });
+      publish(id, viewerId, { liked: false, likeCount: null, loaded: false, pending: false, loading: false, error: null });
       return { ok: false, message: 'The active account changed while the like was updating.' };
     }
     if (!result.response.ok) {
@@ -241,7 +241,7 @@ export async function toggleContentLike(contentId?: string, viewerId?: string | 
     return { ok: true };
   } catch (cause) {
     if (!isCurrentViewer(viewerId)) {
-      publish(id, viewerId, { liked: false, likeCount: null, pending: false, loading: false, error: null });
+      publish(id, viewerId, { liked: false, likeCount: null, loaded: false, pending: false, loading: false, error: null });
       return { ok: false, message: 'The active account changed while the like was updating.' };
     }
     const message = failureMessage(cause);
