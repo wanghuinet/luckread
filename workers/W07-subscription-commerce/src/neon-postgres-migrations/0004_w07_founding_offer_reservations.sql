@@ -13,9 +13,45 @@ ALTER TABLE membership_plan_versions
   ADD CONSTRAINT membership_plan_versions_founding_capacity_check CHECK (
     (offer_kind = 'STANDARD' AND founding_capacity IS NULL)
     OR
-    (offer_kind = 'FOUNDING' AND founding_capacity IS NOT NULL
+    (offer_kind = 'FOUNDING' AND price_mode = 'FIXED' AND founding_capacity IS NOT NULL
       AND founding_capacity BETWEEN 1 AND 2147483647)
   );
+
+-- The first FOUNDING version establishes one lifetime capacity for the offer.
+-- Every later version must preserve both offer kind and capacity at the DB boundary.
+CREATE FUNCTION w07_guard_founding_offer_plan_version()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $
+DECLARE
+  existing_min_capacity INTEGER;
+  existing_max_capacity INTEGER;
+BEGIN
+  IF NEW.offer_kind = 'FOUNDING' AND NEW.price_mode <> 'FIXED' THEN
+    RAISE EXCEPTION 'founding offers require fixed pricing'
+      USING ERRCODE = '23514';
+  END IF;
+
+  SELECT MIN(founding_capacity), MAX(founding_capacity)
+    INTO existing_min_capacity, existing_max_capacity
+    FROM membership_plan_versions
+    WHERE plan_id = NEW.plan_id AND offer_kind = 'FOUNDING';
+
+  IF existing_min_capacity IS NOT NULL AND (
+    existing_min_capacity IS DISTINCT FROM existing_max_capacity
+    OR NEW.offer_kind <> 'FOUNDING'
+    OR NEW.founding_capacity IS DISTINCT FROM existing_min_capacity
+  ) THEN
+    RAISE EXCEPTION 'founding offer kind and lifetime capacity are immutable'
+      USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+CREATE TRIGGER membership_plan_versions_founding_offer_immutable
+BEFORE INSERT ON membership_plan_versions
+FOR EACH ROW EXECUTE FUNCTION w07_guard_founding_offer_plan_version();
 
 CREATE TABLE membership_founding_reservations (
   reservation_id TEXT PRIMARY KEY,
