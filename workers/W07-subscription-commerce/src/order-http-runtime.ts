@@ -253,8 +253,7 @@ export async function handleCommerceOrderRequest(
         }
         throw error;
       }
-      if (!foundingReservation && (!pricingWasResolved || foundingOfferDetected) &&
-          (!dependencies.createOrder || pricingWasResolved || foundingOfferDetected)) {
+      if (!foundingReservation && (!pricingWasResolved || foundingOfferDetected) && !dependencies.createOrder) {
         foundingReservation = await getFoundingReservationByIdempotency(
           getMembershipPool(), customerId, reservationKey,
         );
