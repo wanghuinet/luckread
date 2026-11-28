@@ -154,6 +154,7 @@ function fixture(options: {
     syncRenewalOutcome,
     syncPendingOutcomes,
     fulfillPaidOrder,
+    commitFoundingReservation: async () => null,
     expirePendingPlanUpgradePostgres: async (
       financePool: W07WebhookPostgresPool,
       membershipPool: W07WebhookPostgresPool,
