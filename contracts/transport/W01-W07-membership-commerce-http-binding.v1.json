@@ -678,9 +678,9 @@
     "idempotency": "Reservation identity is scoped to the authenticated subscriber and the order Idempotency-Key. Exact retries reuse the existing reservation; a different plan/version conflicts.",
     "crossDatabaseSaga": "D1-01 membership and D1-04 order/payment remain separate Neon databases with no cross-database transaction or foreign key. W07 attaches the D1-04 order reference after order persistence; a retry repairs an interrupted attach.",
     "compensation": "Definite pre-write order validation/reference failures release the HELD reservation. Ambiguous database failures retain the short hold for expiry/reconciliation. A finance-confirmed terminal failed/cancelled/expired payment releases an unpaid HELD reservation.",
-    "paymentCommit": "Only a verified signed payment_succeeded event plus finance-authoritative successful Payment/Order state may commit the reservation. Seat expiry is evaluated against finance orders.confirmed_at, not webhook arrival time.",
+    "paymentCommit": "Only a verified signed payment_succeeded event plus finance-authoritative successful Payment/Order state may commit the reservation. The immutable order-line snapshot carries the reservation ID; W07 verifies that identity against the membership reservation's order reference. Seat expiry is evaluated against finance orders.confirmed_at, not webhook arrival time.",
     "capacityInvariant": "Founding capacity is immutable after the plan first becomes FOUNDING; later plan versions must preserve the same capacity. Reservations and committed seats are counted across all plan versions.",
-    "holdTtl": "15 minutes maximum; expired unpaid holds do not consume capacity.",
+    "holdTtl": "15-minute window to start checkout. No new payment attempt is admitted after expiry; an existing nonterminal payment attempt may be retried. Expired orders with no payment attempt, cancelled/failed orders, and terminal unpaid payment attempts are released by bounded finance reconciliation after a 5-minute grace window.",
     "excludedDecisions": [
       "Whether a refunded, charged-back, or terminated paid founding membership restores a permanently committed seat remains a separate product-policy decision; this amendment does not infer or implement that policy."
     ],
