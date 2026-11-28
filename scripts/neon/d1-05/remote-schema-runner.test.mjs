@@ -95,7 +95,10 @@ test('schema-only release keeps runtime privacy blockers and honors only the cur
     })
   } else {
     assert.equal(ready, true)
-    assert.equal(assertD105RemoteApplyReady().schemaOnlyRemoteApplyReady, true)
+    assert.throws(
+      () => assertD105RemoteApplyReady(),
+      /source-pinned D1-05 release review is invalid/,
+    )
     assert.equal(review.remoteApplyReady, false)
     assert.equal(review.runtimeDataIngestionEnabled, false)
   }
