@@ -72,11 +72,15 @@ CREATE TABLE membership_founding_reservations (
   release_reason TEXT,
   CONSTRAINT membership_founding_reservations_idempotency_unique
     UNIQUE (subscriber_id, idempotency_key),
+  CONSTRAINT membership_founding_reservations_plan_version_fkey
+    FOREIGN KEY (plan_id, plan_version)
+    REFERENCES membership_plan_versions (plan_id, plan_version) ON DELETE RESTRICT,
   CONSTRAINT membership_founding_reservations_order_unique
     UNIQUE (order_reference),
   CONSTRAINT membership_founding_reservations_state_timestamps_check CHECK (
     (state = 'COMMITTED' AND committed_at IS NOT NULL AND released_at IS NULL)
-    OR (state IN ('HELD', 'RELEASED', 'EXPIRED') AND committed_at IS NULL)
+    OR (state = 'HELD' AND committed_at IS NULL AND released_at IS NULL)
+    OR (state IN ('RELEASED', 'EXPIRED') AND committed_at IS NULL AND released_at IS NOT NULL)
   )
 );
 
