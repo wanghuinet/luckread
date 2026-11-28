@@ -52,6 +52,15 @@ test('home timeline uses cursor-based infinite queries, cached refetch and page-
   expect(feed).not.toContain('const [loadingMore, setLoadingMore]');
 });
 
+test('feed hydration effect cleanup aborts and releases per-card requests with its social batch', () => {
+  expect(feed).toContain('const cardControllers = new Map<string, AbortController>();');
+  expect(feed).toContain('for (const [contentId, controller] of cardControllers)');
+  expect(feed).toContain('socialBatchController.abort();');
+  expect(feed).toContain('controller.abort();');
+  expect(feed).toContain('hydrationControllersRef.current.get(contentId) === controller');
+  expect(feed).toContain('hydrationControllersRef.current.delete(contentId)');
+});
+
 test('TanStack Query and Expo Network are normal app runtime dependencies', () => {
   expect(packageJson.dependencies['@tanstack/react-query']).toBe('5.105.3');
   expect(packageJson.dependencies['expo-network']).toBe('~58.0.6');
