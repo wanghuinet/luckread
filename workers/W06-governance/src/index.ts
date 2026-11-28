@@ -322,6 +322,8 @@ type MembershipPlanAuditInput = {
   minimumPriceMinor: number | null
   suggestedPriceMinor: number | null
   maximumPriceMinor: number | null
+  offerKind: 'STANDARD' | 'FOUNDING'
+  foundingCapacity: number | null
   currency: string
 }
 
@@ -354,6 +356,8 @@ type MembershipPlanPublishAuditInput = {
   minimumPriceMinor: number | null
   suggestedPriceMinor: number | null
   maximumPriceMinor: number | null
+  offerKind: 'STANDARD' | 'FOUNDING'
+  foundingCapacity: number | null
   currency: string
 }
 
@@ -372,6 +376,8 @@ type MembershipPlanUpdateRequestAuditInput = {
   minimumPriceMinor: number | null
   suggestedPriceMinor: number | null
   maximumPriceMinor: number | null
+  offerKind: 'STANDARD' | 'FOUNDING'
+  foundingCapacity: number | null
   currency: string
   benefits: string[]
 }
@@ -394,6 +400,8 @@ type MembershipPlanUpdateAuditInput = {
   minimumPriceMinor: number | null
   suggestedPriceMinor: number | null
   maximumPriceMinor: number | null
+  offerKind: 'STANDARD' | 'FOUNDING'
+  foundingCapacity: number | null
   currency: string
   benefits: string[]
 }
@@ -809,10 +817,17 @@ function validMembershipPlanPrice(body: Record<string, unknown>): boolean {
     body.maximumPriceMinor >= body.suggestedPriceMinor && body.maximumPriceMinor <= 2_147_483_647
 }
 
+function validMembershipPlanOffer(body: Record<string, unknown>): boolean {
+  if (body.offerKind === 'STANDARD') return body.foundingCapacity === null
+  return body.offerKind === 'FOUNDING' && body.priceMode === 'FIXED' &&
+    typeof body.foundingCapacity === 'number' && Number.isSafeInteger(body.foundingCapacity) &&
+    body.foundingCapacity >= 1 && body.foundingCapacity <= 2_147_483_647
+}
+
 function parseMembershipPlanAuditInput(value: unknown): MembershipPlanAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
   const body = value as Record<string, unknown>
-  const allowed = new Set(['eventId', 'planId', 'creatorId', 'planVersion', 'status', 'visibility', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMode', 'priceMinor', 'minimumPriceMinor', 'suggestedPriceMinor', 'maximumPriceMinor', 'currency'])
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'planVersion', 'status', 'visibility', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMode', 'priceMinor', 'minimumPriceMinor', 'suggestedPriceMinor', 'maximumPriceMinor', 'offerKind', 'foundingCapacity', 'currency'])
   if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
     throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
   }
@@ -826,6 +841,7 @@ function parseMembershipPlanAuditInput(value: unknown): MembershipPlanAuditInput
     typeof body.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(body.tier) ||
     (body.billingInterval !== 'MONTHLY' && body.billingInterval !== 'YEARLY') ||
     !validMembershipPlanPrice(body) ||
+    !validMembershipPlanOffer(body) ||
     typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency)
   ) throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
   return body as MembershipPlanAuditInput
@@ -839,6 +855,7 @@ function parseMembershipPlanUpdateTerms(body: Record<string, unknown>): void {
     typeof body.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(body.tier) ||
     (body.billingInterval !== 'MONTHLY' && body.billingInterval !== 'YEARLY') ||
     !validMembershipPlanPrice(body) ||
+    !validMembershipPlanOffer(body) ||
     typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency) ||
     !Array.isArray(body.benefits) || body.benefits.length > 20 ||
     body.benefits.some((item) => typeof item !== 'string' || item.trim() !== item || item.length < 1 || item.length > 180) ||
@@ -850,7 +867,7 @@ function parseMembershipPlanUpdateTerms(body: Record<string, unknown>): void {
 function parseMembershipPlanUpdateRequestAuditInput(value: unknown): MembershipPlanUpdateRequestAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT')
   const body = value as Record<string, unknown>
-  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'idempotencyKey', 'name', 'tier', 'billingInterval', 'priceMode', 'priceMinor', 'minimumPriceMinor', 'suggestedPriceMinor', 'maximumPriceMinor', 'currency', 'benefits'])
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'idempotencyKey', 'name', 'tier', 'billingInterval', 'priceMode', 'priceMinor', 'minimumPriceMinor', 'suggestedPriceMinor', 'maximumPriceMinor', 'offerKind', 'foundingCapacity', 'currency', 'benefits'])
   if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
     throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT')
   }
@@ -905,7 +922,7 @@ function parseMembershipPlanLifecycleAuditInput(value: unknown): MembershipPlanL
 function parseMembershipPlanUpdateAuditInput(value: unknown): MembershipPlanUpdateAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
   const body = value as Record<string, unknown>
-  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'planVersion', 'status', 'visibility', 'version', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMode', 'priceMinor', 'minimumPriceMinor', 'suggestedPriceMinor', 'maximumPriceMinor', 'currency', 'benefits'])
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'planVersion', 'status', 'visibility', 'version', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMode', 'priceMinor', 'minimumPriceMinor', 'suggestedPriceMinor', 'maximumPriceMinor', 'offerKind', 'foundingCapacity', 'currency', 'benefits'])
   if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
     throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
   }
@@ -927,7 +944,7 @@ function parseMembershipPlanUpdateAuditInput(value: unknown): MembershipPlanUpda
 function parseMembershipPlanPublishAuditInput(value: unknown): MembershipPlanPublishAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_AUDIT')
   const body = value as Record<string, unknown>
-  const allowed = new Set(['eventId', 'planId', 'creatorId', 'planVersion', 'status', 'visibility', 'version', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMode', 'priceMinor', 'minimumPriceMinor', 'suggestedPriceMinor', 'maximumPriceMinor', 'currency'])
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'planVersion', 'status', 'visibility', 'version', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMode', 'priceMinor', 'minimumPriceMinor', 'suggestedPriceMinor', 'maximumPriceMinor', 'offerKind', 'foundingCapacity', 'currency'])
   if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
     throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_AUDIT')
   }
@@ -943,6 +960,7 @@ function parseMembershipPlanPublishAuditInput(value: unknown): MembershipPlanPub
     typeof body.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(body.tier) ||
     (body.billingInterval !== 'MONTHLY' && body.billingInterval !== 'YEARLY') ||
     !validMembershipPlanPrice(body) ||
+    !validMembershipPlanOffer(body) ||
     typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency)
   ) throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_AUDIT')
   return body as MembershipPlanPublishAuditInput
@@ -1574,6 +1592,8 @@ export default {
           minimumPriceMinor: input.minimumPriceMinor,
           suggestedPriceMinor: input.suggestedPriceMinor,
           maximumPriceMinor: input.maximumPriceMinor,
+          offerKind: input.offerKind,
+          foundingCapacity: input.foundingCapacity,
           currency: input.currency,
         },
         occurredAt: input.occurredAt,
@@ -1673,6 +1693,8 @@ export default {
           minimumPriceMinor: input.minimumPriceMinor,
           suggestedPriceMinor: input.suggestedPriceMinor,
           maximumPriceMinor: input.maximumPriceMinor,
+          offerKind: input.offerKind,
+          foundingCapacity: input.foundingCapacity,
           currency: input.currency,
           benefits: input.benefits,
         },
@@ -1740,6 +1762,8 @@ export default {
           minimumPriceMinor: input.minimumPriceMinor,
           suggestedPriceMinor: input.suggestedPriceMinor,
           maximumPriceMinor: input.maximumPriceMinor,
+          offerKind: input.offerKind,
+          foundingCapacity: input.foundingCapacity,
           currency: input.currency,
           benefits: input.benefits,
         },
@@ -1796,6 +1820,8 @@ export default {
           minimumPriceMinor: input.minimumPriceMinor,
           suggestedPriceMinor: input.suggestedPriceMinor,
           maximumPriceMinor: input.maximumPriceMinor,
+          offerKind: input.offerKind,
+          foundingCapacity: input.foundingCapacity,
           currency: input.currency,
         },
         occurredAt: input.occurredAt,
