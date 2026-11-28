@@ -68,7 +68,11 @@
         "name",
         "tier",
         "billingInterval",
+        "priceMode",
         "priceMinor",
+        "minimumPriceMinor",
+        "suggestedPriceMinor",
+        "maximumPriceMinor",
         "currency",
         "benefits"
       ],
@@ -97,7 +101,7 @@
       },
       "cache": "NO_STORE",
       "auditRequired": true,
-      "successRule": "W01 validates the W07 draft response and durably persists/confirm the stable membership.plan.created audit in W06 D1-03, including planVersion, status, visibility, name, tier, billingInterval, priceMinor, and currency, before returning either a new 201 or idempotent replay 200 to the caller.",
+      "successRule": "W01 validates the W07 draft response and durably persists/confirm the stable membership.plan.created audit in W06 D1-03, including planVersion, status, visibility, name, tier, billingInterval, priceMode, priceMinor, minimumPriceMinor, suggestedPriceMinor, maximumPriceMinor, and currency, before returning either a new 201 or idempotent replay 200 to the caller.",
       "auditTransportBinding": "W01-W06-moderation-http-binding.v1"
     },
     {
@@ -577,9 +581,15 @@
           "name",
           "tier",
           "billingInterval",
-          "priceMinor",
           "currency",
           "benefits"
+        ],
+        "optional": [
+          "priceMode",
+          "priceMinor",
+          "minimumPriceMinor",
+          "suggestedPriceMinor",
+          "maximumPriceMinor"
         ],
         "additionalProperties": false
       },
