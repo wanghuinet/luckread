@@ -161,3 +161,65 @@ test('rejects comment likes when no authenticated viewer was captured', async ()
   });
   expect(calls).toHaveLength(0);
 });
+
+
+test('reconciles a comment like when W05 commits but the mutation response is lost', async () => {
+  let liked = false;
+  handler = async (path) => {
+    if (path.startsWith('/interactions/likes?')) {
+      return {
+        response: { ok: true, status: 200 },
+        data: { data: { liked } },
+        error: null,
+      };
+    }
+    liked = true;
+    throw new TypeError('response connection lost after commit');
+  };
+
+  await expect(toggleCommentLike('comment-lost-response', 'viewer-a')).resolves.toEqual({ liked: true });
+
+  expect(calls.map((call) => call.options.method)).toEqual(['GET', 'POST', 'GET']);
+  expect(calls[1].options.idempotencyKey).toBeTruthy();
+  expect(calls[0].options.expectedAccountId).toBe('viewer-a');
+  expect(calls[2].options.expectedAccountId).toBe('viewer-a');
+});
+
+test('reconciles a comment unlike after an ambiguous server error', async () => {
+  let liked = true;
+  handler = async (path) => {
+    if (path.startsWith('/interactions/likes?')) {
+      return {
+        response: { ok: true, status: 200 },
+        data: { data: { liked } },
+        error: null,
+      };
+    }
+    liked = false;
+    return {
+      response: { ok: false, status: 503 },
+      data: { error: { message: 'Temporary server failure.' } },
+      error: { status: 503, message: 'Temporary server failure.' },
+    };
+  };
+
+  await expect(toggleCommentLike('comment-unlike-ambiguous', 'viewer-a')).resolves.toEqual({ liked: false });
+  expect(calls.map((call) => call.options.method)).toEqual(['GET', 'DELETE', 'GET']);
+});
+
+test('keeps definitive comment-like authorization failures as errors without reconciliation', async () => {
+  handler = async (path) => path.startsWith('/interactions/likes?')
+    ? {
+        response: { ok: true, status: 200 },
+        data: { data: { liked: false } },
+        error: null,
+      }
+    : {
+        response: { ok: false, status: 403 },
+        data: { error: { message: 'This action is not allowed.' } },
+        error: { status: 403, message: 'This action is not allowed.' },
+      };
+
+  await expect(toggleCommentLike('comment-forbidden', 'viewer-a')).rejects.toThrow('This action is not allowed.');
+  expect(calls.map((call) => call.options.method)).toEqual(['GET', 'POST']);
+});
