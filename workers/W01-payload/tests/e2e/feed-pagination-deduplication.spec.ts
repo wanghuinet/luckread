@@ -293,3 +293,23 @@ test('refresh supersedes a slow pagination request without allowing stale posts 
   await expect(cards).toHaveCount(1)
   expect(initialRequests).toBe(2)
 })
+
+test('refresh preserves the reader scroll offset when replacing a long Following timeline', async ({ page }) => {
+  let refreshes = 0
+  const makeItems = (prefix: string) => Array.from({ length: 30 }, (_, index) => post(`${prefix}-${index}`))
+  await page.route('**/api/v1/feed/following**', async route => {
+    refreshes += 1
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { items: makeItems(refreshes === 1 ? 'old' : 'new'), nextCursor: null, hasMore: false } }) })
+  })
+  await mockSocial(page)
+  await page.setViewportSize({ width: 390, height: 700 })
+  await page.goto('http://127.0.0.1:3000/home?feed=following')
+  await expect(page.getByTestId('luckread-social-post-card')).toHaveCount(30)
+  await page.evaluate(() => window.scrollTo({ top: 1400, behavior: 'auto' }))
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(500)
+  const before = await page.evaluate(() => window.scrollY)
+  await page.getByRole('button', { name: /刷新动态|Refresh feed|重新整理動態/i }).click()
+  await expect(page.getByText('Feed post new-0', { exact: true })).toBeVisible()
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThanOrEqual(before - 10)
+  await expect(page.evaluate(() => window.scrollY)).toBeLessThanOrEqual(before + 10)
+})
