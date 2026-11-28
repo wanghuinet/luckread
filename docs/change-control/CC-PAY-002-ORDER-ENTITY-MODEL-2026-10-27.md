@@ -37,10 +37,10 @@ The existing Merchant/Seller contracts (116–123) remain the identity and quali
 ## Invariants
 1. Customer identity, seller identity/qualification, item prices, discounts and tax decisions are server-derived, not client-authoritative.
 2. Money uses integer minor units and explicit currency; total = subtotal - discount + tax.
-3. Order + lines + initial idempotency record commit in one Neon D1-04 finance-domain transaction; provider network calls stay outside it.
+3. Order + lines + initial idempotency record commit in one transaction in the existing Neon finance database (logical D1-04 domain); provider network calls stay outside it.
 4. Seller, offer, tax and fee policy versions used by a transaction are immutable in its snapshot.
 5. Every mutable transition uses version compare-and-set; no Last-Write-Wins.
-6. D1-04/Neon payment and financial authority and D1-01 subscription/access authority remain distinct; no distributed transaction.
+6. Neon finance authority (logical D1-04) and D1-01 subscription/access authority remain distinct; no distributed transaction.
 7. Refund/reversal is separate from destructive modification of ledger facts.
 
 ## Not included
