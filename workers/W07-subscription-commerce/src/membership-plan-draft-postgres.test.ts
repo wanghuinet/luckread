@@ -110,13 +110,13 @@ describe('native PostgreSQL membership plan draft creation', () => {
       'COMMIT',
     ])
     expect(pg.transactionCalls[1]?.sql).toContain("VALUES ($1, 'CREATOR', $2, 1, 'DRAFT', 'PRIVATE', 1")
-    expect(pg.transactionCalls[2]?.sql).toContain('VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::timestamptz)')
+    expect(pg.transactionCalls[2]?.sql).toContain('VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::timestamptz)')
     expect(pg.transactionCalls[1]?.values).toEqual([
       result.planId, creatorId, result.createdAt, result.createdAt,
     ])
     expect(pg.transactionCalls[2]?.values).toEqual([
       result.planId, input.name, input.tier, input.billingInterval, input.priceMinor,
-      'FIXED', null, null, null, input.currency, JSON.stringify(input.benefits),
+      'FIXED', null, null, null, 'STANDARD', null, input.currency, JSON.stringify(input.benefits),
       input.trialPeriodDays, result.createdAt,
     ])
     expect(pg.release).toHaveBeenCalledTimes(1)
@@ -148,7 +148,7 @@ describe('native PostgreSQL membership plan draft creation', () => {
     })
     expect(pg.transactionCalls[2]?.values).toEqual([
       result.planId, flexible.name, flexible.tier, flexible.billingInterval,
-      null, 'FLEXIBLE', 500, 1200, 5000, flexible.currency,
+      null, 'FLEXIBLE', 500, 1200, 5000, 'STANDARD', null, flexible.currency,
       JSON.stringify(flexible.benefits), 0, result.createdAt,
     ])
   })
