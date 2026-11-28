@@ -33,11 +33,17 @@ export function TwitterClonePostComposerTrigger({
 export default function TwitterClonePostComposerModal() {
   const [open, setOpen] = useState(false)
   const [hasOpened, setHasOpened] = useState(false)
+  const [quoteContentId, setQuoteContentId] = useState<string | null>(null)
   const panelRef = useRef<HTMLElement | null>(null)
   const openerRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    const showComposer = () => {
+    const showComposer = (event: Event) => {
+      const detail = event instanceof CustomEvent && event.detail && typeof event.detail === 'object'
+        ? event.detail as { quoteContentId?: unknown }
+        : null
+      const requestedQuoteId = typeof detail?.quoteContentId === 'string' ? detail.quoteContentId.trim() : ''
+      setQuoteContentId(requestedQuoteId || null)
       openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
       setHasOpened(true)
       setOpen(true)
@@ -106,7 +112,16 @@ export default function TwitterClonePostComposerModal() {
         role="dialog"
         tabIndex={-1}
       >
-        <PublishComposer initialType="post" presentation="tweet-modal" onClose={() => setOpen(false)} />
+        <PublishComposer
+          key={quoteContentId ?? 'new-post'}
+          initialType="post"
+          presentation="tweet-modal"
+          quoteContentId={quoteContentId ?? undefined}
+          onClose={() => {
+            setOpen(false)
+            setQuoteContentId(null)
+          }}
+        />
       </section>
     </div>,
     document.body,
