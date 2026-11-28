@@ -48,7 +48,7 @@ Every L4 must map to one authoritative fact or an explicitly identified projecti
 - derived metric treated as merchant fact
 ## 5. Physical Runtime / Authority Mapping
 
-- Merchant, Store, Qualification, Staff and Merchant Scope facts map to the existing logical D1-04 Commerce / Financial authority and its physical Neon finance PostgreSQL database.
-- W07 is the sole Worker owner/writer for those facts; W01 is the only public API ingress and W08 supplies authorization decisions.
+- Merchant, Store, Qualification, Staff and Merchant Scope facts map to logical D1-04 Commerce / Financial authority. Neon `luckread_finance` is the approved PostgreSQL schema target; existing D1 remains production authority until separately approved cutover.
+- W07 is the sole logical Worker owner for those facts. Existing production writes continue through the currently admitted D1 path during schema migration; after cutover W07 alone writes Neon. W01 is the only public API ingress and W08 supplies authorization decisions.
 - W10 may execute existing asynchronous propagation only; it does not own Merchant facts. Other domains consume references/events and do not create duplicate Merchant records.
-- Historical D1 references are logical migration lineage only, not permission to retain a D1 runtime binding or fallback.
+- No dual-write or second Merchant authority is permitted. Existing D1 production bindings remain until cutover; no new D1 binding or fallback may be introduced.
