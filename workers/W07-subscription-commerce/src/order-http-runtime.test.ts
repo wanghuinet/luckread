@@ -250,6 +250,54 @@ describe('private W07 Neon commerce order HTTP handler', () => {
     expect(writes).toBe(0)
   })
 
+  it('rejects more than the maximum order line count before resolving Neon stores or pricing', async () => {
+    const getPostgresPool = vi.fn()
+    const getOrderCreateStore = vi.fn()
+    const resolvePricing = vi.fn(async () => explicitTestPricing)
+    const items = Array.from({ length: 51 }, (_, index) => ({
+      itemRef: 'item_' + String(index).padStart(3, '0'),
+      quantity: 1,
+    }))
+
+    const response = await handleCommerceOrderRequest(
+      postRequest({ items }, { 'Idempotency-Key': 'too_many_lines_01' }),
+      'user_42',
+      env,
+      { getPostgresPool, getOrderCreateStore, resolvePricing },
+    )
+
+    expect(response?.status).toBe(400)
+    expect(await parseResponse(response!)).toMatchObject({
+      error: { code: 'VALIDATION_FAILED' },
+    })
+    expect(getPostgresPool).not.toHaveBeenCalled()
+    expect(getOrderCreateStore).not.toHaveBeenCalled()
+    expect(resolvePricing).not.toHaveBeenCalled()
+  })
+
+  it('rejects a quantity above the contract limit before resolving Neon stores or pricing', async () => {
+    const getPostgresPool = vi.fn()
+    const getOrderCreateStore = vi.fn()
+    const resolvePricing = vi.fn(async () => explicitTestPricing)
+
+    const response = await handleCommerceOrderRequest(
+      postRequest({ items: [{ itemRef: 'item_quantity_limit', quantity: 10_001 }] }, {
+        'Idempotency-Key': 'too_many_units_01',
+      }),
+      'user_42',
+      env,
+      { getPostgresPool, getOrderCreateStore, resolvePricing },
+    )
+
+    expect(response?.status).toBe(400)
+    expect(await parseResponse(response!)).toMatchObject({
+      error: { code: 'VALIDATION_FAILED' },
+    })
+    expect(getPostgresPool).not.toHaveBeenCalled()
+    expect(getOrderCreateStore).not.toHaveBeenCalled()
+    expect(resolvePricing).not.toHaveBeenCalled()
+  })
+
   it('reads an order through the owner-scoped Neon reader and emits only the admitted DTO', async () => {
     let captured: Parameters<typeof getCommerceOrderPostgres> | undefined
     const pool = {} as W07WebhookPostgresPool
