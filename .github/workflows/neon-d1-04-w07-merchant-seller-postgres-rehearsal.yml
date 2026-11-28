@@ -1,0 +1,99 @@
+name: Neon D1-04 W07 Merchant Seller PostgreSQL 18 Local Rehearsal
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-04-w07-merchant-seller-postgres-rehearsal.yml'
+      - 'contracts/database/neon-d1-04-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-04-w07-merchant-seller-schema.v1.json'
+      - 'contracts/database/neon-d1-04-w07-order-payment-schema.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'contracts/persistence/ORDER-D1-04-persistence.v1.json'
+      - 'contracts/persistence/PAYMENT-D1-04-persistence.v1.json'
+      - 'contracts/state-machines/order.json'
+      - 'contracts/state-machines/payment.json'
+      - 'contracts/transport/worker-d1-access-boundary.v1.json'
+      - 'docs/116-MERCHANT-SELLER-PLATFORM-CONTRACT-v1.0.md'
+      - 'docs/118-MERCHANT-SELLER-DATA-CONTRACT-v1.0.md'
+      - 'docs/121-MERCHANT-SELLER-PERMISSION-AND-SECURITY-CONTRACT-v1.0.md'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/000*_w07_d1_04_*.sql'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0007_w07_d1_04_merchant_seller.sql'
+      - 'workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-merchant-seller-postgres-schema.sql'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-04-w07-merchant-seller-postgres-rehearsal.yml'
+      - 'contracts/database/neon-d1-04-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-04-w07-merchant-seller-schema.v1.json'
+      - 'contracts/database/neon-d1-04-w07-order-payment-schema.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'docs/116-MERCHANT-SELLER-PLATFORM-CONTRACT-v1.0.md'
+      - 'docs/118-MERCHANT-SELLER-DATA-CONTRACT-v1.0.md'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/000*_w07_d1_04_*.sql'
+      - 'workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-merchant-seller-postgres-schema.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-04-w07-merchant-seller-postgres18-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  merchant-seller-local-rehearsal:
+    name: Rehearse W07 Merchant/Seller additive schema on disposable PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: schema_generator
+          POSTGRES_PASSWORD: schema_local_only
+          POSTGRES_DB: luckread_finance_schema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schema_generator -d luckread_finance_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify canonical D1-04 predecessor migration artifacts
+        run: |
+          set -euo pipefail
+          test -s workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql
+          test -s workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0002_w07_d1_04_saved_methods_mandates.sql
+          test -s workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0003_w07_d1_04_renewal_cycles.sql
+          test -s workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0004_w07_d1_04_revenuecat_webhook_inbox.sql
+          test -s workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0005_w07_d1_04_refunds_billing_documents.sql
+          test -s workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0006_w07_d1_04_payment_method_revocation.sql
+      - name: Apply the six already admitted D1-04 predecessor migrations locally
+        env:
+          W07_D104_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_local_only@127.0.0.1:5432/luckread_finance_schema
+        run: |
+          set -euo pipefail
+          for migration in workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/000{1,2,3,4,5,6}_w07_d1_04_*.sql; do
+            psql "$W07_D104_SCHEMA_DATABASE_URL" --set ON_ERROR_STOP=1 --no-psqlrc --single-transaction --file "$migration"
+          done
+      - name: Apply Merchant/Seller schema locally (no Neon credentials)
+        env:
+          W07_D104_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_local_only@127.0.0.1:5432/luckread_finance_schema
+        run: |
+          psql "$W07_D104_SCHEMA_DATABASE_URL" --set ON_ERROR_STOP=1 --no-psqlrc --single-transaction \
+            --file workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0007_w07_d1_04_merchant_seller.sql
+      - name: Verify catalog, merchant ownership, qualification, staff scope and rollback semantics
+        env:
+          W07_D104_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_local_only@127.0.0.1:5432/luckread_finance_schema
+        run: |
+          psql "$W07_D104_SCHEMA_DATABASE_URL" --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-merchant-seller-postgres-schema.sql \
+            | tee merchant-seller-postgres18-postflight.txt

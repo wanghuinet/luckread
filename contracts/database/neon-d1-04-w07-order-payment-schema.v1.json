@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
   "title": "LuckRead D1-04 W07 Cumulative Finance PostgreSQL Schema",
   "version": "1.0.0",
-  "status": "W07_D1_04_ALL_SEVEN_SOURCE_SLICES_LOCAL_POSTGRES18_REHEARSAL_PASSED",
+  "status": "W07_D1_04_MERCHANT_SELLER_SCHEMA_LOCAL_REHEARSAL_PENDING",
   "target": {
     "domainId": "D1-04",
     "databaseName": "luckread_finance",
@@ -15,7 +15,10 @@
     "stagedSchemaTarget": "Neon PostgreSQL",
     "businessDataImport": false,
     "productionCutoverAuthorized": false,
-    "remoteSchemaApplied": false
+    "remoteSchemaApplied": true,
+    "remoteSchemaAppliedMigrationCount": 6,
+    "remoteSchemaAppliedTableCount": 15,
+    "merchantSellerRemoteSchemaApplied": false
   },
   "primaryOwner": {
     "worker": "W07",
@@ -25,7 +28,12 @@
       "OrderCreateIdempotency",
       "Payment",
       "PaymentProviderEvent",
-      "PaymentProviderEventConflict"
+      "PaymentProviderEventConflict",
+      "Merchant",
+      "Store",
+      "MerchantQualification",
+      "MerchantStaff",
+      "MerchantScope"
     ],
     "migrationArtifact": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql",
     "template": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-order-payment-postgres.sql",
@@ -39,7 +47,9 @@
       "workers/W07-subscription-commerce/migrations-d1-04/0004_subscription_renewal_cycles.sql",
       "workers/W07-subscription-commerce/migrations-d1-04/0005_revenuecat_webhook_inbox.sql",
       "workers/W07-subscription-commerce/migrations-d1-04/0006_refunds_billing_documents.sql",
-      "workers/W07-subscription-commerce/migrations-d1-04/0007_payment_method_revocation_requests.sql"
+      "workers/W07-subscription-commerce/migrations-d1-04/0007_payment_method_revocation_requests.sql",
+      "docs/116-MERCHANT-SELLER-PLATFORM-CONTRACT-v1.0.md",
+      "docs/118-MERCHANT-SELLER-DATA-CONTRACT-v1.0.md"
     ],
     "includedTables": [
       "orders",
@@ -56,7 +66,12 @@
       "revenuecat_webhook_event_conflicts",
       "refunds",
       "billing_documents",
-      "payment_method_revocation_requests"
+      "payment_method_revocation_requests",
+      "merchant_profiles",
+      "merchant_stores",
+      "merchant_qualifications",
+      "merchant_staff",
+      "merchant_scopes"
     ],
     "deferredTables": [],
     "excludedTables": [
@@ -66,7 +81,7 @@
       "users",
       "media"
     ],
-    "tableCount": 15
+    "tableCount": 20
   },
   "schema": {
     "tables": {
@@ -365,6 +380,72 @@
         "completionRule": "COMPLETED requires provider_method_deleted_at and every mandate attached to the saved method to be REVOKED, FAILED or EXPIRED.",
         "ownerRule": "Insert requires exact provider/merchant/customer/payment_method_id match with one existing saved_payment_methods row.",
         "relationship": "PostgreSQL keeps D1-04 without foreign keys and preserves the saved-method reference using an owner-binding trigger."
+      },
+      "merchant_profiles": {
+        "primaryKey": "merchant_id",
+        "immutable": [
+          "merchant_id",
+          "merchant_type",
+          "identity_ref",
+          "created_at"
+        ],
+        "status": [
+          "PENDING",
+          "ACTIVE",
+          "RESTRICTED",
+          "SUSPENDED",
+          "CLOSED"
+        ]
+      },
+      "merchant_stores": {
+        "primaryKey": "store_id",
+        "owner": "merchant_id",
+        "ownerImmutable": true,
+        "status": [
+          "OPEN",
+          "PAUSED",
+          "CLOSED"
+        ]
+      },
+      "merchant_qualifications": {
+        "primaryKey": "qualification_id",
+        "unique": [
+          "merchant_id",
+          "capability",
+          "jurisdiction_country",
+          "jurisdiction_region"
+        ],
+        "status": [
+          "PENDING_REVIEW",
+          "APPROVED",
+          "DENIED",
+          "EXPIRED",
+          "RE_REVIEW"
+        ]
+      },
+      "merchant_staff": {
+        "primaryKey": "staff_id",
+        "identityReference": "W02 user_id; no copied identity data",
+        "activeMembershipUnique": [
+          "merchant_id",
+          "user_id"
+        ],
+        "status": [
+          "INVITED",
+          "ACTIVE",
+          "SUSPENDED",
+          "REMOVED"
+        ]
+      },
+      "merchant_scopes": {
+        "primaryKey": "scope_id",
+        "denyByDefault": true,
+        "explicitResourceScope": true,
+        "settlementView": "READ_ONLY",
+        "status": [
+          "ACTIVE",
+          "REVOKED"
+        ]
       }
     },
     "explicitIndexNames": [
@@ -398,7 +479,15 @@
       "ix_refunds_status_updated",
       "ix_billing_documents_customer_issued",
       "ix_payment_method_revocation_status",
-      "ux_payment_method_revocation_customer_idempotency"
+      "ux_payment_method_revocation_customer_idempotency",
+      "ix_merchant_profiles_status_created",
+      "ix_merchant_stores_merchant_status_created",
+      "ux_merchant_qualifications_jurisdiction",
+      "ix_merchant_qualifications_status_expiry",
+      "ux_merchant_staff_active_user",
+      "ux_merchant_staff_active_owner",
+      "ux_merchant_scopes_active_resource",
+      "ix_merchant_scopes_staff_status"
     ],
     "triggerNames": [
       "orders_commercial_snapshot_immutable",
@@ -472,13 +561,38 @@
       "payment_method_revocation_request_transition_guard",
       "payment_method_revocation_request_provider_deleted_immutable",
       "payment_method_revocation_request_retained",
-      "payment_method_revocation_request_completion_guard"
+      "payment_method_revocation_request_completion_guard",
+      "merchant_primary_store_guard",
+      "merchant_identity_immutable",
+      "merchant_version_guard",
+      "merchant_transition_guard",
+      "merchant_retained",
+      "store_requires_merchant",
+      "store_identity_immutable",
+      "store_version_guard",
+      "store_transition_guard",
+      "store_retained",
+      "qualification_requires_merchant",
+      "qualification_identity_immutable",
+      "qualification_version_guard",
+      "qualification_transition_guard",
+      "qualification_retained",
+      "staff_requires_merchant",
+      "staff_identity_immutable",
+      "staff_version_guard",
+      "staff_transition_guard",
+      "staff_retained",
+      "scope_requires_active_staff",
+      "scope_identity_immutable",
+      "scope_version_guard",
+      "scope_transition_guard",
+      "scope_retained"
     ],
     "totals": {
-      "tables": 15,
-      "explicitIndexes": 31,
-      "triggers": 72,
-      "triggerFunctions": 6,
+      "tables": 20,
+      "explicitIndexes": 39,
+      "triggers": 97,
+      "triggerFunctions": 7,
       "foreignKeys": 0
     },
     "cumulativeSlices": [
@@ -536,6 +650,15 @@
         "triggers": 7,
         "triggerFunctions": 1,
         "foreignKeys": 0
+      },
+      {
+        "migrationId": "0007_w07_d1_04_merchant_seller",
+        "status": "LOCAL_POSTGRES18_REHEARSAL_PENDING",
+        "tables": 5,
+        "explicitIndexes": 8,
+        "triggers": 25,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
       }
     ],
     "sliceTotals": {
@@ -578,6 +701,13 @@
         "tables": 1,
         "explicitIndexes": 2,
         "triggers": 7,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      },
+      "merchantSeller": {
+        "tables": 5,
+        "explicitIndexes": 8,
+        "triggers": 25,
         "triggerFunctions": 1,
         "foreignKeys": 0
       }
@@ -731,6 +861,6 @@
     "businessDataImported": false,
     "productionCutoverAuthorized": false
   },
-  "nextGate": "All seven W07 D1-04 source migrations have independent PostgreSQL 18.6 local translation/rehearsal evidence. The shared per-database append-only ledger runner for D1-04 and remote Neon schema apply remain separate, unauthorized gates; Cloudflare D1 remains production authority.",
+  "nextGate": "Complete local PostgreSQL 18 Merchant/Seller schema rehearsal and independent review. No remote apply, business data import or production cutover is authorized.",
   "next": "All seven W07 D1-04 source migrations have independent PostgreSQL 18.6 local translation/rehearsal evidence. The shared per-database append-only ledger runner for D1-04 and remote Neon schema apply remain separate, unauthorized gates; Cloudflare D1 remains production authority."
 }

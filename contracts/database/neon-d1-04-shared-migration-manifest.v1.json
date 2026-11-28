@@ -130,14 +130,33 @@
         "workers/W07-subscription-commerce/migrations-d1-04/0007_payment_method_revocation_requests.sql"
       ],
       "scope": "Payment-method revocation request lifecycle."
+    },
+    {
+      "migrationId": "d1-04-w07-merchant-seller-schema-v1",
+      "order": 700,
+      "ownerWorker": "W07",
+      "logicalOwnerWorker": "W07",
+      "kind": "POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0007_w07_d1_04_merchant_seller.sql"
+      ],
+      "dependsOn": [
+        "d1-04-w07-payment-method-revocation-v1"
+      ],
+      "schemaContract": "contracts/database/neon-d1-04-w07-merchant-seller-schema.v1.json",
+      "sourceMigrations": [
+        "docs/116-MERCHANT-SELLER-PLATFORM-CONTRACT-v1.0.md",
+        "docs/118-MERCHANT-SELLER-DATA-CONTRACT-v1.0.md"
+      ],
+      "scope": "Merchant profiles, stores, jurisdictional seller qualifications, staff membership and explicit resource scopes; schema-only."
     }
   ],
-  "sourceMigrationCount": 7,
+  "sourceMigrationCount": 9,
   "expected": {
-    "tables": 15,
-    "explicitIndexes": 31,
-    "triggers": 72,
-    "triggerFunctions": 6,
+    "tables": 20,
+    "explicitIndexes": 39,
+    "triggers": 97,
+    "triggerFunctions": 7,
     "foreignKeys": 0,
     "businessRows": 0,
     "controlSeedRows": 1,
@@ -175,8 +194,8 @@
     ]
   },
   "remoteApplyBlockers": [
-    "The seven W07 D1-04 source migrations have local PostgreSQL 18.6 rehearsals, but the combined shared-ledger execution path requires a separate independent review.",
-    "Remote Neon schema apply and production cutover remain disabled pending a reviewed runner release record."
+    "Merchant/Seller schema has only a local PostgreSQL 18 rehearsal candidate; independent review and a separately reviewed D1-04 shared-ledger runner release are still required.",
+    "Remote Neon DDL for this Merchant/Seller slice, business-data import and production cutover remain unauthorized."
   ],
   "safety": {
     "newWorkers": 0,

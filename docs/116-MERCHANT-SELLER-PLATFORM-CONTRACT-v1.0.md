@@ -262,7 +262,7 @@ P0 must verify:
 7. Suspended merchants cannot perform restricted mutations.
 8. Repeated mutations are idempotent.
 9. External commerce adapter cannot become hidden authority.
-10. D1 remains authoritative for merchant/store metadata.
+10. Production Merchant/Seller storage authority remains unverified until deployment, environment and separately approved cutover evidence are reviewed. Schema target readiness is not production authority evidence.
 11. No Payload Core source is modified or copied.
 
 ## 9. STOP
