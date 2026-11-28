@@ -132,6 +132,52 @@ describe('H5 home feed initial-load recovery', () => {
     expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toContain('/login?returnTo=')
   })
 
+  it('does not let an in-flight pagination response overwrite a newer refreshed timeline', async () => {
+    let resolvePagination: ((response: Response) => void) | undefined
+    fetchMock
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { resolvePagination = resolve }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: {
+        items: [{ id: 'refreshed-post', title: 'Fresh timeline', contentType: 'post' }],
+        nextCursor: null,
+        hasMore: false,
+      } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }))
+
+    render(createElement(TwitterCloneHomeFeed, {
+      initialPage: {
+        items: [{ id: 'initial-post', title: 'Initial timeline', contentType: 'post' }],
+        nextCursor: 'cursor-page-2',
+        hasMore: true,
+      },
+      locale: 'en',
+      feedMode: 'for-you',
+    }))
+
+    fireEvent.click(screen.getByRole('button', { name: getTwitterCloneCopy('en').feed.loadingMore }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh feed' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.getByTestId('post-card').getAttribute('data-content-id')).toBe('refreshed-post'))
+
+    resolvePagination?.(new Response(JSON.stringify({ data: {
+      items: [{ id: 'stale-page-post', title: 'Stale pagination response', contentType: 'post' }],
+      nextCursor: null,
+      hasMore: false,
+    } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+
+    await waitFor(() => expect(screen.getAllByTestId('post-card').map(card => card.getAttribute('data-content-id'))).toEqual([
+      'refreshed-post',
+    ]))
+    expect(screen.queryByText('Stale pagination response')).toBeNull()
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/contents?limit=20')
+  })
+
   it('deduplicates repeated post IDs and stops when pagination returns an already requested cursor', async () => {
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ data: {
       items: [
