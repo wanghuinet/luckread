@@ -213,7 +213,17 @@ export async function toggleUserFollow(targetUserId?: string, viewerId?: string 
       return { ok: false, message: 'The active account changed while follow was updating.' };
     }
     const message = failureMessage(cause);
-    publish(id, viewerId, { following: previousFollowing, pending: false, loading: false, error: message });
+    // A network error does not prove that the server rejected the mutation:
+    // it may have committed before the response was lost. Invalidate the
+    // optimistic snapshot and reconcile through the authoritative W01/W05 read.
+    publish(id, viewerId, {
+      following: previousFollowing,
+      loaded: false,
+      pending: false,
+      loading: false,
+      error: message,
+    });
+    await refreshUserFollowStatus(id, viewerId);
     return { ok: false, message };
   }
 }
