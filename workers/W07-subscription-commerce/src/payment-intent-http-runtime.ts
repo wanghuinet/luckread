@@ -165,13 +165,13 @@ export async function handleCommercePaymentIntentRequest(
     const pool = (dependencies.getPostgresPool ?? getW07PaymentWebhookPostgresPool)(env);
     if (!pool) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
     const foundingReservationId = await getFoundingReservationIdForOrder(pool, customerId, route.orderId);
-    if (foundingReservationId) {
-      const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
-      if (!membershipPool || !await isFoundingReservationActiveForOrder(
-        membershipPool, pool, foundingReservationId, route.orderId,
-      )) {
-        return errorResponse(409, 'INVALID_STATE', 'Founding membership reservation has expired or is no longer active');
-      }
+    const membershipPool = foundingReservationId
+      ? (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env)
+      : undefined;
+    if (foundingReservationId && (!membershipPool || !await isFoundingReservationActiveForOrder(
+      membershipPool, pool, foundingReservationId, route.orderId,
+    ))) {
+      return errorResponse(409, 'INVALID_STATE', 'Founding membership reservation has expired or is no longer active');
     }
     const createAttempt = dependencies.createAttempt ?? createPaymentAttemptPostgres;
     const attempt: PaymentAttemptCreation = await createAttempt(
@@ -182,6 +182,15 @@ export async function handleCommercePaymentIntentRequest(
       providerConfig.expectedMerchantId,
       { paymentEnvironment: providerConfig.environment },
     );
+
+    // Recheck after the finance attempt is durably created. This closes the
+    // expiry/reconciliation race between the first eligibility read and attempt
+    // persistence; no provider intent is created if the hold was released.
+    if (foundingReservationId && (!membershipPool || !await isFoundingReservationActiveForOrder(
+      membershipPool, pool, foundingReservationId, route.orderId,
+    ))) {
+      return errorResponse(409, 'INVALID_STATE', 'Founding membership reservation is no longer active');
+    }
 
     if (!['INITIATING', 'requires_payment_method', 'requires_confirmation'].includes(attempt.payment.status)) {
       return errorResponse(409, 'PAYMENT_STATE_ADVANCED', 'This payment attempt can no longer start checkout');
