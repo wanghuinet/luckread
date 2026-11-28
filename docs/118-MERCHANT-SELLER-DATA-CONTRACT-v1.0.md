@@ -79,10 +79,21 @@ Operational read models may be rebuilt from authoritative Merchant/Store/Staff s
 
 ## 6. Storage
 
-Cloudflare-first default:
+Logical owner: W07 / D1-04. Approved PostgreSQL schema target: Neon `luckread_finance`.
+
+The shared migration ledger currently records D1-04 runner status as NOT_IMPLEMENTED and remoteApplyReady=false. The existing D1-04 manifest contains order/payment schema only; Merchant/Seller entities are not yet present. Do not infer Merchant/Seller runtime persistence or production authority from the presence of W07 Neon configuration.
+
+Production storage authority remains an evidence-controlled deployment fact. Until separately verified and approved, no production data mutation, remote DDL, cutover or dual-write is authorized.
 
 ```text
-D1 = authoritative structured state
-R2 = large merchant assets/evidence references where required
-Cache/KV = derived hot views only
+W07 = sole logical Merchant/Seller owner
+W01 = public API ingress
+W08 = authorization boundary
+Neon luckread_finance = approved schema target
+D1 = retain only the currently admitted production path pending verified cutover
+R2 = controlled evidence/media objects
+Cache/KV = derived projections only
+W10 = admitted asynchronous execution only
 ```
+
+No new D1 binding/fallback, database, Worker, Queue or Service Binding may be introduced.

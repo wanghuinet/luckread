@@ -75,7 +75,7 @@ Must reconcile with:
 
 ### G6 Runtime
 
-Cloudflare-first runtime must use D1 for authoritative structured merchant/store state and asynchronous propagation through Queues where appropriate. External engines remain replaceable adapters.
+The logical owner is W07 in D1-04; Neon `luckread_finance` is the approved PostgreSQL schema target. The shared D1-04 remote migration runner is NOT_IMPLEMENTED and remoteApplyReady=false; the current schema manifest contains order/payment tables only, not Merchant/Seller entities. Production persistence authority must be established from deployed Worker/environment evidence and a separately approved cutover record; source config or local rehearsal alone is insufficient. W01 is public ingress, W08/CASL authorizes, W07 owns Merchant/Seller facts, and W10 executes only admitted asynchronous work. No dual-write, second Merchant store, new D1 binding/fallback, Worker, database, Queue or Service Binding. External engines remain replaceable adapters.
 
 ### G7 Acceptance
 
