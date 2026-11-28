@@ -149,7 +149,7 @@ describe('W07 internal payment-intent runtime', () => {
     const financePool: W07WebhookPostgresPool = {
       async query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string) {
         if (sql.includes("foundingReservationId")) {
-          return { rows: [{ reservation_id: 'fres_0123456789abcdef0123456789abcdef' }] as Row[], rowCount: 1 };
+          return { rows: [{ offer_kind: 'FOUNDING', reservation_id: 'fres_0123456789abcdef0123456789abcdef' }] as Row[], rowCount: 1 };
         }
         if (sql.includes('SELECT status FROM payments')) return { rows: [] as Row[], rowCount: 0 };
         throw new Error('unexpected finance query: ' + sql);
