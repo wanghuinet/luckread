@@ -313,3 +313,20 @@ test('refresh preserves the reader scroll offset when replacing a long Following
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThanOrEqual(before - 10)
   await expect(page.evaluate(() => window.scrollY)).toBeLessThanOrEqual(before + 10)
 })
+
+
+test('returning to Following feed restores a saved reading position', async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem('luckread:home-feed:return-scroll', JSON.stringify({ href: '/home?feed=following', y: 1200 }))
+  })
+  await page.route('**/api/v1/feed/following**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: { items: Array.from({ length: 30 }, (_, index) => post('restore-' + index)), nextCursor: null, hasMore: false } }),
+  }))
+  await mockSocial(page)
+  await page.setViewportSize({ width: 390, height: 700 })
+  await page.goto('http://127.0.0.1:3000/home?feed=following')
+  await expect(page.getByTestId('luckread-social-post-card')).toHaveCount(30)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(800)
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('luckread:home-feed:return-scroll'))).toBeNull()
+})
