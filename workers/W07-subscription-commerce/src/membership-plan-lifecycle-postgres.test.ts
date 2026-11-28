@@ -147,6 +147,29 @@ describe('native PostgreSQL membership plan lifecycle writes', () => {
     expect(release).toHaveBeenCalledTimes(1)
   })
 
+  it('does not allow a founding offer capacity to be reset by a later plan version', async () => {
+    const current = planRow({
+      offer_kind: 'FOUNDING',
+      founding_capacity: 100,
+      price_mode: 'FIXED',
+      price_minor: 9900,
+    })
+    const connect = vi.fn()
+    const pg = pgPool(async () => ({ rows: [current], rowCount: 1 }), connect as never)
+    await expect(reviseMembershipPlan(pg.pool, creatorId, planId, '"lr-plan-v1"', {
+      name: 'Founding Member',
+      tier: 'founding',
+      billingInterval: 'MONTHLY',
+      priceMode: 'FIXED',
+      priceMinor: 9900,
+      offerKind: 'FOUNDING',
+      foundingCapacity: 101,
+      currency: 'USD',
+      benefits: ['founding-badge'],
+    })).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
+    expect(connect).not.toHaveBeenCalled()
+  })
+
   it('rolls back a new immutable version when the main plan version CAS loses', async () => {
     let current = planRow({ status: 'ACTIVE', visibility: 'PUBLIC', version: 2, current_version: 2 })
     const transactionSql: string[] = []
