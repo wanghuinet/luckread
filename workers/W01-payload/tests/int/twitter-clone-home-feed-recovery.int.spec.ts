@@ -160,7 +160,7 @@ describe('H5 home feed initial-load recovery', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh feed' }))
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
-    await screen.findByText('Fresh timeline')
+    await waitFor(() => expect(screen.getByTestId('post-card').getAttribute('data-content-id')).toBe('refreshed-post'))
 
     resolvePagination?.(new Response(JSON.stringify({ data: {
       items: [{ id: 'stale-page-post', title: 'Stale pagination response', contentType: 'post' }],
