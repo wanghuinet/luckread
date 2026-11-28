@@ -310,7 +310,7 @@ export async function commitFoundingReservationForVerifiedPayment(
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
   }
   const paidOrder = await financeDb.query<{ order_id: string; confirmed_at: string }>(
-    "SELECT p.order_id, to_char(o.confirmed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\\"T\\"HH24:MI:SS.MS\\"Z\\"') AS confirmed_at " +
+    "SELECT p.order_id, o.confirmed_at::text AS confirmed_at " +
     "FROM payments p INNER JOIN orders o ON o.order_id = p.order_id " +
     "AND o.customer_id = p.customer_id WHERE p.payment_id = $1 AND p.merchant_id = $2 " +
     "AND p.provider = 'hyperswitch' AND p.status = 'succeeded' AND o.status IN ('CONFIRMED', 'COMPLETED') LIMIT 1",
