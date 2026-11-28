@@ -59,6 +59,20 @@ async function resolveActiveCreatorId(request: Request): Promise<string | Respon
   return creatorId
 }
 
+function validMembershipPlanPrice(plan: Record<string, unknown>): boolean {
+  if (plan.priceMode === 'FIXED') {
+    return typeof plan.priceMinor === 'number' && Number.isSafeInteger(plan.priceMinor) &&
+      plan.priceMinor >= 0 && plan.priceMinor <= 2_147_483_647 &&
+      plan.minimumPriceMinor === null && plan.suggestedPriceMinor === null && plan.maximumPriceMinor === null
+  }
+  return plan.priceMode === 'FLEXIBLE' && plan.priceMinor === null &&
+    typeof plan.minimumPriceMinor === 'number' && Number.isSafeInteger(plan.minimumPriceMinor) && plan.minimumPriceMinor >= 1 &&
+    typeof plan.suggestedPriceMinor === 'number' && Number.isSafeInteger(plan.suggestedPriceMinor) &&
+    plan.suggestedPriceMinor >= plan.minimumPriceMinor &&
+    typeof plan.maximumPriceMinor === 'number' && Number.isSafeInteger(plan.maximumPriceMinor) &&
+    plan.maximumPriceMinor >= plan.suggestedPriceMinor && plan.maximumPriceMinor <= 2_147_483_647
+}
+
 function validPublishedPlan(value: unknown, expectedPlanId: string, expectedCreatorId: string): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const plan = value as Record<string, unknown>
@@ -73,7 +87,7 @@ function validPublishedPlan(value: unknown, expectedPlanId: string, expectedCrea
     typeof plan.name === 'string' && plan.name.trim().length >= 1 && plan.name.length <= 120 &&
     typeof plan.tier === 'string' && /^[a-z][a-z0-9_-]{0,63}$/.test(plan.tier) &&
     (plan.billingInterval === 'MONTHLY' || plan.billingInterval === 'YEARLY') &&
-    Number.isSafeInteger(plan.priceMinor) && Number(plan.priceMinor) >= 0 && Number(plan.priceMinor) <= 2_147_483_647 &&
+    validMembershipPlanPrice(plan) &&
     typeof plan.currency === 'string' && /^[A-Z]{3}$/.test(plan.currency) &&
     Array.isArray(plan.benefits) && plan.benefits.length <= 20 &&
     plan.benefits.every((item) => typeof item === 'string' && item.length >= 1 && item.length <= 180) &&
@@ -179,7 +193,11 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
           name: plan.name as string,
           tier: plan.tier as string,
           billingInterval: plan.billingInterval as 'MONTHLY' | 'YEARLY',
-          priceMinor: plan.priceMinor as number,
+          priceMode: plan.priceMode as 'FIXED' | 'FLEXIBLE',
+          priceMinor: plan.priceMinor as number | null,
+          minimumPriceMinor: plan.minimumPriceMinor as number | null,
+          suggestedPriceMinor: plan.suggestedPriceMinor as number | null,
+          maximumPriceMinor: plan.maximumPriceMinor as number | null,
           currency: plan.currency as string,
         },
       })
