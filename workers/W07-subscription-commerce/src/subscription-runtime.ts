@@ -335,7 +335,7 @@ export async function listActiveMembershipPlans(
     'SELECT p.plan_id, p.owner_id, p.current_version, ' +
     `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
     `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
-    'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+    'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
     'FROM membership_plans AS p ' +
     'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
     "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' ";
@@ -380,7 +380,9 @@ export async function listActiveMembershipPlans(
     }
     if (
       !Number.isSafeInteger(row.current_version) || row.current_version < 1 ||
-      !Number.isSafeInteger(row.price_minor) || row.price_minor < 0 || row.price_minor > 2_147_483_647 ||
+      ((row.price_mode ?? 'FIXED') === 'FIXED' && (!Number.isSafeInteger(row.price_minor) || (row.price_minor as number) < 0 || (row.price_minor as number) > 2_147_483_647)) ||
+      ((row.price_mode ?? 'FIXED') === 'FLEXIBLE' && (row.price_minor !== null || !Number.isSafeInteger(row.minimum_price_minor) || (row.minimum_price_minor as number) < 1 || !Number.isSafeInteger(row.suggested_price_minor) || (row.suggested_price_minor as number) < (row.minimum_price_minor as number) || !Number.isSafeInteger(row.maximum_price_minor) || (row.maximum_price_minor as number) < (row.suggested_price_minor as number) || (row.maximum_price_minor as number) > 2_147_483_647)) ||
+      !['FIXED', 'FLEXIBLE'].includes(row.price_mode ?? 'FIXED') ||
       !/^[A-Z]{3}$/.test(row.currency) ||
       !Number.isSafeInteger(trialPeriodDays) || trialPeriodDays < 0 || trialPeriodDays > 30 ||
       (row.billing_interval !== 'MONTHLY' && row.billing_interval !== 'YEARLY') ||
@@ -417,7 +419,11 @@ export type MembershipPlanDraftInput = {
   name: string
   tier: string
   billingInterval: 'MONTHLY' | 'YEARLY'
-  priceMinor: number
+  priceMinor: number | null
+  priceMode: 'FIXED' | 'FLEXIBLE'
+  minimumPriceMinor: number | null
+  suggestedPriceMinor: number | null
+  maximumPriceMinor: number | null
   currency: string
   benefits: string[]
   trialPeriodDays: number
@@ -433,7 +439,7 @@ async function readOwnedMembershipPlanPostgres(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, ' +
       `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
       `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.plan_id = $1 AND p.owner_type = 'CREATOR' AND p.owner_id = $2 LIMIT 1",
@@ -535,7 +541,11 @@ type MembershipPlanStoredRow = {
   name: string
   tier: string
   billing_interval: string
-  price_minor: number
+  price_minor: number | null
+  price_mode?: 'FIXED' | 'FLEXIBLE'
+  minimum_price_minor?: number | null
+  suggested_price_minor?: number | null
+  maximum_price_minor?: number | null
   currency: string
   benefits_json: string
   trial_period_days: number
@@ -623,6 +633,10 @@ const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed?: boolean) => 
     tier: row.tier,
     billingInterval: row.billing_interval,
     priceMinor: row.price_minor,
+    priceMode: row.price_mode ?? 'FIXED',
+    minimumPriceMinor: row.minimum_price_minor ?? null,
+    suggestedPriceMinor: row.suggested_price_minor ?? null,
+    maximumPriceMinor: row.maximum_price_minor ?? null,
     currency: row.currency,
     benefits,
     trialPeriodDays,
@@ -650,7 +664,7 @@ async function readMembershipPlanDraftByIdPostgres(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, ' +
       `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
       `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = 1 WHERE p.plan_id = $1 LIMIT 1',
       [planId],
@@ -1068,7 +1082,7 @@ export async function listCreatorMembershipPlans(
     'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, ' +
     `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
     `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
-    'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+    'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
     'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
     'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
     "WHERE p.owner_type = 'CREATOR' AND p.owner_id = $1 ";
@@ -1128,7 +1142,7 @@ export async function resolvePurchasableMembershipPlanOffers(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, ' +
       `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
       `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.price_mode, v.minimum_price_minor, v.suggested_price_minor, v.maximum_price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
       'FROM membership_plans AS p ' +
       'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' " +
