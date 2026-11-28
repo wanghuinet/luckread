@@ -67,6 +67,10 @@ test('D1-04 combines seven admitted source migrations and a native Merchant/Sell
   assert.equal(plan.entries[6].entry.migrationId, 'd1-04-w07-merchant-seller-schema-v1')
   assert.deepEqual(plan.entries[6].entry.sourceMigrations, [])
   assert.equal(plan.entries[6].effects.tables.length, 5)
+  assert.equal(shape.sourceMigrationCount, 7)
+  const missingNativeSources = structuredClone(manifest)
+  missingNativeSources.entries[6].sourceContracts = []
+  assert.equal(validateManifestShape(missingNativeSources).valid, false)
 })
 
 test('D1-05 remains local-rehearsal eligible but remote-admission blocked', () => {

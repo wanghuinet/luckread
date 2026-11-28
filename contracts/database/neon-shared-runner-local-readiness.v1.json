@@ -55,8 +55,8 @@
       "sharedPostflightRunId": 42509822425,
       "remoteApplyReady": false,
       "remoteApplyBlockers": [
-        "The D1-04 shared runner has only been exercised against an isolated local PostgreSQL 18.6 database; a separate reviewed remote runner release record is still required.",
-        "Remote Neon schema apply, business data import and production cutover remain unauthorized."
+        "The seven-entry D1-04 manifest and Merchant/Seller schema have local PostgreSQL 18.6 rehearsals; remote release remains separately gated and requires exact source-pinned validation.",
+        "Remote Neon DDL for Merchant/Seller, business data import and production cutover remain unauthorized."
       ],
       "remoteSchemaEvidence": {
         "status": "REMOTE_SCHEMA_ONLY_APPLIED",

@@ -7,7 +7,7 @@
   "review": {
     "reviewKind": "AUTOMATED_INDEPENDENT_READ_ONLY_CODE_PATH_REVIEW",
     "description": "Independent read-only review of W07 D1-04 ownership, seven existing D1 source-to-PG18 translations, the additive Merchant/Seller PostgreSQL-native slice, final trigger/catalog state, exact scheduler control metadata and shared-ledger local-only execution. This is not remote apply approval.",
-    "reviewedMainCommit": "1c83a3cb73e58ab51501bf34b4686fd8f5dd7f62",
+    "reviewedMainCommit": "3d08f094ad263fe03ff6e122a9bfef2ffe62ad09",
     "sharedExecutorPullRequest": 1660,
     "sharedExecutorHeadCommit": "5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de",
     "sharedPostgres18WorkflowRunId": 42509822425,
