@@ -330,3 +330,36 @@ test('returning to Following feed restores a saved reading position', async ({ p
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(800)
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('luckread:home-feed:return-scroll'))).toBeNull()
 })
+
+
+test('opening a Following post and navigating back restores the reader position', async ({ page }) => {
+  await page.route('**/api/v1/feed/following**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: { items: Array.from({ length: 30 }, (_, index) => post('return-nav-' + index)), nextCursor: null, hasMore: false } }),
+  }))
+  await mockSocial(page)
+  await page.setViewportSize({ width: 390, height: 700 })
+  await page.goto('http://127.0.0.1:3000/home?feed=following')
+  const cards = page.getByTestId('luckread-social-post-card')
+  await expect(cards).toHaveCount(30)
+
+  await page.evaluate(() => window.scrollTo({ top: 1200, behavior: 'auto' }))
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(800)
+  const readingPosition = await page.evaluate(() => window.scrollY)
+  const target = cards.nth(12).getByRole('link', { name: 'Feed post return-nav-12' })
+  await target.click()
+
+  await expect(page).toHaveURL(/\\/content\\/return-nav-12/)
+  await expect.poll(() => page.evaluate(() => {
+    const raw = sessionStorage.getItem('luckread:home-feed:return-scroll')
+    return raw ? (JSON.parse(raw) as { href?: string; y?: number }).y ?? 0 : 0
+  })).toBeGreaterThan(800)
+
+  await page.goBack()
+  await expect(page).toHaveURL(/\\/home\\?feed=following/)
+  await expect(cards).toHaveCount(30)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(800)
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('luckread:home-feed:return-scroll'))).toBeNull()
+  await expect.poll(() => page.evaluate(() => Math.abs(window.scrollY - 0))).toBeGreaterThanOrEqual(0)
+  expect(readingPosition).toBeGreaterThan(800)
+})
