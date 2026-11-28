@@ -166,3 +166,29 @@ test('refresh after pagination discards the old cursor and appended timeline', a
   expect(initialRequests).toBe(2)
   expect(cursorRequests).toBe(1)
 })
+
+
+test('Following feed recovers from an initial load failure without discarding retry state', async ({ page }) => {
+  let initialRequests = 0
+  await page.route('**/api/v1/feed/following**', async route => {
+    const url = new URL(route.request().url())
+    if (url.searchParams.has('cursor')) {
+      await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: { message: 'Unexpected cursor request' } }) })
+      return
+    }
+    initialRequests += 1
+    if (initialRequests === 1) {
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { message: 'Feed temporarily unavailable' } }) })
+      return
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { items: [post('feed-recovered')], nextCursor: null, hasMore: false } }) })
+  })
+  await mockSocial(page)
+  await page.goto('http://127.0.0.1:3000/home?feed=following')
+  await expect(page.getByText('Feed temporarily unavailable')).toBeVisible()
+  await expect(page.getByTestId('luckread-social-post-card')).toHaveCount(0)
+  await page.getByRole('button', { name: /重试|Retry/i }).click()
+  await expect(page.getByText('Feed post feed-recovered', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('luckread-social-post-card')).toHaveCount(1)
+  expect(initialRequests).toBe(2)
+})
