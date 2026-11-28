@@ -19,24 +19,26 @@
   "review": {
     "reviewer": "GPT-6",
     "reviewType": "GPT-6 code-path audit plus current-main SHA and CI evidence reconciliation",
-    "reviewedAt": "2026-11-19",
-    "reviewedMainSha": "cc55bd48e086bf9bf4dec34bc869ebe7ada5dd2b",
-    "implementationMergeSha": "cc55bd48e086bf9bf4dec34bc869ebe7ada5dd2b",
+    "reviewedAt": "2026-11-28",
+    "reviewedMainSha": "57a514fdb72407dc543949bbe63846caca6c46d4",
+    "implementationMergeSha": "57a514fdb72407dc543949bbe63846caca6c46d4",
     "result": "NO_BLOCKING_FINDINGS",
     "formalGitHubReviewSubmissions": 0,
     "findings": [],
     "limitations": [
       "No submitted GitHub review records are present; this is a GPT-6 code-path review and current-main/CI evidence reconciliation, not a human GitHub APPROVE review.",
-      "The current PAY-007 schema artifact and independent review source pins were validated by source-equivalent PR candidate run 44511494070 at head 5f43d419427d06213230e6947f1e5bb0fb2f0dd0. Its disposable PostgreSQL 18 rehearsal passed; artifact 14522742681 (sha256:18ad89fcd4bfa16d2118111a78ef2b592352442bc75daf09d72e7914dd5def7a) was uploaded. The candidate workflow had no Neon credentials and its remote apply job was skipped.",
-      "The existing shared D1-04 PostgreSQL 18 rehearsal evidence and remote schema postflight evidence remain the prior successful records. PAY-007 changed only its generated source-guard checksum comment; the migration's executable DDL and the verified 15-table catalog did not change.",
-      "Remote Neon DDL execution history is recorded in executionHistory: run 42553336881 committed the six ordered W07 migration and ledger rows but failed only final catalog index classification; run 42555900393 validated the same six-row ledger prefix and completed corrected final catalog Postflight.",
-      "The final remote catalog verifier separately confirmed all 31 manifest-declared explicit indexes and all 29 primary-key/unique-constraint-backed indexes in the D1-04 Neon target. Workflow run 42555900393 produced the successful Postflight report; no new remote apply was performed for this review.",
+      "The historical D1-04 remote Neon schema-only apply and final catalog Postflight are recorded in executionHistory; this review refresh performs no remote DDL.",
+      "The 2026-11-19 W07 Neon-only cleanup was reviewed: the obsolete validate-review-state CI step and retired D1 preflight helpers were removed, while the manual remote apply job remains restricted to workflow_dispatch on main with the exact APPLY_REVIEWED_SCHEMA_D1_04_FINANCE confirmation and assert-ready check before Neon credentials are read.",
+      "The shared-runner independent review was refreshed to keep D1-04 NOT_IMPLEMENTED and remoteApplyReady false for the canonical shared runner; the separately reviewed D1-04 schema-only runner remains independently gated.",
+      "The W07 Wrangler aliases were renamed from HYPERDRIVE_D1_04/HYPERDRIVE_D1_01 to HYPERDRIVE_FINANCE_DB/HYPERDRIVE_MEMBERSHIP_DB; the finance and membership Hyperdrive IDs remain unchanged and the production W07 config remains Neon-only with zero D1 bindings.",
+      "The six ordered W07 PostgreSQL migration artifacts and their manifest pins are unchanged from the historical remote Postflight; the 15-table catalog and index/constraint/trigger readback remain the historical verified state.",
+      "The current-main source-pin audit re-pins all 27 reviewed source files. The source-equivalent PostgreSQL 18 validation run remains a prior no-Neon-credentials run; the current review CI will repeat the local-only rehearsal.",
       "Neon database UUID is pinned from existing W07 D1_04 Wrangler metadata and is not independently exposed for verification by PostgreSQL SQL."
     ],
     "reviewedFiles": [
       {
         "path": ".github/workflows/neon-d1-04-reviewed-remote-schema-apply.yml",
-        "gitBlobSha1": "820ad4212f4fcd8a51eaa129d9310e95b07978f8"
+        "gitBlobSha1": "970f95e2ef0970ddb4bb9cb5975f92f5c221fc99"
       },
       {
         "path": ".github/workflows/neon-d1-04-shared-runner-independent-review.yml",
@@ -80,7 +82,7 @@
       },
       {
         "path": "contracts/database/neon-d1-04-shared-runner-independent-review.v1.json",
-        "gitBlobSha1": "ec0e5282ed46f55e5842a9411ffa90aad1bf4239"
+        "gitBlobSha1": "54d4ca8bc090987a72180fcbd3573348f8818f71"
       },
       {
         "path": "contracts/database/neon-schema-migration-ledger.v1.json",
@@ -92,7 +94,7 @@
       },
       {
         "path": "workers/W07-subscription-commerce/wrangler.jsonc",
-        "gitBlobSha1": "de32f3eff688918142144aa64a201a4ade4ce229"
+        "gitBlobSha1": "758baa37ae4b9c36b82ef06400cdb346c01bfcea"
       },
       {
         "path": "contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
@@ -151,16 +153,16 @@
       "url": "https://github.com/wanghuinet/luckread/actions/runs/42509822425"
     },
     "remoteRunnerValidation": {
-      "runId": 44511494070,
+      "runId": 46132961129,
       "conclusion": "success",
-      "headSha": "5f43d419427d06213230e6947f1e5bb0fb2f0dd0",
-      "sourceCommitSha": "5f43d419427d06213230e6947f1e5bb0fb2f0dd0",
-      "headBranch": "codex/w07-renewal-mandate-read-neon-20261119",
+      "headSha": "57a514fdb72407dc543949bbe63846caca6c46d4",
+      "sourceCommitSha": "9160f7ba4bcaf586435708d99cfef532e7c8ff13",
+      "headBranch": "gpt/d104-refresh-current-main-review-pins",
       "validationScope": "D1_04_SCHEMA_ONLY_LOCAL_PG18_NO_NEON_CREDENTIALS",
-      "url": "https://github.com/wanghuinet/luckread/actions/runs/44511494070",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/46132961129",
       "remoteApplyJob": "skipped",
-      "artifactId": 14522742681,
-      "artifactDigest": "sha256:18ad89fcd4bfa16d2118111a78ef2b592352442bc75daf09d72e7914dd5def7a"
+      "artifactId": 15258103099,
+      "artifactDigest": "sha256:83e4b82960c4173a756370b04cab97bf569789c773d09c37c78d1f21379765cd"
     },
     "catalogPostflight": {
       "postgresMajor": 18,
