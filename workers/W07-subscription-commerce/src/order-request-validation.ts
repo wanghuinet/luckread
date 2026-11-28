@@ -1,6 +1,8 @@
 export type CreateCommerceOrderItem = Readonly<{
   itemRef: string
   quantity: number
+  /** Buyer-selected amount, accepted only when the authoritative offer is FLEXIBLE. */
+  selectedAmountMinor?: number
 }>
 
 export type CreateCommerceOrderRequest = Readonly<{
@@ -64,7 +66,7 @@ export function validateCreateCommerceOrderRequest(
   for (let index = 0; index < input.items.length; index += 1) {
     const candidate: unknown = input.items[index]
     const field = `items[${index}]`
-    if (!isRecord(candidate) || !hasOnlyKeys(candidate, ['itemRef', 'quantity'])) return invalid(field)
+    if (!isRecord(candidate) || !hasOnlyKeys(candidate, ['itemRef', 'quantity', 'selectedAmountMinor'])) return invalid(field)
 
     const itemRef = candidate.itemRef
     if (
@@ -86,7 +88,18 @@ export function validateCreateCommerceOrderRequest(
       quantity > MAX_ORDER_QUANTITY
     ) return invalid(`${field}.quantity`)
 
-    items.push({ itemRef, quantity })
+    const selectedAmountMinor = candidate.selectedAmountMinor
+    if (selectedAmountMinor !== undefined &&
+        (typeof selectedAmountMinor !== 'number' || !Number.isSafeInteger(selectedAmountMinor) ||
+          selectedAmountMinor < 1 || selectedAmountMinor > 2_147_483_647)) {
+      return invalid(`${field}.selectedAmountMinor`)
+    }
+
+    items.push({
+      itemRef,
+      quantity,
+      ...(selectedAmountMinor === undefined ? {} : { selectedAmountMinor }),
+    })
   }
 
   return { ok: true, value: { items } }
