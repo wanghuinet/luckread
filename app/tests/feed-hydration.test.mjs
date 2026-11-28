@@ -57,9 +57,13 @@ test('home feed hydration is cancellable per visible card and never fans out for
   expect(screen).toContain('readContentBody(item, controller.signal, sessionToken)');
   expect(screen).toContain('const socialBatchPromise = readContentSocialBatch(');
   expect(screen).toContain('pendingRecords.map((item) => item.id)');
-  expect(screen).toContain('return () => socialBatchController.abort();');
+  expect(screen).toContain('const cardControllers = new Map<string, AbortController>();');
+  expect(screen).toContain('socialBatchController.abort();');
+  expect(screen).toContain('for (const [contentId, controller] of cardControllers)');
+  expect(screen).toContain('controller.abort();');
+  expect(screen).toContain('hydrationControllersRef.current.get(contentId) === controller');
+  expect(screen).toContain('hydrationControllersRef.current.delete(contentId)');
   expect(screen).toContain('readContentAuthor(item, controller.signal)');
-  expect(screen).toContain('controller.abort()');
   expect(screen).toContain('hydrationControllersRef.current.clear()');
   expect(screen).not.toContain('Promise.allSettled(pendingRecords.map(async (item)');
 });

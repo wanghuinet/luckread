@@ -200,7 +200,13 @@ test('home feed renders first-page projections while optional detail hydration r
   expect(homeScreen).not.toContain('pendingRecords.map(async (item) =>');
   expect(homeScreen).toContain('readContentBody(item, controller.signal, sessionToken)');
   expect(homeScreen).toContain('readContentAuthor(item, controller.signal)');
-  expect(homeScreen).toContain('return () => socialBatchController.abort();');
+  // Batch cleanup also cancels and releases the per-card requests it owns.
+  expect(homeScreen).toContain('const cardControllers = new Map<string, AbortController>();');
+  expect(homeScreen).toContain('socialBatchController.abort();');
+  expect(homeScreen).toContain('for (const [contentId, controller] of cardControllers)');
+  expect(homeScreen).toContain('controller.abort();');
+  expect(homeScreen).toContain('hydrationControllersRef.current.get(contentId) === controller');
+  expect(homeScreen).toContain('hydrationControllersRef.current.delete(contentId)');
   expect(homeScreen).toContain('generation !== hydrationGenerationRef.current');
   expect(homeScreen).not.toContain('setItems(visibleItems)');
   expect(homeScreen).not.toContain('!loading && !loadingMore');
