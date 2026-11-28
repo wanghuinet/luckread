@@ -40,6 +40,8 @@ export type ActiveMembershipPlanRow = {
   minimum_price_minor?: number | null
   suggested_price_minor?: number | null
   maximum_price_minor?: number | null
+  offer_kind?: 'STANDARD' | 'FOUNDING'
+  founding_capacity?: number | null
   trial_period_days: number
   plan_id: string
   owner_id: string
@@ -391,6 +393,11 @@ export async function listActiveMembershipPlans(
       ((row.price_mode ?? 'FIXED') === 'FIXED' && (!Number.isSafeInteger(row.price_minor) || (row.price_minor as number) < 0 || (row.price_minor as number) > 2_147_483_647 || (row.minimum_price_minor !== undefined && row.minimum_price_minor !== null) || (row.suggested_price_minor !== undefined && row.suggested_price_minor !== null) || (row.maximum_price_minor !== undefined && row.maximum_price_minor !== null))) ||
       ((row.price_mode ?? 'FIXED') === 'FLEXIBLE' && (row.price_minor !== null || !Number.isSafeInteger(row.minimum_price_minor) || (row.minimum_price_minor as number) < 1 || !Number.isSafeInteger(row.suggested_price_minor) || (row.suggested_price_minor as number) < (row.minimum_price_minor as number) || !Number.isSafeInteger(row.maximum_price_minor) || (row.maximum_price_minor as number) < (row.suggested_price_minor as number) || (row.maximum_price_minor as number) > 2_147_483_647)) ||
       !['FIXED', 'FLEXIBLE'].includes(row.price_mode ?? 'FIXED') ||
+      !['STANDARD', 'FOUNDING'].includes(row.offer_kind ?? 'STANDARD') ||
+      ((row.offer_kind ?? 'STANDARD') === 'STANDARD' && row.founding_capacity != null) ||
+      ((row.offer_kind ?? 'STANDARD') === 'FOUNDING' &&
+        ((row.price_mode ?? 'FIXED') !== 'FIXED' || !Number.isSafeInteger(row.founding_capacity) ||
+          (row.founding_capacity as number) < 1 || (row.founding_capacity as number) > 2_147_483_647)) ||
       !/^[A-Z]{3}$/.test(row.currency) ||
       !Number.isSafeInteger(trialPeriodDays) || trialPeriodDays < 0 || trialPeriodDays > 30 ||
       (row.billing_interval !== 'MONTHLY' && row.billing_interval !== 'YEARLY') ||
@@ -411,6 +418,8 @@ export async function listActiveMembershipPlans(
       minimumPriceMinor: row.minimum_price_minor ?? null,
       suggestedPriceMinor: row.suggested_price_minor ?? null,
       maximumPriceMinor: row.maximum_price_minor ?? null,
+      offerKind: row.offer_kind ?? 'STANDARD',
+      foundingCapacity: row.founding_capacity ?? null,
       currency: row.currency,
       trialPeriodDays,
       benefits,
