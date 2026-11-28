@@ -29,6 +29,7 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   const activeRequestRef = useRef<AbortController | null>(null)
   // Increment on every initial/refresh request so stale pagination cannot mutate newer state.
   const requestGenerationRef = useRef(0)
+  const scrollRestoreFramesRef = useRef<number[]>([])
 
   const loadInitial = useCallback(async (force = false) => {
     if (loadingRef.current && !force) return
@@ -69,7 +70,16 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
       setHasMore(page.hasMore === true)
       setCandidateWindowTruncated(page.candidateWindowTruncated === true)
       if (scrollPosition !== null && scrollPosition > 0) {
-        requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: scrollPosition, behavior: 'auto' })))
+        scrollRestoreFramesRef.current.forEach(frame => cancelAnimationFrame(frame))
+        scrollRestoreFramesRef.current = []
+        const firstFrame = requestAnimationFrame(() => {
+          const secondFrame = requestAnimationFrame(() => {
+            if (generation === requestGenerationRef.current) window.scrollTo({ top: scrollPosition, behavior: 'auto' })
+            scrollRestoreFramesRef.current = []
+          })
+          scrollRestoreFramesRef.current.push(secondFrame)
+        })
+        scrollRestoreFramesRef.current.push(firstFrame)
       }
     } catch (cause) {
       if (!controller.signal.aborted && generation === requestGenerationRef.current) {
@@ -127,6 +137,8 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
 
   useEffect(() => () => {
     activeRequestRef.current?.abort()
+    scrollRestoreFramesRef.current.forEach(frame => cancelAnimationFrame(frame))
+    scrollRestoreFramesRef.current = []
   }, [])
 
   useEffect(() => {
