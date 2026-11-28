@@ -245,7 +245,7 @@ export async function getFoundingReservationByIdempotency(
   const idempotencyKey = validateIdempotencyKey(idempotencyKeyInput);
   const result = await db.query<ReservationRow>(
     'SELECT reservation_id, plan_id, plan_version, subscriber_id, order_reference, state, ' +
-    "to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\\"T\\"HH24:MI:SS.MS\\"Z\\"') AS expires_at " +
+    "to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS expires_at " +
     'FROM membership_founding_reservations WHERE subscriber_id = $1 AND idempotency_key = $2 LIMIT 1',
     [subscriberId, idempotencyKey],
   );
