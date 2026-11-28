@@ -7,6 +7,7 @@ import type {
 import {
   commitFoundingReservationAfterVerifiedPayment,
   commitFoundingReservationForVerifiedPayment,
+  getFoundingReservationIdForOrder,
   releaseFoundingReservationForUnpaidPayment,
   reconcileExpiredFoundingReservations,
   reserveFoundingOfferCapacity,
@@ -167,6 +168,18 @@ describe('founding offer capacity reservation', () => {
     )).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 });
     expect(client.statements.some((entry) => entry.sql.includes("UPDATE membership_founding_reservations SET state = 'COMMITTED'"))).toBe(false);
     expect(client.statements.some((entry) => entry.sql === 'ROLLBACK')).toBe(true);
+  });
+
+  it('fails closed when an immutable order snapshot contains an unknown offer kind', async () => {
+    const financeDb = {
+      async query<T extends Row = Row>() {
+        return { rows: [{ offer_kind: 'FOUNDING_PLUS', reservation_id: null }] as T[], rowCount: 1 };
+      },
+      async connect() { throw new Error('read-only snapshot lookup'); },
+    } as unknown as W07WebhookPostgresPool;
+    await expect(getFoundingReservationIdForOrder(
+      financeDb, 'subscriber_1', 'ord_snapshot_unknown',
+    )).rejects.toMatchObject({ code: 'INTEGRITY_VIOLATION', status: 500 });
   });
 
   it('releases an expired unpaid order after finance confirms there is no payment attempt', async () => {
