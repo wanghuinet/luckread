@@ -331,6 +331,113 @@ BEGIN
     RAISE EXCEPTION 'Forward current_version transition to existing plan version failed';
   END IF;
 
+  INSERT INTO membership_plan_versions
+    (plan_id, plan_version, name, tier, billing_interval, price_minor, price_mode,
+     offer_kind, founding_capacity, currency, benefits_json, created_at)
+  VALUES
+    ('w07-schema-fixture-plan', 3, 'Founding', 'founding', 'YEARLY', 2500, 'FIXED',
+     'FOUNDING', 2, 'USD', '[]', '2026-01-03T00:00:00Z');
+  UPDATE membership_plans SET current_version = 3, version = version + 1
+  WHERE plan_id = 'w07-schema-fixture-plan';
+
+  BEGIN
+    INSERT INTO membership_plan_versions
+      (plan_id, plan_version, name, tier, billing_interval, price_minor, price_mode,
+       offer_kind, founding_capacity, currency, benefits_json, created_at)
+    VALUES
+      ('w07-schema-fixture-plan', 4, 'Reset Capacity', 'founding', 'YEARLY', 2500, 'FIXED',
+       'FOUNDING', 3, 'USD', '[]', now());
+    RAISE EXCEPTION 'Expected founding lifetime capacity reset to fail';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO membership_plan_versions
+      (plan_id, plan_version, name, tier, billing_interval, price_minor, price_mode,
+       offer_kind, founding_capacity, currency, benefits_json, created_at)
+    VALUES
+      ('w07-schema-fixture-plan', 4, 'Changed Offer Kind', 'founding', 'YEARLY', 2500, 'FIXED',
+       'STANDARD', NULL, 'USD', '[]', now());
+    RAISE EXCEPTION 'Expected founding offer kind change to fail';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO membership_plan_versions
+      (plan_id, plan_version, name, tier, billing_interval, price_minor, price_mode,
+       minimum_price_minor, suggested_price_minor, maximum_price_minor,
+       offer_kind, founding_capacity, currency, benefits_json, created_at)
+    VALUES
+      ('w07-schema-fixture-plan', 4, 'Flexible Founding', 'founding', 'YEARLY', NULL, 'FLEXIBLE',
+       100, 200, 300, 'FOUNDING', 2, 'USD', '[]', now());
+    RAISE EXCEPTION 'Expected flexible founding price to fail';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO membership_plan_versions
+    (plan_id, plan_version, name, tier, billing_interval, price_minor, price_mode,
+     offer_kind, founding_capacity, currency, benefits_json, created_at)
+  VALUES
+    ('w07-schema-fixture-plan', 4, 'Founding Revision', 'founding', 'YEARLY', 3000, 'FIXED',
+     'FOUNDING', 2, 'USD', '[]', '2026-01-04T00:00:00Z');
+  UPDATE membership_plans SET current_version = 4, version = version + 1
+  WHERE plan_id = 'w07-schema-fixture-plan';
+
+  INSERT INTO membership_founding_reservations
+    (reservation_id, plan_id, plan_version, subscriber_id, idempotency_key,
+     state, expires_at, created_at, updated_at)
+  VALUES
+    ('fres_0123456789abcdef0123456789abcdef', 'w07-schema-fixture-plan', 4,
+     'w07-founding-subscriber', 'w07-founding-idempotency', 'HELD',
+     '2026-01-10T00:00:00Z', '2026-01-04T00:00:00Z', '2026-01-04T00:00:00Z');
+
+  BEGIN
+    INSERT INTO membership_founding_reservations
+      (reservation_id, plan_id, plan_version, subscriber_id, idempotency_key,
+       state, expires_at, released_at, created_at, updated_at)
+    VALUES
+      ('fres_1123456789abcdef0123456789abcdef', 'w07-schema-fixture-plan', 4,
+       'w07-founding-subscriber-2', 'w07-founding-idempotency-2', 'HELD',
+       '2026-01-10T00:00:00Z', '2026-01-04T00:00:00Z',
+       '2026-01-04T00:00:00Z', '2026-01-04T00:00:00Z');
+    RAISE EXCEPTION 'Expected HELD reservation with released_at to fail';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO membership_founding_reservation_payment_events
+    (reservation_id, provider_event_reference, created_at)
+  VALUES
+    ('fres_0123456789abcdef0123456789abcdef', 'evt_w07_founding_payment_1',
+     '2026-01-05T00:00:00Z');
+
+  BEGIN
+    INSERT INTO membership_founding_reservation_payment_events
+      (reservation_id, provider_event_reference, created_at)
+    VALUES
+      ('fres_0123456789abcdef0123456789abcdef', 'evt_w07_founding_payment_2',
+       '2026-01-05T00:00:01Z');
+    RAISE EXCEPTION 'Expected one payment event per founding reservation';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO membership_founding_reservations
+      (reservation_id, plan_id, plan_version, subscriber_id, idempotency_key,
+       state, expires_at, created_at, updated_at)
+    VALUES
+      ('fres_2123456789abcdef0123456789abcdef', 'w07-schema-fixture-plan', 99,
+       'w07-founding-subscriber-3', 'w07-founding-idempotency-3', 'HELD',
+       '2026-01-10T00:00:00Z', '2026-01-04T00:00:00Z', '2026-01-04T00:00:00Z');
+    RAISE EXCEPTION 'Expected founding reservation plan-version foreign key';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
   BEGIN
     UPDATE membership_plan_versions SET name = 'Mutable'
     WHERE plan_id = 'w07-schema-fixture-plan' AND plan_version = 1;
