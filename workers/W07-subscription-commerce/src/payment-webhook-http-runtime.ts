@@ -28,6 +28,7 @@ import { receiveHyperswitchPaymentWebhookPostgres } from './payment-webhook-paym
 import { receiveHyperswitchMandateWebhookPostgres } from './mandate-webhook-postgres-persistence.js';
 import { issueReceiptForPaidPaymentPostgres } from './billing-document-postgres-persistence.js';
 import { expirePendingSubscriptionPlanUpgradeForPaymentPostgres } from './subscription-plan-upgrade-expiry-postgres.js';
+import { commitFoundingReservationForVerifiedPayment } from './founding-offer-reservations-postgres.js';
 
 type HyperswitchWebhookRuntimeEnv =
   Pick<W07PaymentMethodReadRuntimeEnv, 'W07_DATABASE_DRIVER' | 'HYPERDRIVE_FINANCE_DB'> &
@@ -55,6 +56,7 @@ type HyperswitchWebhookRuntimeDependencies = Readonly<{
   syncRenewalOutcome?: typeof syncRenewalCycleOutcomeForPayment;
   syncPendingOutcomes?: typeof syncPendingRenewalOutcomes;
   fulfillPaidOrder?: typeof fulfillPaidMembershipOrder;
+  commitFoundingReservation?: typeof commitFoundingReservationForVerifiedPayment;
   expirePendingPlanUpgradePostgres?: typeof expirePendingSubscriptionPlanUpgradeForPaymentPostgres;
 }>;
 
@@ -273,6 +275,20 @@ export async function handleHyperswitchWebhookRequest(
       if (subscriptionSync.outcome === 'NO_RENEWAL_CYCLE' && isSignedPaymentSucceededEvent(rawBody)) {
         const fulfill = dependencies.fulfillPaidOrder ?? fulfillPaidMembershipOrder;
         purchaseFulfillment = await fulfill(renewalEnv, paymentId, env.HYPERSWITCH_MERCHANT_ID);
+
+        // A paid founding seat is consumed only after the finance DB confirms the
+        // provider payment and the initial membership purchase path has been attempted.
+        // If this membership-DB step fails, return 503 so the signed webhook is retried;
+        // the commit operation is idempotent by reservation + provider event identity.
+        const commitFounding = dependencies.commitFoundingReservation ??
+          commitFoundingReservationForVerifiedPayment;
+        await commitFounding(
+          membershipPool,
+          postgresPool,
+          paymentId,
+          env.HYPERSWITCH_MERCHANT_ID,
+          result.eventId,
+        );
       }
 
       // A verified terminal renewal payment is an existing, trusted execution
