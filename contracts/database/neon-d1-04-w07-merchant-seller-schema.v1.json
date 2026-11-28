@@ -23,7 +23,8 @@
       "MerchantScope"
     ],
     "identityAuthority": "W02",
-    "auditAuthority": "W06"
+    "auditAuthority": "W06",
+    "migrationArtifact": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0007_w07_d1_04_merchant_seller.sql"
   },
   "sourceContracts": [
     "docs/116-MERCHANT-SELLER-PLATFORM-CONTRACT-v1.0.md",

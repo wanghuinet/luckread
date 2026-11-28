@@ -35,13 +35,16 @@ BEGIN
     JOIN pg_catalog.pg_class t ON t.oid=c.conrelid
     JOIN pg_catalog.pg_namespace n ON n.oid=t.relnamespace
     WHERE n.nspname='public' AND c.contype='f';
-  IF table_count<>20 OR trigger_count<>97 OR trigger_function_count<>7 OR foreign_key_count<>0 THEN
-    RAISE EXCEPTION 'D1-04 cumulative catalog mismatch: tables %, triggers %, functions %, foreign keys %',
-      table_count,trigger_count,trigger_function_count,foreign_key_count;
+  IF table_count<>20 OR index_count<>39 OR trigger_count<>97 OR trigger_function_count<>7 OR foreign_key_count<>0 THEN
+    RAISE EXCEPTION 'D1-04 cumulative catalog mismatch: tables %, explicit indexes %, triggers %, functions %, foreign keys %',
+      table_count,index_count,trigger_count,trigger_function_count,foreign_key_count;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_indexes WHERE schemaname='public' AND indexname='ux_merchant_staff_active_owner') THEN
-    RAISE EXCEPTION 'active merchant owner uniqueness index missing';
-  END IF;
+  IF (SELECT count(*) FROM pg_catalog.pg_indexes WHERE schemaname='public' AND indexname IN (
+    'ix_merchant_profiles_status_created','ix_merchant_stores_merchant_status_created',
+    'ux_merchant_qualifications_jurisdiction','ix_merchant_qualifications_status_expiry',
+    'ux_merchant_staff_active_user','ux_merchant_staff_active_owner',
+    'ux_merchant_scopes_active_resource','ix_merchant_scopes_staff_status'
+  ))<>8 THEN RAISE EXCEPTION 'Merchant/Seller explicit index inventory mismatch'; END IF;
 END $$;
 
 INSERT INTO merchant_profiles
