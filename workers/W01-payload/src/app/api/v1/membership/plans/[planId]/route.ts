@@ -107,6 +107,13 @@ function validMembershipPlanPrice(plan: Record<string, unknown>): boolean {
     plan.maximumPriceMinor >= plan.suggestedPriceMinor && plan.maximumPriceMinor <= 2_147_483_647
 }
 
+function validMembershipPlanOffer(plan: Record<string, unknown>): boolean {
+  if (plan.offerKind === 'STANDARD') return plan.foundingCapacity === null
+  return plan.offerKind === 'FOUNDING' && plan.priceMode === 'FIXED' &&
+    typeof plan.foundingCapacity === 'number' && Number.isSafeInteger(plan.foundingCapacity) &&
+    plan.foundingCapacity >= 1 && plan.foundingCapacity <= 2_147_483_647
+}
+
 function validUpdatedPlan(value: unknown, expectedPlanId: string, expectedCreatorId: string): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const plan = value as Record<string, unknown>
@@ -122,6 +129,7 @@ function validUpdatedPlan(value: unknown, expectedPlanId: string, expectedCreato
     typeof plan.tier === 'string' && /^[a-z][a-z0-9_-]{0,63}$/.test(plan.tier) &&
     (plan.billingInterval === 'MONTHLY' || plan.billingInterval === 'YEARLY') &&
     validMembershipPlanPrice(plan) &&
+    validMembershipPlanOffer(plan) &&
     typeof plan.currency === 'string' && /^[A-Z]{3}$/.test(plan.currency) &&
     Array.isArray(plan.benefits) && plan.benefits.length <= 20 &&
     plan.benefits.every((item) => typeof item === 'string' && item.length >= 1 && item.length <= 180) &&
@@ -162,13 +170,21 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     const fields = body as Record<string, unknown>
     const legacyFixedKeys = ['name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits']
     const fixedKeys = [...legacyFixedKeys, 'priceMode']
+    const foundingKeys = [...fixedKeys, 'offerKind', 'foundingCapacity']
     const flexibleKeys = ['name', 'tier', 'billingInterval', 'priceMode', 'priceMinor', 'minimumPriceMinor', 'suggestedPriceMinor', 'maximumPriceMinor', 'currency', 'benefits']
+    const flexibleWithStandardOfferKeys = [...flexibleKeys, 'offerKind', 'foundingCapacity']
     const keys = Object.keys(fields).sort()
     const sameKeys = (expected: string[]) => keys.length === expected.length && [...expected].sort().every((key, index) => keys[index] === key)
     const priceMode = fields.priceMode === undefined ? 'FIXED' : fields.priceMode
+    const offerKind = fields.offerKind === undefined ? 'STANDARD' : fields.offerKind
+    const foundingCapacity = fields.foundingCapacity === undefined ? null : fields.foundingCapacity
     if (
-      !(sameKeys(legacyFixedKeys) || sameKeys(fixedKeys) || (priceMode === 'FLEXIBLE' && sameKeys(flexibleKeys)))
+      !(sameKeys(legacyFixedKeys) || sameKeys(fixedKeys) || sameKeys(foundingKeys) ||
+        (priceMode === 'FLEXIBLE' && (sameKeys(flexibleKeys) || sameKeys(flexibleWithStandardOfferKeys))))
     ) return errorResponse(400, 'VALIDATION_FAILED', 'Only supported membership plan terms may be updated')
+    const offerFields = offerKind === 'STANDARD'
+      ? { offerKind: 'STANDARD' as const, foundingCapacity: null }
+      : { offerKind: 'FOUNDING' as const, foundingCapacity: foundingCapacity as number }
     const priceFields = priceMode === 'FIXED'
       ? {
           priceMode: 'FIXED' as const,
@@ -189,6 +205,9 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       typeof fields.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(fields.tier) ||
       (fields.billingInterval !== 'MONTHLY' && fields.billingInterval !== 'YEARLY') ||
       !validMembershipPlanPrice(priceFields) ||
+      (offerKind === 'STANDARD' ? foundingCapacity !== null :
+        offerKind !== 'FOUNDING' || priceMode !== 'FIXED' || typeof foundingCapacity !== 'number' ||
+        !Number.isSafeInteger(foundingCapacity) || foundingCapacity < 1 || foundingCapacity > 2_147_483_647) ||
       typeof fields.currency !== 'string' || !/^[A-Z]{3}$/.test(fields.currency) ||
       !Array.isArray(fields.benefits) || fields.benefits.length > 20 ||
       fields.benefits.some((item) => typeof item !== 'string' || item !== item.trim() || item.length < 1 || item.length > 180) ||
@@ -200,6 +219,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       tier: fields.tier,
       billingInterval: fields.billingInterval as 'MONTHLY' | 'YEARLY',
       ...priceFields,
+      ...offerFields,
       currency: fields.currency,
       benefits: fields.benefits as string[],
     }
@@ -210,6 +230,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       ...(priceMode === 'FIXED'
         ? { priceMode: 'FIXED' as const, priceMinor: fields.priceMinor }
         : priceFields),
+      ...offerFields,
       currency: fields.currency,
       benefits: fields.benefits as string[],
     }
@@ -266,6 +287,8 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
           minimumPriceMinor: plan.minimumPriceMinor as number | null,
           suggestedPriceMinor: plan.suggestedPriceMinor as number | null,
           maximumPriceMinor: plan.maximumPriceMinor as number | null,
+          offerKind: plan.offerKind as 'STANDARD' | 'FOUNDING',
+          foundingCapacity: plan.foundingCapacity as number | null,
           currency: plan.currency as string,
           benefits: plan.benefits as string[],
         },
