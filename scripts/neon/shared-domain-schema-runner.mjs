@@ -256,6 +256,13 @@ function contractArtifactPaths(contract) {
 function validateEntryContract(manifest, entry, readSource = readText) {
   if (!isSafeRepositoryPath(entry.schemaContract)) fail('unsafe schema contract path: ' + entry.schemaContract)
   const contract = JSON.parse(readSource(entry.schemaContract))
+  if (Array.isArray(entry.sourceMigrations) && entry.sourceMigrations.length === 0) {
+    const manifestSourceContracts = [...(entry.sourceContracts ?? [])].sort()
+    const contractSourceContracts = [...(contract.sourceContracts ?? [])].sort()
+    if (JSON.stringify(manifestSourceContracts) !== JSON.stringify(contractSourceContracts)) {
+      fail('native PostgreSQL schema source-contract set does not match its schema contract: ' + entry.schemaContract)
+    }
+  }
   if (contract.target?.domainId !== manifest.domainId ||
       contract.target?.databaseName !== manifest.databaseName ||
       contract.target?.postgresMajor !== 18) {
