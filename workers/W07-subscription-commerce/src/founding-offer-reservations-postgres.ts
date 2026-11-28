@@ -195,6 +195,9 @@ export async function getFoundingReservationIdForOrder(
   );
   const row = result.rows[0];
   if (!row) return null;
+  if (row.offer_kind !== null && row.offer_kind !== 'STANDARD' && row.offer_kind !== 'FOUNDING') {
+    throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+  }
   if (row.offer_kind === 'FOUNDING') {
     if (typeof row.reservation_id !== 'string' || !/^fres_[a-f0-9]{32}$/.test(row.reservation_id)) {
       throw new SubscriptionRuntimeError('INVALID_STATE', 409);
@@ -482,6 +485,9 @@ export async function commitFoundingReservationForVerifiedPayment(
   const order = paidOrder.rows[0];
   if (!order?.order_id || !order.confirmed_at || !Number.isFinite(Date.parse(order.confirmed_at))) {
     throw new SubscriptionRuntimeError('INVALID_STATE', 409);
+  }
+  if (order.offer_kind !== null && order.offer_kind !== 'STANDARD' && order.offer_kind !== 'FOUNDING') {
+    throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
   }
   if (order.offer_kind !== 'FOUNDING') {
     if (order.reservation_id !== null) throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
