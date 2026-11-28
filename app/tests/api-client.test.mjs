@@ -278,6 +278,50 @@ test('loads authoritative content like state and aggregate count from W01/W05', 
   expect(getContentLikeSnapshot(contentId, {}, activeViewerId)).toMatchObject({ liked: true, likeCount: 8, loading: false });
 });
 
+test('resolves unknown like state before choosing the inverse mutation', async () => {
+  const contentId = 'stage3-like-unknown-initial-state';
+  let liked = true;
+  let likeCount = 8;
+  const methods = [];
+
+  pendingFetch = async (_input, init) => {
+    const method = String(init.method || 'GET').toUpperCase();
+    methods.push(method);
+    if (method === 'GET') {
+      return new Response(JSON.stringify({ data: { liked, likeCount } }), { status: 200 });
+    }
+    if (method === 'DELETE') {
+      liked = false;
+      likeCount = 7;
+      return new Response(null, { status: 204 });
+    }
+    if (method === 'POST') {
+      liked = true;
+      likeCount = 8;
+      return new Response(null, { status: 204 });
+    }
+    throw new Error('Unexpected like method: ' + method);
+  };
+
+  expect(getContentLikeSnapshot(contentId, {}, activeViewerId)).toMatchObject({
+    liked: false,
+    loaded: false,
+    loading: false,
+  });
+
+  const outcome = await toggleContentLike(contentId, activeViewerId);
+
+  expect(outcome.ok).toBe(true);
+  expect(methods).toEqual(['GET', 'DELETE', 'GET']);
+  expect(getContentLikeSnapshot(contentId, {}, activeViewerId)).toMatchObject({
+    liked: false,
+    likeCount: 7,
+    loaded: true,
+    loading: false,
+    pending: false,
+  });
+});
+
 test('likes through the real API client with an idempotency key and reconciles count', async () => {
   const contentId = 'stage3-like-toggle-content';
   let getCount = 0;
