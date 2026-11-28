@@ -15,10 +15,20 @@ function getShareId(value: unknown): string | null {
 }
 
 /** Create an authoritative W01/W05 share and return its public landing URL. */
-export async function createContentShareLink(contentId?: string): Promise<ContentShareLinkResult> {
+export async function createContentShareLink(
+  contentId?: string,
+  idempotencyKeyValue?: string,
+): Promise<ContentShareLinkResult> {
   const id = typeof contentId === 'string' ? contentId.trim() : '';
   if (!id) {
     return { ok: false, message: 'This item is not connected to a LuckRead content ID.' };
+  }
+
+  const idempotencyKey = idempotencyKeyValue === undefined
+    ? createIdempotencyKey()
+    : idempotencyKeyValue.trim();
+  if (!idempotencyKey || idempotencyKey.length > 256) {
+    return { ok: false, message: 'A valid share retry key is required.' };
   }
 
   try {
@@ -27,7 +37,7 @@ export async function createContentShareLink(contentId?: string): Promise<Conten
       {
         method: 'POST',
         body: JSON.stringify({ contentId: id }),
-        idempotencyKey: createIdempotencyKey(),
+        idempotencyKey,
       },
     );
 

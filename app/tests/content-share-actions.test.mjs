@@ -15,7 +15,8 @@ test('uses the Expo SDK 58 Clipboard package and the React Native text share API
 });
 
 test('copy and native share actions use the same authoritative public share URL', () => {
-  expect(shareButton).toContain('createContentShareLink(contentId)');
+  expect(shareButton).toContain('createContentShareLink(normalizedContentId, idempotencyKey)');
+  expect(shareButton).toContain('pendingShareKeyRef.current = { contentId: normalizedContentId, key: idempotencyKey }');
   expect(shareButton).toContain("options: ['Copy link', 'More sharing options', 'Cancel']");
   expect(shareButton).toContain("text: 'Copy link'");
   expect(shareButton).toContain('Share.share({ message, title:');

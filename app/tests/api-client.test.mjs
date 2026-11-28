@@ -1096,6 +1096,33 @@ test('creates a public share URL through the existing W01/W05 shares endpoint', 
   expect(headers.get('Idempotency-Key')).toBeTruthy();
 });
 
+test('reuses one W05 idempotency key when a committed share response is lost', async () => {
+  const contentId = 'stage3-share-lost-response';
+  const idempotencyKey = 'share-retry-stable-key';
+  const seenKeys = [];
+  let committedShareId = null;
+  pendingFetch = async (_input, init) => {
+    seenKeys.push(new Headers(init.headers).get('Idempotency-Key'));
+    if (!committedShareId) {
+      committedShareId = 'share-retry-stable-id';
+      throw new TypeError('response connection lost after W05 commit');
+    }
+    return new Response(JSON.stringify({
+      data: { shareId: committedShareId, contentId },
+    }), { status: 201 });
+  };
+
+  const firstAttempt = await createContentShareLink(contentId, idempotencyKey);
+  const retry = await createContentShareLink(contentId, idempotencyKey);
+
+  expect(firstAttempt.ok).toBe(false);
+  expect(retry).toEqual({
+    ok: true,
+    url: 'https://luckread.com/s/share-retry-stable-id',
+  });
+  expect(seenKeys).toEqual([idempotencyKey, idempotencyKey]);
+});
+
 test('does not create a share link when W01/W05 rejects the share', async () => {
   pendingFetch = async () => new Response(JSON.stringify({
     error: { code: 'FORBIDDEN', message: 'Sharing is not allowed for this content.' },
