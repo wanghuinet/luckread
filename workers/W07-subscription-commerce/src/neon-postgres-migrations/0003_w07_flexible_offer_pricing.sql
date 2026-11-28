@@ -24,8 +24,11 @@ ALTER TABLE membership_plan_versions
     OR
     (price_mode = 'FLEXIBLE'
       AND price_minor IS NULL
+      AND minimum_price_minor IS NOT NULL
       AND minimum_price_minor BETWEEN 1 AND 2147483647
+      AND suggested_price_minor IS NOT NULL
       AND suggested_price_minor BETWEEN minimum_price_minor AND 2147483647
+      AND maximum_price_minor IS NOT NULL
       AND maximum_price_minor BETWEEN suggested_price_minor AND 2147483647)
   );
 
