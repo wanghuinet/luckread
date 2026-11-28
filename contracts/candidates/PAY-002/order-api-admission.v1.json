@@ -23,7 +23,6 @@
       "status": "ADMITTED",
       "evidence": {
         "implementationCommit": "81b782303802de98d08cbdeaa078699c93d808ff",
-        "mainCommit": "4e46e92d88be9c61f60a003a43f2a6d06b20adb5",
         "source": {
           "resolver": {
             "path": "workers/W07-subscription-commerce/src/order-item-resolution.ts",
@@ -51,7 +50,8 @@
             "fixtureRowsRolledBack": true
           }
         },
-        "scopeLimit": "Admits W07 current public membership-plan item/version/current-price resolution and its PostgreSQL 18 evidence. Does not admit production discount/tax authority, seller-of-record, real-money checkout, or production order writes."
+        "scopeLimit": "Admits W07 current public membership-plan item/version/current-price resolution and its PostgreSQL 18 evidence. Does not admit production discount/tax authority, seller-of-record, real-money checkout, or production order writes.",
+        "verifiedMainSha": "77410cf968faaf9fcbc41adb647f625a8c9bf20d"
       }
     },
     {
@@ -129,7 +129,6 @@
       "status": "ADMITTED",
       "evidence": {
         "implementationCommit": "08340609a9510dfbd69e7d6380ddc6d7984dfa2e",
-        "mainCommit": "4e46e92d88be9c61f60a003a43f2a6d06b20adb5",
         "source": {
           "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-order-persistence-postgres-runtime.mjs",
           "blobSha": "949df2afefdfe11eb1e6e235319e935528221c53"
@@ -153,7 +152,8 @@
             "createsOrderAndImmutableLine": true
           }
         },
-        "scopeLimit": "Admits atomic idempotency/replay/conflict/concurrency and rollback evidence on disposable PostgreSQL 18. It does not activate production order creation or payment."
+        "scopeLimit": "Admits atomic idempotency/replay/conflict/concurrency and rollback evidence on disposable PostgreSQL 18. It does not activate production order creation or payment.",
+        "verifiedMainSha": "77410cf968faaf9fcbc41adb647f625a8c9bf20d"
       }
     },
     {
@@ -202,6 +202,11 @@
           "w07ValidationTests": {
             "path": "workers/W07-subscription-commerce/src/order-request-validation.test.ts",
             "blobSha": "c1d8daeecaa151693ebba843457a9dbd26faa052"
+          },
+          "w07OrderHttpAbuseTests": {
+            "path": "workers/W07-subscription-commerce/src/order-http-runtime.test.ts",
+            "blobSha": "795db6bd42957f49f6822c7231d9c3b06b408788",
+            "implementationCommit": "77410cf968faaf9fcbc41adb647f625a8c9bf20d"
           }
         },
         "configuredLimits": {
@@ -240,9 +245,20 @@
             "W01 and W07 enforce 16 KiB streamed request-body bounds",
             "W07 DTO validator rejects item counts above 50 and quantities above 10000",
             "W07 applies origin/global and principal write rate limits before the order handler"
-          ]
+          ],
+          "additionalW07RuntimeValidation": {
+            "pullRequest": 2341,
+            "workflowRunId": 46132242176,
+            "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/46132242176",
+            "workflowConclusion": "success",
+            "assertions": [
+              "51 order lines are rejected before resolving Neon stores or pricing",
+              "quantity 10001 is rejected before resolving Neon stores or pricing"
+            ]
+          }
         },
-        "scopeLimit": "Admits route-level anti-abuse controls only. No rate-limit namespace or infrastructure was added; no D1/Neon writes, real payment, or production deployment was performed."
+        "scopeLimit": "Admits route-level anti-abuse controls only. No rate-limit namespace or infrastructure was added; no D1/Neon writes, real payment, or production deployment was performed.",
+        "verifiedMainSha": "77410cf968faaf9fcbc41adb647f625a8c9bf20d"
       }
     },
     {
