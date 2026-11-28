@@ -103,3 +103,12 @@ test('Following feed preserves existing posts and recovers after a pagination fa
   await expect(page.getByText('Feed post feed-2', { exact: true })).toBeVisible()
   expect(cursorRequests).toBe(2)
 })
+
+
+test('Following feed initial unauthenticated response offers sign-in recovery', async ({ page }) => {
+  await page.route('**/api/v1/feed/following**', route => route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Sign in required' } }) }))
+  await mockSocial(page)
+  await page.goto('http://127.0.0.1:3000/home?feed=following')
+  await expect(page.getByRole('heading', { name: /sign in to see posts|登录后查看你关注账号|登入後查看你追蹤帳號/i })).toBeVisible()
+  await expect(page.getByRole('link', { name: /sign in|登录|登入/i })).toHaveAttribute('href', /returnTo=.*home.*feed.*following/)
+})
