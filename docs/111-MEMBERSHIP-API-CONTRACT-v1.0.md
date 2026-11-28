@@ -68,3 +68,16 @@ Subscription creation, cancel, pause, resume and plan change must be idempotent.
 ## 6. Boundary
 
 Membership APIs never expose payment provider secrets, raw card data, internal ledger details, Payload internals or D1 schema names.
+
+## 7. Phase 2 Plan Pricing DTO Extension
+
+Creator plan create/update DTOs may include `priceMode`.
+
+- FIXED requests require `priceMinor` and MUST NOT include flexible range fields.
+- FLEXIBLE requests require `minimumPriceMinor`, `suggestedPriceMinor`, and `maximumPriceMinor`; all are integer minor units and must satisfy the data contract range invariant.
+- Responses return the canonical pricing mode and only the fields applicable to that mode. Historical fixed plans are normalized to `priceMode: FIXED`.
+- A checkout request may include `selectedAmountMinor` only for a FLEXIBLE plan. W07 validates the amount against the authoritative current public plan version. FIXED plans reject this field. The client cannot supply price mode, currency, plan version, order total, discount, tax, seller, payment or entitlement assertions.
+- W07 persists the accepted selected amount and immutable pricing range in the order-line snapshot. Repricing an existing order is forbidden.
+
+Creator mutations continue to require the existing authenticated W02 principal, W08-resolved creator scope, If-Match/version CAS, Idempotency-Key and durable W06 audit. W01 remains the only public API boundary.
+
