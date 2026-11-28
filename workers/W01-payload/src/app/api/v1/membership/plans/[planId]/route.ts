@@ -93,6 +93,20 @@ function isErrorResponse(value: unknown): value is Response {
   return value instanceof Response
 }
 
+function validMembershipPlanPrice(plan: Record<string, unknown>): boolean {
+  if (plan.priceMode === 'FIXED') {
+    return typeof plan.priceMinor === 'number' && Number.isSafeInteger(plan.priceMinor) &&
+      plan.priceMinor >= 0 && plan.priceMinor <= 2_147_483_647 &&
+      plan.minimumPriceMinor === null && plan.suggestedPriceMinor === null && plan.maximumPriceMinor === null
+  }
+  return plan.priceMode === 'FLEXIBLE' && plan.priceMinor === null &&
+    typeof plan.minimumPriceMinor === 'number' && Number.isSafeInteger(plan.minimumPriceMinor) && plan.minimumPriceMinor >= 1 &&
+    typeof plan.suggestedPriceMinor === 'number' && Number.isSafeInteger(plan.suggestedPriceMinor) &&
+    plan.suggestedPriceMinor >= plan.minimumPriceMinor &&
+    typeof plan.maximumPriceMinor === 'number' && Number.isSafeInteger(plan.maximumPriceMinor) &&
+    plan.maximumPriceMinor >= plan.suggestedPriceMinor && plan.maximumPriceMinor <= 2_147_483_647
+}
+
 function validUpdatedPlan(value: unknown, expectedPlanId: string, expectedCreatorId: string): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const plan = value as Record<string, unknown>
@@ -107,7 +121,7 @@ function validUpdatedPlan(value: unknown, expectedPlanId: string, expectedCreato
     typeof plan.name === 'string' && plan.name.trim().length >= 1 && plan.name.length <= 120 &&
     typeof plan.tier === 'string' && /^[a-z][a-z0-9_-]{0,63}$/.test(plan.tier) &&
     (plan.billingInterval === 'MONTHLY' || plan.billingInterval === 'YEARLY') &&
-    Number.isSafeInteger(plan.priceMinor) && Number(plan.priceMinor) >= 0 && Number(plan.priceMinor) <= 2_147_483_647 &&
+    validMembershipPlanPrice(plan) &&
     typeof plan.currency === 'string' && /^[A-Z]{3}$/.test(plan.currency) &&
     Array.isArray(plan.benefits) && plan.benefits.length <= 20 &&
     plan.benefits.every((item) => typeof item === 'string' && item.length >= 1 && item.length <= 180) &&
@@ -146,15 +160,23 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       return errorResponse(400, 'VALIDATION_FAILED', 'A valid JSON plan body is required')
     }
     const fields = body as Record<string, unknown>
+    const legacyFixedKeys = ['name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits']
+    const fixedKeys = [...legacyFixedKeys, 'priceMode']
+    const flexibleKeys = ['name', 'tier', 'billingInterval', 'priceMode', 'priceMinor', 'minimumPriceMinor', 'suggestedPriceMinor', 'maximumPriceMinor', 'currency', 'benefits']
+    const keys = Object.keys(fields).sort()
+    const sameKeys = (expected: string[]) => keys.length === expected.length && [...expected].sort().every((key, index) => keys[index] === key)
+    const priceMode = fields.priceMode === undefined ? 'FIXED' : fields.priceMode
     if (
-      Object.keys(fields).length !== 6 ||
-      !['name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits'].every((key) => Object.hasOwn(fields, key))
-    ) return errorResponse(400, 'VALIDATION_FAILED', 'Only plan commercial terms may be updated')
+      !(sameKeys(legacyFixedKeys) || sameKeys(fixedKeys) || (priceMode === 'FLEXIBLE' && sameKeys(flexibleKeys)))
+    ) return errorResponse(400, 'VALIDATION_FAILED', 'Only supported membership plan terms may be updated')
+    const priceFields: Record<string, unknown> = priceMode === 'FIXED'
+      ? { priceMode: 'FIXED', priceMinor: fields.priceMinor, minimumPriceMinor: null, suggestedPriceMinor: null, maximumPriceMinor: null }
+      : { priceMode, priceMinor: fields.priceMinor, minimumPriceMinor: fields.minimumPriceMinor, suggestedPriceMinor: fields.suggestedPriceMinor, maximumPriceMinor: fields.maximumPriceMinor }
     if (
       typeof fields.name !== 'string' || fields.name !== fields.name.trim() || fields.name.length < 1 || fields.name.length > 120 ||
       typeof fields.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(fields.tier) ||
       (fields.billingInterval !== 'MONTHLY' && fields.billingInterval !== 'YEARLY') ||
-      typeof fields.priceMinor !== 'number' || !Number.isSafeInteger(fields.priceMinor) || fields.priceMinor < 0 || fields.priceMinor > 2_147_483_647 ||
+      !validMembershipPlanPrice(priceFields) ||
       typeof fields.currency !== 'string' || !/^[A-Z]{3}$/.test(fields.currency) ||
       !Array.isArray(fields.benefits) || fields.benefits.length > 20 ||
       fields.benefits.some((item) => typeof item !== 'string' || item !== item.trim() || item.length < 1 || item.length > 180) ||
@@ -165,7 +187,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       name: fields.name,
       tier: fields.tier,
       billingInterval: fields.billingInterval as 'MONTHLY' | 'YEARLY',
-      priceMinor: fields.priceMinor,
+      ...priceFields,
       currency: fields.currency,
       benefits: fields.benefits as string[],
     }
@@ -191,7 +213,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
 
     const w07Response = await callW07Subscription({
       request, pathname: '/membership/plans/' + encodeURIComponent(planId), method: 'PUT',
-      principal, verifiedCreatorId: creatorId, body,
+      principal, verifiedCreatorId: creatorId, body: terms,
     })
     if (!w07Response.ok) return w07Response
     const envelopeValue: unknown = await w07Response.clone().json().catch((): null => null)
@@ -217,7 +239,12 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
           version: plan.version as number, occurredAt: plan.updatedAt as string,
           name: plan.name as string, tier: plan.tier as string,
           billingInterval: plan.billingInterval as 'MONTHLY' | 'YEARLY',
-          priceMinor: plan.priceMinor as number, currency: plan.currency as string,
+          priceMode: plan.priceMode as 'FIXED' | 'FLEXIBLE',
+          priceMinor: plan.priceMinor as number | null,
+          minimumPriceMinor: plan.minimumPriceMinor as number | null,
+          suggestedPriceMinor: plan.suggestedPriceMinor as number | null,
+          maximumPriceMinor: plan.maximumPriceMinor as number | null,
+          currency: plan.currency as string,
           benefits: plan.benefits as string[],
         },
       })
