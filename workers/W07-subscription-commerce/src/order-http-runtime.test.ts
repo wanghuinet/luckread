@@ -135,6 +135,86 @@ describe('private W07 Neon commerce order HTTP handler', () => {
     expect(JSON.stringify(envelope)).not.toContain('itemSnapshotJson')
   })
 
+  it('reserves a founding seat before order persistence and attaches the finance order reference', async () => {
+    const reservationRow = {
+      reservation_id: 'fres_0123456789abcdef0123456789abcdef',
+      plan_id: 'plan_' + 'a'.repeat(64),
+      plan_version: 1,
+      subscriber_id: 'user_42',
+      order_reference: null,
+      state: 'HELD',
+      expires_at: '2026-11-29T12:15:00.000Z',
+    };
+    const attachedRow = { ...reservationRow, order_reference: orderData.orderId };
+    const transactionSql: string[] = [];
+    const client = {
+      async query(sql: string) {
+        transactionSql.push(sql);
+        if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return { rows: [], rowCount: null };
+        if (sql.includes('SELECT plan_id FROM membership_plans')) return { rows: [{ plan_id: reservationRow.plan_id }], rowCount: 1 };
+        if (sql.includes('FROM membership_founding_reservations WHERE subscriber_id')) return { rows: [], rowCount: 0 };
+        if (sql.includes('SELECT p.current_version')) return { rows: [{
+          current_version: 1, offer_kind: 'FOUNDING', founding_capacity: 10, min_capacity: 10, max_capacity: 10,
+        }], rowCount: 1 };
+        if (sql.includes('COUNT(*)::integer AS occupied')) return { rows: [{ occupied: 0 }], rowCount: 1 };
+        if (sql.includes('INSERT INTO membership_founding_reservations')) return { rows: [reservationRow], rowCount: 1 };
+        if (sql.includes('FROM membership_founding_reservations WHERE reservation_id')) return { rows: [reservationRow], rowCount: 1 };
+        if (sql.includes('UPDATE membership_founding_reservations SET order_reference')) return { rows: [attachedRow], rowCount: 1 };
+        if (sql.includes("UPDATE membership_founding_reservations SET state = 'EXPIRED'")) return { rows: [], rowCount: 0 };
+        throw new Error('unexpected founding reservation SQL: ' + sql);
+      },
+      release() {},
+    };
+    const membershipPool = {
+      async query(sql: string) {
+        if (sql.includes('WHERE subscriber_id = $1 AND idempotency_key = $2')) {
+          return { rows: [reservationRow], rowCount: 1 };
+        }
+        throw new Error('unexpected membership pool query: ' + sql);
+      },
+      async connect() { return client; },
+    } as unknown as W07WebhookPostgresPool;
+    const foundingPricing: AuthoritativelyPricedOrder = {
+      currency: 'USD',
+      items: [{
+        ...explicitTestPricing.items[0]!,
+        itemSnapshotJson: JSON.stringify({
+          planId: 'plan_' + 'a'.repeat(64),
+          planVersion: 1,
+          priceMode: 'FIXED',
+          offerKind: 'FOUNDING',
+          foundingCapacity: 10,
+        }),
+      }],
+    };
+    const mockCreate = (async (...args: Parameters<typeof createCommerceOrder>) => {
+      await args[4]({ items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] });
+      return createResult;
+    }) as typeof createCommerceOrder;
+    const postgresPool = {} as W07WebhookPostgresPool;
+    const response = await handleCommerceOrderRequest(
+      postRequest({ items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] }, {
+        'Idempotency-Key': 'founding_purchase_01',
+      }),
+      'user_42',
+      env,
+      {
+        getPostgresPool: () => postgresPool,
+        getMembershipPool: () => membershipPool,
+        getOrderCreateStore: () => orderCreateStore(),
+        createOrder: mockCreate,
+        issueInvoice: async () => ({} as Awaited<ReturnType<typeof issueInvoiceForOrderPostgres>>),
+        resolvePricing: async () => foundingPricing,
+      },
+    );
+    expect(response?.status).toBe(201);
+    expect(transactionSql[0]).toBe('BEGIN');
+    expect(transactionSql.findIndex((sql) => sql.includes('SELECT plan_id FROM membership_plans')))
+      .toBeLessThan(transactionSql.findIndex((sql) => sql.includes('COUNT(*)::integer AS occupied')));
+    expect(transactionSql.some((sql) => sql.includes('INSERT INTO membership_founding_reservations'))).toBe(true);
+    expect(transactionSql.some((sql) => sql.includes('UPDATE membership_founding_reservations SET order_reference'))).toBe(true);
+  });
+
   it('fails closed if either Neon store or finance pool is unavailable before writing an Order', async () => {
     let writes = 0
     const mockCreate = (async () => {
