@@ -195,6 +195,8 @@ jobs:
         run: bun run test:publish-flow
       - name: Test native notifications, bookmarks, relationships and discovery API routes
         run: bun run test:social-screen-api
+      - name: Test native repost and bookmark ambiguous-write reconciliation
+        run: bun test tests/repost-bookmark-reconciliation.test.mjs
       - name: Test group chat member ID whitespace parsing
         run: bun test tests/group-member-input.test.mjs
       - name: Test group info query recovery states
