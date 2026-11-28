@@ -14,6 +14,7 @@ const required = [
   'founding_capacity',
   "price_mode = 'FIXED'",
   'w07_guard_founding_offer_plan_version',
+  'FOR UPDATE',
   'membership_plan_versions_founding_offer_immutable',
   'CREATE TABLE membership_founding_reservations',
   'UNIQUE (subscriber_id, idempotency_key)',
