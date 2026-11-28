@@ -5,6 +5,7 @@ let activeViewerId = 'viewer-a';
 const calls = [];
 const serverLikes = new Map();
 const serverFollows = new Map();
+let failNextFollowMutationAfterCommit = false;
 
 mock.module('../store/auth-store.ts', () => ({
   useAuthStore: Object.assign(
@@ -44,6 +45,10 @@ mock.module('../lib/api-client.ts', () => ({
         };
       }
       serverFollows.set(activeViewerId + ':' + targetId, options.method === 'POST');
+      if (failNextFollowMutationAfterCommit) {
+        failNextFollowMutationAfterCommit = false;
+        throw new TypeError('follow response was lost after server commit');
+      }
       return { response: { ok: true, status: 200 }, data: { data: {} }, error: null };
     }
 
@@ -67,6 +72,7 @@ beforeEach(() => {
   calls.length = 0;
   serverLikes.clear();
   serverFollows.clear();
+  failNextFollowMutationAfterCommit = false;
 });
 
 test('content like state is isolated and refreshed independently for each signed-in viewer', async () => {
@@ -111,6 +117,29 @@ test('content like mutation reconciles only the initiating viewer cache', async 
   expect(getContentLikeSnapshot(contentId, {}, 'viewer-a').liked).toBe(false);
   expect(getContentLikeSnapshot(contentId, {}, 'viewer-b').liked).toBe(false);
   expect(calls.filter((call) => call.path === '/interactions/likes')).toHaveLength(1);
+});
+
+test('follow mutation re-reads authoritative state when the write commits but its response is lost', async () => {
+  const targetId = 'follow-response-lost-after-commit';
+
+  serverFollows.set('viewer-a:' + targetId, false);
+  await refreshUserFollowStatus(targetId, 'viewer-a');
+  failNextFollowMutationAfterCommit = true;
+
+  await expect(toggleUserFollow(targetId, 'viewer-a')).resolves.toMatchObject({
+    ok: false,
+    message: 'follow response was lost after server commit',
+  });
+
+  expect(calls.filter((call) => call.path === '/social/follows/' + targetId).map((call) => call.options.method))
+    .toEqual(['GET', 'POST', 'GET']);
+  expect(getUserFollowSnapshot(targetId, 'viewer-a')).toMatchObject({
+    following: true,
+    loaded: true,
+    loading: false,
+    pending: false,
+    error: null,
+  });
 });
 
 test('a stale like action cannot execute after the active account changes', async () => {
