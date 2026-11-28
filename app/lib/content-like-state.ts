@@ -6,6 +6,7 @@ export type ContentLikeSnapshot = {
   liked: boolean;
   likeCount: number | null;
   loading: boolean;
+  loaded: boolean;
   pending: boolean;
   error: string | null;
 };
@@ -34,6 +35,7 @@ const EMPTY_SNAPSHOT: ContentLikeSnapshot = Object.freeze({
   liked: false,
   likeCount: null,
   loading: false,
+  loaded: false,
   pending: false,
   error: null,
 });
@@ -98,6 +100,7 @@ export function getContentLikeSnapshot(
     liked: typeof initial.liked === 'boolean' ? initial.liked : false,
     likeCount,
     loading: false,
+    loaded: typeof initial.liked === 'boolean',
     pending: false,
     error: null,
   };
@@ -158,7 +161,7 @@ export async function refreshContentLikeStatus(contentId?: string, viewerId?: st
       { method: 'GET', expectedAccountId: viewerId ?? undefined },
     );
     if (!isCurrentViewer(viewerId)) {
-      publish(id, viewerId, { liked: false, likeCount: null, loading: false, pending: false, error: null });
+      publish(id, viewerId, { liked: false, likeCount: null, loading: false, loaded: false, pending: false, error: null });
       return;
     }
     if (!result.response.ok) {
@@ -170,10 +173,10 @@ export async function refreshContentLikeStatus(contentId?: string, viewerId?: st
       publish(id, viewerId, { loading: false, error: 'LuckRead returned an invalid like status.' });
       return;
     }
-    publish(id, viewerId, { liked: parsed.liked, likeCount: parsed.likeCount, loading: false, error: null });
+    publish(id, viewerId, { liked: parsed.liked, likeCount: parsed.likeCount, loading: false, loaded: true, error: null });
   } catch (cause) {
     if (!isCurrentViewer(viewerId)) {
-      publish(id, viewerId, { liked: false, likeCount: null, loading: false, pending: false, error: null });
+      publish(id, viewerId, { liked: false, likeCount: null, loading: false, loaded: false, pending: false, error: null });
       return;
     }
     publish(id, viewerId, { loading: false, error: failureMessage(cause) });
@@ -187,8 +190,26 @@ export async function toggleContentLike(contentId?: string, viewerId?: string | 
   if (!normalizeViewerId(viewerId)) return { ok: false, status: 401, message: 'Sign in to like this post.' };
   if (!isCurrentViewer(viewerId)) return { ok: false, message: 'Your account changed. Refresh the post before trying again.' };
 
-  const current = getContentLikeSnapshot(id, {}, viewerId);
+  let current = getContentLikeSnapshot(id, {}, viewerId);
   if (current.loading || current.pending) return { ok: false, message: 'Like status is still syncing. Please try again.' };
+
+  // A feed projection may not include viewer-specific like state. Resolve it
+  // before choosing POST vs DELETE; assuming "not liked" can make an early tap
+  // send the wrong operation for a post the viewer already liked.
+  if (!current.loaded) {
+    await refreshContentLikeStatus(id, viewerId);
+    if (!isCurrentViewer(viewerId)) {
+      return { ok: false, message: 'Your account changed while like status was loading.' };
+    }
+    current = getContentLikeSnapshot(id, {}, viewerId);
+    if (!current.loaded) {
+      return { ok: false, message: current.error ?? 'Like status is not available yet. Please retry.' };
+    }
+    if (current.loading || current.pending) {
+      return { ok: false, message: 'Like status is still syncing. Please try again.' };
+    }
+  }
+
   const previousLiked = current.liked;
   const previousCount = current.likeCount;
   const nextLiked = !previousLiked;
@@ -197,7 +218,7 @@ export async function toggleContentLike(contentId?: string, viewerId?: string | 
 
   try {
     if (!isCurrentViewer(viewerId)) {
-      publish(id, viewerId, { liked: false, likeCount: null, pending: false, loading: false, error: null });
+      publish(id, viewerId, { liked: false, likeCount: null, loaded: false, pending: false, loading: false, error: null });
       return { ok: false, message: 'Your account changed before the like request was sent.' };
     }
     const result = await apiRequest<unknown>('/interactions/likes', {
@@ -207,7 +228,7 @@ export async function toggleContentLike(contentId?: string, viewerId?: string | 
       expectedAccountId: viewerId ?? undefined,
     });
     if (!isCurrentViewer(viewerId)) {
-      publish(id, viewerId, { liked: false, likeCount: null, pending: false, loading: false, error: null });
+      publish(id, viewerId, { liked: false, likeCount: null, loaded: false, pending: false, loading: false, error: null });
       return { ok: false, message: 'The active account changed while the like was updating.' };
     }
     if (!result.response.ok) {
@@ -220,7 +241,7 @@ export async function toggleContentLike(contentId?: string, viewerId?: string | 
     return { ok: true };
   } catch (cause) {
     if (!isCurrentViewer(viewerId)) {
-      publish(id, viewerId, { liked: false, likeCount: null, pending: false, loading: false, error: null });
+      publish(id, viewerId, { liked: false, likeCount: null, loaded: false, pending: false, loading: false, error: null });
       return { ok: false, message: 'The active account changed while the like was updating.' };
     }
     const message = failureMessage(cause);
