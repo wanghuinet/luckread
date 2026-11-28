@@ -92,7 +92,11 @@ export default function ContentComments({
         page.items.map((item) => [item.id, item.likedByViewer === true]),
       )
       setLikedComments((current) => nextCursor ? { ...current, ...pageLikeState } : pageLikeState)
-      setComments((current) => nextCursor ? [...current, ...page.items] : page.items)
+      setComments((current) => {
+        if (!nextCursor) return page.items
+        const existingIds = new Set(current.map((item) => item.id))
+        return [...current, ...page.items.filter((item) => !existingIds.has(item.id))]
+      })
       setCursor(page.nextCursor)
       setHasMore(page.hasMore)
     } catch (error) {
