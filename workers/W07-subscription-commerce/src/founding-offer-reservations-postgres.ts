@@ -265,6 +265,55 @@ export async function commitFoundingReservationAfterVerifiedPayment(
   });
 }
 
+/** Bounded expiry reconciliation; never releases an order with a succeeded or nonterminal payment. */
+export async function reconcileExpiredFoundingReservations(
+  membershipDb: W07WebhookPostgresPool,
+  financeDb: W07WebhookPostgresPool,
+  now = new Date(),
+  limit = 100,
+): Promise<Readonly<{ scanned: number; released: number; retained: number }>> {
+  if (!(now instanceof Date) || !Number.isFinite(now.getTime()) ||
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+  }
+  const candidates = await membershipDb.query<{
+    reservation_id: string; order_reference: string | null;
+  }>(
+    "SELECT reservation_id, order_reference FROM membership_founding_reservations " +
+    "WHERE state = 'HELD' AND expires_at <= $1 ORDER BY expires_at, reservation_id LIMIT $2",
+    [now.toISOString(), limit],
+  );
+  let released = 0;
+  let retained = 0;
+  for (const candidate of candidates.rows) {
+    if (!candidate.order_reference) {
+      await releaseUnpaidFoundingReservation(membershipDb, candidate.reservation_id, 'HOLD_EXPIRED');
+      released += 1;
+      continue;
+    }
+    const finance = await financeDb.query<{
+      order_status: string; payment_status: string | null;
+    }>(
+      "SELECT o.status AS order_status, p.status AS payment_status FROM orders o " +
+      "LEFT JOIN payments p ON p.order_id = o.order_id AND p.provider = 'hyperswitch' " +
+      "WHERE o.order_id = $1 ORDER BY p.created_at DESC NULLS LAST LIMIT 10",
+      [candidate.order_reference],
+    );
+    const rows = finance.rows;
+    const orderStatus = rows[0]?.order_status;
+    const terminalUnpaid = rows.length > 0 &&
+      rows.every((row) => row.payment_status !== null &&
+        ['failed', 'cancelled', 'expired'].includes(row.payment_status));
+    if (orderStatus === 'CANCELLED' || orderStatus === 'FAILED' || terminalUnpaid) {
+      await releaseUnpaidFoundingReservation(membershipDb, candidate.reservation_id, 'HOLD_EXPIRED');
+      released += 1;
+    } else {
+      retained += 1;
+    }
+  }
+  return { scanned: candidates.rows.length, released, retained };
+}
+
 /** Releases only unpaid HELD reservations. A committed seat is never implicitly restored. */
 export async function releaseUnpaidFoundingReservation(
   db: W07WebhookPostgresPool,
