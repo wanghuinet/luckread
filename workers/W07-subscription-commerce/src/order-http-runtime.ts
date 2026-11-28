@@ -16,14 +16,23 @@ import {
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
+import {
+  attachFoundingReservationOrder,
+  getFoundingReservationByIdempotency,
+  releaseUnpaidFoundingReservation,
+  reserveFoundingOfferCapacity,
+} from './founding-offer-reservations-postgres.js';
+import { getW07MembershipPostgresPool } from './neon/membership-database-runtime.js';
 
-type OrderRuntimeEnv = W07PaymentMethodReadRuntimeEnv;
+
+type OrderRuntimeEnv = W07PaymentMethodReadRuntimeEnv & { HYPERDRIVE_MEMBERSHIP_DB?: { connectionString?: string } };
 
 type OrderRuntimeDependencies = Readonly<{
   createOrder?: typeof createCommerceOrder;
   getOrder?: typeof getCommerceOrderPostgres;
   issueInvoice?: typeof issueInvoiceForOrderPostgres;
   getPostgresPool?: (env: OrderRuntimeEnv) => W07WebhookPostgresPool | undefined;
+  getMembershipPool?: (env: OrderRuntimeEnv) => W07WebhookPostgresPool | undefined;
   getOrderCreateStore?: (env: OrderRuntimeEnv) => OrderCreatePersistenceStore | undefined;
   /** Must be an admitted pricing authority that returns immutable offer versions, discounts, and tax decisions. */
   resolvePricing?: (request: unknown) => Promise<AuthoritativelyPricedOrder>;
@@ -181,13 +190,87 @@ export async function handleCommerceOrderRequest(
         throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
       }
       const createOrder = dependencies.createOrder ?? createCommerceOrder;
-      const result: CreateOrderResult = await createOrder(
-        orderCreateStore,
-        customerId,
-        request.headers.get('Idempotency-Key'),
-        body,
-        (validatedRequest) => dependencies.resolvePricing!(validatedRequest),
-      );
+      let pricingWasResolved = false;
+      let foundingOfferDetected = false;
+      let foundingReservationId: string | null = null;
+      let membershipPool: W07WebhookPostgresPool | undefined;
+      const getMembershipPool = () => {
+        membershipPool ??= (dependencies.getMembershipPool ?? getW07MembershipPostgresPool)(env);
+        if (!membershipPool) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+        return membershipPool;
+      };
+      const reservationKey = keyValidation.value;
+      const resolvePricingWithReservation = async (validatedRequest: unknown): Promise<AuthoritativelyPricedOrder> => {
+        const priced = await dependencies.resolvePricing!(validatedRequest);
+        pricingWasResolved = true;
+        const membershipItem = priced.items.find((item) => item.itemType === 'MEMBERSHIP_PLAN');
+        if (!membershipItem) return priced;
+        let snapshot: unknown;
+        try { snapshot = JSON.parse(membershipItem.itemSnapshotJson) as unknown; }
+        catch { throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500); }
+        if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+          throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+        }
+        const offer = snapshot as Record<string, unknown>;
+        if (offer.offerKind !== 'FOUNDING') return priced;
+        foundingOfferDetected = true;
+        const planVersion = Number(membershipItem.itemVersion);
+        if (membershipItem.quantity !== 1 || !/^plan_[a-f0-9]{64}$/.test(membershipItem.itemRef) ||
+            !Number.isSafeInteger(planVersion) || planVersion < 1 ||
+            !Number.isSafeInteger(offer.foundingCapacity) || (offer.foundingCapacity as number) < 1 ||
+            offer.priceMode !== 'FIXED') {
+          throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+        }
+        const reservation = await reserveFoundingOfferCapacity(getMembershipPool(), {
+          planId: membershipItem.itemRef,
+          planVersion,
+          subscriberId: customerId,
+          idempotencyKey: reservationKey,
+        });
+        foundingReservationId = reservation.reservationId;
+        return priced;
+      };
+      let result: CreateOrderResult;
+      try {
+        result = await createOrder(
+          orderCreateStore,
+          customerId,
+          request.headers.get('Idempotency-Key'),
+          body,
+          resolvePricingWithReservation,
+        );
+      } catch (error) {
+        // Only release when the persistence layer reports a definite pre-write
+        // validation/reference failure. Ambiguous DB failures retain the short
+        // hold for expiry/reconciliation instead of risking a paid unreserved order.
+        if (foundingReservationId && error instanceof OrderPersistenceError &&
+            (error.code === 'VALIDATION_FAILED' || error.code === 'RESOURCE_NOT_FOUND' ||
+             error.code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT')) {
+          await releaseUnpaidFoundingReservation(getMembershipPool(), foundingReservationId, 'ORDER_CREATE_FAILED')
+            .catch(() => undefined);
+        }
+        throw error;
+      }
+      let foundingReservation = foundingReservationId
+        ? null
+        : pricingWasResolved && !foundingOfferDetected
+          ? null
+          : await getFoundingReservationByIdempotency(getMembershipPool(), customerId, reservationKey);
+      if (foundingReservationId) {
+        foundingReservation = await getFoundingReservationByIdempotency(
+          getMembershipPool(), customerId, reservationKey,
+        );
+      }
+      if (foundingReservation) {
+        if (foundingReservation.state !== 'HELD') {
+          throw new SubscriptionRuntimeError('INVALID_STATE', 409);
+        }
+        await attachFoundingReservationOrder(
+          getMembershipPool(),
+          foundingReservation.reservationId,
+          result.data.orderId,
+        );
+      }
       // Invoice issuance is replay-safe on (INVOICE, order_id) and runs in the
       // same D1-04 Neon finance domain as the Order, never through a D1 facade.
       const issueInvoice = dependencies.issueInvoice ?? issueInvoiceForOrderPostgres;
