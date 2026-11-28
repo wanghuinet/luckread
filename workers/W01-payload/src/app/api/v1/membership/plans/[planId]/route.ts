@@ -191,6 +191,16 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       currency: fields.currency,
       benefits: fields.benefits as string[],
     }
+    const w07Terms = {
+      name: fields.name,
+      tier: fields.tier,
+      billingInterval: fields.billingInterval as 'MONTHLY' | 'YEARLY',
+      ...(priceMode === 'FIXED'
+        ? { priceMode: 'FIXED' as const, priceMinor: fields.priceMinor }
+        : priceFields),
+      currency: fields.currency,
+      benefits: fields.benefits as string[],
+    }
 
     const intentEventId = 'evt_mpl_update_requested_' + planId + '_' + idempotencyKey
     let intentResponse: Response
@@ -213,7 +223,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
 
     const w07Response = await callW07Subscription({
       request, pathname: '/membership/plans/' + encodeURIComponent(planId), method: 'PUT',
-      principal, verifiedCreatorId: creatorId, body: terms,
+      principal, verifiedCreatorId: creatorId, body: w07Terms,
     })
     if (!w07Response.ok) return w07Response
     const envelopeValue: unknown = await w07Response.clone().json().catch((): null => null)
