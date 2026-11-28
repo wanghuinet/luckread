@@ -35,7 +35,7 @@ Commerce/order/payments/ledger/rights/risk integrations must consume references 
 
 ## 5. Runtime Acceptance
 
-Verify W01-only public ingress, W08 authorization, W07-only Merchant/Seller reads and writes against the existing Neon finance database (logical D1-04), native PostgreSQL migrations and transaction/CAS semantics, existing W10 asynchronous handoff, cache invalidation and degraded downstream behavior. Tests must prove there is no D1 binding/fallback, direct client-to-database access, dual write, new Worker, database, Queue or Service Binding. The historical D1-04 name may appear in migration lineage but must not be treated as a live D1 runtime dependency.
+Verify W01-only public ingress, W08 authorization, W07-only Merchant/Seller business ownership, existing D1 production persistence during migration, Neon-native schema migrations/rehearsal and transaction/CAS semantics, existing W10 asynchronous handoff, cache invalidation and degraded downstream behavior. Tests must prove there is no direct client-to-database access, dual write, new Worker, database, Queue or Service Binding. Existing D1 production bindings remain until separately approved cutover; Neon must not be described as production authority before that gate.
 
 ## 6. STOP
 
