@@ -233,10 +233,10 @@ export async function commitFoundingReservationAfterVerifiedPayment(
     }
     const updated = await client.query<ReservationRow>(
       "UPDATE membership_founding_reservations SET state = 'COMMITTED', committed_at = $2, updated_at = $2 " +
-      "WHERE reservation_id = $1 AND state = 'HELD' AND expires_at > $2 " +
+      "WHERE reservation_id = $1 AND state = 'HELD' AND expires_at > $3 " +
       'RETURNING reservation_id, plan_id, plan_version, subscriber_id, order_reference, state, ' +
       "to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS expires_at",
-      [reservationId, now.toISOString()],
+      [reservationId, now.toISOString(), verifiedPaidAt.toISOString()],
     );
     const next = updated.rows[0];
     if (!next) throw new SubscriptionRuntimeError('INVALID_STATE', 409);
