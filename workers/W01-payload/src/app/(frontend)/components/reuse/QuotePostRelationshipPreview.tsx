@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import type { PublicLocale } from '../../i18n/public-locale'
@@ -29,20 +29,38 @@ type QuotePreviewState =
 
 export default function QuotePostRelationshipPreview({
   contentId,
-  enabled,
   locale = 'zh',
 }: {
   contentId: string
-  enabled: boolean
   locale?: PublicLocale
 }) {
+  const probeRef = useRef<HTMLDivElement | null>(null)
+  const [visible, setVisible] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
   const [state, setState] = useState<QuotePreviewState>({ status: 'loading' })
   const english = locale === 'en'
   const traditional = locale === 'tw'
 
   useEffect(() => {
-    if (!enabled) return
+    if (visible) return
+    const probe = probeRef.current
+    if (!probe) return
+    if (typeof IntersectionObserver === 'undefined') {
+      setVisible(true)
+      return
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setVisible(true)
+        observer.disconnect()
+      }
+    }, { rootMargin: '320px 0px' })
+    observer.observe(probe)
+    return () => observer.disconnect()
+  }, [visible])
+
+  useEffect(() => {
+    if (!visible) return
     const controller = new AbortController()
     let active = true
     setState({ status: 'loading' })
@@ -112,25 +130,22 @@ export default function QuotePostRelationshipPreview({
       active = false
       controller.abort()
     }
-  }, [contentId, enabled, retryNonce])
-
-  if (!enabled || state.status === 'none') return null
-  if (state.status === 'loading') {
-    return <div className="mt-3 rounded-xl border border-light-border px-3 py-3 text-xs text-light-secondary dark:border-dark-border dark:text-dark-secondary" role="status">{english ? 'Loading quoted post…' : traditional ? '正在載入引用原帖…' : '正在加载引用原帖…'}</div>
-  }
-  if (state.status === 'error') {
-    return (
-      <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-light-border px-3 py-3 text-xs text-light-secondary dark:border-dark-border dark:text-dark-secondary" role="status">
-        <span>{english ? 'Quoted post is temporarily unavailable.' : traditional ? '引用原帖暫時無法顯示。' : '引用原帖暂时无法显示。'}</span>
-        <button className="font-semibold text-main-accent" onClick={() => setRetryNonce((value) => value + 1)} type="button">
-          {english ? 'Retry' : traditional ? '重試' : '重试'}
-        </button>
-      </div>
-    )
-  }
+  }, [contentId, visible, retryNonce])
 
   return (
-    <div className="mt-3 overflow-hidden rounded-xl border border-light-border dark:border-dark-border">
+    <>
+      <div aria-hidden="true" className="h-px" ref={probeRef} />
+      {!visible || state.status === 'none' ? null : state.status === 'loading' ? (
+        <div className="mt-3 rounded-xl border border-light-border px-3 py-3 text-xs text-light-secondary dark:border-dark-border dark:text-dark-secondary" role="status">{english ? 'Loading quoted post…' : traditional ? '正在載入引用原帖…' : '正在加载引用原帖…'}</div>
+      ) : state.status === 'error' ? (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-light-border px-3 py-3 text-xs text-light-secondary dark:border-dark-border dark:text-dark-secondary" role="status">
+          <span>{english ? 'Quoted post is temporarily unavailable.' : traditional ? '引用原帖暫時無法顯示。' : '引用原帖暂时无法显示。'}</span>
+          <button className="font-semibold text-main-accent" onClick={() => setRetryNonce((value) => value + 1)} type="button">
+            {english ? 'Retry' : traditional ? '重試' : '重试'}
+          </button>
+        </div>
+      ) : (
+        <div className="mt-3 overflow-hidden rounded-xl border border-light-border dark:border-dark-border">
       <Link
         aria-label={english ? 'Open quoted post' : traditional ? '打開引用原帖' : '打开引用原帖'}
         className="block px-3 py-3 transition hover:bg-light-primary/5 dark:hover:bg-white/5"
@@ -146,6 +161,8 @@ export default function QuotePostRelationshipPreview({
           {english ? 'View original post' : traditional ? '查看原帖' : '查看原帖'}
         </span>
       </Link>
-    </div>
+        </div>
+      )}
+    </>
   )
 }
