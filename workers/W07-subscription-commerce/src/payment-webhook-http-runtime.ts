@@ -293,13 +293,10 @@ export async function handleHyperswitchWebhookRequest(
       // the durable Neon finance Payment + Order + immutable OrderLine snapshot
       // before performing an idempotent scoped transition in the Neon membership store.
       if (subscriptionSync.outcome === 'NO_RENEWAL_CYCLE' && isSignedPaymentSucceededEvent(rawBody)) {
-        const fulfill = dependencies.fulfillPaidOrder ?? fulfillPaidMembershipOrder;
-        purchaseFulfillment = await fulfill(renewalEnv, paymentId, env.HYPERSWITCH_MERCHANT_ID);
-
-        // A paid founding seat is consumed only after the finance DB confirms the
-        // provider payment and the initial membership purchase path has been attempted.
-        // If this membership-DB step fails, return 503 so the signed webhook is retried;
-        // the commit operation is idempotent by reservation + provider event identity.
+        // Commit the founding seat before granting subscription access. The helper
+        // returns null for ordinary plans; for founding orders it verifies the
+        // reservation identity in the immutable order snapshot and finance state.
+        // If commit fails, do not fulfill the subscription; the signed webhook retries.
         const commitFounding = dependencies.commitFoundingReservation ??
           commitFoundingReservationForVerifiedPayment;
         await commitFounding(
@@ -309,6 +306,9 @@ export async function handleHyperswitchWebhookRequest(
           env.HYPERSWITCH_MERCHANT_ID,
           result.eventId,
         );
+
+        const fulfill = dependencies.fulfillPaidOrder ?? fulfillPaidMembershipOrder;
+        purchaseFulfillment = await fulfill(renewalEnv, paymentId, env.HYPERSWITCH_MERCHANT_ID);
       }
 
       // A verified terminal renewal payment is an existing, trusted execution
