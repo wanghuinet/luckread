@@ -15,7 +15,7 @@ test('keeps keyboard focus inside the post composer modal and restores it on clo
   await expect(textarea).toBeFocused()
 
   await page.keyboard.press('Shift+Tab')
-  await expect(dialog).toContainElement(page.locator(':focus'))
+  await expect.poll(() => dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true)
 
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
