@@ -346,6 +346,27 @@ test('resolves unknown like state before choosing the inverse mutation', async (
   });
 });
 
+test('does not guess a like mutation when the initial status read fails', async () => {
+  const contentId = 'stage3-like-initial-read-failure';
+  const methods = [];
+  pendingFetch = async (_input, init) => {
+    const method = String(init.method || 'GET').toUpperCase();
+    methods.push(method);
+    return new Response(JSON.stringify({ errors: [{ message: 'temporarily unavailable' }] }), { status: 503 });
+  };
+
+  const outcome = await toggleContentLike(contentId, activeViewerId);
+
+  expect(outcome.ok).toBe(false);
+  expect(methods).toEqual(['GET']);
+  expect(getContentLikeSnapshot(contentId, {}, activeViewerId)).toMatchObject({
+    liked: false,
+    loaded: false,
+    loading: false,
+    pending: false,
+  });
+});
+
 test('likes through the real API client with an idempotency key and reconciles count', async () => {
   const contentId = 'stage3-like-toggle-content';
   let getCount = 0;
