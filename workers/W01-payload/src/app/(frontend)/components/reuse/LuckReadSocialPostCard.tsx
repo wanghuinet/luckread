@@ -12,6 +12,7 @@ import { getSharedViewerRequest } from '../../../../lib/viewer-request-coalescer
 import { getSharedSocialSummary } from '../../../../lib/social-summary-request-coalescer.js'
 import { observeTimelineCard } from '../../../../lib/timeline-card-visibility.js'
 import SocialPoll from './SocialPoll'
+import QuotePostRelationshipPreview from './QuotePostRelationshipPreview'
 import type { PublicLocale } from '../../i18n/public-locale'
 
 /**
@@ -911,6 +912,7 @@ function LuckReadSocialPostCard({
         </div>
 
         <h3>{title}</h3>
+        <QuotePostRelationshipPreview contentId={contentId} enabled={presentation !== 'x-timeline' || timelineCardNearViewport} locale={locale} />
 
         {mediaWarning && !mediaRevealed ? (
           <SensitiveMediaNotice warning={mediaWarning} locale={locale} onReveal={() => setRevealedMediaKey(mediaRevealKey)} />
