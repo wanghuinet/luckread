@@ -153,6 +153,44 @@ describe('native PostgreSQL membership plan draft creation', () => {
     ])
   })
 
+  it('persists a fixed-price founding offer and immutable capacity in version 1', async () => {
+    const founding = {
+      name: 'Founding Member',
+      tier: 'founding',
+      billingInterval: 'YEARLY' as const,
+      priceMinor: 9900,
+      offerKind: 'FOUNDING' as const,
+      foundingCapacity: 100,
+      currency: 'USD',
+      benefits: ['founding-badge', 'founding-posts'],
+      trialPeriodDays: 0,
+    };
+    const pg = nativePool(async () => emptySelect(), async (sql, values) => successfulTransaction(sql, values));
+    const result = await createMembershipPlanDraft(pg.pool, actorId, creatorId, founding, 'founding-v1');
+    expect(result).toMatchObject({
+      offerKind: 'FOUNDING',
+      foundingCapacity: 100,
+      priceMode: 'FIXED',
+      priceMinor: 9900,
+    });
+    expect(pg.transactionCalls[2]?.values).toEqual([
+      result.planId, founding.name, founding.tier, founding.billingInterval,
+      founding.priceMinor, 'FIXED', null, null, null, 'FOUNDING', 100,
+      founding.currency, JSON.stringify(founding.benefits), 0, result.createdAt,
+    ]);
+  });
+
+  it('rejects flexible pricing for founding offers before opening a database transaction', async () => {
+    const pg = nativePool(async () => emptySelect(), async () => successfulTransaction('BEGIN', []));
+    await expect(createMembershipPlanDraft(pg.pool, actorId, creatorId, {
+      name: 'Founding Flexible', tier: 'founding', billingInterval: 'YEARLY',
+      priceMode: 'FLEXIBLE', minimumPriceMinor: 500, suggestedPriceMinor: 1000,
+      maximumPriceMinor: 2000, offerKind: 'FOUNDING', foundingCapacity: 10,
+      currency: 'USD', benefits: [], trialPeriodDays: 0,
+    }, 'founding-flexible-invalid')).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 });
+    expect(pg.connect).not.toHaveBeenCalled();
+  });
+
   it('rejects invalid flexible price boundaries before opening a database transaction', async () => {
     const invalid = [
       { priceMode: 'FLEXIBLE', minimumPriceMinor: 0, suggestedPriceMinor: 100, maximumPriceMinor: 200 },
