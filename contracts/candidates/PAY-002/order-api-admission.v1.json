@@ -144,12 +144,13 @@
           "scenarios": {
             "sameKeySamePayloadReplays": true,
             "sameKeyDifferentPayloadConflicts": true,
-            "concurrentSamePayloadConvergesToOneOrder": true,
             "concurrentDifferentPayloadIsRejected": true,
             "expiredIdempotencyCanBeReclaimed": true,
             "lineFailureRollsBackClaimAndOrder": true,
             "failedKeyCanBeRetried": true,
-            "fixtureRowsCleaned": true
+            "fixtureRowsCleaned": true,
+            "concurrentSubmissionsConvergeToOneOrder": true,
+            "createsOrderAndImmutableLine": true
           }
         },
         "scopeLimit": "Admits atomic idempotency/replay/conflict/concurrency and rollback evidence on disposable PostgreSQL 18. It does not activate production order creation or payment."
