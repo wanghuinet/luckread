@@ -488,8 +488,8 @@ async function reviseMembershipPlanPostgres(
     inTransaction = true
     const inserted = await client.query<{ plan_id: string } & Record<string, unknown>>(
       'INSERT INTO membership_plan_versions ' +
-      '(plan_id, plan_version, name, tier, billing_interval, price_minor, price_mode, minimum_price_minor, suggested_price_minor, maximum_price_minor, currency, benefits_json, trial_period_days, created_at) ' +
-      'SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::timestamptz WHERE EXISTS (' +
+      '(plan_id, plan_version, name, tier, billing_interval, price_minor, price_mode, minimum_price_minor, suggested_price_minor, maximum_price_minor, offer_kind, founding_capacity, currency, benefits_json, trial_period_days, created_at) ' +
+      'SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::timestamptz WHERE EXISTS (' +
       "SELECT 1 FROM membership_plans p WHERE p.plan_id = $15 AND p.owner_type = 'CREATOR' AND p.owner_id = $16 " +
       "AND p.status IN ('DRAFT','ACTIVE','PAUSED') AND p.current_version = $17 AND p.version = $18) " +
       'ON CONFLICT (plan_id, plan_version) DO NOTHING RETURNING plan_id',
@@ -514,15 +514,16 @@ async function reviseMembershipPlanPostgres(
       'AND v.plan_version = $7 AND v.name = $8 AND v.tier = $9 AND v.billing_interval = $10 ' +
       'AND v.price_minor IS NOT DISTINCT FROM $11 AND v.price_mode = $12 ' +
       'AND v.minimum_price_minor IS NOT DISTINCT FROM $13 AND v.suggested_price_minor IS NOT DISTINCT FROM $14 ' +
-      'AND v.maximum_price_minor IS NOT DISTINCT FROM $15 AND v.currency = $16 ' +
-      'AND v.benefits_json = $17 AND v.trial_period_days = $18) ' +
+      'AND v.maximum_price_minor IS NOT DISTINCT FROM $15 AND v.offer_kind = $16 ' +
+      'AND v.founding_capacity IS NOT DISTINCT FROM $17 AND v.currency = $18 ' +
+      'AND v.benefits_json = $19 AND v.trial_period_days = $20) ' +
       'RETURNING plan_id',
       [
         input.nextPlanVersion, input.updatedAt, input.planId, input.creatorId,
         input.currentPlanVersion, input.expectedVersion, input.nextPlanVersion,
         input.revision.name, input.revision.tier, input.revision.billingInterval,
         input.revision.priceMinor, input.revision.priceMode, input.revision.minimumPriceMinor,
-        input.revision.suggestedPriceMinor, input.revision.maximumPriceMinor, input.revision.currency,
+        input.revision.suggestedPriceMinor, input.revision.maximumPriceMinor, input.revision.offerKind, input.revision.foundingCapacity, input.revision.currency,
         input.benefitsJson, input.revision.trialPeriodDays,
       ],
     )
@@ -814,13 +815,13 @@ async function insertMembershipPlanDraftPostgres(
     }
     const versionInsert = await client.query<{ plan_id: string } & Record<string, unknown>>(
       'INSERT INTO membership_plan_versions ' +
-      '(plan_id, plan_version, name, tier, billing_interval, price_minor, price_mode, minimum_price_minor, suggested_price_minor, maximum_price_minor, currency, benefits_json, trial_period_days, created_at) ' +
-      'VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::timestamptz) ' +
+      '(plan_id, plan_version, name, tier, billing_interval, price_minor, price_mode, minimum_price_minor, suggested_price_minor, maximum_price_minor, offer_kind, founding_capacity, currency, benefits_json, trial_period_days, created_at) ' +
+      'VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::timestamptz) ' +
       'ON CONFLICT (plan_id, plan_version) DO NOTHING RETURNING plan_id',
       [
         input.planId, input.plan.name, input.plan.tier, input.plan.billingInterval,
         input.plan.priceMinor, input.plan.priceMode, input.plan.minimumPriceMinor,
-        input.plan.suggestedPriceMinor, input.plan.maximumPriceMinor, input.plan.currency,
+        input.plan.suggestedPriceMinor, input.plan.maximumPriceMinor, input.plan.offerKind, input.plan.foundingCapacity, input.plan.currency,
         input.benefitsJson, input.plan.trialPeriodDays, input.now,
       ],
     )
