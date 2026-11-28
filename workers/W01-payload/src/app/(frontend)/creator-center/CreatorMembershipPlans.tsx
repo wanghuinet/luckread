@@ -15,7 +15,11 @@ type MembershipPlan = {
   name: string
   tier: string
   billingInterval: 'MONTHLY' | 'YEARLY'
-  priceMinor: number
+  priceMode: 'FIXED' | 'FLEXIBLE'
+  priceMinor: number | null
+  minimumPriceMinor: number | null
+  suggestedPriceMinor: number | null
+  maximumPriceMinor: number | null
   currency: string
   benefits: string[]
   status: PlanStatus
@@ -39,7 +43,9 @@ const isPlan = (value: unknown): value is MembershipPlan => {
     typeof plan.creatorId === 'string' && Number.isSafeInteger(plan.planVersion) && Number(plan.planVersion) >= 1 &&
     typeof plan.name === 'string' && typeof plan.tier === 'string' &&
     (plan.billingInterval === 'MONTHLY' || plan.billingInterval === 'YEARLY') &&
-    Number.isSafeInteger(plan.priceMinor) && Number(plan.priceMinor) >= 0 && Number(plan.priceMinor) <= 2_147_483_647 &&
+    (plan.priceMode === 'FIXED'
+      ? Number.isSafeInteger(plan.priceMinor) && Number(plan.priceMinor) >= 0 && Number(plan.priceMinor) <= 2_147_483_647 && plan.minimumPriceMinor === null && plan.suggestedPriceMinor === null && plan.maximumPriceMinor === null
+      : plan.priceMode === 'FLEXIBLE' && plan.priceMinor === null && Number.isSafeInteger(plan.minimumPriceMinor) && Number(plan.minimumPriceMinor) >= 1 && Number.isSafeInteger(plan.suggestedPriceMinor) && Number(plan.suggestedPriceMinor) >= Number(plan.minimumPriceMinor) && Number.isSafeInteger(plan.maximumPriceMinor) && Number(plan.maximumPriceMinor) >= Number(plan.suggestedPriceMinor) && Number(plan.maximumPriceMinor) <= 2_147_483_647) &&
     typeof plan.currency === 'string' && /^[A-Z]{3}$/.test(plan.currency) &&
     Array.isArray(plan.benefits) && plan.benefits.length <= 20 &&
     plan.benefits.every((benefit) => typeof benefit === 'string' && benefit.length > 0 && benefit.length <= 180) &&
@@ -50,6 +56,13 @@ const isPlan = (value: unknown): value is MembershipPlan => {
     typeof plan.createdAt === 'string' && !Number.isNaN(Date.parse(plan.createdAt)) &&
     typeof plan.updatedAt === 'string' && !Number.isNaN(Date.parse(plan.updatedAt)) &&
     typeof plan.replayed === 'boolean'
+}
+
+function parseMoneyMinor(value: string): number | null {
+  if (!/^(0|[1-9]\\d*)(\\.\\d{1,2})?$/.test(value.trim())) return null
+  const [whole, fraction = ''] = value.trim().split('.')
+  const amount = Number(whole) * 100 + Number(fraction.padEnd(2, '0'))
+  return Number.isSafeInteger(amount) && amount <= 2_147_483_647 ? amount : null
 }
 
 function formatPrice(priceMinor: number, currency: string, locale: StudioLocale): string {
@@ -86,6 +99,12 @@ const copy = (locale: StudioLocale) => locale === 'en-US' ? {
   tier: 'Tier key',
   tierPlaceholder: 'supporter',
   price: 'Price (USD)',
+  priceMode: 'Pricing model',
+  fixedPrice: 'Fixed price',
+  flexiblePrice: 'Pay what you want',
+  minimumPrice: 'Minimum price (USD)',
+  suggestedPrice: 'Suggested price (USD)',
+  maximumPrice: 'Maximum price (USD)',
   interval: 'Billing interval',
   monthly: 'Monthly',
   yearly: 'Yearly',
@@ -136,6 +155,12 @@ const copy = (locale: StudioLocale) => locale === 'en-US' ? {
   tier: '等级标识',
   tierPlaceholder: 'supporter',
   price: '价格（USD）',
+  priceMode: '定价方式',
+  fixedPrice: '固定价格',
+  flexiblePrice: '自定义金额（区间内）',
+  minimumPrice: '最低价格（USD）',
+  suggestedPrice: '建议价格（USD）',
+  maximumPrice: '最高价格（USD）',
   interval: '计费周期',
   monthly: '每月',
   yearly: '每年',
@@ -185,6 +210,10 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
   const [planName, setPlanName] = useState('')
   const [tier, setTier] = useState('supporter')
   const [price, setPrice] = useState('5.00')
+  const [priceMode, setPriceMode] = useState<'FIXED' | 'FLEXIBLE'>('FIXED')
+  const [minimumPrice, setMinimumPrice] = useState('5.00')
+  const [suggestedPrice, setSuggestedPrice] = useState('10.00')
+  const [maximumPrice, setMaximumPrice] = useState('25.00')
   const [interval, setInterval] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY')
   const [benefitsText, setBenefitsText] = useState('')
   const [createKey, setCreateKey] = useState('')
@@ -192,6 +221,10 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
   const [editName, setEditName] = useState('')
   const [editTier, setEditTier] = useState('')
   const [editPrice, setEditPrice] = useState('')
+  const [editPriceMode, setEditPriceMode] = useState<'FIXED' | 'FLEXIBLE'>('FIXED')
+  const [editMinimumPrice, setEditMinimumPrice] = useState('')
+  const [editSuggestedPrice, setEditSuggestedPrice] = useState('')
+  const [editMaximumPrice, setEditMaximumPrice] = useState('')
   const [editInterval, setEditInterval] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY')
   const [editBenefitsText, setEditBenefitsText] = useState('')
   const [editKey, setEditKey] = useState('')
@@ -255,8 +288,17 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
     const normalizedTier = tier.trim()
     const rawBenefits = benefitsText.split('\n').map((value) => value.trim()).filter(Boolean)
     if (!planName.trim() || planName.trim().length > 120 ||
-        !/^[a-z][a-z0-9_-]{0,63}$/.test(normalizedTier) ||
-        !/^(0|[1-9]\d*)(\.\d{1,2})?$/.test(price.trim())) {
+        !/^[a-z][a-z0-9_-]{0,63}$/.test(normalizedTier)) {
+      setError(labels.validation)
+      return
+    }
+    const fixedAmount = priceMode === 'FIXED' ? parseMoneyMinor(price) : null
+    const minimumAmount = priceMode === 'FLEXIBLE' ? parseMoneyMinor(minimumPrice) : null
+    const suggestedAmount = priceMode === 'FLEXIBLE' ? parseMoneyMinor(suggestedPrice) : null
+    const maximumAmount = priceMode === 'FLEXIBLE' ? parseMoneyMinor(maximumPrice) : null
+    if (priceMode === 'FIXED' ? fixedAmount === null :
+      minimumAmount === null || minimumAmount < 1 || suggestedAmount === null || maximumAmount === null ||
+      minimumAmount > suggestedAmount || suggestedAmount > maximumAmount) {
       setError(labels.validation)
       return
     }
@@ -265,12 +307,9 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
       setError(labels.benefitsError)
       return
     }
-    const [whole, fraction = ''] = price.trim().split('.')
-    const priceMinor = Number(whole) * 100 + Number(fraction.padEnd(2, '0'))
-    if (!Number.isSafeInteger(priceMinor) || priceMinor < 0 || priceMinor > 2_147_483_647) {
-      setError(labels.validation)
-      return
-    }
+    const pricing = priceMode === 'FIXED'
+      ? { priceMode, priceMinor: fixedAmount }
+      : { priceMode, priceMinor: null, minimumPriceMinor: minimumAmount, suggestedPriceMinor: suggestedAmount, maximumPriceMinor: maximumAmount }
     const key = createKey || crypto.randomUUID()
     setCreateKey(key)
     setCreating(true)
@@ -282,7 +321,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
         headers: { accept: 'application/json', 'content-type': 'application/json', 'Idempotency-Key': key },
         body: JSON.stringify({
           name: planName.trim(), tier: normalizedTier, billingInterval: interval,
-          priceMinor, currency: 'USD', benefits: rawBenefits,
+          ...pricing, currency: 'USD', benefits: rawBenefits,
         }),
       })
       if (response.status === 401) { redirectToLogin(); return }
@@ -305,7 +344,11 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
     setEditingPlanId(plan.planId)
     setEditName(plan.name)
     setEditTier(plan.tier)
-    setEditPrice(String(Math.floor(plan.priceMinor / 100)) + '.' + String(plan.priceMinor % 100).padStart(2, '0'))
+    setEditPrice(plan.priceMinor === null ? '' : String(Math.floor(plan.priceMinor / 100)) + '.' + String(plan.priceMinor % 100).padStart(2, '0'))
+    setEditPriceMode(plan.priceMode)
+    setEditMinimumPrice(plan.minimumPriceMinor === null ? '' : (plan.minimumPriceMinor / 100).toFixed(2))
+    setEditSuggestedPrice(plan.suggestedPriceMinor === null ? '' : (plan.suggestedPriceMinor / 100).toFixed(2))
+    setEditMaximumPrice(plan.maximumPriceMinor === null ? '' : (plan.maximumPriceMinor / 100).toFixed(2))
     setEditInterval(plan.billingInterval)
     setEditBenefitsText(plan.benefits.join('\n'))
     setEditKey(crypto.randomUUID())
@@ -322,8 +365,17 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
     const rawBenefits = editBenefitsText.split('\n').map((value) => value.trim()).filter(Boolean)
     const normalizedPrice = editPrice.trim()
     if (!editName.trim() || editName.trim().length > 120 ||
-        !/^[a-z][a-z0-9_-]{0,63}$/.test(normalizedTier) ||
-        !/^(0|[1-9]\d*)(\.\d{1,2})?$/.test(normalizedPrice)) {
+        !/^[a-z][a-z0-9_-]{0,63}$/.test(normalizedTier)) {
+      setError(labels.revisionValidation)
+      return
+    }
+    const fixedAmount = editPriceMode === 'FIXED' ? parseMoneyMinor(normalizedPrice) : null
+    const minimumAmount = editPriceMode === 'FLEXIBLE' ? parseMoneyMinor(editMinimumPrice) : null
+    const suggestedAmount = editPriceMode === 'FLEXIBLE' ? parseMoneyMinor(editSuggestedPrice) : null
+    const maximumAmount = editPriceMode === 'FLEXIBLE' ? parseMoneyMinor(editMaximumPrice) : null
+    if (editPriceMode === 'FIXED' ? fixedAmount === null :
+      minimumAmount === null || minimumAmount < 1 || suggestedAmount === null || maximumAmount === null ||
+      minimumAmount > suggestedAmount || suggestedAmount > maximumAmount) {
       setError(labels.revisionValidation)
       return
     }
@@ -332,12 +384,9 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
       setError(labels.revisionBenefitsError)
       return
     }
-    const [whole, fraction = ''] = normalizedPrice.split('.')
-    const priceMinor = Number(whole) * 100 + Number(fraction.padEnd(2, '0'))
-    if (!Number.isSafeInteger(priceMinor) || priceMinor < 0 || priceMinor > 2_147_483_647) {
-      setError(labels.revisionValidation)
-      return
-    }
+    const pricing = editPriceMode === 'FIXED'
+      ? { priceMode: editPriceMode, priceMinor: fixedAmount }
+      : { priceMode: editPriceMode, priceMinor: null, minimumPriceMinor: minimumAmount, suggestedPriceMinor: suggestedAmount, maximumPriceMinor: maximumAmount }
     const key = editKey || crypto.randomUUID()
     setEditKey(key)
     setSavingPlanId(plan.planId)
@@ -358,7 +407,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
             name: editName.trim(),
             tier: normalizedTier,
             billingInterval: editInterval,
-            priceMinor,
+            ...pricing,
             currency: plan.currency,
             benefits: rawBenefits,
           }),
