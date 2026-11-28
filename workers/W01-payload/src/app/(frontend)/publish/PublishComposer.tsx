@@ -1186,7 +1186,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           </button>
           <button
             className="rounded-full accent-tab bg-main-accent px-4 py-1.5 text-[13px] font-bold text-white transition enabled:hover:bg-main-accent/90 enabled:active:bg-main-accent/75 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={busy || autoSaveStatus === 'saving' || reviewLocked || (!body.trim() && assets.length === 0)}
+            disabled={busy || autoSaveStatus === 'saving' || reviewLocked || loadingQuote || Boolean(quoteContentId && !quoteTarget) || (!body.trim() && assets.length === 0)}
             onClick={submitForReview}
             type="button"
           >
