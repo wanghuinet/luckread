@@ -192,3 +192,33 @@ test('Following feed recovers from an initial load failure without discarding re
   await expect(page.getByTestId('luckread-social-post-card')).toHaveCount(1)
   expect(initialRequests).toBe(2)
 })
+
+
+test('refresh failure preserves the current timeline and refresh retry recovers', async ({ page }) => {
+  let initialRequests = 0
+  await page.route('**/api/v1/feed/following**', async route => {
+    const url = new URL(route.request().url())
+    if (url.searchParams.has('cursor')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { items: [], nextCursor: null, hasMore: false } }) })
+      return
+    }
+    initialRequests += 1
+    if (initialRequests === 2) {
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { message: 'Refresh temporarily failed' } }) })
+      return
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { items: [post(initialRequests === 1 ? 'feed-stable' : 'feed-restored')], nextCursor: null, hasMore: false } }) })
+  })
+  await mockSocial(page)
+  await page.goto('http://127.0.0.1:3000/home?feed=following')
+  const cards = page.getByTestId('luckread-social-post-card')
+  await expect(page.getByText('Feed post feed-stable', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /刷新动态|Refresh feed|重新整理動態/i }).click()
+  await expect(page.getByText('Refresh temporarily failed')).toBeVisible()
+  await expect(cards).toHaveCount(1)
+  await expect(page.getByText('Feed post feed-stable', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /重试|Retry/i }).click()
+  await expect(page.getByText('Feed post feed-restored', { exact: true })).toBeVisible()
+  await expect(cards).toHaveCount(1)
+  expect(initialRequests).toBe(3)
+})
