@@ -168,7 +168,7 @@ export async function handleCommercePaymentIntentRequest(
     if (foundingReservationId) {
       const membershipPool = (dependencies.getMembershipPostgresPool ?? getW07MembershipPostgresPool)(env);
       if (!membershipPool || !await isFoundingReservationActiveForOrder(
-        membershipPool, foundingReservationId, route.orderId,
+        membershipPool, pool, foundingReservationId, route.orderId,
       )) {
         return errorResponse(409, 'INVALID_STATE', 'Founding membership reservation has expired or is no longer active');
       }
