@@ -270,14 +270,21 @@ export async function handleCommerceOrderRequest(
         );
       }
       if (foundingReservation) {
-        if (foundingReservation.state !== 'HELD') {
+        if (foundingReservation.state === 'COMMITTED') {
+          // A completed payment may be followed by an exact order-create retry.
+          // Preserve the original idempotent response only for the same order.
+          if (foundingReservation.orderReference !== result.data.orderId) {
+            throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+          }
+        } else if (foundingReservation.state === 'HELD') {
+          await attachFoundingReservationOrder(
+            getMembershipPool(),
+            foundingReservation.reservationId,
+            result.data.orderId,
+          );
+        } else {
           throw new SubscriptionRuntimeError('INVALID_STATE', 409);
         }
-        await attachFoundingReservationOrder(
-          getMembershipPool(),
-          foundingReservation.reservationId,
-          result.data.orderId,
-        );
       }
       // Invoice issuance is replay-safe on (INVOICE, order_id) and runs in the
       // same Neon D1-04 finance domain as the Order, never through a D1 facade.
