@@ -50,7 +50,7 @@ function address(env: DemoCommercePricingEnv, prefix: 'FROM' | 'TO'): TaxJarSand
 
 /**
  * Shared owning-domain Demo resolver for customer-present checkout and scheduled
- * renewals. It always resolves the immutable plan/version from D1-01 first,
+ * renewals. It always resolves the immutable plan/version from the Neon D1-01 membership database first,
  * then applies the explicitly selected Demo tax adapter. It never creates
  * production prices or silently substitutes a missing tax provider.
  */
