@@ -222,3 +222,25 @@ test('refresh failure preserves the current timeline and refresh retry recovers'
   await expect(cards).toHaveCount(1)
   expect(initialRequests).toBe(3)
 })
+
+
+test('manual refresh supersedes a slow initial Following request', async ({ page }) => {
+  let initialRequests = 0
+  await page.route('**/api/v1/feed/following**', async route => {
+    const url = new URL(route.request().url())
+    if (url.searchParams.has('cursor')) { await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:{items:[],nextCursor:null,hasMore:false}})}); return }
+    initialRequests += 1
+    if (initialRequests === 1) {
+      await new Promise(resolve => setTimeout(resolve, 1200))
+      try { await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:{items:[post('feed-stale-request')],nextCursor:null,hasMore:false}})}) } catch { /* request intentionally superseded */ }
+      return
+    }
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:{items:[post('feed-refresh-wins')],nextCursor:null,hasMore:false}})})
+  })
+  await mockSocial(page)
+  await page.goto('http://127.0.0.1:3000/home?feed=following')
+  await page.getByRole('button', {name:/刷新动态|Refresh feed|重新整理動態/i}).click()
+  await expect(page.getByText('Feed post feed-refresh-wins',{exact:true})).toBeVisible()
+  await expect(page.getByText('Feed post feed-stale-request',{exact:true})).toHaveCount(0)
+  expect(initialRequests).toBe(2)
+})
