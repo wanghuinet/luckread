@@ -327,7 +327,7 @@ export async function reconcileExpiredFoundingReservations(
     reservation_id: string; order_reference: string | null;
   }>(
     "SELECT reservation_id, order_reference FROM membership_founding_reservations " +
-    "WHERE state = 'HELD' AND expires_at <= $1 ORDER BY expires_at, reservation_id LIMIT $2",
+    "WHERE state = 'HELD' AND expires_at <= $1::timestamptz - INTERVAL '5 minutes' ORDER BY expires_at, reservation_id LIMIT $2",
     [now.toISOString(), limit],
   );
   let released = 0;
@@ -351,7 +351,11 @@ export async function reconcileExpiredFoundingReservations(
     const terminalUnpaid = rows.length > 0 &&
       rows.every((row) => row.payment_status !== null &&
         ['failed', 'cancelled', 'expired'].includes(row.payment_status));
-    if (rows.length === 0 || orderStatus === 'CANCELLED' || orderStatus === 'FAILED' || terminalUnpaid) {
+    const noPaymentAttempt = rows.length === 1 && rows[0]?.payment_status === null;
+    const expiredUnpaidOrder = noPaymentAttempt &&
+      (orderStatus === 'CREATED' || orderStatus === 'PENDING_PAYMENT');
+    if (rows.length === 0 || orderStatus === 'CANCELLED' || orderStatus === 'FAILED' ||
+        terminalUnpaid || expiredUnpaidOrder) {
       await releaseUnpaidFoundingReservation(membershipDb, candidate.reservation_id, 'HOLD_EXPIRED');
       released += 1;
     } else {
