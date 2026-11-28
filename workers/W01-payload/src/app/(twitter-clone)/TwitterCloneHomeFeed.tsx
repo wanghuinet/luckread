@@ -136,20 +136,28 @@ export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{init
   }, [copy.feed.loadMoreError, feedMode, hasMore, nextCursor, requiresAuth])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || loading) return
     let saved: { href?: string; y?: number } | null = null
     try {
       const raw = sessionStorage.getItem('luckread:home-feed:return-scroll')
       if (raw) saved = JSON.parse(raw) as { href?: string; y?: number }
-      sessionStorage.removeItem('luckread:home-feed:return-scroll')
     } catch { return }
     if (!saved || saved.href !== window.location.pathname + window.location.search || typeof saved.y !== 'number' || saved.y <= 0) return
+    // Following starts empty and hydrates asynchronously. Wait until its first page
+    // has settled so the browser has enough document height to restore the offset.
+    if (items.length === 0) {
+      try { sessionStorage.removeItem('luckread:home-feed:return-scroll') } catch { /* Ignore unavailable storage. */ }
+      return
+    }
     let secondFrame = 0
     const firstFrame = requestAnimationFrame(() => {
-      secondFrame = requestAnimationFrame(() => window.scrollTo({ top: saved!.y!, behavior: 'auto' }))
+      secondFrame = requestAnimationFrame(() => {
+        window.scrollTo({ top: saved!.y!, behavior: 'auto' })
+        try { sessionStorage.removeItem('luckread:home-feed:return-scroll') } catch { /* Ignore unavailable storage. */ }
+      })
     })
     return () => { cancelAnimationFrame(firstFrame); if (secondFrame) cancelAnimationFrame(secondFrame) }
-  }, [])
+  }, [items.length, loading])
 
   useEffect(() => () => {
     activeRequestRef.current?.abort()
