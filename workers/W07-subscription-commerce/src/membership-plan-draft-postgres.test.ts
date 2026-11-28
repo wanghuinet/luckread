@@ -91,6 +91,10 @@ describe('native PostgreSQL membership plan draft creation', () => {
       version: 1,
       benefits: input.benefits,
       trialPeriodDays: 7,
+      priceMode: 'FIXED',
+      minimumPriceMinor: null,
+      suggestedPriceMinor: null,
+      maximumPriceMinor: null,
       etag: '"lr-plan-v1"',
       replayed: false,
     })
@@ -106,15 +110,66 @@ describe('native PostgreSQL membership plan draft creation', () => {
       'COMMIT',
     ])
     expect(pg.transactionCalls[1]?.sql).toContain("VALUES ($1, 'CREATOR', $2, 1, 'DRAFT', 'PRIVATE', 1")
-    expect(pg.transactionCalls[2]?.sql).toContain('VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9::timestamptz)')
+    expect(pg.transactionCalls[2]?.sql).toContain('VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::timestamptz)')
     expect(pg.transactionCalls[1]?.values).toEqual([
       result.planId, creatorId, result.createdAt, result.createdAt,
     ])
     expect(pg.transactionCalls[2]?.values).toEqual([
       result.planId, input.name, input.tier, input.billingInterval, input.priceMinor,
-      input.currency, JSON.stringify(input.benefits), input.trialPeriodDays, result.createdAt,
+      'FIXED', null, null, null, input.currency, JSON.stringify(input.benefits),
+      input.trialPeriodDays, result.createdAt,
     ])
     expect(pg.release).toHaveBeenCalledTimes(1)
+  })
+
+
+
+  it('persists flexible price ranges as an immutable v1 snapshot', async () => {
+    const flexible = {
+      name: 'Founding Supporter',
+      tier: 'founding',
+      billingInterval: 'YEARLY' as const,
+      priceMode: 'FLEXIBLE' as const,
+      minimumPriceMinor: 500,
+      suggestedPriceMinor: 1200,
+      maximumPriceMinor: 5000,
+      currency: 'USD',
+      benefits: ['founding-badge'],
+      trialPeriodDays: 0,
+    }
+    const pg = nativePool(async () => emptySelect(), async (sql, values) => successfulTransaction(sql, values))
+    const result = await createMembershipPlanDraft(pg.pool, actorId, creatorId, flexible, 'flexible-v1')
+    expect(result).toMatchObject({
+      priceMinor: null,
+      priceMode: 'FLEXIBLE',
+      minimumPriceMinor: 500,
+      suggestedPriceMinor: 1200,
+      maximumPriceMinor: 5000,
+    })
+    expect(pg.transactionCalls[2]?.values).toEqual([
+      result.planId, flexible.name, flexible.tier, flexible.billingInterval,
+      null, 'FLEXIBLE', 500, 1200, 5000, flexible.currency,
+      JSON.stringify(flexible.benefits), 0, result.createdAt,
+    ])
+  })
+
+  it('rejects invalid flexible price boundaries before opening a database transaction', async () => {
+    const invalid = [
+      { priceMode: 'FLEXIBLE', minimumPriceMinor: 0, suggestedPriceMinor: 100, maximumPriceMinor: 200 },
+      { priceMode: 'FLEXIBLE', minimumPriceMinor: 200, suggestedPriceMinor: 100, maximumPriceMinor: 300 },
+      { priceMode: 'FLEXIBLE', minimumPriceMinor: 100, suggestedPriceMinor: 200, maximumPriceMinor: 199 },
+      { priceMode: 'FLEXIBLE', minimumPriceMinor: 100, suggestedPriceMinor: 200, maximumPriceMinor: 2_147_483_648 },
+    ]
+    for (const pricing of invalid) {
+      const pg = nativePool(async () => emptySelect(), async () => successfulTransaction('BEGIN', []))
+      await expect(createMembershipPlanDraft(
+        pg.pool, actorId, creatorId, {
+          name: 'Flexible', tier: 'flexible', billingInterval: 'MONTHLY',
+          currency: 'USD', benefits: [], ...pricing,
+        }, 'invalid-flexible',
+      )).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+      expect(pg.connect).not.toHaveBeenCalled()
+    }
   })
 
   it('replays the immutable original v1 create result without opening a transaction', async () => {
