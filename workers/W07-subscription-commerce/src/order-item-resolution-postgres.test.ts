@@ -71,9 +71,6 @@ describe('PAY-002 native PostgreSQL membership offer resolution', () => {
       billingInterval: 'YEARLY',
       priceMinor: 4900,
       priceMode: 'FIXED',
-      minimumPriceMinor: null,
-      suggestedPriceMinor: null,
-      maximumPriceMinor: null,
       currency: 'USD',
       benefits: ['Member posts', 'Archive access'],
     })
