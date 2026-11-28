@@ -73,33 +73,66 @@ export async function resolveCommerceOrderItems(
   const resolved: ResolvedCommerceOrderItem[] = [];
 
   for (const item of validated.value.items) {
-    // Flexible selections remain fail-closed until the authoritative W07 plan
-    // reader and immutable order snapshot carry the matching price-mode version.
-    if (item.selectedAmountMinor !== undefined) {
-      throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
-    }
     const plan = planById.get(item.itemRef);
     if (!plan || plan.status !== 'ACTIVE' || plan.visibility !== 'PUBLIC') {
       throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
     }
-    // This route creates payment intents that require a positive amount and
-    // fulfillment is tied to a verified paid webhook. Zero-price offers need a
-    // separate no-payment activation contract; never create an unpayable order.
-    if (!Number.isSafeInteger(plan.priceMinor) || plan.priceMinor < 1) {
-      throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
-    }
 
-    const snapshot = {
-      planId: plan.planId,
-      planVersion: plan.planVersion,
-      creatorId: plan.creatorId,
-      name: plan.name,
-      tier: plan.tier,
-      billingInterval: plan.billingInterval,
-      priceMinor: plan.priceMinor,
-      currency: plan.currency,
-      benefits: plan.benefits,
-    };
+    const priceMode = plan.priceMode ?? 'FIXED';
+    let unitAmountMinor: number;
+    let snapshot: Record<string, unknown>;
+    if (priceMode === 'FIXED') {
+      if (item.selectedAmountMinor !== undefined ||
+          !Number.isSafeInteger(plan.priceMinor) || (plan.priceMinor as number) < 1) {
+        throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+      }
+      unitAmountMinor = plan.priceMinor as number;
+      snapshot = {
+        planId: plan.planId,
+        planVersion: plan.planVersion,
+        creatorId: plan.creatorId,
+        name: plan.name,
+        tier: plan.tier,
+        billingInterval: plan.billingInterval,
+        priceMinor: unitAmountMinor,
+        priceMode: 'FIXED',
+        currency: plan.currency,
+        benefits: plan.benefits,
+      };
+    } else if (priceMode === 'FLEXIBLE') {
+      const minimum = plan.minimumPriceMinor;
+      const suggested = plan.suggestedPriceMinor;
+      const maximum = plan.maximumPriceMinor;
+      const selected = item.selectedAmountMinor;
+      if (
+        plan.priceMinor !== null ||
+        !Number.isSafeInteger(minimum) || !Number.isSafeInteger(suggested) || !Number.isSafeInteger(maximum) ||
+        (minimum as number) < 1 || (suggested as number) < (minimum as number) ||
+        (maximum as number) < (suggested as number) || (maximum as number) > 2_147_483_647 ||
+        !Number.isSafeInteger(selected) || (selected as number) < (minimum as number) ||
+        (selected as number) > (maximum as number)
+      ) {
+        throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+      }
+      unitAmountMinor = selected as number;
+      snapshot = {
+        planId: plan.planId,
+        planVersion: plan.planVersion,
+        creatorId: plan.creatorId,
+        name: plan.name,
+        tier: plan.tier,
+        billingInterval: plan.billingInterval,
+        priceMode: 'FLEXIBLE',
+        minimumPriceMinor: minimum,
+        suggestedPriceMinor: suggested,
+        maximumPriceMinor: maximum,
+        selectedAmountMinor: unitAmountMinor,
+        currency: plan.currency,
+        benefits: plan.benefits,
+      };
+    } else {
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+    }
     const itemSnapshotJson = JSON.stringify(snapshot);
     if (new TextEncoder().encode(itemSnapshotJson).byteLength > MAX_ITEM_SNAPSHOT_BYTES) {
       throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
@@ -110,7 +143,7 @@ export async function resolveCommerceOrderItems(
       itemRef: plan.planId,
       itemVersion: String(plan.planVersion),
       quantity: 1,
-      unitAmountMinor: plan.priceMinor,
+      unitAmountMinor,
       currency: plan.currency,
       itemSnapshotJson,
     });
