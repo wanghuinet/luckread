@@ -46,7 +46,7 @@ function toPlanIds(items: readonly CreateCommerceOrderItem[]): string[] {
 
 /**
  * Resolve only the already-implemented membership-plan offer type. Values come
- * from W07's read-only D1-01 query, never from client-supplied price fields.
+ * from W07's read-only Neon membership query, never from client-supplied price fields.
  * This function performs no writes, provider requests, order creation or
  * entitlement changes; unsupported item families fail closed.
  */
