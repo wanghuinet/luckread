@@ -9,10 +9,12 @@ let failNextBookmarkAfterCommit = false;
 let returnNextRepost503AfterCommit = false;
 
 mock.module('../store/auth-store.ts', () => ({
-  useAuthStore: Object.assign(
-    (selector) => selector({ user: activeViewerId ? { id: activeViewerId } : null }),
-    { getState: () => ({ user: activeViewerId ? { id: activeViewerId } : null }) },
-  ),
+  useAuthStore: {
+    getState: () => ({
+      status: activeViewerId ? 'authenticated' : 'anonymous',
+      user: activeViewerId ? { id: activeViewerId } : null,
+    }),
+  },
 }));
 
 mock.module('../lib/api-client.ts', () => ({
