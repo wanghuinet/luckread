@@ -285,3 +285,31 @@ export async function commitFoundingReservationForPaidOrder(
   if (!reservationId) return null;
   return commitFoundingReservationAfterVerifiedPayment(db, reservationId, verifiedPaymentEventId, now);
 }
+
+
+/**
+ * Resolve the paid order from the finance authority, then commit its membership-DB
+ * reservation. The databases intentionally remain separate; the webhook retry is
+ * the saga recovery mechanism if the second step is interrupted.
+ */
+export async function commitFoundingReservationForVerifiedPayment(
+  membershipDb: W07WebhookPostgresPool,
+  financeDb: W07WebhookPostgresPool,
+  paymentId: string,
+  merchantId: string,
+  verifiedPaymentEventId: string,
+  now = new Date(),
+): Promise<FoundingReservation | null> {
+  if (!/^pay_[A-Za-z0-9]{26}$/.test(paymentId) || !merchantId || merchantId.length > 256) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+  }
+  const paidOrder = await financeDb.query<{ order_id: string }>(
+    "SELECT p.order_id FROM payments p INNER JOIN orders o ON o.order_id = p.order_id " +
+    "AND o.customer_id = p.customer_id WHERE p.payment_id = $1 AND p.merchant_id = $2 " +
+    "AND p.provider = 'hyperswitch' AND p.status = 'succeeded' AND o.status IN ('CONFIRMED', 'COMPLETED') LIMIT 1",
+    [paymentId, merchantId],
+  );
+  const orderId = paidOrder.rows[0]?.order_id;
+  if (!orderId) throw new SubscriptionRuntimeError('INVALID_STATE', 409);
+  return commitFoundingReservationForPaidOrder(membershipDb, orderId, verifiedPaymentEventId, now);
+}
