@@ -152,6 +152,19 @@ BEGIN
     RAISE EXCEPTION 'D1 ISO-8601 timestamp fields must map to PostgreSQL TIMESTAMPTZ';
   END IF;
 
+  expected_columns := ARRAY[
+    'benefits_json', 'billing_interval', 'created_at', 'currency', 'founding_capacity',
+    'maximum_price_minor', 'minimum_price_minor', 'name', 'offer_kind', 'plan_id',
+    'plan_version', 'price_minor', 'price_mode', 'suggested_price_minor', 'tier', 'trial_period_days'
+  ];
+  SELECT array_agg(column_name ORDER BY column_name)
+    INTO actual_columns
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'membership_plan_versions';
+  IF actual_columns IS DISTINCT FROM expected_columns THEN
+    RAISE EXCEPTION 'membership_plan_versions columns drift: %', actual_columns;
+  END IF;
+
   IF (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_plans') <> 9
      OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_plan_versions') <> 16
      OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_founding_reservations') <> 13
@@ -248,6 +261,10 @@ BEGIN
       WHERE conrelid = 'membership_plan_versions'::regclass AND contype = 'f') <> 1
      OR (SELECT COUNT(*) FROM pg_constraint
       WHERE conrelid = 'membership_revenuecat_product_bindings'::regclass AND contype = 'f') <> 1
+     OR (SELECT COUNT(*) FROM pg_constraint
+      WHERE conrelid = 'membership_founding_reservations'::regclass AND contype = 'f') <> 1
+     OR (SELECT COUNT(*) FROM pg_constraint
+      WHERE conrelid = 'membership_founding_reservation_payment_events'::regclass AND contype = 'f') <> 1
      OR EXISTS (
        SELECT 1 FROM pg_constraint
        WHERE contype = 'f'
