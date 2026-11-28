@@ -263,7 +263,7 @@ P0 must verify:
 7. Suspended merchants cannot perform restricted mutations.
 8. Repeated mutations are idempotent.
 9. External commerce adapter cannot become hidden authority.
-10. D1 remains authoritative for merchant/store metadata.
+10. W07 in the existing Neon finance PostgreSQL database (logical D1-04) remains authoritative for merchant/store metadata; no live D1 runtime dependency is permitted.
 11. No Payload Core source is modified or copied.
 
 ## 9. STOP
