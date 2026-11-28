@@ -113,7 +113,11 @@
         "name",
         "tier",
         "billingInterval",
+        "priceMode",
         "priceMinor",
+        "minimumPriceMinor",
+        "suggestedPriceMinor",
+        "maximumPriceMinor",
         "currency",
         "occurredAt"
       ]
@@ -198,7 +202,11 @@
         "name",
         "tier",
         "billingInterval",
+        "priceMode",
         "priceMinor",
+        "minimumPriceMinor",
+        "suggestedPriceMinor",
+        "maximumPriceMinor",
         "currency",
         "occurredAt"
       ],
@@ -257,7 +265,11 @@
         "name",
         "tier",
         "billingInterval",
+        "priceMode",
         "priceMinor",
+        "minimumPriceMinor",
+        "suggestedPriceMinor",
+        "maximumPriceMinor",
         "currency",
         "benefits",
         "occurredAt"
@@ -288,7 +300,11 @@
         "name",
         "tier",
         "billingInterval",
+        "priceMode",
         "priceMinor",
+        "minimumPriceMinor",
+        "suggestedPriceMinor",
+        "maximumPriceMinor",
         "currency",
         "benefits"
       ],
