@@ -228,12 +228,15 @@ export async function toggleContentBookmark(
 
     if (!result.response.ok) {
       const message = result.error?.message ?? 'Could not update this bookmark.';
+      const ambiguous = result.response.status === 408 || result.response.status === 429 || result.response.status >= 500;
       publish(viewerId, id, {
         bookmarked: previousBookmarked,
+        loaded: ambiguous ? false : current.loaded,
         pending: false,
         loading: false,
         error: message,
       });
+      if (ambiguous) await refreshContentBookmarkStatus(id, viewerId);
       return { ok: false, status: result.response.status, message };
     }
 
@@ -246,12 +249,16 @@ export async function toggleContentBookmark(
       return { ok: false, message: 'The active account changed while the bookmark was updating.' };
     }
     const message = failureMessage(cause);
+    // The write may have committed before its response was lost. Re-read W05
+    // instead of leaving the optimistic rollback as a false authoritative state.
     publish(viewerId, id, {
       bookmarked: previousBookmarked,
+      loaded: false,
       pending: false,
       loading: false,
       error: message,
     });
+    await refreshContentBookmarkStatus(id, viewerId);
     return { ok: false, message };
   }
 }
