@@ -353,10 +353,14 @@ export async function commitFoundingReservationForVerifiedPayment(
   if (!/^pay_[A-Za-z0-9]{26}$/.test(paymentId) || !merchantId || merchantId.length > 256) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
   }
-  const paidOrder = await financeDb.query<{ order_id: string; confirmed_at: string }>(
-    "SELECT p.order_id, o.confirmed_at::text AS confirmed_at " +
+  const paidOrder = await financeDb.query<{
+    order_id: string; confirmed_at: string; reservation_id: string | null;
+  }>(
+    "SELECT p.order_id, o.confirmed_at::text AS confirmed_at, " +
+    "ol.item_snapshot_json::jsonb ->> 'foundingReservationId' AS reservation_id " +
     "FROM payments p INNER JOIN orders o ON o.order_id = p.order_id " +
-    "AND o.customer_id = p.customer_id WHERE p.payment_id = $1 AND p.merchant_id = $2 " +
+    "AND o.customer_id = p.customer_id INNER JOIN order_lines ol ON ol.order_id = o.order_id " +
+    "AND ol.item_type = 'MEMBERSHIP_PLAN' WHERE p.payment_id = $1 AND p.merchant_id = $2 " +
     "AND p.provider = 'hyperswitch' AND p.status = 'succeeded' AND o.status IN ('CONFIRMED', 'COMPLETED') LIMIT 1",
     [paymentId, merchantId],
   );
@@ -364,7 +368,13 @@ export async function commitFoundingReservationForVerifiedPayment(
   if (!order?.order_id || !order.confirmed_at || !Number.isFinite(Date.parse(order.confirmed_at))) {
     throw new SubscriptionRuntimeError('INVALID_STATE', 409);
   }
-  return commitFoundingReservationForPaidOrder(
-    membershipDb, order.order_id, verifiedPaymentEventId, now, new Date(order.confirmed_at),
+  if (!order.reservation_id) return null;
+  const linked = await membershipDb.query<{ reservation_id: string }>(
+    'SELECT reservation_id FROM membership_founding_reservations WHERE reservation_id = $1 AND order_reference = $2 LIMIT 1',
+    [order.reservation_id, order.order_id],
+  );
+  if (!linked.rows[0]) throw new SubscriptionRuntimeError('INVALID_STATE', 409);
+  return commitFoundingReservationAfterVerifiedPayment(
+    membershipDb, order.reservation_id, verifiedPaymentEventId, now, new Date(order.confirmed_at),
   );
 }
