@@ -269,7 +269,7 @@ export async function handleCommerceOrderRequest(
         );
       }
       // Invoice issuance is replay-safe on (INVOICE, order_id) and runs in the
-      // same D1-04 Neon finance domain as the Order, never through a D1 facade.
+      // same Neon D1-04 finance domain as the Order, never through a D1 facade.
       const issueInvoice = dependencies.issueInvoice ?? issueInvoiceForOrderPostgres;
       await issueInvoice(pool, customerId, result.data.orderId);
       return Response.json(
