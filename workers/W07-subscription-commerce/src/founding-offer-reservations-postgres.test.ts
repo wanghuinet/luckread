@@ -6,6 +6,7 @@ import type {
 } from './payment-webhook-database-postgres.js';
 import {
   commitFoundingReservationAfterVerifiedPayment,
+  releaseFoundingReservationForUnpaidPayment,
   reserveFoundingOfferCapacity,
 } from './founding-offer-reservations-postgres.js';
 
@@ -129,6 +130,34 @@ describe('founding offer capacity reservation', () => {
     )).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 });
     expect(client.statements.some((entry) => entry.sql.includes("UPDATE membership_founding_reservations SET state = 'COMMITTED'"))).toBe(false);
     expect(client.statements.some((entry) => entry.sql === 'ROLLBACK')).toBe(true);
+  });
+
+  it('releases a held seat only after the finance database confirms a terminal unpaid payment', async () => {
+    const released = { ...heldRow, state: 'RELEASED' };
+    const client = new FakeClient((sql) => {
+      if (sql.includes('FROM membership_founding_reservations WHERE reservation_id')) return [heldRow];
+      if (sql.includes("UPDATE membership_founding_reservations SET state = $2")) return [released];
+      return [];
+    });
+    const membershipDb = {
+      async query<T extends Row = Row>(sql: string) {
+        if (sql.includes('WHERE order_reference = $1')) return { rows: [{ reservation_id: heldRow.reservation_id }] as T[], rowCount: 1 };
+        throw new Error('unexpected membership read');
+      },
+      async connect() { return client; },
+    } as unknown as W07WebhookPostgresPool;
+    const financeDb = {
+      async query<T extends Row = Row>(sql: string) {
+        expect(sql).toContain("status IN ('failed', 'cancelled', 'expired')");
+        return { rows: [{ order_id: 'ord_failed' }] as T[], rowCount: 1 };
+      },
+      async connect() { throw new Error('finance transaction is not required'); },
+    } as unknown as W07WebhookPostgresPool;
+    const result = await releaseFoundingReservationForUnpaidPayment(
+      membershipDb, financeDb, 'pay_' + 'e'.repeat(26), 'merchant_test',
+    );
+    expect(result?.state).toBe('RELEASED');
+    expect(client.statements.some((entry) => entry.sql.includes("UPDATE membership_founding_reservations SET state = $2"))).toBe(true);
   });
 
   it('fails closed when plan versions disagree on the founding capacity', async () => {
