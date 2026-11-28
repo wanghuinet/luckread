@@ -106,7 +106,11 @@ export async function callW06MembershipPlanPublishAudit(input: {
     name: string
     tier: string
     billingInterval: 'MONTHLY' | 'YEARLY'
-    priceMinor: number
+    priceMode: 'FIXED' | 'FLEXIBLE'
+    priceMinor: number | null
+    minimumPriceMinor: number | null
+    suggestedPriceMinor: number | null
+    maximumPriceMinor: number | null
     currency: string
   }
 }): Promise<Response> {
