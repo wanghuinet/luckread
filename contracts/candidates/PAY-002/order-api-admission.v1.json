@@ -67,60 +67,51 @@
     {
       "id": "D1-04-SCHEMA-01",
       "requirement": "A separately reviewed D1-04 migration candidate and exact post-migration schema/constraint evidence must pass before runtime writes are enabled.",
-      "status": "PENDING",
+      "status": "ADMITTED",
       "evidence": {
-        "reviewContract": "contracts/database/neon-d1-04-remote-runner-review.v1.json",
-        "schemaManifest": "contracts/database/neon-d1-04-shared-migration-manifest.v1.json",
-        "remoteStateEvidence": "contracts/database/neon-five-database-remote-schema-evidence.v1.json#domains.D1-04",
-        "remotePostflight": {
+        "implementationCommit": "54ca2d84a9268e02b1ec204ac18eef53c5509e96",
+        "verifiedMainSha": "54ca2d84a9268e02b1ec204ac18eef53c5509e96",
+        "sourceReview": {
+          "pullRequest": 2344,
+          "mergeCommit": "54ca2d84a9268e02b1ec204ac18eef53c5509e96",
+          "reviewRecord": "contracts/database/neon-d1-04-remote-runner-review.v1.json",
+          "reviewRecordBlobSha": "d86942786244c85ae35721a5a49cf2229f84db74",
+          "reviewStatus": "AI_REVIEW_PASS_NO_BLOCKING_FINDINGS",
+          "reviewedMainSha": "57a514fdb72407dc543949bbe63846caca6c46d4",
+          "currentMainPinAudit": {
+            "reviewedFiles": 27,
+            "matchingFiles": 27,
+            "driftedFiles": 0
+          },
+          "sourcePinValidationRunId": 46132961129,
+          "sourcePinValidationUrl": "https://github.com/wanghuinet/luckread/actions/runs/46132961129",
+          "sourcePinValidationConclusion": "success",
+          "localPostgres18ArtifactId": 15258103099,
+          "localPostgres18ArtifactDigest": "sha256:83e4b82960c4173a756370b04cab97bf569789c773d09c37c78c2e24b8ae74c77",
+          "remoteApplyJob": "skipped"
+        },
+        "historicalRemoteSchemaPostflight": {
           "workflowRunId": 42555900393,
           "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42555900393",
-          "sourceCommitSha": "c18d294d3fc2acac9e6c66eb052dfed6e6c46758",
-          "migrationSourceCommitSha": "239379e38273cec07f4eaf9da1bb3d1210a11084",
+          "sourceCommitSha": "c18d294d3fc2acac6e9c66eb052dfed6e6c46758",
           "artifactId": 13646957840,
-          "artifactSha256": "sha256:b35461e7b49a0131eceee3782244fd0f10d44d2c0b6f7fac90932481f9cd8228",
-          "verifiedPostflight": {
-            "postgresMajor": 18,
-            "migrationArtifacts": 6,
-            "sourceMigrations": 7,
-            "appendOnlyLedgerRows": 6,
-            "newlyAppliedMigrationsOnFinalReadback": 0,
+          "artifactDigest": "sha256:b35461e7b49a0131eceee3782244fd0f10d44d2c0b6f7fac90932481f9cd8228",
+          "postgresMajor": 18,
+          "appliedMigrations": 6,
+          "appendOnlyLedgerRows": 6,
+          "finalPostflightNewMigrationsApplied": 0,
+          "catalog": {
             "tables": 15,
             "explicitIndexes": 31,
             "constraintIndexes": 29,
             "triggers": 72,
             "triggerFunctions": 6,
             "foreignKeys": 0,
-            "controlSeedRows": 1,
-            "businessRows": 0
+            "businessRows": 0,
+            "controlSeedRows": 1
           }
         },
-        "independentReview": {
-          "reviewStatus": "AI_REVIEW_PASS_NO_BLOCKING_FINDINGS",
-          "reviewCommit": "cc55bd48e086bf9bf4dec34bc869ebe7ada5dd2b",
-          "formalGitHubApprovals": 0,
-          "currentMainPinAudit": {
-            "mainSha": "fa0a2843248f133bdcd5bf5fa2cd739d56ca9db2",
-            "totalPins": 27,
-            "matchingPins": 24,
-            "driftedPins": [
-              {
-                "path": ".github/workflows/neon-d1-04-reviewed-remote-schema-apply.yml",
-                "change": "Legacy validate-review-state step was retired after the W07 Neon-only runtime cleanup."
-              },
-              {
-                "path": "contracts/database/neon-d1-04-shared-runner-independent-review.v1.json",
-                "change": "The local-only shared-runner review record was refreshed; it still blocks new remote shared-runner DDL."
-              },
-              {
-                "path": "workers/W07-subscription-commerce/wrangler.jsonc",
-                "change": "Legacy D1_01/D1_04 runtime labels were removed and Hyperdrive aliases renamed to HYPERDRIVE_MEMBERSHIP_DB/HYPERDRIVE_FINANCE_DB; the finance Hyperdrive id is unchanged."
-              }
-            ],
-            "migrationAndManifestPinsStillMatch": true
-          }
-        },
-        "scopeLimit": "This admission covers the existing historical D1-04 schema-only remote application and exact postflight readback. It does not authorize new remote DDL, the shared D1-04 runner (which remains local-only/remote-apply-blocked), business-data import, production cutover, production charging, refunds, payouts or settlements. Cloudflare D1 was not touched by the schema apply; runtime/production cutover remains separately gated."
+        "scopeLimit": "Admits the already-applied W07 D1-04 schema and its exact historical remote PostgreSQL 18 catalog/constraint readback, now reconciled to 27/27 current-main source pins and a fresh local PostgreSQL 18 source-equivalent validation. Does not authorize new remote DDL, business-data import, Cloudflare D1 writes, production cutover or production charging. The canonical shared runner remains local-only/remote-apply-blocked; the separately reviewed schema-only workflow still requires explicit manual dispatch and exact confirmation."
       }
     },
     {
@@ -273,5 +264,5 @@
     }
   ],
   "greenRule": "This gate cannot be GREEN while any implementation evidence is PENDING; canonical contract admission is distinct from runtime/production admission, and PAY-002 remains unresolved.",
-  "nextAction": "Reconcile and independently re-review the historical D1-04 schema application against the current exact-main migration/runner source pins without executing remote DDL. Then complete the unified exact-commit create/read security E2E matrix (including unavailable-item, price-spoof, owner-isolation, replay and recovery paths) before final Evidence Registry admission. Keep live order writes fail-closed while production discount/tax authority and seller-of-record remain unresolved."
+  "nextAction": "Complete E2E-SECURITY-01 as one exact-main create/read security matrix covering request validation, price spoofing, unavailable/private items, owner isolation, idempotent replay and conflict, concurrent submission, rollback/recovery, W06 audit durability and W08 authorization. Then record EVIDENCE-REGISTRY-01 from the exact passing commit. Keep live order writes fail-closed while production discount/tax authority and seller-of-record remain unresolved."
 }

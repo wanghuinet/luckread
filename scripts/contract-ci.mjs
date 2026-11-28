@@ -12,6 +12,7 @@
  */
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { extname, join, relative, resolve } from 'node:path'
+import { validatePay002D104SchemaEvidence } from './pay-002-schema-admission.mjs'
 
 const CONTRACTS_ROOT = resolve('contracts')
 const ID_PREFIX = 'https://luckread.com/contracts/v1/'
@@ -679,9 +680,13 @@ async function checkOrderContractCandidate() {
     fail('PAY-002 D1-04-BINDING-01 must match the verified physical identity evidence');
   }
   const schemaEvidence = (apiAdmission.requiredEvidence ?? []).find((entry) => entry.id === 'D1-04-SCHEMA-01');
-  if (!schemaEvidence || schemaEvidence.status !== 'PENDING') {
-    fail('PAY-002 D1-04-SCHEMA-01 must remain pending until migration and postflight evidence pass');
-  }
+  const schemaAdmission = validatePay002D104SchemaEvidence({
+    schemaEvidence,
+    reviewRecord: await readContract('contracts/database/neon-d1-04-remote-runner-review.v1.json'),
+    manifest: await readContract('contracts/database/neon-d1-04-shared-migration-manifest.v1.json'),
+    sharedRunnerReview: await readContract('contracts/database/neon-d1-04-shared-runner-independent-review.v1.json'),
+  });
+  for (const message of schemaAdmission.errors) fail('PAY-002 D1-04-SCHEMA-01: ' + message);
   for (const tableName of ['orders', 'order_lines']) {
     const table = persistence.tables?.[tableName];
     if (!table) { fail('Order persistence candidate missing table ' + tableName); continue; }

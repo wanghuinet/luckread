@@ -57,6 +57,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
+      - name: Test PAY-002 D1-04 schema evidence admission rules
+        if: matrix.domain == 'state-machines'
+        run: node --test scripts/pay-002-schema-admission.test.mjs
       - run: node scripts/contract-ci.mjs ${{ matrix.domain }}
 
   contract-semantic:
