@@ -167,6 +167,7 @@ describe('private W07 Neon commerce order HTTP handler', () => {
     };
     const membershipPool = {
       async query(sql: string) {
+        if (sql.includes("WHERE state = 'HELD' AND expires_at <= $1")) return { rows: [], rowCount: 0 };
         if (sql.includes('WHERE subscriber_id = $1 AND idempotency_key = $2')) {
           return { rows: [reservationRow], rowCount: 1 };
         }
